@@ -15,12 +15,21 @@ from dataclasses import replace
 from typing import Mapping, Sequence
 
 from ..ledger import EvidenceLedger
-from ..model_backend import ModelBackend
+from ..model_backend import ContextEnvelope, ModelBackend
 from ..model_provider import ModelProvider
 from ..models import AgentResult, Evidence, Objective, Role, WorkItem
 from ..roles import ROLE_CONTRACTS
 from .canonical import canonical_digest
 from .contracts import RoleResult
+from .role_applicability import (
+    ApplicabilityDenied,
+    ArchetypeSignals,
+    ContextTier,
+    RoleDisposition,
+    RoleDispositionRecord,
+    resolve_dispositions,
+    route_prior_results,
+)
 from .roles import (
     KERNEL_IMPLEMENTED_ROLES,
     RoleInvocation,
@@ -145,8 +154,22 @@ class RoleRuntime:
             instruction=self._instruction(invocation, prior_results),
             dependencies=tuple(item.work_id for item in prior_results),
         )
-        context = tuple(self._agent_context(item) for item in prior_results)
-        agent_result = await self.backend.execute(contract, work_item, objective, context)
+        routing = route_prior_results(
+            invocation.role, tuple(item.role for item in prior_results)
+        )
+        context = tuple(
+            self._agent_context(item)
+            for item in prior_results
+            if routing[item.role] is ContextTier.FULL
+        )
+        envelope = self._context_envelope(invocation, prior_results)
+        agent_result = await self.backend.execute(
+            contract,
+            work_item,
+            objective,
+            context,
+            context_envelope=envelope,
+        )
         return self._to_role_result(invocation, capabilities.required_outputs, agent_result)
 
     async def run(self, invocation: RoleInvocation, *, prior_results: Sequence[RoleResult] = ()) -> RoleResult:
@@ -154,8 +177,14 @@ class RoleRuntime:
 
         return await self.execute(invocation, prior_results=prior_results)
 
-    async def run_mission(self, invocations: Sequence[RoleInvocation]) -> tuple[RoleResult, ...]:
-        """Run one ordered, bounded mission through each role exactly once."""
+    async def run_mission(
+        self,
+        invocations: Sequence[RoleInvocation],
+        *,
+        signals: ArchetypeSignals | None = None,
+        dispositions: Sequence[RoleDispositionRecord] | None = None,
+    ) -> tuple[RoleResult, ...]:
+        """Run or deterministically discharge every canonical lifecycle role."""
 
         supplied = tuple(invocations)
         observed = tuple(item.role for item in supplied)
@@ -163,10 +192,101 @@ class RoleRuntime:
             raise RoleProtocolError(
                 "a role mission must contain each canonical role exactly once in lifecycle order"
             )
+        if signals is not None and dispositions is not None:
+            raise ApplicabilityDenied("provide signals or dispositions, not both")
+        records = (
+            resolve_dispositions(signals)
+            if signals is not None
+            else tuple(dispositions)
+            if dispositions is not None
+            else tuple(
+                RoleDispositionRecord(
+                    role=role,
+                    disposition=RoleDisposition.MODEL_EXECUTE,
+                    rationale="legacy caller requested the complete provider-backed lifecycle",
+                    evidence_refs=invocation.evidence_refs,
+                )
+                for role, invocation in zip(self.roles, supplied, strict=True)
+            )
+        )
+        if (
+            len(records) != len(self.roles)
+            or tuple(record.role for record in records) != self.roles
+        ):
+            raise ApplicabilityDenied(
+                "role dispositions must cover every canonical role in lifecycle order"
+            )
         results: list[RoleResult] = []
-        for invocation in supplied:
-            results.append(await self.execute(invocation, prior_results=tuple(results)))
+        for invocation, record in zip(supplied, records, strict=True):
+            if record.disposition is RoleDisposition.BLOCKED:
+                raise ApplicabilityDenied(
+                    f"role {record.role!r} is blocked: {record.blocking_reason}"
+                )
+            if record.disposition is RoleDisposition.MODEL_EXECUTE:
+                result = await self.execute(invocation, prior_results=tuple(results))
+            else:
+                result = self.deterministic_result(invocation, record)
+            results.append(result)
         return tuple(results)
+
+    def deterministic_result(
+        self, invocation: RoleInvocation, record: RoleDispositionRecord
+    ) -> RoleResult:
+        """Produce the typed, evidence-bound result without a provider call."""
+
+        self._validate_invocation(invocation)
+        if record.role != invocation.role:
+            raise ApplicabilityDenied("disposition is bound to a different role")
+        if record.disposition is RoleDisposition.MODEL_EXECUTE:
+            raise ApplicabilityDenied("model_execute cannot be resolved deterministically")
+        if record.disposition is RoleDisposition.BLOCKED:
+            raise ApplicabilityDenied(
+                f"role {record.role!r} is blocked: {record.blocking_reason}"
+            )
+        required_outputs = role_capabilities(invocation.role).required_outputs
+        content = f"{record.disposition.value}: {record.rationale}"
+        output_refs = tuple(
+            canonical_digest(
+                {
+                    "role": invocation.role,
+                    "work_id": invocation.work_id,
+                    "output": name,
+                    "content": content,
+                }
+            )
+            for name in required_outputs
+        )
+        unresolved: tuple[str, ...] = ()
+        if record.trigger is not None:
+            unresolved = (f"deferred until: {record.trigger}",)
+        provisional = RoleResult(
+            mission_id=invocation.mission_id,
+            work_id=invocation.work_id,
+            attempt_id=invocation.attempt_id,
+            role=invocation.role,
+            executor_id=invocation.executor_id,
+            context_manifest_digest=invocation.context.manifest.manifest_digest,
+            authority_envelope_digest=invocation.authority_envelope_digest,
+            base_artifact_refs=tuple(
+                dict.fromkeys(
+                    (
+                        *invocation.evidence_refs,
+                        *invocation.base_artifact_refs,
+                        *record.evidence_refs,
+                        record.digest,
+                    )
+                )
+            ),
+            candidate_artifact_refs=invocation.candidate_artifact_refs,
+            output_artifact_refs=output_refs,
+            claims=tuple(required_outputs),
+            effect_receipt_refs=(),
+            unresolved_risks=unresolved,
+            requested_next_role=next_role(invocation.role),
+            self_assessment=f"{record.disposition.value}: {record.rationale}",
+            result_digest="sha256:" + "0" * 64,
+        )
+        return replace(provisional, result_digest=result_digest(provisional))
 
     @staticmethod
     def _validate_invocation(invocation: RoleInvocation) -> None:
@@ -185,6 +305,9 @@ class RoleRuntime:
     ) -> str:
         manifest = invocation.context.manifest.to_document()
         request = invocation.context.request
+        routing = route_prior_results(
+            invocation.role, tuple(item.role for item in prior_results)
+        )
         binding = {
             "mission_id": invocation.mission_id,
             "work_id": invocation.work_id,
@@ -200,6 +323,14 @@ class RoleRuntime:
             "base_artifact_refs": list(invocation.base_artifact_refs),
             "candidate_artifact_refs": list(invocation.candidate_artifact_refs),
             "prior_role_result_digests": [item.result_digest for item in prior_results],
+            "prior_role_context": [
+                {
+                    "role": item.role,
+                    "result_digest": item.result_digest,
+                    "tier": routing[item.role].value,
+                }
+                for item in prior_results
+            ],
         }
         return (
             "Execute the bounded role contract using only this invocation binding. "
@@ -221,6 +352,59 @@ class RoleRuntime:
                     payload={"result_digest": result.result_digest},
                 ),
             ),
+        )
+
+    @classmethod
+    def _context_envelope(
+        cls,
+        invocation: RoleInvocation,
+        prior_results: Sequence[RoleResult],
+    ) -> ContextEnvelope:
+        """Project compiled context and prior results without re-tiering either."""
+
+        routing = route_prior_results(
+            invocation.role, tuple(item.role for item in prior_results)
+        )
+        full: list[tuple[str, str]] = []
+        digests: list[tuple[str, str]] = []
+        omitted: list[str] = []
+        for result in prior_results:
+            tier = routing[result.role]
+            if tier is ContextTier.FULL:
+                item = cls._agent_context(result)
+                body = json.dumps(
+                    {
+                        "role": item.role.value,
+                        "summary": item.summary,
+                        "evidence": [
+                            {
+                                "kind": evidence.kind,
+                                "summary": evidence.summary,
+                                "source": evidence.source,
+                                "payload": evidence.payload,
+                            }
+                            for evidence in item.evidence
+                        ],
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                full.append((result.role, body))
+            elif tier is ContextTier.DIGEST:
+                digests.append((result.role, result.result_digest))
+            else:
+                omitted.append(result.role)
+        manifest = invocation.context.manifest
+        return ContextEnvelope(
+            manifest_digest=manifest.manifest_digest,
+            token_budget=invocation.context.request.token_budget,
+            estimated_tokens=invocation.context.estimated_tokens,
+            full_bodies=tuple(full),
+            digests=tuple(digests),
+            omitted_roles=tuple(omitted),
+            cold_references=manifest.cold_references,
+            generator_evaluator_separated=manifest.generator_evaluator_separated,
         )
 
     @staticmethod

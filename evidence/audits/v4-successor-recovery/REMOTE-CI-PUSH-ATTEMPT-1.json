@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-remote-ci-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-REMOTE-CI-PUSH-ATTEMPT-1",
+  "workflow_run": {
+    "repository": "kb4beast/hive-mind-os",
+    "run_id": 33709101645,
+    "event": "push",
+    "branch": "codex/v4-successor-recovery",
+    "created_at": "2026-09-03T02:49:52Z",
+    "candidate_commit": "99bcfd1f5a10b55089b8b329e174f7f4fb70bc10",
+    "candidate_tree": "679729516738548399e065a75f60dd195a05f470",
+    "candidate_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+  },
+  "failed_jobs": [
+    {
+      "job_id": 100504577623,
+      "name": "unit-tests (Python 3.11)",
+      "runner": "ubuntu-latest",
+      "python": "3.11",
+      "started_at": "2026-09-03T02:49:54Z",
+      "completed_at": "2026-09-03T02:55:05Z",
+      "tests_run": 1347,
+      "elapsed_seconds": 292.083,
+      "failures": 8,
+      "errors": 1,
+      "skips": 16,
+      "common_error": "committed checkout contains an unapproved untracked or ignored path",
+      "additional_error": "TemporaryDirectory cleanup observed a non-empty commit-graphs directory after the contaminated fixture failures.",
+      "disposition": "REJECT_CANDIDATE_AND_AMEND"
+    },
+    {
+      "job_id": 100504577645,
+      "name": "unit-tests (Python 3.14)",
+      "runner": "ubuntu-latest",
+      "python": "3.14.7",
+      "started_at": "2026-09-03T02:49:54Z",
+      "completed_at": "2026-09-03T02:54:30Z",
+      "tests_run": 1347,
+      "elapsed_seconds": 263.262,
+      "failures": 8,
+      "errors": 0,
+      "skips": 16,
+      "common_error": "committed checkout contains an unapproved untracked or ignored path",
+      "disposition": "REJECT_CANDIDATE_AND_AMEND"
+    }
+  ],
+  "cancelled_push_jobs": [
+    {
+      "job_id": 100504577662,
+      "name": "unit-tests (Python 3.12)",
+      "started_at": "2026-09-03T02:49:54Z",
+      "completed_at": "2026-09-03T02:56:16Z",
+      "log_path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-1-python-3.12-cancelled.log",
+      "log_bytes": 281525,
+      "log_sha256": "74f63015e89d6b53a151b157b69b78cfd7959e54fb59d43560c5dd31febacdb2"
+    },
+    {
+      "job_id": 100504577675,
+      "name": "unit-tests (Windows, Python 3.12)",
+      "started_at": "2026-09-03T02:49:54Z",
+      "completed_at": "2026-09-03T02:56:10Z",
+      "log_path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-1-windows-python-3.12-cancelled.log",
+      "log_bytes": 143050,
+      "log_sha256": "39246e6b679ba502ad4930b67fc23f00b26797955520fc55f33af635847db5a0"
+    },
+    {
+      "job_id": 100504577732,
+      "name": "unit-tests (Windows, Python 3.14)",
+      "started_at": "2026-09-03T02:49:54Z",
+      "completed_at": "2026-09-03T02:56:07Z",
+      "log_path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-1-windows-python-3.14-cancelled.log",
+      "log_bytes": 151140,
+      "log_sha256": "c672006743c9cb74e159599449773e69f69428c88378764459414e367ad6ff37"
+    }
+  ],
+  "duplicate_pull_request_run": {
+    "run_id": 33709132840,
+    "event": "pull_request",
+    "created_at": "2026-09-03T02:50:21Z",
+    "completed_at": "2026-09-03T02:56:11Z",
+    "conclusion": "cancelled_after_candidate_rejection",
+    "candidate_commit": "99bcfd1f5a10b55089b8b329e174f7f4fb70bc10",
+    "failed_jobs": [
+      {
+        "job_id": 100504672183,
+        "name": "unit-tests (Python 3.11)",
+        "runner": "ubuntu-latest",
+        "python": "3.11",
+        "started_at": "2026-09-03T02:50:25Z",
+        "completed_at": "2026-09-03T02:54:49Z",
+        "tests_run": 1347,
+        "elapsed_seconds": 251.933,
+        "failures": 8,
+        "errors": 0,
+        "skips": 16
+      },
+      {
+        "job_id": 100504672195,
+        "name": "unit-tests (Python 3.12)",
+        "runner": "ubuntu-latest",
+        "python": "3.12",
+        "started_at": "2026-09-03T02:50:24Z",
+        "completed_at": "2026-09-03T02:55:10Z",
+        "tests_run": 1347,
+        "elapsed_seconds": 271.932,
+        "failures": 8,
+        "errors": 0,
+        "skips": 16
+      },
+      {
+        "job_id": 100504672192,
+        "name": "unit-tests (Python 3.14)",
+        "runner": "ubuntu-latest",
+        "python": "3.14",
+        "started_at": "2026-09-03T02:50:25Z",
+        "completed_at": "2026-09-03T02:54:53Z",
+        "tests_run": 1347,
+        "elapsed_seconds": 256.181,
+        "failures": 8,
+        "errors": 0,
+        "skips": 16
+      }
+    ],
+    "cancelled_jobs": [
+      {
+        "job_id": 100504672107,
+        "name": "unit-tests (Windows, Python 3.12)",
+        "started_at": "2026-09-03T02:50:24Z",
+        "completed_at": "2026-09-03T02:56:06Z",
+        "log_path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-1-windows-python-3.12-cancelled.log",
+        "log_bytes": 143693,
+        "log_sha256": "ea8da5c6c72b2d6283aa374aa7b5cc5ae8d7ee93f6fbdd3bdc4b41381b060924"
+      },
+      {
+        "job_id": 100504672137,
+        "name": "unit-tests (Windows, Python 3.14)",
+        "started_at": "2026-09-03T02:50:24Z",
+        "completed_at": "2026-09-03T02:56:10Z",
+        "log_path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-1-windows-python-3.14-cancelled.log",
+        "log_bytes": 152643,
+        "log_sha256": "f75b12d314af36beaf1b362d9ec9f5d4ec80dc826c7180e1cc517fa6c418cc74"
+      }
+    ],
+    "root_cause_matches_push_run": true,
+    "preserved_logs": [
+      {
+        "job_id": 100504672183,
+        "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-1-python-3.11.log",
+        "bytes": 336854,
+        "sha256": "9f7808f6ab7920366dcb94f9934a4280b57a766832f1a19f0382b60f57f362ca"
+      },
+      {
+        "job_id": 100504672195,
+        "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-1-python-3.12.log",
+        "bytes": 337033,
+        "sha256": "12d41884c4cc967280234cde1ee420bffb6f6f391b97f9fe087bc5666796a3c9"
+      },
+      {
+        "job_id": 100504672192,
+        "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-1-python-3.14.log",
+        "bytes": 375308,
+        "sha256": "c72aae12e4ef9c7f1260fd868925a430cd7629b5dbe068d35a2b96621a5bb55b"
+      }
+    ]
+  },
+  "root_cause": {
+    "finding_id": "V4-R4-HARNESS-003",
+    "severity": "P1_TEST_INTEGRITY",
+    "summary": "The frozen R4 verifier was loaded with importlib while ambient bytecode writes remained enabled. That created an ignored __pycache__ path inside the disposable authenticated fixture, which the verifier correctly rejected.",
+    "why_local_passed": "The local and collector commands explicitly set PYTHONDONTWRITEBYTECODE=1, masking the ambient dependency. CI intentionally compiled first and ran unittest without that variable.",
+    "correction": "Temporarily set sys.dont_write_bytecode only around every dynamic verifier module load, restore the prior interpreter value in finally, and assert that the reconstructed R4 repository remains bytecode-free immediately after loading."
+  },
+  "preserved_logs": [
+    {
+      "job_id": 100504577623,
+      "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-1-python-3.11.log",
+      "bytes": 337512,
+      "sha256": "43624b2f577ba51259f0da513ab9b04b74366cf0b518e39746247d028ee21e6e",
+      "content_policy": "Exact completed GitHub Actions job log returned by the job-logs API, including its UTF-8 BOM."
+    },
+    {
+      "job_id": 100504577645,
+      "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-1-python-3.14.log",
+      "bytes": 373180,
+      "sha256": "4f30c2d05a88921c6b9ba70614dc5f7fdf3fe6a4f00f602a90f2719d93cae95f",
+      "content_policy": "Exact completed GitHub Actions job log returned by the job-logs API, including its UTF-8 BOM."
+    }
+  ],
+  "independently_valid_results_from_the_same_commit": {
+    "static_and_type_checks": "SUCCESS",
+    "secret_scan": "SUCCESS",
+    "codeql": "SUCCESS",
+    "sbom_and_build_provenance": "SUCCESS",
+    "artifact_id": 9876290484,
+    "artifact_archive_sha256": "4aeb43c8b98cb9728f241ce07929c39f3ebedfccb23050c0d8d475cb26ddfc4c",
+    "wheel_sha256": "56a4895171cb66c018e88d7356975cdcd5585c535f7ba38ab3118178525748ad",
+    "sbom_sha256": "19d609e434a40e1fb66157855deb63b9b6fe2966047d0ab3496f271ebeb3d63d",
+    "strict_wheel_and_sbom_attestation_verification": true,
+    "pr_dependency_and_license_review_run_id": 33709132840,
+    "pr_dependency_and_license_review": "SUCCESS"
+  },
+  "efficiency_action": {
+    "push_run_cancel_requested_after_failure": true,
+    "duplicate_pull_request_run_cancel_requested_after_failure": true,
+    "reason": "The immutable candidate was already rejected and remaining duplicate matrix work could not change that disposition."
+  },
+  "nonclaims": [
+    "Successful jobs from rejected commit 99bcfd1f5a10b55089b8b329e174f7f4fb70bc10 do not qualify a later amended candidate.",
+    "The successful SBOM artifact proves the explicit generation repair for this rejected commit only.",
+    "No release, activation, deployment, merge, A5, production-readiness, or superiority claim follows from this receipt."
+  ],
+  "rollback": "Preserve this adverse receipt and exact job log. Revert the bytecode suppression only with a replacement that proves dynamic verifier loading cannot mutate the authenticated R4 fixture under ambient CI settings."
+}

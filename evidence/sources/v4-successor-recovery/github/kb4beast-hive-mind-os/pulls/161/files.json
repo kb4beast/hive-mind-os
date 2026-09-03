@@ -1,0 +1,14 @@
+[
+  {
+    "sha": "c5e5ee49181b79ae91efbc8ddb5fb2e22c39a786",
+    "filename": ".github/workflows/ci.yml",
+    "status": "modified",
+    "additions": 1,
+    "deletions": 1,
+    "changes": 2,
+    "blob_url": "https://github.com/kb4beast/hive-mind-os/blob/00b5dc95ed1090ea603218dbcd02d59b05d05603/.github%2Fworkflows%2Fci.yml",
+    "raw_url": "https://github.com/kb4beast/hive-mind-os/raw/00b5dc95ed1090ea603218dbcd02d59b05d05603/.github%2Fworkflows%2Fci.yml",
+    "contents_url": "https://api.github.com/repos/kb4beast/hive-mind-os/contents/.github%2Fworkflows%2Fci.yml?ref=00b5dc95ed1090ea603218dbcd02d59b05d05603",
+    "patch": "@@ -92,7 +92,7 @@ jobs:\n         with:\n           persist-credentials: false\n       - name: Initialize CodeQL\n-        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6\n+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9\n         with:\n           languages: python\n       - name: Analyze"
+  }
+]

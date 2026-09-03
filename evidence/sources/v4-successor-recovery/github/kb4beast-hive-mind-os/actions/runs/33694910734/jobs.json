@@ -1,0 +1,878 @@
+{
+  "total_count": 10,
+  "jobs": [
+    {
+      "id": 100461588646,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_owpg",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588646",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588646",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-02T23:24:26Z",
+      "name": "static-and-type-checks",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:11Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:11Z",
+          "completed_at": "2026-09-02T23:24:14Z"
+        },
+        {
+          "name": "Ruff static checks",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:14Z",
+          "completed_at": "2026-09-02T23:24:15Z"
+        },
+        {
+          "name": "Pyright type checks",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:15Z",
+          "completed_at": "2026-09-02T23:24:24Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-02T23:24:24Z",
+          "completed_at": "2026-09-02T23:24:24Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-02T23:24:24Z",
+          "completed_at": "2026-09-02T23:24:24Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588646",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000012607,
+      "runner_name": "GitHub Actions 1000012607",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588812,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_oxTA",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588812",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588812",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-02T23:24:22Z",
+      "name": "sbom-and-build-provenance",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:11Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:11Z",
+          "completed_at": "2026-09-02T23:24:12Z"
+        },
+        {
+          "name": "Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:12Z",
+          "completed_at": "2026-09-02T23:24:13Z"
+        },
+        {
+          "name": "Build wheel without project dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:13Z",
+          "completed_at": "2026-09-02T23:24:16Z"
+        },
+        {
+          "name": "Generate SPDX JSON SBOM",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-02T23:24:16Z",
+          "completed_at": "2026-09-02T23:24:18Z"
+        },
+        {
+          "name": "Upload immutable build evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:24:18Z",
+          "completed_at": "2026-09-02T23:24:18Z"
+        },
+        {
+          "name": "Attest wheel and SBOM provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-02T23:24:18Z",
+          "completed_at": "2026-09-02T23:24:20Z"
+        },
+        {
+          "name": "Post Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-02T23:24:20Z",
+          "completed_at": "2026-09-02T23:24:20Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-09-02T23:24:20Z",
+          "completed_at": "2026-09-02T23:24:20Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-09-02T23:24:20Z",
+          "completed_at": "2026-09-02T23:24:20Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588812",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000012608,
+      "runner_name": "GitHub Actions 1000012608",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588845,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_oxbQ",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588845",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588845",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-02T23:29:24Z",
+      "name": "unit-tests (Python 3.14)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:11Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:11Z",
+          "completed_at": "2026-09-02T23:24:13Z"
+        },
+        {
+          "name": "Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:13Z",
+          "completed_at": "2026-09-02T23:24:18Z"
+        },
+        {
+          "name": "Install exact local package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:18Z",
+          "completed_at": "2026-09-02T23:24:22Z"
+        },
+        {
+          "name": "Compile bytecode",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-02T23:24:22Z",
+          "completed_at": "2026-09-02T23:24:23Z"
+        },
+        {
+          "name": "Run deterministic test suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:24:23Z",
+          "completed_at": "2026-09-02T23:29:22Z"
+        },
+        {
+          "name": "Post Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-02T23:29:22Z",
+          "completed_at": "2026-09-02T23:29:22Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-02T23:29:22Z",
+          "completed_at": "2026-09-02T23:29:22Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-02T23:29:22Z",
+          "completed_at": "2026-09-02T23:29:22Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588845",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000012609,
+      "runner_name": "GitHub Actions 1000012609",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588866,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_oxgg",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588866",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588866",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-02T23:28:22Z",
+      "name": "unit-tests (Python 3.11)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:11Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:11Z",
+          "completed_at": "2026-09-02T23:24:13Z"
+        },
+        {
+          "name": "Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:13Z",
+          "completed_at": "2026-09-02T23:24:17Z"
+        },
+        {
+          "name": "Install exact local package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:17Z",
+          "completed_at": "2026-09-02T23:24:20Z"
+        },
+        {
+          "name": "Compile bytecode",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-02T23:24:20Z",
+          "completed_at": "2026-09-02T23:24:21Z"
+        },
+        {
+          "name": "Run deterministic test suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:24:21Z",
+          "completed_at": "2026-09-02T23:28:18Z"
+        },
+        {
+          "name": "Post Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-02T23:28:18Z",
+          "completed_at": "2026-09-02T23:28:18Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-02T23:28:18Z",
+          "completed_at": "2026-09-02T23:28:19Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-02T23:28:19Z",
+          "completed_at": "2026-09-02T23:28:19Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588866",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000012610,
+      "runner_name": "GitHub Actions 1000012610",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588887,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_oxlw",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588887",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588887",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:11Z",
+      "completed_at": "2026-09-02T23:28:52Z",
+      "name": "unit-tests (Python 3.12)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:12Z",
+          "completed_at": "2026-09-02T23:24:13Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:13Z",
+          "completed_at": "2026-09-02T23:24:15Z"
+        },
+        {
+          "name": "Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:15Z",
+          "completed_at": "2026-09-02T23:24:17Z"
+        },
+        {
+          "name": "Install exact local package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:17Z",
+          "completed_at": "2026-09-02T23:24:19Z"
+        },
+        {
+          "name": "Compile bytecode",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-02T23:24:19Z",
+          "completed_at": "2026-09-02T23:24:20Z"
+        },
+        {
+          "name": "Run deterministic test suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:24:20Z",
+          "completed_at": "2026-09-02T23:28:48Z"
+        },
+        {
+          "name": "Post Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-02T23:28:48Z",
+          "completed_at": "2026-09-02T23:28:49Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-02T23:28:49Z",
+          "completed_at": "2026-09-02T23:28:49Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-02T23:28:49Z",
+          "completed_at": "2026-09-02T23:28:49Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588887",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000012611,
+      "runner_name": "GitHub Actions 1000012611",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588912,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_oxsA",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588912",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588912",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-02T23:25:23Z",
+      "name": "codeql-security",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:11Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:11Z",
+          "completed_at": "2026-09-02T23:24:12Z"
+        },
+        {
+          "name": "Initialize CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:12Z",
+          "completed_at": "2026-09-02T23:24:25Z"
+        },
+        {
+          "name": "Analyze",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:25Z",
+          "completed_at": "2026-09-02T23:25:20Z"
+        },
+        {
+          "name": "Post Analyze",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:25:20Z",
+          "completed_at": "2026-09-02T23:25:20Z"
+        },
+        {
+          "name": "Post Initialize CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-02T23:25:20Z",
+          "completed_at": "2026-09-02T23:25:21Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-02T23:25:21Z",
+          "completed_at": "2026-09-02T23:25:21Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-02T23:25:21Z",
+          "completed_at": "2026-09-02T23:25:21Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588912",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000012613,
+      "runner_name": "GitHub Actions 1000012613",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588915,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_oxsw",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588915",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588915",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-02T23:57:18Z",
+      "name": "unit-tests (Windows, Python 3.12)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:10Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:18Z"
+        },
+        {
+          "name": "Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:18Z",
+          "completed_at": "2026-09-02T23:24:21Z"
+        },
+        {
+          "name": "Install exact local package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:21Z",
+          "completed_at": "2026-09-02T23:24:28Z"
+        },
+        {
+          "name": "Compile bytecode",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-02T23:24:28Z",
+          "completed_at": "2026-09-02T23:24:29Z"
+        },
+        {
+          "name": "Run deterministic test suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:24:29Z",
+          "completed_at": "2026-09-02T23:57:14Z"
+        },
+        {
+          "name": "Post Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-02T23:57:14Z",
+          "completed_at": "2026-09-02T23:57:15Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-02T23:57:15Z",
+          "completed_at": "2026-09-02T23:57:17Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-02T23:57:17Z",
+          "completed_at": "2026-09-02T23:57:17Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588915",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000012612,
+      "runner_name": "GitHub Actions 1000012612",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588926,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_oxvg",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588926",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588926",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-03T00:05:41Z",
+      "name": "unit-tests (Windows, Python 3.14)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:10Z"
+        },
+        {
+          "name": "Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:19Z"
+        },
+        {
+          "name": "Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:19Z",
+          "completed_at": "2026-09-02T23:24:23Z"
+        },
+        {
+          "name": "Install exact local package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-02T23:24:23Z",
+          "completed_at": "2026-09-02T23:24:30Z"
+        },
+        {
+          "name": "Compile bytecode",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-02T23:24:30Z",
+          "completed_at": "2026-09-02T23:24:32Z"
+        },
+        {
+          "name": "Run deterministic test suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:24:32Z",
+          "completed_at": "2026-09-03T00:05:36Z"
+        },
+        {
+          "name": "Post Configure Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-03T00:05:36Z",
+          "completed_at": "2026-09-03T00:05:38Z"
+        },
+        {
+          "name": "Post Checkout immutable workflow input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-03T00:05:38Z",
+          "completed_at": "2026-09-03T00:05:40Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-03T00:05:40Z",
+          "completed_at": "2026-09-03T00:05:40Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588926",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000012614,
+      "runner_name": "GitHub Actions 1000012614",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461588969,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_ox6Q",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461588969",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461588969",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:09Z",
+      "completed_at": "2026-09-02T23:24:15Z",
+      "name": "secret-scan",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:10Z"
+        },
+        {
+          "name": "Checkout complete history",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-02T23:24:10Z",
+          "completed_at": "2026-09-02T23:24:12Z"
+        },
+        {
+          "name": "Scan for committed secrets",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-02T23:24:12Z",
+          "completed_at": "2026-09-02T23:24:14Z"
+        },
+        {
+          "name": "Post Checkout complete history",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-02T23:24:14Z",
+          "completed_at": "2026-09-02T23:24:14Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-02T23:24:14Z",
+          "completed_at": "2026-09-02T23:24:14Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461588969",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000012615,
+      "runner_name": "GitHub Actions 1000012615",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 100461589582,
+      "run_id": 33694910734,
+      "workflow_name": "Constitutional CI",
+      "head_branch": "codex/v3-squash-proof-recovery-r4",
+      "run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTkkejs8AAAAXY_o0Tg",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100461589582",
+      "html_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734/job/100461589582",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-09-02T23:24:07Z",
+      "started_at": "2026-09-02T23:24:07Z",
+      "completed_at": "2026-09-02T23:24:07Z",
+      "name": "dependency-and-license-review",
+      "steps": [
+
+      ],
+      "check_run_url": "https://api.github.com/repos/kb4beast/hive-mind-os/check-runs/100461589582",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

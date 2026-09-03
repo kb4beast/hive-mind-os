@@ -1,0 +1,53 @@
+**********************
+PowerShell transcript start
+Start time: 20260903063457
+Username: AI-WORKHORSE\beesp
+RunAs User: AI-WORKHORSE\beesp
+Configuration Name: 
+Machine: AI-WORKHORSE (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Users\beesp\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.dll -Command try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}
+$root='C:\Users\beesp\AppData\Local\Temp\hive-v4-ci-33749585546-3743ad1e2bafaac2efd2b19d91510086ce48d478'; $log=Join-Path $root 'C77-spdx-validation-transcript.txt'; $validator='C:\Users\beesp\AppData\Local\Temp\hive-v4-spdx-validator-33749585546\Scripts\pyspdxtools.exe'; $python='C:\Users\beesp\AppData\Local\Temp\hive-v4-spdx-validator-33749585546\Scripts\python.exe'; $sbom=Join-Path $root 'hive-mind-os-build-evidence\hive-mind-os.spdx.json'; Start-Transcript -LiteralPath $log -Force | Out-Null; "COMMAND: $validator -i $sbom"; & $validator -i $sbom 2>&1; "EXIT: $LASTEXITCODE"; "COMMAND: $python -m pip show spdx-tools"; & $python -m pip show spdx-tools | Select-String '^(Name|Version|License|Location):'; $code=@'
+import json, sys
+from pathlib import Path
+from spdx_tools.spdx.parser.jsonlikedict.json_like_dict_parser import JsonLikeDictParser
+from spdx_tools.spdx.validation.document_validator import validate_full_spdx_document
+path=Path(sys.argv[1])
+base=json.loads(path.read_text(encoding="utf-8"))
+for name, add_copyright in (("timestamp-only", False), ("timestamp+copyright", True)):
+    data=json.loads(json.dumps(base))
+    data["creationInfo"]["created"]=data["creationInfo"]["created"].split(".")[0]+"Z"
+    if add_copyright:
+        for package in data["packages"]:
+            package["copyrightText"]="NOASSERTION"
+    messages=validate_full_spdx_document(JsonLikeDictParser().parse(data))
+    print(f"{name}: validation_messages={len(messages)}")
+    for message in messages:
+        print(message.validation_message)
+'@; "COMMAND: in-memory JsonLikeDictParser + validate_full_spdx_document variants; artifact bytes unchanged"; & $python -c $code $sbom; "EXIT: $LASTEXITCODE"; Stop-Transcript | Out-Null; $h=Get-FileHash -LiteralPath $log -Algorithm SHA256; [pscustomobject]@{Path=$log;Bytes=(Get-Item -LiteralPath $log).Length;SHA256=$h.Hash.ToLowerInvariant()} | ConvertTo-Json
+Process ID: 48976
+PSVersion: 7.6.4
+PSEdition: Core
+GitCommitId: 7.6.4
+OS: Microsoft Windows 10.0.26200
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+COMMAND: C:\Users\beesp\AppData\Local\Temp\hive-v4-spdx-validator-33749585546\Scripts\pyspdxtools.exe -i C:\Users\beesp\AppData\Local\Temp\hive-v4-ci-33749585546-3743ad1e2bafaac2efd2b19d91510086ce48d478\hive-mind-os-build-evidence\hive-mind-os.spdx.json
+ERROR:root:There have been issues while parsing the provided document:
+Error while parsing Document: ["time data '2026-09-03T11:25:40.785436227Z' does not match format '%Y-%m-%dT%H:%M:%SZ'"]
+EXIT: 1
+COMMAND: C:\Users\beesp\AppData\Local\Temp\hive-v4-spdx-validator-33749585546\Scripts\python.exe -m pip show spdx-tools
+
+Name: spdx-tools
+Version: 0.8.5
+Location: C:\Users\beesp\AppData\Local\Temp\hive-v4-spdx-validator-33749585546\Lib\site-packages
+COMMAND: in-memory JsonLikeDictParser + validate_full_spdx_document variants; artifact bytes unchanged
+
+EXIT: 0
+**********************
+PowerShell transcript end
+End time: 20260903063458
+**********************

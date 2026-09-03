@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-full-gate-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-FULL-GATE-ATTEMPT-4",
+  "completed_at_utc": "2026-09-03T06:44:31.7676589Z",
+  "command": "python -m unittest discover -s tests -v",
+  "environment": {
+    "python": "3.14",
+    "bytecode_disabled": true,
+    "git_environment_removal_method": "System.Environment.SetEnvironmentVariable(name, null, Process) invoked from PowerShell",
+    "git_environment_removed": false,
+    "residual_environment": {
+      "GIT_PAGER": ""
+    }
+  },
+  "result": {
+    "tests": 1476,
+    "seconds": 1781.961,
+    "failures": 0,
+    "errors": 2,
+    "skips": 8,
+    "outcome": "FAILED"
+  },
+  "validated_index_tree": {
+    "commit_before_amend": "99bcfd1f5a10b55089b8b329e174f7f4fb70bc10",
+    "tree": "dffad2e344b3d17aa8167d0b165c0adb97ceb619",
+    "sole_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+  },
+  "raw_log": {
+    "path": "evidence/audits/v4-successor-recovery/logs/pre-candidate-full-gate-attempt-4.log",
+    "bytes": 274100,
+    "sha256": "08276e82d22c977aa39546ba4624761a4d6768c06c3a62b70245df791777442e"
+  },
+  "first_cause": {
+    "classification": "LOCAL_GATE_LAUNCH_ENVIRONMENT_ERROR",
+    "affected_tests": [
+      "test_hive_cortex_explorer.HiveCortexExplorerTests.test_explorer_can_read_history_and_discover_tests_through_receipts",
+      "test_hive_cortex_explorer.HiveCortexExplorerTests.test_fake_git_path_entry_is_not_invoked"
+    ],
+    "exception": "ExplorerDenied: inherited Git environment injection is not allowed",
+    "explanation": "PowerShell retained GIT_PAGER as a present empty process variable after the .NET null assignment. RepositoryExplorer intentionally rejects every inherited GIT_* name, including an empty value. The full gate therefore did not run in the claimed scrubbed environment."
+  },
+  "bounded_reproduction": {
+    "command": "python -m unittest -v tests.test_hive_cortex_explorer",
+    "same_incorrect_null_removal": {
+      "tests": 7,
+      "errors": 2,
+      "outcome": "FAILED"
+    },
+    "powershell_env_provider_removal": {
+      "tests": 7,
+      "errors": 0,
+      "outcome": "OK",
+      "assertion": "Remove-Item -LiteralPath Env:GIT_PAGER removed the name rather than retaining an empty value."
+    }
+  },
+  "disposition": "REJECT_AS_QUALIFYING_RECEIPT_AND_ADAPT_GATE_LAUNCHER_ENVIRONMENT_REMOVAL",
+  "nonclaims": [
+    "This failed local attempt does not qualify the candidate tree.",
+    "The two errors do not show a V4 runtime defect; they show that the invoking process retained a forbidden empty Git environment variable.",
+    "The bounded seven-test pass does not replace the required full repository gate.",
+    "No activation, merge, release, deployment, A5, production-readiness, or superiority claim follows from this receipt."
+  ],
+  "rollback": "Preserve this failed receipt and exact log append-only; rerun the exact full gate only after deleting every GIT_* name through the PowerShell Env provider and proving the child Python process sees an empty Git environment inventory."
+}

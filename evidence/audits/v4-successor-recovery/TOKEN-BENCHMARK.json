@@ -1,0 +1,98 @@
+{
+  "challenger_input_tokens": 3438,
+  "comparator_input_tokens": 21218,
+  "disposition": "MEASURED_LOWER_INPUT_CONTEXT",
+  "forbidden_claim": "No product superiority, quality parity, or outcome improvement is established.",
+  "kind": "hive-mind-controlled-token-benchmark-v1",
+  "lanes": [
+    {
+      "accepted_outcome_digest": "sha256:50f1ac83bedee7a7909f961fe237e3b68d8a45b2f49fbac2531e96755f2f013f",
+      "challenger_digest": "sha256:a49ebaa42ae6470bf7d12036c32802e9525696e2c696711f2e3c1f13895f7565",
+      "challenger_input_tokens": 816,
+      "comparator_digest": "sha256:64539fa73d8e6bcb705f83e44c9f7e3319ccb338c01d52f4094e5c40ba687b1a",
+      "comparator_input_tokens": 5016,
+      "controls": {
+        "acceptance_digest": "sha256:e85d051793523f237f1c046b9764e3421e024524064d84ab21e6568e32e23fc5",
+        "authority_digest": "sha256:d8ee17f5d857207cc1e910733670b914d387ebf882c64c5e718601d46801c94d",
+        "budget_digest": "sha256:50fcaf84e7654fb8b9d9c60f821907c7c9bb3297aabf4c1bc412fdab00292974",
+        "model_route_digest": "sha256:2e88e4d32f43df8c2b09c16d66080423039c8dd2a3a4ecfa28d5ae06ed97ebaa",
+        "subject_snapshot_digest": "sha256:4e0943a9224fbd8822af0d12de6f2593035c9ee53e12572f7d47c64cbe908c22"
+      },
+      "lane_id": "lane-repository",
+      "measurement_source": "tokenizer-measured",
+      "reduction_basis_points": 8373,
+      "repetitions": 5,
+      "saved_tokens": 4200,
+      "subject_class": "repository",
+      "tokenizer_id": "hive-mind-portable-lexical-tokenizer-v1"
+    },
+    {
+      "accepted_outcome_digest": "sha256:f8cd64feb441ac60f3b7b658f138188a59ae712fa5290186d9839b0a63ac973f",
+      "challenger_digest": "sha256:dd0eea67f5c14587c31bbe8c33a00bcdb943dd7b586d395f86e77976f26a57cb",
+      "challenger_input_tokens": 1344,
+      "comparator_digest": "sha256:7dad291cf3c05678df90489ad11c583724bd9e2c7bd373149dc23b95082cfebb",
+      "comparator_input_tokens": 8344,
+      "controls": {
+        "acceptance_digest": "sha256:f3ee09b39ca93262e19bf374b07e3e2bc6aea9bc27245c380d1361a00f509bec",
+        "authority_digest": "sha256:d8ee17f5d857207cc1e910733670b914d387ebf882c64c5e718601d46801c94d",
+        "budget_digest": "sha256:50fcaf84e7654fb8b9d9c60f821907c7c9bb3297aabf4c1bc412fdab00292974",
+        "model_route_digest": "sha256:2e88e4d32f43df8c2b09c16d66080423039c8dd2a3a4ecfa28d5ae06ed97ebaa",
+        "subject_snapshot_digest": "sha256:e5fab9c8685e5ab8172044a58156b94c6241de5d9fdfaa26e32d56c1d1415761"
+      },
+      "lane_id": "lane-monorepo",
+      "measurement_source": "tokenizer-measured",
+      "reduction_basis_points": 8389,
+      "repetitions": 5,
+      "saved_tokens": 7000,
+      "subject_class": "monorepo",
+      "tokenizer_id": "hive-mind-portable-lexical-tokenizer-v1"
+    },
+    {
+      "accepted_outcome_digest": "sha256:fdfe15b2e5820362e27208d913b42792caa34388dfc4eccf5012c33075171654",
+      "challenger_digest": "sha256:5189501efcecd1a4883a8adb22b1a53fe92c5da761ddb4695bbce5a6369fb87a",
+      "challenger_input_tokens": 726,
+      "comparator_digest": "sha256:4b3911edd7364da214f7007f23ee164d22574fc339c82f58dbe7f1c1c889960d",
+      "comparator_input_tokens": 4506,
+      "controls": {
+        "acceptance_digest": "sha256:f199d132c28a55d666c13d83fbe6bdf42abe7b70f768e388078118089feffe05",
+        "authority_digest": "sha256:d8ee17f5d857207cc1e910733670b914d387ebf882c64c5e718601d46801c94d",
+        "budget_digest": "sha256:50fcaf84e7654fb8b9d9c60f821907c7c9bb3297aabf4c1bc412fdab00292974",
+        "model_route_digest": "sha256:2e88e4d32f43df8c2b09c16d66080423039c8dd2a3a4ecfa28d5ae06ed97ebaa",
+        "subject_snapshot_digest": "sha256:8e04959ba4ad066d2c864fd2bb7019674c6f026b6810d41b9fe8c5584fc0c793"
+      },
+      "lane_id": "lane-research-artifact",
+      "measurement_source": "tokenizer-measured",
+      "reduction_basis_points": 8388,
+      "repetitions": 5,
+      "saved_tokens": 3780,
+      "subject_class": "research-artifact",
+      "tokenizer_id": "hive-mind-portable-lexical-tokenizer-v1"
+    },
+    {
+      "accepted_outcome_digest": "sha256:6359bd7bde31691dea341b67c0b2c78b175d883c189864fb5f12a25ca7952ddd",
+      "challenger_digest": "sha256:d48c17eb1b51b5efcbca023cc4906cae121b5b9f493df8f63eb32213fddded98",
+      "challenger_input_tokens": 552,
+      "comparator_digest": "sha256:23052e0b63b63c74ce37a0eb2e46ce24d8059383a1b0da1b6515b7d44e51d312",
+      "comparator_input_tokens": 3352,
+      "controls": {
+        "acceptance_digest": "sha256:a9f5dedd434012b1c426c86b8fe1c76ad7add47be0394858ce2a04863c5d033c",
+        "authority_digest": "sha256:d8ee17f5d857207cc1e910733670b914d387ebf882c64c5e718601d46801c94d",
+        "budget_digest": "sha256:50fcaf84e7654fb8b9d9c60f821907c7c9bb3297aabf4c1bc412fdab00292974",
+        "model_route_digest": "sha256:2e88e4d32f43df8c2b09c16d66080423039c8dd2a3a4ecfa28d5ae06ed97ebaa",
+        "subject_snapshot_digest": "sha256:62d8d0ce1f9a0193bf800f44faab174cd68c835ca4e17f86d79c7ed0a77e3254"
+      },
+      "lane_id": "lane-workflow",
+      "measurement_source": "tokenizer-measured",
+      "reduction_basis_points": 8353,
+      "repetitions": 5,
+      "saved_tokens": 2800,
+      "subject_class": "workflow",
+      "tokenizer_id": "hive-mind-portable-lexical-tokenizer-v1"
+    }
+  ],
+  "reduction_basis_points": 8379,
+  "report_digest": "sha256:0e08cc8ec5eae038e1faa98c9511f30602224178368a1586b68073124a490f5b",
+  "schema_version": 1,
+  "threshold_basis_points": 3000,
+  "threshold_met": true
+}

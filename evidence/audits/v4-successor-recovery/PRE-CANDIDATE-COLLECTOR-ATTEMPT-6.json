@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-6",
+  "captured_at_utc": "2026-09-03T09:47:39.0651168Z",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "staged_tree": "525da6c4f9becaa81896646bf02cde7ced0ebb0d",
+  "observer": "/root/v4_quality_reviewer",
+  "judge_concurrence": "/root/v4_final_judge",
+  "first_cause": {
+    "classification": "EXACT_TEST_COUNT_AND_SUCCESS_ADMIT_NONEXECUTED_SKIPPED_TESTS",
+    "explanation": "unittest includes skipped tests in testsRun and treats an all-skipped suite as successful. The C71 terminal formula therefore accepted the expected count even when the test body did not execute.",
+    "affected_security_tests": [
+      "tests.test_control_token_economy.TestResultCacheTests.test_failure_publication_does_not_follow_a_failures_link",
+      "tests.test_control_token_economy.TestResultCacheTests.test_cache_root_rejects_a_linked_ancestor"
+    ],
+    "environmental_trigger": "Directory-link creation can explicitly raise unittest.SkipTest when the host capability is unavailable."
+  },
+  "deterministic_probe": {
+    "command": "$code=@'\nimport io, unittest\nclass Probe(unittest.TestCase):\n    @unittest.skip(\"capability unavailable\")\n    def test_security_boundary(self):\n        raise AssertionError(\"must not execute\")\nr=unittest.TextTestRunner(stream=io.StringIO()).run(unittest.defaultTestLoader.loadTestsFromTestCase(Probe))\nexpected=1\nprint(f\"testsRun={r.testsRun}\")\nprint(f\"wasSuccessful={r.wasSuccessful()}\")\nprint(f\"skipped={len(r.skipped)}\")\nprint(f\"collector_current_terminal_valid={r.wasSuccessful() and r.testsRun==expected}\")\n'@; python -I -B -W error::ResourceWarning -c $code",
+    "output": [
+      "testsRun=1",
+      "wasSuccessful=True",
+      "skipped=1",
+      "collector_current_terminal_valid=True"
+    ],
+    "expected_failure_probe": "testsRun=1; wasSuccessful=True; skipped=0; expectedFailures=1; unexpectedSuccesses=0",
+    "unexpected_success_probe": "wasSuccessful=False"
+  },
+  "correction": [
+    "Bind failures, errors, skipped, expectedFailures, and unexpectedSuccesses in the parent-recognized terminal record.",
+    "Require every adverse outcome count to be exactly zero in each module and in the aggregate.",
+    "Use one shared parser for collector qualification and deterministic skip/outcome regressions."
+  ],
+  "disposition": "REJECT_525DA6C4_AS_FINAL_TREE_AND_ADAPT_TERMINAL_RECEIPT_WITH_ZERO_ADVERSE_OUTCOME_COUNTS",
+  "nonclaims": [
+    "Exact testsRun remains useful inventory evidence but does not alone prove that test bodies executed.",
+    "The process-local terminal marker still cannot resist hostile same-process code.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this attempt."
+  ],
+  "rollback": "Preserve this receipt and the cancelled exact-tree gate; rerun focused stress and the full exact gate only after the zero-adverse-outcome contract passes."
+}

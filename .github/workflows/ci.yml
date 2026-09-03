@@ -34,16 +34,20 @@ jobs:
         run: python -m unittest discover -s tests -v
 
   unit-tests-windows:
-    name: unit-tests (Windows, Python 3.12)
+    name: unit-tests (Windows, Python ${{ matrix.python-version }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12"]
+        include:
+          - python-version: "3.14"
     steps:
       - name: Checkout immutable workflow input
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Keep the tested object identical to the one direct-child review candidate.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Configure Python
@@ -153,19 +157,45 @@ jobs:
           cache: pip
       - name: Build wheel without project dependencies
         run: python -m pip wheel --disable-pip-version-check --no-deps --wheel-dir dist .
-      - name: Generate SPDX JSON SBOM
-        uses: anchore/sbom-action@f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a # v0.9.0
+      - name: Download pinned Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a # v0.9.0
         with:
-          path: dist
-          format: spdx-json
-          output-file: dist/hive-mind-os.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
+          syft-version: v0.42.2
+      - name: Generate and validate SPDX JSON SBOM
+        shell: bash
+        run: |
+          "${{ steps.syft.outputs.cmd }}" packages . \
+            --output spdx-json=dist/hive-mind-os.spdx.json
+          python scripts/normalize_spdx_json.py dist/hive-mind-os.spdx.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          sbom = Path("dist/hive-mind-os.spdx.json")
+          wheels = sorted(Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"expected exactly one wheel, found {len(wheels)}")
+          if not sbom.is_file() or sbom.stat().st_size == 0:
+              raise SystemExit("SPDX JSON SBOM is missing or empty")
+          document = json.loads(sbom.read_text(encoding="utf-8"))
+          required = {"SPDXID", "spdxVersion", "creationInfo", "packages"}
+          missing = sorted(required - document.keys())
+          if missing:
+              raise SystemExit(f"SPDX JSON SBOM is missing fields: {missing}")
+          if not isinstance(document["packages"], list) or not document["packages"]:
+              raise SystemExit("SPDX JSON SBOM contains no discovered packages")
+          PY
+          python -m pip install --disable-pip-version-check --require-hashes \
+            -r requirements/spdx-validator-linux-py312.txt
+          pyspdxtools -i dist/hive-mind-os.spdx.json
       - name: Upload immutable build evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hive-mind-os-build-evidence
-          path: dist/
+          path: |
+            dist/*.whl
+            dist/hive-mind-os.spdx.json
           if-no-files-found: error
           retention-days: 30
       - name: Attest wheel and SBOM provenance

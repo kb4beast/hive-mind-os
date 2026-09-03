@@ -1,0 +1,54 @@
+{
+  "schema_version": 2,
+  "kind": "hive-mind-generic-product-v4-manifest-v2",
+  "plan_id": "generic-hive-mind-product-v4",
+  "status": "CANDIDATE_NOT_AUTHORIZED",
+  "predecessor": {
+    "plan_id": "generic-hive-mind-product-v3",
+    "commit": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+    "tree": "86e502763fcfd924094ba8194dd0c31b114652a9",
+    "qualification_receipt_path": "evidence/audits/generic-v3-baseline-recovery/V3-R4-QUALIFICATION.json",
+    "qualification_receipt_sha256": "sha256:e4b1a287bb49b961afa4c68ab3849a975853e4b8ebd324bd7761c059cccb51fb"
+  },
+  "candidate_base": {
+    "commit": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+    "tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d"
+  },
+  "request_text": "Approve an executable successor to `generic-hive-mind-product-v3`, bind it to `main` and this exact request, and issue a signed one-run activation bundle with independent review and frozen-host evidence.",
+  "request_sha256": "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+  "repository_id": "sha256:48eb2b11cd99bb34f430f5e1c7a39d9a32b9bbaac6a99db4736d2ac422915590",
+  "target_branch": "main",
+  "plan": {
+    "path": "docs/execution/dags/generic-hive-mind-product-v4/plan.json",
+    "sha256": "sha256:283099b3d74af76c4320043044f763f2067d8c626a0e4e4e390560c1029176c1",
+    "mode": "host-activated-generic-dag-v1",
+    "node_count": 20
+  },
+  "source_intake": {
+    "path": "evidence/audits/v4-successor-recovery/SOURCE-INTAKE.json",
+    "sha256": "sha256:27822617648a04965c17a9f3c4161d71d76521518aa58b5c128f916cb2e89132",
+    "archive_path": "evidence/sources/v4-successor-recovery/SOURCE-ARCHIVE.json",
+    "archive_sha256": "sha256:908d82cc7bccea22e37eda43eea28d9d363528b20c6b913014b0fb080c07893c",
+    "source_count": 13,
+    "unavailable_source_count": 0
+  },
+  "activation_policy": {
+    "maximum_lease_seconds": 900,
+    "nonce_uniqueness": "nonce-primary-key-global-single-use",
+    "signature_order": [
+      "independent_review",
+      "frozen_host",
+      "issuer",
+      "nonce_cas"
+    ],
+    "required_principals": [
+      "builder",
+      "independent_reviewer",
+      "actor",
+      "issuer",
+      "host_attester"
+    ],
+    "protected_merge_authorized": false
+  },
+  "execution_authorized": false
+}

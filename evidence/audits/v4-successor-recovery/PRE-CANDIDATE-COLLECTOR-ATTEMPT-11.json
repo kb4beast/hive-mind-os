@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-warning-repair-stability-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-11",
+  "captured_at_utc": "2026-09-03T10:44:20.1781910Z",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "stress_execution_staged_tree": "c6dbca1a0a9d81a4779051c32d6e589045d12dcf",
+  "post_stress_patch_id_correction_staged_tree": "ff6c84f974f563edb45ec4b68e47db4b3393c60b",
+  "post_stress_receipt_correction": "Attempt-10's transport-dependent diff_sha1 field was replaced by the independently reproduced stable patch ID. A collector command-description string was then narrowed from zero-warning to exact ResourceWarning:/Exception ignored occurrence enforcement. Executable behavior, tests, and qualification semantics did not change.",
+  "source_binding": {
+    "candidate_source": "C:/Users/beesp/.codex/worktrees/b7eb/hive-mind-os/src",
+    "python": "C:/Python314/python.exe",
+    "python_version": "3.14",
+    "bytecode_suppressed": true,
+    "warning_policy": "error::ResourceWarning plus captured-stderr zero-occurrence enforcement",
+    "focused_module_count": 29,
+    "focused_test_count": 286,
+    "zero_failures_required": true,
+    "zero_errors_required": true,
+    "zero_skips_required": true,
+    "zero_expected_failures_required": true,
+    "zero_unexpected_successes_required": true,
+    "zero_resource_warning_stderr_occurrences_required": true,
+    "zero_unraisable_exception_stderr_occurrences_required": true
+  },
+  "collector_stress": {
+    "test": "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_writes_review_evidence_without_authorizing_activation",
+    "sequential": {
+      "planned_iterations": 12,
+      "completed_iterations": 12,
+      "passes": 12,
+      "failures": 0,
+      "duration_milliseconds": [28565, 28532, 28551, 28513, 28011, 28088, 28064, 27978, 28105, 28137, 28107, 27964]
+    },
+    "concurrent": {
+      "planned_iterations": 4,
+      "completed_iterations": 4,
+      "passes": 4,
+      "failures": 0,
+      "duration_milliseconds": [31610, 31519, 31606, 31593]
+    },
+    "qualification_predicate_exercised": "Every run required one exact terminal marker per module, exact per-module counts and 286/286 aggregate tests, zero unittest adverse outcomes, zero captured ResourceWarning: and Exception ignored stderr occurrences, stable executable/source hashes, no bytecode, and inert activation state.",
+    "result": "PASS"
+  },
+  "supporting_validation": {
+    "root_collector_regression_module": {
+      "tests_run": 11,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "duration_seconds": 41.675
+    },
+    "independent_curator": {
+      "real_unraisable_regression_python_versions": ["3.12", "3.14"],
+      "source_sha256_match": true,
+      "stable_patch_id_before_command_description_narrowing": "0dc7b02ef70d033aaa38b9d79805c7aa1a599b3e",
+      "final_stable_patch_id": "f321fd7e2e01bc4a7afe74da285a909f8c47786d",
+      "result": "NO_C76_FAIL_OPEN_PATH"
+    },
+    "independent_judge": {
+      "collector_regression_tests": 11,
+      "failures": 0,
+      "court_claim_sequence": "V4-C01_THROUGH_V4-C76_CONTINUOUS_UNIQUE",
+      "stress_tree_recomputed": "c6dbca1a0a9d81a4779051c32d6e589045d12dcf",
+      "result": "NO_UNRESOLVED_C76_P1_OR_P2"
+    }
+  },
+  "disposition": "ACCEPT_C76_REPAIR_STABILITY_FOR_FINAL_RECEIPT_BEARING_TREE_FREEZE_AND_DOWNSTREAM_GATING",
+  "remaining_gates": [
+    "Freeze the final receipt-bearing staged tree and run the exact 1488-test complete local CI command against it.",
+    "Amend the sole direct-child commit without changing its parent, run a clean collector against that exact commit, and force-push only with the exact remote lease.",
+    "Require fresh exact-head remote CI, artifact inventory and attestation validation, independent Curator verdict, and Judge disposition."
+  ],
+  "nonclaims": [
+    "Captured diagnostic occurrence scanning is conservative and can falsely reject prose that contains the matched strings.",
+    "Hostile same-process code can suppress or replace stderr, warnings, finalizers, or sys.unraisablehook; this repair does not claim resistance to that threat.",
+    "Forced garbage collection cannot prove absence of still-referenced, non-reporting, or external-process resource leaks.",
+    "Fresh-child focused validation does not exercise cross-module interpreter-state interactions; the complete combined local and remote gates remain required.",
+    "This stability receipt is not the complete repository CI gate and does not authorize activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority."
+  ],
+  "rollback": "If any downstream gate fails, preserve its adverse receipt, supersede this pre-freeze tree, and re-enter repair without activation or protected-branch mutation."
+}

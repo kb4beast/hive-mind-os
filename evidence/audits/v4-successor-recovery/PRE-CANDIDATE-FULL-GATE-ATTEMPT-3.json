@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-full-gate-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-FULL-GATE-ATTEMPT-3",
+  "completed_at_utc": "2026-09-03T02:48:36.4193867Z",
+  "command": "python -m unittest discover -s tests -v",
+  "environment": {
+    "python": "3.14",
+    "bytecode_disabled": true,
+    "git_environment_removed": true
+  },
+  "result": {
+    "tests": 1347,
+    "seconds": 1720.765,
+    "failures": 0,
+    "errors": 0,
+    "skips": 8,
+    "outcome": "OK"
+  },
+  "candidate_created_from_validated_tree": {
+    "commit": "99bcfd1f5a10b55089b8b329e174f7f4fb70bc10",
+    "tree": "679729516738548399e065a75f60dd195a05f470",
+    "sole_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+  },
+  "raw_log": {
+    "path": "evidence/audits/v4-successor-recovery/logs/pre-candidate-full-gate-attempt-3.log",
+    "bytes": 257616,
+    "sha256": "cca9d7348b76a5e99605dabe4b825d7d9129eeb6da6d631699c612e396de3df1"
+  },
+  "later_disposition": "REJECT_AS_FINAL_CANDIDATE_AFTER_AMBIENT_REMOTE_CI_FAILURE",
+  "nonclaims": [
+    "This local pass does not override the preserved Linux 3.11, 3.12, and 3.14 failures for the same commit.",
+    "This receipt cannot qualify any amended commit or tree.",
+    "No activation, merge, release, deployment, A5, production-readiness, or superiority claim follows from this pass."
+  ],
+  "rollback": "Preserve this successful-but-superseded receipt and its exact log together with the later remote rejection."
+}

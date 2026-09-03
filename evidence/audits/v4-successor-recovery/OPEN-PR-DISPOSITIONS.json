@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "kind": "hive-mind-open-pr-scout-assessment-v2",
+  "observed_at_utc": "2026-09-02T21:03:50Z",
+  "scope": "The individually observed pull requests numbered 157 through 164; no complete-list response was archived, so this is not evidence that they were the entire open set.",
+  "base_commit": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+  "analyst": "/root/pr_integrator",
+  "analyst_role": "SCOUT_AND_CROSS_EXAMINATION_INPUT_ONLY",
+  "court_disposition": false,
+  "separation_note": "This one analyst's recommendations are evidence for the V4 court. They are not Curator findings, Judge verdicts, merge decisions, or completed courtroom dispositions.",
+  "pull_requests": [
+    {"number": 157, "head": "c0a0df8004ec7edff1238129e5356cdfe4e87246", "url": "https://github.com/kb4beast/hive-mind-os/pull/157", "scout_recommendation": "QUARANTINE", "reason": "Competing external business plan with unresolved sources, wrong governance tier, and incomplete role coverage."},
+    {"number": 158, "head": "6c88f3a80acaca8da33f7f73fcdb7fdd727f15de", "url": "https://github.com/kb4beast/hive-mind-os/pull/158", "scout_recommendation": "QUARANTINE", "reason": "Contradicts PR 157 and overclaims execution and auditability without dispatcher evidence or full roles."},
+    {"number": 159, "head": "889323f084c4a7aaa9318eeced8cacca5f8b70d1", "url": "https://github.com/kb4beast/hive-mind-os/pull/159", "scout_recommendation": "ADAPT_DEFER", "reason": "Optional visualization and sample; requires governed review and Optimizer coverage."},
+    {"number": 160, "head": "97b9e0f3469fa0cbe1572d4080b4d5276a79b0ea", "url": "https://github.com/kb4beast/hive-mind-os/pull/160", "scout_recommendation": "ADAPT_DEFER", "reason": "Optional test expansion; no CI ran and a subprocess mock contradicts text mode."},
+    {"number": 161, "head": "00b5dc95ed1090ea603218dbcd02d59b05d05603", "url": "https://github.com/kb4beast/hive-mind-os/pull/161", "scout_recommendation": "ADAPT_WITH_163", "reason": "CodeQL init-only update creates a version mismatch."},
+    {"number": 162, "head": "9497832cc3d867387884f102e1ddd5791cf463fa", "url": "https://github.com/kb4beast/hive-mind-os/pull/162", "scout_recommendation": "DEFER", "reason": "Optional SBOM update without baseline-green CI or review."},
+    {"number": 163, "head": "eecae8d5de85aae3b5fa572aea4559ec687bb4de", "url": "https://github.com/kb4beast/hive-mind-os/pull/163", "scout_recommendation": "ADAPT_WITH_161", "reason": "CodeQL analyze-only update creates the inverse version mismatch."},
+    {"number": 164, "head": "1e299b5238518f36b5be72c82cc615e9c5101238", "url": "https://github.com/kb4beast/hive-mind-os/pull/164", "scout_recommendation": "QUARANTINE_AS_SUBMITTED_ADAPT_IDEA", "reason": "Mutates a V3-frozen compiler without re-sealing its digest-bound evidence; portable root resolution belongs in a versioned successor."}
+  ],
+  "scout_merge_recommendation": "MERGE_NONE_AS_SUBMITTED",
+  "retention": "Keep every branch and adverse check as losing evidence; do not silently copy or close it as part of V4."
+}

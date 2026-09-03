@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-7",
+  "captured_at_utc": "2026-09-03T09:53:29Z",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "staged_tree": "7b1de2bf5e915486d192a5ed6884011a10e2d870",
+  "observer": "/root",
+  "source_observation": {
+    "codex_rollout_id": "01a0631f-d93c-7ec0-a772-ea76d52085f3",
+    "stress_launch_ordinal": 18188,
+    "failure_output_ordinal": 18213,
+    "cancelled_process_ordinal": 18241,
+    "failed_process_id": "exec-5f402a89-2f38-4f19-9418-e11cb018dea0"
+  },
+  "stress": {
+    "test": "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_writes_review_evidence_without_authorizing_activation",
+    "warning_policy": "error::ResourceWarning",
+    "concurrent": {
+      "planned_iterations": 4,
+      "completed_iterations": 4,
+      "passes": 4,
+      "failures": 0,
+      "duration_milliseconds": [32271, 32219, 32258, 32323]
+    },
+    "sequential": {
+      "planned_iterations": 12,
+      "completed_iterations_before_owner_cancellation": 6,
+      "passes": 5,
+      "failures": 1,
+      "results": [
+        {"iteration": 1, "exit_code": 0, "duration_milliseconds": 32274},
+        {"iteration": 2, "exit_code": 0, "duration_milliseconds": 28052},
+        {"iteration": 3, "exit_code": 1, "duration_milliseconds": 75144},
+        {"iteration": 4, "exit_code": 0, "duration_milliseconds": 27296},
+        {"iteration": 5, "exit_code": 0, "duration_milliseconds": 27299},
+        {"iteration": 6, "exit_code": 0, "duration_milliseconds": 28087}
+      ],
+      "cancellation_reason": "The remaining six repetitions were superseded after the retained module transcript localized an actionable test-harness defect."
+    }
+  },
+  "localized_failure": {
+    "collector_timeout_scope": "module_process",
+    "module": "tests.test_integration_transaction",
+    "test": "tests.test_integration_transaction.IntegrationTransactionTests.test_round_aliases_converge_on_one_transaction_and_cas_owner",
+    "module_timeout_seconds": 60,
+    "unittest_reported_duration_seconds": 75.047,
+    "outer_test_duration_milliseconds": 75144,
+    "terminal_marker_present": false,
+    "collector_disposition": "FAILED_CLOSED_WITH_RETAINED_TRANSCRIPT",
+    "faulthandler_observations": 3,
+    "main_thread_stack": [
+      "C:\\Python314\\Lib\\threading.py:369 in wait",
+      "C:\\Python314\\Lib\\threading.py:404 in wait_for",
+      "C:\\Python314\\Lib\\threading.py:775 in _wait",
+      "C:\\Python314\\Lib\\threading.py:740 in wait",
+      "tests/test_integration_transaction.py:372 in test_round_aliases_converge_on_one_transaction_and_cas_owner"
+    ],
+    "worker_stacks": [
+      "ThreadPoolExecutor-0_1: C:\\Python314\\Lib\\concurrent\\futures\\thread.py:116 in _worker",
+      "ThreadPoolExecutor-0_0: C:\\Python314\\Lib\\concurrent\\futures\\thread.py:116 in _worker"
+    ],
+    "observed_state": "The main test thread remained in commit_start.wait() while both executor workers were idle in the worker loop. The worker futures had therefore returned or raised before satisfying the three-party commit barrier.",
+    "unknown_obligation": "The pre-barrier worker exception or return cause is not present in the original transcript because the main thread never inspected either future. No production deadlock claim follows until that cause is reproduced."
+  },
+  "first_cause": {
+    "classification": "UNBOUNDED_THREE_PARTY_TEST_BARRIER_MASKS_PRE_BARRIER_WORKER_FAILURES",
+    "explanation": "The test uses unbounded three-party Barrier.wait calls in the main thread and both workers. If either worker raises before the commit barrier, the main thread waits forever and the future exception remains hidden. Executor context shutdown can also wait indefinitely unless the compare-and-swap hold is released on every exit path."
+  },
+  "correction": [
+    "Give every barrier wait a short explicit timeout and convert a broken barrier into diagnostics from both futures.",
+    "Release or abort compare-and-swap synchronization in a finally block.",
+    "Collect both futures with bounded diagnostic waits and retain the collector's 60-second child-process deadline as hard containment for an arbitrary production hang.",
+    "Reproduce the underlying worker result after the harness becomes observable; fix production code only if that evidence identifies a production defect."
+  ],
+  "disposition": "REJECT_7B1DE2BF_AS_FINAL_TREE_AND_ADAPT_TEST_SYNCHRONIZATION_WITH_BOUNDED_FAIL_FAST_DIAGNOSTICS",
+  "nonclaims": [
+    "This receipt proves a test-harness liveness and observability defect, not a production integration deadlock.",
+    "The collector contained and localized the stall; it does not establish why a worker left before the commit barrier.",
+    "Future.result timeouts do not terminate Python worker threads; the harness bounds its own barriers and compare-and-swap hold while the collector remains the hard process-level deadline.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this attempt."
+  ],
+  "rollback": "Preserve this receipt append-only; rerun the exact test and collector stress only after bounded synchronization exposes or eliminates the hidden worker result."
+}

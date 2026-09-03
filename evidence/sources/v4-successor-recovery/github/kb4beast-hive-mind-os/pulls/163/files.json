@@ -1,0 +1,14 @@
+[
+  {
+    "sha": "58686dc614c0d33c9e1e0fe9a295a0bd359b5fe6",
+    "filename": ".github/workflows/ci.yml",
+    "status": "modified",
+    "additions": 1,
+    "deletions": 1,
+    "changes": 2,
+    "blob_url": "https://github.com/kb4beast/hive-mind-os/blob/eecae8d5de85aae3b5fa572aea4559ec687bb4de/.github%2Fworkflows%2Fci.yml",
+    "raw_url": "https://github.com/kb4beast/hive-mind-os/raw/eecae8d5de85aae3b5fa572aea4559ec687bb4de/.github%2Fworkflows%2Fci.yml",
+    "contents_url": "https://api.github.com/repos/kb4beast/hive-mind-os/contents/.github%2Fworkflows%2Fci.yml?ref=eecae8d5de85aae3b5fa572aea4559ec687bb4de",
+    "patch": "@@ -96,7 +96,7 @@ jobs:\n         with:\n           languages: python\n       - name: Analyze\n-        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6\n+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9\n \n   secret-scan:\n     name: secret-scan"
+  }
+]

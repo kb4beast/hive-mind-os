@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-remote-ci-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "candidate": {
+    "commit": "89ff95b3547eb487b69087e7326c202369e73126",
+    "tree": "764549def53b10766752a74b4ea61adfb20bf6d9",
+    "sole_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+  },
+  "runs": [
+    {
+      "run_id": 33735172127,
+      "event": "push",
+      "conclusion": "cancelled_after_three_linux_failures",
+      "successful_jobs": ["static-and-type-checks", "sbom-and-build-provenance", "secret-scan", "codeql-security"],
+      "failed_linux_jobs": [
+        {"job_id": 100583907150, "python": "3.11", "tests": 1480, "seconds": 253.309, "errors": 2, "skips": 22},
+        {"job_id": 100583907095, "python": "3.12", "tests": 1480, "seconds": 299.155, "errors": 2, "skips": 22},
+        {"job_id": 100583907129, "python": "3.14", "tests": 1480, "seconds": 287.844, "errors": 2, "skips": 22}
+      ],
+      "cancelled_jobs": ["unit-tests (Windows, Python 3.12)", "unit-tests (Windows, Python 3.14)"],
+      "expected_skipped_job": "dependency-and-license-review"
+    },
+    {
+      "run_id": 33735175632,
+      "event": "pull_request",
+      "conclusion": "cancelled_after_three_linux_failures",
+      "successful_jobs": ["static-and-type-checks", "codeql-security", "secret-scan", "dependency-and-license-review", "sbom-and-build-provenance"],
+      "failed_linux_jobs": [
+        {"job_id": 100583919321, "python": "3.11", "tests": 1480, "seconds": 250.597, "errors": 2, "skips": 22},
+        {"job_id": 100583919326, "python": "3.12", "tests": 1480, "seconds": 308.858, "errors": 2, "skips": 22},
+        {"job_id": 100583919382, "python": "3.14", "tests": 1480, "seconds": 273.864, "errors": 2, "skips": 22}
+      ],
+      "cancelled_jobs": ["unit-tests (Windows, Python 3.12)", "unit-tests (Windows, Python 3.14)"]
+    },
+    {
+      "run_id": 33735175764,
+      "event": "pull_request",
+      "workflow": "Autopilot Control Room",
+      "conclusion": "success",
+      "job_id": 100583918856
+    }
+  ],
+  "first_cause": {
+    "classification": "POSIX_DIRECTORY_SYMLINK_CLEANUP_ERROR_IN_CANDIDATE_TESTS",
+    "affected_tests": [
+      "test_control_token_economy.TestResultCacheTests.test_failure_publication_does_not_follow_a_failures_link",
+      "test_control_token_economy.TestResultCacheTests.test_cache_root_rejects_a_linked_ancestor"
+    ],
+    "exception": "NotADirectoryError: [Errno 20] Not a directory",
+    "explanation": "Both candidate-added tests call os.rmdir on a directory symlink. Windows accepts the cleanup used for its directory-link fallback, but POSIX requires unlinking the symlink itself. The same two cleanup errors occurred in all six Linux jobs across Python 3.11, 3.12, and 3.14."
+  },
+  "raw_evidence": [
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-2-python-3.11.log", "bytes": 353613, "sha256": "9c232a9122bf97c72d60886eec95bbb63826c29a4f6c4dd75dd9f904a62b994d"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-2-python-3.12.log", "bytes": 353612, "sha256": "53471fe0a78896908ff54ee972db7a9402a133678c27fe2a8a921350433df54f"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-2-python-3.14.log", "bytes": 378351, "sha256": "cc9f213f06941fad810961390b955b00b79e8bdd898b5acf73af6981445cfb03"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-2-python-3.11.log", "bytes": 355748, "sha256": "1c7f130d65cadf9966325e2133f3b9ffe855efa12ab5785235078498ff592a73"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-2-python-3.12.log", "bytes": 355740, "sha256": "a02fa0b9b8285e7bb4bbfd9ba7ceb3bda358d8d5c5aa26fdcf62f978f3dab449"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-2-python-3.14.log", "bytes": 380481, "sha256": "9029d4562d8fb3e7ca1d2f4834f12f429e0de828d2c9295d792ae755491acb53"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-2-run.json", "bytes": 12661, "sha256": "615f9fc5de2aaa79bae86cf28a62cd8b0191e51716b310ceba7b5b5aac50f8a5"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-ci-pr-attempt-2-run.json", "bytes": 12703, "sha256": "43fedcdea1abc43a0aaaf14784cc4a48d71b85c9ffb456b167237aa7ece7593c"},
+    {"path": "evidence/audits/v4-successor-recovery/logs/remote-autopilot-attempt-2-run.json", "bytes": 12725, "sha256": "24ed480bf94cb72f6255216bffe254f54fd4dacd5fb3468c08cb55f8bfbad8be"}
+  ],
+  "superseded_artifact_evidence": {
+    "artifact_id": 9885431360,
+    "name": "hive-mind-os-build-evidence",
+    "archive_bytes": 678873,
+    "archive_digest": "sha256:e9f1a8bcfd2a5bdee51365ecac717f554dd330c1296f6345d1e89fa21472bb9f",
+    "wheel_sha256": "0445b840ba2b91bdfe90ae2524e32c5954677ec3e924f5d4aa5202fc9f8455af",
+    "sbom_sha256": "e8bd7d3d21a71f8143aab37188b61bf6973654d3d2677e80581e892f8209e3e3",
+    "attestation_verification": "passed_for_both_exact_files_and_exact_89ff95b_push_run",
+    "wheel_reproduction": "229_of_229_RECORD_entries_valid; all 139 Python files equal candidate HEAD blobs",
+    "sbom": "SPDX-2.2; one hive-mind-os 0.7.0 package; MIT concluded and declared",
+    "qualification_effect": "none_because_required_push_ci_failed"
+  },
+  "disposition": "REJECT_89FF95B_AS_FINAL_CANDIDATE_AND_ADAPT_PLATFORM_SAFE_DIRECTORY_LINK_CLEANUP",
+  "nonclaims": [
+    "Passing early CI jobs, Autopilot, artifact integrity, and attestations cannot override a failed required unit-test matrix.",
+    "The two errors occurred during candidate test cleanup; they do not prove the cache followed either hostile link.",
+    "Cancelled Windows jobs and a failed push run are not successful full exact-head CI evidence.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this attempt."
+  ],
+  "rollback": "Preserve every log and run snapshot; use link unlinking for POSIX symlinks and directory removal only for Windows junction fallback, then rerun every local and remote gate on a new exact candidate."
+}

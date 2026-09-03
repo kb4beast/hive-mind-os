@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-draft-bundle-provenance-v1",
+  "recorded_at_utc": "2026-09-03T03:05:59.4696167Z",
+  "source_id": "SRC-V4-001",
+  "purpose": "Preserve the complete Git object history of the unpublished local V4 draft used as an adapted design source.",
+  "bundle": {
+    "path": "evidence/sources/v4-successor-recovery/src-v4-001-local-draft.bundle",
+    "bytes": 7493301,
+    "sha256": "sha256:9fa24683f1b8883cf0d465a95845699201338814d04097c59ead91e1dddd0a58",
+    "hash_algorithm": "sha1",
+    "complete_history": true,
+    "advertised_ref": "refs/heads/codex/generic-v4-main-activation",
+    "advertised_commit": "540bd310f2f58d7c335897c40f3ac8b44d4de712",
+    "advertised_tree": "abb7ecd6d2c2f2e149dbdf1faeb89618d837c284",
+    "advertised_parent": "04ba84f663a0fd67aebb5ab562fbdce7a321b104",
+    "reachable_commit_count": 710
+  },
+  "source": {
+    "repository_at_capture": "local:C:/Users/beesp/Downloads/Trash/HiveMindTrash/hive-mind-os-v4",
+    "branch": "codex/generic-v4-main-activation",
+    "commit": "540bd310f2f58d7c335897c40f3ac8b44d4de712",
+    "tree": "abb7ecd6d2c2f2e149dbdf1faeb89618d837c284",
+    "parent": "04ba84f663a0fd67aebb5ab562fbdce7a321b104",
+    "committed_at": "2026-08-24T09:13:30-05:00",
+    "worktree_clean_at_capture": true,
+    "configured_origin_at_capture": "local:C:/Users/beesp/.codex/worktrees/8c87/hive-mind-os",
+    "published_to_github": false,
+    "license": {
+      "spdx": "MIT",
+      "path_at_tip": "LICENSE",
+      "git_blob": "06da1af7996f5e2b059cd52045e36f9f2cfac201",
+      "bytes": 1065,
+      "included_in_bundle": true
+    }
+  },
+  "adapted_commit_range": {
+    "exclusive_base": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+    "linear_commit_count": 6,
+    "commits_oldest_first": [
+      "9b4820a848a43f54743f37c9faa7c6535e8e368a",
+      "9e80713e8972ac50df8d1ddbd05002c2ffaee8ff",
+      "83f5ca01d6cd561db8da20f642777e3309be11b7",
+      "28af6b0d2bf703883a3f202a5851536789ab2c70",
+      "04ba84f663a0fd67aebb5ab562fbdce7a321b104",
+      "540bd310f2f58d7c335897c40f3ac8b44d4de712"
+    ]
+  },
+  "verification": {
+    "standalone_empty_repository_bundle_verify": "PASS",
+    "standalone_fetch_ref": "refs/heads/source-v4",
+    "standalone_fetched_tip": "540bd310f2f58d7c335897c40f3ac8b44d4de712",
+    "network_required_for_consumption": false
+  },
+  "nonclaims": [
+    "The archived draft is source evidence, not an executable or approved candidate.",
+    "The bundle authenticates retained bytes only after its raw SHA-256 is checked; it does not authenticate the original author or grant authority.",
+    "No draft commit was cherry-picked into the successor unchanged."
+  ]
+}

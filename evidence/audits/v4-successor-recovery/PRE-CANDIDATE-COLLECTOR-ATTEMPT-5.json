@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-repair-validation-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-5",
+  "captured_at_utc": "2026-09-03T09:34:19.0444643Z",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "implementation_staged_tree": "80f08216013736643e7ea9c3044dd6668ba1268e",
+  "worktree_matched_index": true,
+  "bytecode_free_after": true,
+  "observer": "/root",
+  "independent_cross_examiner": "/root/ci_artifact_guard",
+  "focused_contract": {
+    "module_count": 29,
+    "expected_test_count": 282,
+    "fresh_child_per_module": true,
+    "warning_policy": "error::ResourceWarning",
+    "overall_timeout_milliseconds": 180000,
+    "maximum_module_timeout_milliseconds": 60000,
+    "terminal_result": "PARENT_GENERATED_RANDOM_MARKER_WITH_EXACT_PER_MODULE_COUNT",
+    "qualification_requires_exact_inventory": true
+  },
+  "validation": {
+    "powershell_parse": "PASS",
+    "diff_check": "PASS",
+    "ruff_affected_files": "PASS",
+    "pyright": "PASS_WITH_ZERO_ERRORS_AND_SIX_PREEXISTING_WARNINGS",
+    "control_token_economy": {
+      "tests": 14,
+      "result": "PASS_WARNING_FATAL",
+      "seconds": 0.443
+    },
+    "collector_module": {
+      "tests": 8,
+      "result": "PASS_WARNING_FATAL",
+      "seconds": 37.081,
+      "deterministic_timeout_regression": "PASS_1MS_MODULE_TIMEOUT_EMPTY_STDOUT_EXACT_MODULE_EXIT_124_AND_RETAINED_TRANSCRIPT"
+    },
+    "sequential_stress": {
+      "command": "python -B -W error::ResourceWarning -m unittest tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_writes_review_evidence_without_authorizing_activation -q",
+      "passed": 12,
+      "failed": 0,
+      "duration_milliseconds": [31723, 27657, 27389, 27429, 27442, 27350, 27183, 27280, 27401, 27183, 27286, 27090]
+    },
+    "concurrent_stress": {
+      "same_command": true,
+      "passed": 4,
+      "failed": 0,
+      "duration_milliseconds": [31773, 31650, 31719, 31813]
+    },
+    "independent_adversarial_review": "NO_REMAINING_FUNCTIONAL_BLOCKER_IN_C68_C69_C70_C71"
+  },
+  "orchestration_note": {
+    "event": "The sequential and concurrent shells redundantly invoked git write-tree at launch; one sequential metadata read encountered a transient index.lock and returned no echoed tree before its first test.",
+    "effect": "The index remained unchanged; the tree was observed immediately before launch, by the concurrent lane, and again after all stress as 80f08216013736643e7ea9c3044dd6668ba1268e. Every sequential test then executed successfully.",
+    "claim_limit": "Do not treat the blank redundant echo as a separate tree observation."
+  },
+  "disposition": "ADAPT_REPAIRS_PASS_FOCUSED_AND_STRESS_VALIDATION_PENDING_EXACT_FULL_GATE_CLEAN_COLLECTOR_REMOTE_CI_CURATOR_AND_JUDGE",
+  "nonclaims": [
+    "The previously observed attempt-4 failure remains genuine adverse evidence and is not erased by this pass.",
+    "Child deadlines exclude bounded process-tree termination and output-drain cleanup tails; cumulative diagnostic rewrites are not crash-atomic custody.",
+    "The random terminal marker prevents accidental transcript collision but cannot resist hostile code in the same child process.",
+    "Human-readable module frames are diagnostic and not collision-proof authenticated framing.",
+    "Fresh child processes do not exercise cross-module interpreter-state interactions; the combined exact full suite and remote matrix remain required.",
+    "This staged implementation tree does not include this receipt and is not the final candidate tree.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this validation."
+  ],
+  "rollback": "Preserve attempts 3, 4, and 5 together; reject the successor if the receipt-bearing frozen tree fails any exact local, remote, Curator, or Judge gate."
+}

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-journal-concurrency-adverse-and-repair-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-8",
+  "captured_at_utc": "2026-09-03T10:08:01.0859152Z",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "pre_repair_staged_tree": "7b1de2bf5e915486d192a5ed6884011a10e2d870",
+  "diagnostic_repair_worktree": {
+    "frozen_candidate": false,
+    "diff_sha1": "7fb7ea3b46d88c6033263efebe4322ba3c598e01",
+    "reason": "The bounded C73 harness and journal repair were intentionally unstaged while the underlying failure was reproduced."
+  },
+  "observers": ["/root/v4_quality_reviewer", "/root"],
+  "concurrent_verification_probe": {
+    "source_state": "SUPERSEDED_UNLOCKED_CANDIDATE_STATE_JOURNAL",
+    "python": "3.14",
+    "flags": ["-I", "-B", "-X", "utf8", "-W", "error::ResourceWarning"],
+    "fixture": "Two integration-ready candidates in one in-memory CandidateStateJournal; two synchronized threads each call journal.verify() 500 times.",
+    "verification_calls": 1000,
+    "duration_seconds": 1.073,
+    "failure_count": 133,
+    "distinct_failures": [
+      "CandidateStateError: candidate history contains invalid JSON",
+      "CandidateStateError: candidate history event digest is invalid",
+      "CandidateStateError: candidate history hash chain is broken",
+      "CandidateStateError: candidate history index disagrees with payload",
+      "CandidateStateError: candidate history sequence is discontinuous"
+    ],
+    "exit_code": 0,
+    "exit_code_explanation": "The diagnostic probe retained and counted every exception instead of treating them as an unhandled process failure."
+  },
+  "bounded_integration_reproduction": {
+    "source_state": "C73_BOUNDED_TEST_HARNESS_WITH_UNLOCKED_CANDIDATE_STATE_JOURNAL",
+    "first_observed_failure_iteration": 3,
+    "first_output": "commit barrier broke; worker 1: IntegrationError: candidate-state journal is invalid; worker 2: IntegrationError: candidate-state journal is invalid",
+    "cause_observed_failure_iteration": 11,
+    "cause_output": "commit barrier broke; worker 1: IntegrationError: candidate-state journal is invalid caused by CandidateStateError: candidate history sequence is discontinuous; worker 2: IntegrationError: candidate-state journal is invalid caused by CandidateStateError: candidate history sequence is discontinuous",
+    "per_failure_duration_seconds": 5.0,
+    "external_effect_observed": false
+  },
+  "journal_lock_audit": {
+    "connection_configuration": "sqlite3.connect(..., check_same_thread=False)",
+    "existing_same_handle_lock": "threading.RLock",
+    "unlocked_public_operations": [
+      "CandidateStateJournal.verify full connection read",
+      "CandidateStateJournal.transition initial idempotency SELECT and read/validate/append sequence",
+      "CandidateStateJournal.close"
+    ],
+    "already_locked_operations": [
+      "CandidateStateJournal.latest",
+      "CandidateStateJournal.history",
+      "CandidateStateJournal._append",
+      "CandidateStateJournal.checkpoint through _append"
+    ],
+    "first_cause": "The public verify path bypassed the journal RLock, so concurrent callers used the same SQLite connection and observed impossible mixed row values. IntegrationCoordinator.prepare invokes this public verify path before its already-locked latest checks."
+  },
+  "repair": {
+    "implementation": [
+      "Hold the same reentrant journal lock across verify and close.",
+      "Hold the lock across the complete transition retry-read, validation, and nested append path.",
+      "Retain the existing lock in latest, history, and _append; reentrancy preserves their nested calls."
+    ],
+    "regressions": [
+      "Deterministically prove that a second same-handle verifier cannot enter connection reads while the first verifier holds them.",
+      "Run 1000 synchronized same-handle verification calls.",
+      "Prove two same-handle transitions retain exactly one compare-and-swap winner.",
+      "Retain the bounded concurrent integration-alias test and its complete worker-cause diagnostics."
+    ],
+    "independent_post_repair_probe": {
+      "verification_calls": 1000,
+      "failure_count": 0,
+      "duration_seconds": 1.064,
+      "observer": "/root/v4_quality_reviewer"
+    }
+  },
+  "constructor_failure_probe": {
+    "classification": "POST_CONNECT_CONSTRUCTOR_REJECTION_LEAKS_SQLITE_CONNECTION",
+    "fixture": "Create a valid file-backed journal, insert a malformed durable event through an independent SQLite connection, close that writer, then construct CandidateStateJournal under Python 3.14 warning-fatal and force garbage collection.",
+    "constructor_result": "CandidateStateError: candidate snapshot has an unknown shape",
+    "stderr": [
+      "Exception ignored while finalizing database connection <sqlite3.Connection object>",
+      "ResourceWarning: unclosed database in <sqlite3.Connection object>"
+    ],
+    "gc_collected": 28,
+    "process_exit_code": 0,
+    "required_repair": "Close the just-opened connection if schema initialization or initial verification raises, then re-raise the original exception.",
+    "post_repair_probe": {
+      "constructor_result": "CandidateStateError: candidate snapshot has an unknown shape",
+      "gc_collected": 15,
+      "resource_warning_present": false,
+      "process_exit_code": 0,
+      "independent_variant": "A malformed empty payload produced CandidateStateError: candidate history contains invalid JSON and gc_complete_without_resource_warning for /root/v4_quality_reviewer."
+    },
+    "fixture_distinction": "The root probe inserted canonical JSON with an unknown empty object shape; the independent Curator variant inserted an invalid empty payload. Both force post-connect initial verification failure, but their expected CandidateStateError messages differ."
+  },
+  "disposition": "REJECT_UNLOCKED_SHARED_CONNECTION_AND_LEAKING_CONSTRUCTOR; ADAPT_WITH_COMPLETE_SAME_HANDLE_LOCK_COVERAGE_AND_FAILURE_ATOMIC_INITIALIZATION",
+  "nonclaims": [
+    "The observed concurrency defect failed closed and caused false rejection; no journal corruption, false acceptance, or external side effect was observed.",
+    "A process-local RLock serializes one CandidateStateJournal object only; cross-handle consistency continues to rely on SQLite transactions and is not broadened by this repair.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this attempt."
+  ],
+  "rollback": "Preserve this receipt append-only; freeze a new candidate only after warning-fatal journal and integration regressions plus renewed collector stress pass."
+}

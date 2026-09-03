@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v3-r4-delta-bundle-provenance-v1",
+  "created_at_utc": "2026-09-03T00:36:57.194Z",
+  "purpose": "Permit successor tests to reconstruct and exercise the exact frozen R4 payload without reading changed V4 working-tree files or relying on a mutable remote ref.",
+  "bundle": {
+    "path": "tests/fixtures/generic-v3-r4.bundle",
+    "bytes": 683892,
+    "sha256": "sha256:265ee2e6dece8a47e649c55b5df7e0e714a60e631126bc76874731e20cfdabdf",
+    "hash_algorithm": "sha1",
+    "prerequisite_commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+    "advertised_ref": "refs/heads/codex/v3-squash-proof-recovery-r4",
+    "advertised_commit": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+    "advertised_tree": "86e502763fcfd924094ba8194dd0c31b114652a9",
+    "commit_count_after_prerequisite": 1
+  },
+  "source": {
+    "repository": "kb4beast/hive-mind-os",
+    "source_branch": "codex/v3-squash-proof-recovery-r4",
+    "source_commit": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+    "source_tree": "86e502763fcfd924094ba8194dd0c31b114652a9",
+    "source_parent": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+    "license": "MIT-repository-context"
+  },
+  "generation": {
+    "command": "git bundle create generic-v3-r4.bundle codex/v3-squash-proof-recovery-r4 ^28463ae6dd842b0b316fcf99eab98804cdaf9735",
+    "creator": "/root",
+    "content_policy": "one exact commit and its reachable objects beyond the declared prerequisite",
+    "network_required_for_consumption": false
+  },
+  "nonclaims": [
+    "The bundle does not change or requalify R4.",
+    "The bundle does not grant execution, activation, release, deployment, or merge authority.",
+    "The bundle must be authenticated by raw SHA-256 before Git parses it."
+  ],
+  "rollback": "Remove the V4-only bundle and its successor harness changes together; preserve the R4 qualification receipt and remote branch."
+}

@@ -29,6 +29,14 @@ GENERIC_PROMPT_SOURCE = {
     "license": "unresolved-no-repository-license-declared",
 }
 
+DAG_AUTHORING_STANDARD = {
+    "standard_version": 1,
+    "source_path": "docs/execution/DAG_AUTHORING_STANDARD.md",
+    "installed_path": ".hive-mind/dag-authoring-standard.md",
+    "sha256": "86d1c1c81a27fc3e3ffd931193e0e145030756f78b58c674e8ba8b1c1bd3397d",
+    "bytes": 27006,
+}
+
 DEFAULT_OBJECTIVE = (
     "Discover and execute the strongest evidence-backed improvement for this "
     "repository within its checked-in authority and acceptance boundaries."
@@ -94,6 +102,44 @@ def _atomic_write_json(root: Path, path: Path, value: object) -> None:
         os.fsync(handle.fileno())
         temporary = Path(handle.name)
     os.replace(temporary, path)
+
+
+def _atomic_write_bytes(root: Path, path: Path, body: bytes) -> None:
+    """Atomically retain exact standard bytes inside managed repository state."""
+
+    path = _validate_managed_path(root, path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path = _validate_managed_path(root, path)
+    with tempfile.NamedTemporaryFile(
+        "wb", dir=path.parent, prefix=f".{path.name}.", delete=False
+    ) as handle:
+        handle.write(body)
+        handle.flush()
+        os.fsync(handle.fileno())
+        temporary = Path(handle.name)
+    os.replace(temporary, path)
+
+
+def _standard_source_path() -> Path:
+    return Path(__file__).resolve().parents[2] / str(DAG_AUTHORING_STANDARD["source_path"])
+
+
+def _read_authoring_standard() -> tuple[bytes, dict[str, Any]]:
+    path = _standard_source_path()
+    try:
+        body = path.read_bytes()
+    except OSError as error:
+        raise PortableAutopilotError(
+            f"packaged DAG authoring standard is missing: {path}"
+        ) from error
+    if (
+        len(body) != DAG_AUTHORING_STANDARD["bytes"]
+        or sha256(body).hexdigest() != DAG_AUTHORING_STANDARD["sha256"]
+    ):
+        raise PortableAutopilotError(
+            "packaged DAG authoring standard does not match its pin"
+        )
+    return body, dict(DAG_AUTHORING_STANDARD)
 
 
 def _git(repo: Path, args: Sequence[str]) -> str:
@@ -499,6 +545,54 @@ def _load_bootstrap_request(path: Path, root: Path) -> Mapping[str, Any]:
     return value
 
 
+def _request_standard_binding(
+    root: Path, bootstrap: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    standard = bootstrap.get("dag_authoring_standard")
+    if not isinstance(standard, Mapping) or not standard.get("sha256"):
+        raise PortableAutopilotError(
+            "portable Autopilot request predates the DAG authoring standard; "
+            "remove .hive-mind/autopilot-request.json and re-run "
+            "`hive-mind autopilot init` to bind this repository to a standard version"
+        )
+    required = {
+        "standard_version", "source_path", "installed_path", "sha256", "bytes"
+    }
+    if set(standard) != required:
+        raise PortableAutopilotError("portable Autopilot standard binding fields are invalid")
+    if type(standard.get("standard_version")) is not int or int(standard["standard_version"]) < 1:
+        raise PortableAutopilotError("portable Autopilot standard version is invalid")
+    digest = standard.get("sha256")
+    size = standard.get("bytes")
+    installed = standard.get("installed_path")
+    if (
+        not isinstance(digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        or type(size) is not int
+        or int(size) < 1
+        or not isinstance(installed, str)
+        or installed != ".hive-mind/dag-authoring-standard.md"
+    ):
+        raise PortableAutopilotError("portable Autopilot standard pin is invalid")
+    path = _validate_managed_path(root, root / installed)
+    try:
+        body = path.read_bytes()
+    except OSError as error:
+        raise PortableAutopilotError(
+            "materialized DAG authoring standard is missing; reinitialize explicitly"
+        ) from error
+    if len(body) != size or sha256(body).hexdigest() != digest:
+        raise PortableAutopilotError(
+            "materialized DAG authoring standard does not match the request pin"
+        )
+    return {
+        "standard_version": standard["standard_version"],
+        "installed_path": installed,
+        "sha256": digest,
+        "bytes": size,
+    }
+
+
 def _controller_environment() -> dict[str, str]:
     allowed = ("PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP")
     return {key: os.environ[key] for key in allowed if os.environ.get(key)}
@@ -893,6 +987,7 @@ def initialize_repository(
             "portable Autopilot target must be an unprotected integration/release branch"
         )
     _git(root, ["check-ref-format", "--branch", target_branch])
+    standard_body, standard_pin = _read_authoring_standard()
     request: dict[str, Any] = {
         "schema_version": 1,
         "kind": "hive-mind-portable-autopilot-request-v1",
@@ -926,6 +1021,7 @@ def initialize_repository(
             "protected_branch_mutation": False,
         },
         "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "dag_authoring_standard": standard_pin,
     }
     request["request_id"] = "sha256:" + sha256(_canonical_bytes(request)).hexdigest()
     path = _validate_managed_path(root, root / ".hive-mind" / "autopilot-request.json")
@@ -942,6 +1038,8 @@ def initialize_repository(
             "orchestration_requirements",
             "protection_verification",
         )
+        # A stored request stays bound to the version it was authored against.
+        # Rebinding is an explicit replacement, never an ambient package upgrade.
         if isinstance(existing, Mapping) and all(
             existing.get(key) == request.get(key) for key in stable_keys
         ):
@@ -949,6 +1047,11 @@ def initialize_repository(
         raise PortableAutopilotError(
             f"portable Autopilot request already exists: {path}; inspect it before replacing"
         )
+    _atomic_write_bytes(
+        root,
+        root / str(standard_pin["installed_path"]),
+        standard_body,
+    )
     _atomic_write_json(root, path, request)
     return {"status": "initialized", "request": request, "path": str(path)}
 
@@ -1106,6 +1209,7 @@ def _uninstalled_contract(
             "Autopilot is not initialized; run `hive-mind autopilot init --repository <path>`"
         )
     bootstrap = _load_bootstrap_request(request_path, root)
+    standard_pin = _request_standard_binding(root, bootstrap)
     if expected_bootstrap is not None and bootstrap != expected_bootstrap:
         raise PortableAutopilotError(
             "portable Autopilot persisted request changed after initialization"
@@ -1148,6 +1252,7 @@ def _uninstalled_contract(
             },
             "operator_request": request,
             "target_branch": bootstrap["target_branch"],
+            "dag_authoring_standard": standard_pin,
             "tasks": [],
             "closure_target": None,
             "outcome": "IDLE",
@@ -1171,6 +1276,16 @@ def _uninstalled_contract(
         "not authority to copy or redistribute its wording. Create "
         "machine-readable node contracts, conflict/lock data, release/integration "
         "boundaries, receipts, tests, rollback, and the portable orchestration policy. "
+        "The DAG you build MUST satisfy the DAG authoring standard retained in this "
+        f"repository at {standard_pin['installed_path']} "
+        f"(sha256 {standard_pin['sha256']}, standard version {standard_pin['standard_version']}); "
+        "verify those exact bytes before relying on them and fail closed if they differ. "
+        "That standard binds node contracts, scaffold ownership, budgeted read scopes, "
+        "durability ordering, executable rounds, per-round validation, and prompt-as-contract "
+        "rendering. The generated control plane MUST implement `dag-lint`, and "
+        "`python .autopilot/bin/autopilot.py --repo-root . dag-lint --json` MUST exit zero "
+        "with no errors or warnings against the generated DAG. Do not report success until "
+        "that receipt exists; lint findings must be corrected, never suppressed. "
         "Before any push or PR, verify current protected-ref rules and fail closed if they "
         "cannot be established. Target the configured release branch, never a protected "
         "branch. The active host must independently review the clean controller bundle "
@@ -1198,6 +1313,7 @@ def _uninstalled_contract(
         },
         "operator_request": request,
         "target_branch": bootstrap["target_branch"],
+        "dag_authoring_standard": standard_pin,
         "tasks": [
             {
                 "task_key": task_key,
@@ -1217,6 +1333,10 @@ def _uninstalled_contract(
                 },
                 "prompt": task_prompt,
                 "expected_artifact": "validated repository-resident Autopilot DAG bootstrap PR",
+                "required_receipts": [
+                    "dag-lint --json exit 0 with zero errors and warnings",
+                    "independent validation of the generated control plane",
+                ],
             }
         ],
         "closure_target": task_key,

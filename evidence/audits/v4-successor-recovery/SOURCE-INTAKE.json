@@ -1,0 +1,635 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-source-intake-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "intake_started_at_utc": "2026-09-02T21:03:50Z",
+  "last_archive_capture_at_utc": "2026-09-03T11:50:54.380Z",
+  "source_archive": {
+    "path": "evidence/sources/v4-successor-recovery/SOURCE-ARCHIVE.json",
+    "bytes": 16743,
+    "sha256": "sha256:908d82cc7bccea22e37eda43eea28d9d363528b20c6b913014b0fb080c07893c",
+    "source_ids": [
+      "SRC-V4-001",
+      "SRC-V4-002",
+      "SRC-V4-003",
+      "SRC-V4-004",
+      "SRC-V4-005",
+      "SRC-V4-006",
+      "SRC-V4-007",
+      "SRC-V4-008",
+      "SRC-V4-009",
+      "SRC-V4-010",
+      "SRC-V4-011",
+      "SRC-V4-012",
+      "SRC-V4-013"
+    ]
+  },
+  "sources": [
+    {
+      "source_id": "SRC-V4-001",
+      "type": "git-commit-range",
+      "uri": "local:C:/Users/beesp/Downloads/Trash/HiveMindTrash/hive-mind-os-v4",
+      "version": "540bd310f2f58d7c335897c40f3ac8b44d4de712",
+      "base": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+      "observed_or_retrieved_at_utc": "2026-09-03T03:05:59.4696167Z",
+      "license": "MIT-repository-context",
+      "provenance": "owner-local clean branch codex/generic-v4-main-activation; six commits created 2026-08-24; upstream configured to a local worktree and never published to GitHub",
+      "archive_binding": {
+        "entry": "SRC-V4-001",
+        "bundle_path": "evidence/sources/v4-successor-recovery/src-v4-001-local-draft.bundle",
+        "bundle_bytes": 7493301,
+        "bundle_sha256": "sha256:9fa24683f1b8883cf0d465a95845699201338814d04097c59ead91e1dddd0a58",
+        "provenance_path": "evidence/sources/v4-successor-recovery/src-v4-001-local-draft.provenance.json",
+        "complete_history": true
+      },
+      "claims": [
+        "The draft binds an exact request and target branch and describes an external signature and nonce gate.",
+        "The draft contains no executable plan and no cryptographic verification of candidate, plan, manifest, or evidence bytes.",
+        "Its nonce fixture keys consumption by nonce plus payload and permits a changed-payload replay.",
+        "Its identity check compares mutable display strings rather than structured principal and key identities."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-001",
+        "CLM-V4-002",
+        "CLM-V4-003",
+        "CLM-V4-004"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-001",
+        "CTR-V4-006"
+      ],
+      "disposition": "ADAPT"
+    },
+    {
+      "source_id": "SRC-V4-002",
+      "type": "pull-request-set",
+      "uri": "https://github.com/kb4beast/hive-mind-os/pulls?q=is%3Apr+is%3Aopen",
+      "version": "open-prs-157-through-164-observed-2026-09-02",
+      "observed_or_retrieved_at_utc": "2026-09-02T21:03:50Z",
+      "archive_captured_at_utc": "2026-09-03T03:06:00Z",
+      "license": "MIT-repository-context",
+      "provenance": "GitHub CLI authenticated read-only inspection of exact head/base OIDs, files, reviews, and checks",
+      "archive_binding": {
+        "entry": "SRC-V4-002",
+        "provider_snapshot_root": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls",
+        "derived_assessment_path": "evidence/audits/v4-successor-recovery/OPEN-PR-DISPOSITIONS.json",
+        "derived_assessment_sha256": "sha256:1a02f5fd4214429ab862f148ddf480a11202fc9e6758c5bf5e164bab0502e658"
+      },
+      "claims": [
+        "The individually observed pull requests 157 through 164 were based on 59a5364501c5e49ceb28574aad7a4ac1512291b9 and inherited the broken V3-history CI setup.",
+        "None of the individually observed pull requests 157 through 164 had a completed independent review in the archived responses.",
+        "None of the individually observed pull requests 157 through 164 was a complete V4 successor candidate."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-005",
+        "CLM-V4-006",
+        "CLM-V4-007"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-002",
+        "CTR-V4-007"
+      ],
+      "disposition": "ADAPT_INDIVIDUALLY"
+    },
+    {
+      "source_id": "SRC-V4-003",
+      "type": "official-documentation",
+      "uri": "https://raw.githubusercontent.com/python/cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/Doc/library/os.rst",
+      "version": "cpython-v3.14.0-peeled-commit-ebf955df7a89ed0c7968f79faec1de49f61ed7cb",
+      "observed_or_retrieved_at_utc": "2026-09-02T22:42:54.057Z",
+      "license": "Python-documentation-license",
+      "provenance": "Exact source and license bytes already archived by the qualified R4 intake as SRC-V3R-PYTHON-STAT-001.",
+      "archive_binding": {
+        "entry": "SRC-V4-003",
+        "reused_source_id": "SRC-V3R-PYTHON-STAT-001",
+        "archive_path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+        "archive_sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e"
+      },
+      "claims": [
+        "Windows st_ctime is deprecated as creation time from Python 3.12 and st_birthtime_ns exposes creation time."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-008"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-008"
+      ],
+      "disposition": "ADOPT_FOR_WINDOWS_CONTINUITY"
+    },
+    {
+      "source_id": "SRC-V4-004",
+      "type": "official-documentation",
+      "uri": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/sdk-api-src/content/winbase/ns-winbase-file_basic_info.md",
+      "version": "microsoftdocs-sdk-api-commit-788888c51ea955dae21e60c5e243c0a8593df8a6",
+      "observed_or_retrieved_at_utc": "2026-09-02T22:42:54.057Z",
+      "license": "Microsoft-documentation-terms",
+      "provenance": "Exact source and license bytes already archived by the qualified R4 intake as SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001.",
+      "archive_binding": {
+        "entry": "SRC-V4-004",
+        "reused_source_id": "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001",
+        "archive_path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+        "archive_sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e"
+      },
+      "claims": [
+        "ChangeTime is metadata change time and LastWriteTime is data-stream write time."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-009"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-008"
+      ],
+      "disposition": "ADOPT_FOR_WINDOWS_CONTINUITY"
+    },
+    {
+      "source_id": "SRC-V4-005",
+      "type": "official-documentation",
+      "uri": "https://raw.githubusercontent.com/git/git/67ad42147a7acc2af6074753ebd03d904476118f/Documentation/git-bundle.adoc",
+      "version": "git-v2.53.0-peeled-commit-67ad42147a7acc2af6074753ebd03d904476118f",
+      "observed_or_retrieved_at_utc": "2026-09-02T22:42:54.057Z",
+      "license": "GPL-2.0-only",
+      "provenance": "Exact source and license bytes already archived by the qualified R4 intake as SRC-V3R-GIT-BUNDLE-001.",
+      "archive_binding": {
+        "entry": "SRC-V4-005",
+        "reused_source_id": "SRC-V3R-GIT-BUNDLE-001",
+        "archive_path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+        "archive_sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e"
+      },
+      "claims": [
+        "A bundle carries Git refs and objects and may require prerequisite commits; bundle verify checks format and prerequisites."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-010",
+        "CLM-V4-011"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-005"
+      ],
+      "disposition": "ADOPT_FOR_SQUASH_PROOF_HISTORY"
+    },
+    {
+      "source_id": "SRC-V4-006",
+      "type": "repository-ci-observation",
+      "uri": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "version": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "observed_or_retrieved_at_utc": "2026-09-03T03:06:00Z",
+      "license": "MIT-repository-context",
+      "provenance": "Authenticated GitHub CLI inspection of exact run logs, artifact 9871406573, and GitHub build-provenance attestation",
+      "archive_binding": {
+        "entry": "SRC-V4-006",
+        "provider_snapshot_root": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/actions/runs/33694910734",
+        "qualification_receipt_path": "evidence/audits/generic-v3-baseline-recovery/V3-R4-QUALIFICATION.json",
+        "qualification_receipt_sha256": "sha256:e4b1a287bb49b961afa4c68ab3849a975853e4b8ebd324bd7761c059cccb51fb",
+        "cross_examination_path": "evidence/audits/v4-successor-recovery/SBOM-EVIDENCE-GAP.json",
+        "cross_examination_sha256": "sha256:5b42b5d58b59c19f4391c4d55fdff1d6f095857febddee5faaf00e573c03ec89"
+      },
+      "claims": [
+        "R4 passed the full Linux and Windows matrix.",
+        "Its build-evidence artifact retained only the wheel and its attestation named only that wheel.",
+        "A successful job conclusion cannot substitute for checking the claimed evidence subjects."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-012",
+        "CLM-V4-013",
+        "CLM-V4-014"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-003",
+        "CTR-V4-007"
+      ],
+      "disposition": "ADAPT_R4_AS_INERT_PREDECESSOR"
+    },
+    {
+      "source_id": "SRC-V4-007",
+      "type": "official-action-manifest",
+      "uri": "https://github.com/anchore/sbom-action/blob/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/action.yml",
+      "version": "f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a",
+      "observed_or_retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "raw_sha256": "sha256:8a8ad268a69c1ba8cc468d10eeb14137e648069d859066280d6547680d501779",
+      "license": "Apache-2.0",
+      "provenance": "GitHub repository API retrieval of exact commit-addressed upstream file bytes; no commit-signature verification evidence was retained",
+      "archive_binding": {
+        "entry": "SRC-V4-007",
+        "path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/action.yml"
+      },
+      "claims": [
+        "The pinned action accepts artifact-name but does not accept output-file, upload-artifact, or upload-release-assets."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-015"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-004"
+      ],
+      "disposition": "ADOPT_FOR_CI_CONTRACT"
+    },
+    {
+      "source_id": "SRC-V4-008",
+      "type": "official-action-manifest",
+      "uri": "https://github.com/anchore/sbom-action/blob/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/download-syft/action.yml",
+      "version": "f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a",
+      "observed_or_retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "raw_sha256": "sha256:a025ceb3598b59757472ba2ed15ec2a3352cb2e0ffb3de9ec084095856ad6a2b",
+      "license": "Apache-2.0",
+      "provenance": "GitHub repository API retrieval of exact commit-addressed upstream file bytes; no commit-signature verification evidence was retained",
+      "archive_binding": {
+        "entry": "SRC-V4-008",
+        "path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/download-syft/action.yml"
+      },
+      "claims": [
+        "The pinned download-syft sub-action exports a command path and accepts an explicit Syft version."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-016"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-004"
+      ],
+      "disposition": "ADOPT_FOR_FAIL_CLOSED_SBOM_GENERATION"
+    },
+    {
+      "source_id": "SRC-V4-009",
+      "type": "official-action-source",
+      "uri": "https://github.com/anchore/sbom-action/blob/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/src/SyftVersion.ts",
+      "version": "f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a",
+      "observed_or_retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "raw_sha256": "sha256:ee161181a498f0f5c4ff2aa91f42c307257d31be4e147b79a42e025da9994451",
+      "license": "Apache-2.0",
+      "provenance": "GitHub repository API retrieval of exact commit-addressed upstream file bytes; no commit-signature verification evidence was retained",
+      "archive_binding": {
+        "entry": "SRC-V4-009",
+        "path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/src/SyftVersion.ts"
+      },
+      "claims": [
+        "The exact action release selected Syft v0.42.2 by default."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-017"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-004"
+      ],
+      "disposition": "ADOPT_AS_EXPLICIT_TOOL_PIN"
+    },
+    {
+      "source_id": "SRC-V4-010",
+      "type": "official-documentation",
+      "uri": "https://github.com/anchore/syft/blob/v0.42.2/README.md",
+      "version": "v0.42.2",
+      "observed_or_retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "raw_sha256": "sha256:96b0a3def5de842c4f640045921910c1abbfa240e99cf57d3f8237c50e5545df",
+      "license": "Apache-2.0",
+      "provenance": "GitHub repository API retrieval of the exact versioned upstream documentation",
+      "archive_binding": {
+        "entry": "SRC-V4-010",
+        "path": "evidence/sources/v4-successor-recovery/syft/v0.42.2/README.md"
+      },
+      "claims": [
+        "Syft v0.42.2 supports directory package scans and spdx-json=file output."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-018",
+        "CLM-V4-019"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-004"
+      ],
+      "disposition": "ADOPT_FOR_FAIL_CLOSED_SBOM_GENERATION"
+    },
+    {
+      "source_id": "SRC-V4-011",
+      "type": "derived-git-bundle-evidence",
+      "uri": "tests/fixtures/generic-v3-r4.bundle",
+      "version": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "observed_or_retrieved_at_utc": "2026-09-03T00:36:57.194Z",
+      "raw_sha256": "sha256:265ee2e6dece8a47e649c55b5df7e0e714a60e631126bc76874731e20cfdabdf",
+      "license": "MIT-repository-context",
+      "provenance": "Locally generated from the exact qualified R4 commit as one prerequisite-bound delta; complete generation and nonclaim record is tests/fixtures/generic-v3-r4.provenance.json",
+      "archive_binding": {
+        "entry": "SRC-V4-011",
+        "path": "tests/fixtures/generic-v3-r4.bundle",
+        "provenance_path": "tests/fixtures/generic-v3-r4.provenance.json",
+        "provenance_sha256": "sha256:a21ad70a1972afb98819615fa55ff0c2a40288740aaef86a1eac43c744c20fa1"
+      },
+      "claims": [
+        "A successor harness can reconstruct exact R4 bytes without reading changed V4 working-tree files or fetching a mutable remote branch.",
+        "The delta bundle is invalid without exact prerequisite 28463ae6dd842b0b316fcf99eab98804cdaf9735."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-020",
+        "CLM-V4-021"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-005"
+      ],
+      "disposition": "ADOPT_FOR_FROZEN_PREDECESSOR_TESTING"
+    },
+    {
+      "source_id": "SRC-V4-012",
+      "type": "official-standard",
+      "uri": "https://github.com/spdx/spdx-spec/releases/tag/v2.2.2",
+      "version": "v2.2.2 annotated-tag-7984b095909251d84f322116f6612ca8eacfa63e peeled-commit-a05c12a2dd4652b1396fd2659f2cd3ea1f37faba",
+      "observed_or_retrieved_at_utc": "2026-09-03T11:50:54.380Z",
+      "raw_sha256": "sha256:111e61e420c8d235d9bd4676e7e33b348357d779e0a57b8ffc485c76f987bbc1",
+      "license": "CC-BY-3.0",
+      "provenance": "GitHub raw retrieval of exact peeled-commit source bytes; the annotated tag and peeled commit were observed as unsigned, so tag authenticity is not asserted.",
+      "archive_binding": {
+        "entry": "SRC-V4-012",
+        "document_creation_information_path": "evidence/sources/v4-successor-recovery/spdx-spec/v2.2.2/chapters/document-creation-information.md",
+        "package_information_path": "evidence/sources/v4-successor-recovery/spdx-spec/v2.2.2/chapters/package-information.md"
+      },
+      "claims": [
+        "SPDX 2.2.2 clause 6.9 requires one Created field in whole-second UTC format YYYY-MM-DDThh:mm:ssZ.",
+        "SPDX 2.2.2 clause 7.17 requires one package Copyright Text field and permits NOASSERTION when no assertion is available."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-022",
+        "CLM-V4-023"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-009"
+      ],
+      "disposition": "ADOPT_FOR_STANDARDS_AWARE_SPDX_NORMALIZATION_AND_VALIDATION"
+    },
+    {
+      "source_id": "SRC-V4-013",
+      "type": "official-validator-tool-and-release",
+      "uri": "https://github.com/spdx/tools-python/releases/tag/v0.8.5",
+      "version": "v0.8.5 commit-cef432adee09dbff2eedf7e33e4aa8be7c11ccfd wheel-sha256-7c2d5865941be9d2e898f5b084e8d5422dd298dc5a29320ddb198fec304f59c4",
+      "observed_or_retrieved_at_utc": "2026-09-03T11:50:54.380Z",
+      "raw_sha256": "sha256:7c2d5865941be9d2e898f5b084e8d5422dd298dc5a29320ddb198fec304f59c4",
+      "license": "Apache-2.0",
+      "provenance": "GitHub raw retrieval of exact commit-addressed source files and PyPI retrieval of the exact wheel plus release metadata; the observed Git commit was unsigned, so commit-signature authenticity is not asserted.",
+      "archive_binding": {
+        "entry": "SRC-V4-013",
+        "wheel_path": "evidence/sources/v4-successor-recovery/spdx-tools/v0.8.5/spdx_tools-0.8.5-py3-none-any.whl",
+        "cli_source_path": "evidence/sources/v4-successor-recovery/spdx-tools/v0.8.5/src/spdx_tools/spdx/clitools/pyspdxtools.py"
+      },
+      "claims": [
+        "The exact spdx-tools 0.8.5 distribution exposes the pyspdxtools validation CLI and can reject the observed invalid SPDX 2.2 document."
+      ],
+      "supports_claim_ids": [
+        "CLM-V4-024"
+      ],
+      "supports_counterclaim_ids": [
+        "CTR-V4-009"
+      ],
+      "disposition": "ADOPT_AS_HASH_PINNED_STANDARDS_VALIDATOR"
+    }
+  ],
+  "atomic_claims": [
+    {
+      "claim_id": "CLM-V4-001",
+      "source_ids": ["SRC-V4-001"],
+      "counterclaim_ids": ["CTR-V4-001", "CTR-V4-006"],
+      "court_claim_ids": ["V4-C02"],
+      "statement": "The preserved local draft binds an exact request and target branch and describes an external signature and nonce gate.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADAPTATION"
+    },
+    {
+      "claim_id": "CLM-V4-002",
+      "source_ids": ["SRC-V4-001"],
+      "counterclaim_ids": ["CTR-V4-001", "CTR-V4-006"],
+      "court_claim_ids": ["V4-C02"],
+      "statement": "The preserved local draft contains no executable plan and no cryptographic verification of candidate, plan, manifest, or evidence bytes.",
+      "intake_status": "SUPPORTED_ADVERSE_INPUT"
+    },
+    {
+      "claim_id": "CLM-V4-003",
+      "source_ids": ["SRC-V4-001"],
+      "counterclaim_ids": ["CTR-V4-001"],
+      "court_claim_ids": ["V4-C02", "V4-C10"],
+      "statement": "The preserved local draft keys nonce consumption by nonce plus payload and therefore permits replay of the nonce with a changed payload.",
+      "intake_status": "SUPPORTED_ADVERSE_INPUT"
+    },
+    {
+      "claim_id": "CLM-V4-004",
+      "source_ids": ["SRC-V4-001"],
+      "counterclaim_ids": ["CTR-V4-001"],
+      "court_claim_ids": ["V4-C02", "V4-C10"],
+      "statement": "The preserved local draft compares mutable display strings instead of structured principal and key identities.",
+      "intake_status": "SUPPORTED_ADVERSE_INPUT"
+    },
+    {
+      "claim_id": "CLM-V4-005",
+      "source_ids": ["SRC-V4-002"],
+      "counterclaim_ids": ["CTR-V4-002", "CTR-V4-007"],
+      "court_claim_ids": ["V4-C01"],
+      "statement": "The archived provider responses show that the individually observed pull requests 157 through 164 were based on commit 59a5364501c5e49ceb28574aad7a4ac1512291b9.",
+      "intake_status": "SUPPORTED_POINT_IN_TIME_INPUT"
+    },
+    {
+      "claim_id": "CLM-V4-006",
+      "source_ids": ["SRC-V4-002"],
+      "counterclaim_ids": ["CTR-V4-002", "CTR-V4-007"],
+      "court_claim_ids": [],
+      "statement": "The archived review responses for the individually observed pull requests 157 through 164 were empty.",
+      "intake_status": "SUPPORTED_POINT_IN_TIME_INPUT"
+    },
+    {
+      "claim_id": "CLM-V4-007",
+      "source_ids": ["SRC-V4-002"],
+      "counterclaim_ids": ["CTR-V4-002", "CTR-V4-007"],
+      "court_claim_ids": ["V4-C01", "V4-C02"],
+      "statement": "The individually observed pull requests 157 through 164 did not constitute a complete V4 successor candidate under the recorded assessment criteria.",
+      "intake_status": "SUPPORTED_SCOUT_ASSESSMENT_PENDING_COURT"
+    },
+    {
+      "claim_id": "CLM-V4-008",
+      "source_ids": ["SRC-V4-003"],
+      "counterclaim_ids": ["CTR-V4-008"],
+      "court_claim_ids": ["V4-C15"],
+      "statement": "Python documents Windows st_ctime as deprecated for creation time from Python 3.12 and exposes creation time through st_birthtime_ns.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-009",
+      "source_ids": ["SRC-V4-004"],
+      "counterclaim_ids": ["CTR-V4-008"],
+      "court_claim_ids": ["V4-C15"],
+      "statement": "Microsoft documents ChangeTime as metadata change time and LastWriteTime as data-stream write time.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-010",
+      "source_ids": ["SRC-V4-005"],
+      "counterclaim_ids": ["CTR-V4-005"],
+      "court_claim_ids": ["V4-C01", "V4-C05"],
+      "statement": "A Git bundle carries refs and Git objects.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-011",
+      "source_ids": ["SRC-V4-005"],
+      "counterclaim_ids": ["CTR-V4-005"],
+      "court_claim_ids": ["V4-C01", "V4-C05"],
+      "statement": "A Git bundle may require prerequisite commits, and git bundle verify checks its format and prerequisite availability.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-012",
+      "source_ids": ["SRC-V4-006"],
+      "counterclaim_ids": ["CTR-V4-003", "CTR-V4-007"],
+      "court_claim_ids": ["V4-C01"],
+      "statement": "The archived R4 run completed successfully across its recorded Linux and Windows test matrix.",
+      "intake_status": "SUPPORTED_POINT_IN_TIME_INPUT"
+    },
+    {
+      "claim_id": "CLM-V4-013",
+      "source_ids": ["SRC-V4-006"],
+      "counterclaim_ids": ["CTR-V4-003", "CTR-V4-007"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "The archived R4 build-evidence artifact and verified attestation named only the wheel rather than every expected evidence subject.",
+      "intake_status": "SUPPORTED_ADVERSE_INPUT"
+    },
+    {
+      "claim_id": "CLM-V4-014",
+      "source_ids": ["SRC-V4-006"],
+      "counterclaim_ids": ["CTR-V4-003", "CTR-V4-007"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "A successful CI job conclusion does not by itself establish that each claimed evidence subject exists.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADAPTATION"
+    },
+    {
+      "claim_id": "CLM-V4-015",
+      "source_ids": ["SRC-V4-007"],
+      "counterclaim_ids": ["CTR-V4-004"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "The pinned sbom-action manifest accepts artifact-name and does not declare output-file, upload-artifact, or upload-release-assets inputs.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-016",
+      "source_ids": ["SRC-V4-008"],
+      "counterclaim_ids": ["CTR-V4-004"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "The pinned download-syft sub-action exports a command path and accepts an explicit Syft version.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-017",
+      "source_ids": ["SRC-V4-009"],
+      "counterclaim_ids": ["CTR-V4-004"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "The exact pinned action source selected Syft v0.42.2 by default.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-018",
+      "source_ids": ["SRC-V4-010"],
+      "counterclaim_ids": ["CTR-V4-004"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "Syft v0.42.2 documents directory package scans.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-019",
+      "source_ids": ["SRC-V4-010"],
+      "counterclaim_ids": ["CTR-V4-004"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "Syft v0.42.2 documents spdx-json=file output.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-020",
+      "source_ids": ["SRC-V4-011"],
+      "counterclaim_ids": ["CTR-V4-005"],
+      "court_claim_ids": ["V4-C05", "V4-C06"],
+      "statement": "The prerequisite-bound R4 bundle lets the successor reconstruct exact R4 bytes without reading changed V4 working-tree files or fetching a mutable remote branch.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-021",
+      "source_ids": ["SRC-V4-011"],
+      "counterclaim_ids": ["CTR-V4-005"],
+      "court_claim_ids": ["V4-C01", "V4-C05"],
+      "statement": "The R4 delta bundle cannot be verified without exact prerequisite commit 28463ae6dd842b0b316fcf99eab98804cdaf9735.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-022",
+      "source_ids": ["SRC-V4-012"],
+      "counterclaim_ids": ["CTR-V4-009"],
+      "court_claim_ids": ["V4-C77"],
+      "statement": "SPDX 2.2.2 requires creationInfo.created in whole-second UTC format and therefore rejects Syft fractional-second output.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-023",
+      "source_ids": ["SRC-V4-012"],
+      "counterclaim_ids": ["CTR-V4-009"],
+      "court_claim_ids": ["V4-C77"],
+      "statement": "SPDX 2.2.2 requires package copyrightText and permits NOASSERTION instead of inventing a copyright assertion.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    },
+    {
+      "claim_id": "CLM-V4-024",
+      "source_ids": ["SRC-V4-013"],
+      "counterclaim_ids": ["CTR-V4-009"],
+      "court_claim_ids": ["V4-C77"],
+      "statement": "The pinned spdx-tools 0.8.5 validator can exercise the applicable SPDX 2.2 semantic checks in CI.",
+      "intake_status": "SUPPORTED_INPUT_FOR_ADOPTION"
+    }
+  ],
+  "counterclaims": [
+    {
+      "counterclaim_id": "CTR-V4-001",
+      "source_ids": ["SRC-V4-001"],
+      "court_claim_ids": ["V4-C02", "V4-C10"],
+      "statement": "Preserving and adapting the local draft does not make that draft complete, cryptographically authenticated, or activatable."
+    },
+    {
+      "counterclaim_id": "CTR-V4-002",
+      "source_ids": ["SRC-V4-002"],
+      "court_claim_ids": ["V4-C01"],
+      "statement": "Snapshots for pull requests 157 through 164 do not prove that those eight records were the complete open-pull-request set at observation time."
+    },
+    {
+      "counterclaim_id": "CTR-V4-003",
+      "source_ids": ["SRC-V4-006"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "A green job conclusion cannot substitute for byte-level inspection of each claimed artifact and attestation subject."
+    },
+    {
+      "counterclaim_id": "CTR-V4-004",
+      "source_ids": ["SRC-V4-007", "SRC-V4-008", "SRC-V4-009", "SRC-V4-010"],
+      "court_claim_ids": ["V4-C04"],
+      "statement": "Pinning an action version does not make undeclared or unsupported action inputs effective and does not itself prove generated output."
+    },
+    {
+      "counterclaim_id": "CTR-V4-005",
+      "source_ids": ["SRC-V4-005", "SRC-V4-011"],
+      "court_claim_ids": ["V4-C01", "V4-C05", "V4-C06"],
+      "statement": "Copying files from a live successor worktree is not equivalent to reconstructing and validating the frozen predecessor from authenticated Git objects."
+    },
+    {
+      "counterclaim_id": "CTR-V4-006",
+      "source_ids": ["SRC-V4-001"],
+      "court_claim_ids": ["V4-C02", "V4-C03"],
+      "statement": "Archived source bytes provide provenance, not activation, merge, deployment, signing, or external execution authority."
+    },
+    {
+      "counterclaim_id": "CTR-V4-007",
+      "source_ids": ["SRC-V4-002", "SRC-V4-006"],
+      "court_claim_ids": ["V4-C01", "V4-C04", "V4-C07"],
+      "statement": "Provider snapshots are point-in-time observations and do not establish that mutable provider state remains current or immutable."
+    },
+    {
+      "counterclaim_id": "CTR-V4-008",
+      "source_ids": ["SRC-V4-003", "SRC-V4-004"],
+      "court_claim_ids": ["V4-C15"],
+      "statement": "Filesystem timestamp continuity is platform-dependent and cannot authenticate content or eliminate a concurrent replacement race by itself."
+    },
+    {
+      "counterclaim_id": "CTR-V4-009",
+      "source_ids": ["SRC-V4-012", "SRC-V4-013"],
+      "court_claim_ids": ["V4-C77"],
+      "statement": "Artifact provenance and shallow JSON shape checks do not establish SPDX semantic conformance; a repair must reject unsupported versions and malformed inputs rather than silently broadening the standard."
+    }
+  ],
+  "unavailable_sources": [],
+  "open_obligations": [
+    "A final immutable candidate, supported-host CI including an observed SBOM artifact and attestation, independent Curator receipt, and distinct Judge verdict do not exist until implementation freezes.",
+    "External reviewer, frozen-host, issuer signatures, nonce reservation, one-run execution, and protected merge remain outside repository authority."
+  ]
+}

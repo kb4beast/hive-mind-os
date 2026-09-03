@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-warning-adverse-and-repair-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-10",
+  "captured_at_utc": "2026-09-03T10:34:25.0362299Z",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "superseded_staged_tree": "c55ac7c357687aa0902d1aaef5c898c041ad9519",
+  "diagnostic_repair_worktree": {
+    "frozen_candidate": false,
+    "stable_patch_id": "f321fd7e2e01bc4a7afe74da285a909f8c47786d",
+    "stable_patch_id_base": "c55ac7c357687aa0902d1aaef5c898c041ad9519",
+    "stable_patch_id_method": "git diff c55ac7c357687aa0902d1aaef5c898c041ad9519 -- <changed_paths> | git patch-id --stable",
+    "stable_patch_id_synthetic_commit": "0000000000000000000000000000000000000000",
+    "changed_paths": [
+      "scripts/V4EvidenceProcess.ps1",
+      "scripts/Collect-V4ActivationEvidence.ps1",
+      "tests/test_collect_v4_activation_evidence.py"
+    ]
+  },
+  "observers": ["/root/v4_quality_reviewer", "/root/v4_final_judge", "/root"],
+  "controlled_adverse_probe": {
+    "python_flags": ["-I", "-B", "-X", "utf8", "-W", "error::ResourceWarning"],
+    "fixture": "A unittest body abandons a resource whose finalizer emits ResourceWarning. The warning-as-error exception is routed through sys.unraisablehook before a canonical successful terminal marker is emitted.",
+    "unittest": {
+      "tests_run": 1,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "successful": true
+    },
+    "canonical_success_marker_present": true,
+    "process_exit_code": 0,
+    "stderr_contains": ["Exception ignored", "ResourceWarning:"],
+    "pre_repair_parser_result": "VALID",
+    "first_cause": "-W error::ResourceWarning raises during finalization, but an exception routed through sys.unraisablehook is reported on stderr rather than propagated to unittest or the process exit status. The collector hashed but did not interpret the fully drained stderr transcript."
+  },
+  "repair": {
+    "implementation": [
+      "Pass each fully drained child stderr transcript into the terminal-result parser.",
+      "Count case-sensitive ResourceWarning: and Exception ignored stderr substring occurrences and require both counts to be zero in outcomes_clean, terminal_result_valid, module completion, aggregate evidence, and qualification eligibility.",
+      "Force one full gc.collect() after unittest returns and before emitting the terminal marker, while retaining post-exit stderr scanning for interpreter-shutdown finalizers.",
+      "Record conservative per-module and aggregate stderr occurrence counts with names that do not claim unique warning-event counts."
+    ],
+    "source_sha256": {
+      "scripts/V4EvidenceProcess.ps1": "53dd9a8a47f3c64d311bd5c4915c5603d0947b873793ecf26b2ac8634f77a208",
+      "scripts/Collect-V4ActivationEvidence.ps1": "12bba2a729b5936978cf7f290dcef6bed89cd5958ebb0083db71de63eab326c9",
+      "tests/test_collect_v4_activation_evidence.py": "668b8b1a6bda59d494dc9208d4f4abeebb14ebdfbc644d92c2922656fee41d43"
+    }
+  },
+  "validation": {
+    "root_real_unraisable_regression": {
+      "python": "3.14",
+      "tests_run": 1,
+      "failures": 0,
+      "errors": 0,
+      "post_repair_parser_valid": false
+    },
+    "root_complete_collector_regression_module": {
+      "python": "3.14",
+      "tests_run": 11,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "duration_seconds": 41.675
+    },
+    "independent_curator": {
+      "real_regression_python_versions": ["3.12", "3.14"],
+      "result": "PASS",
+      "static_result_after_type_correction": "PYRIGHT_0_ERRORS_RUFF_CLEAN_DIFF_CHECK_CLEAN",
+      "finding": "NO_FAIL_OPEN_PATH_IN_CAPTURED_STDERR_SCAN"
+    },
+    "independent_judge": {
+      "complete_collector_regression_tests": 11,
+      "failures": 0,
+      "duration_seconds": 41.627,
+      "verdict": "ADAPT_IMPLEMENTATION_SUFFICIENT_NO_UNRESOLVED_P1_OR_P2"
+    }
+  },
+  "disposition": "REJECT_WARNING_POLICY_ALONE; ADAPT_WITH_FORCED_FINALIZER_COLLECTION_AND_CAPTURED_STDERR_ZERO_OCCURRENCE_ENFORCEMENT",
+  "remaining_gates": [
+    "Restage and recompute the exact receipt-bearing tree.",
+    "Rerun renewed sequential and concurrent collector stability evidence because collector semantics changed.",
+    "Run the exact complete local CI command on the repaired receipt-bearing tree, then clean-commit collection and exact-lease remote CI gates."
+  ],
+  "nonclaims": [
+    "The counts are conservative captured-stderr substring occurrences, not canonical unique warning events; false rejection is possible.",
+    "Hostile same-process code can replace or suppress stderr, warnings, finalizers, or sys.unraisablehook; the collector does not claim resistance to that threat.",
+    "Forced garbage collection cannot prove absence of still-referenced resources, non-reporting leaks, or external-process leaks.",
+    "This repair does not qualify the superseded c55ac7c tree or its cancelled full gate.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this receipt."
+  ],
+  "rollback": "Preserve the controlled adverse result and this repair receipt append-only; if renewed stress or a downstream gate fails, supersede the repaired tree and re-enter bounded repair."
+}

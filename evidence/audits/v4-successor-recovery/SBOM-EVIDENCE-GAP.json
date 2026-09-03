@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-sbom-evidence-gap-audit-v1",
+  "recorded_at_utc": "2026-09-03T00:16:12.222Z",
+  "subject": {
+    "repository": "kb4beast/hive-mind-os",
+    "commit": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+    "tree": "86e502763fcfd924094ba8194dd0c31b114652a9",
+    "workflow": "Constitutional CI",
+    "run_id": 33694910734,
+    "run_url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734",
+    "conclusion": "success"
+  },
+  "finding": {
+    "finding_id": "V4-SBOM-P2-001",
+    "severity": "P2",
+    "introduced_by_subject": false,
+    "inherited_from_commit": "577cc2f3",
+    "summary": "The successful build-evidence job neither retained nor attested an SBOM even though its step names claimed both.",
+    "disposition": "ADAPT_IN_SUCCESSOR",
+    "blocks": [
+      "R4 adoption as a release-ready candidate",
+      "a claim that Constitutional CI produced SBOM evidence",
+      "V4 qualification until corrected CI is observed"
+    ]
+  },
+  "observations": {
+    "workflow_warning": "Unexpected input(s) 'output-file', 'upload-artifact', 'upload-release-assets'",
+    "accepted_inputs": [
+      "path",
+      "image",
+      "registry-username",
+      "registry-password",
+      "format",
+      "github-token",
+      "artifact-name",
+      "syft-version",
+      "dependency-snapshot"
+    ],
+    "artifact": {
+      "artifact_id": 9871406573,
+      "name": "hive-mind-os-build-evidence",
+      "compressed_bytes": 534554,
+      "created_at": "2026-09-02T23:24:18Z",
+      "expires_at": "2026-10-02T23:24:18Z",
+      "regular_files": [
+        {
+          "path": "hive_mind_os-0.7.0-py3-none-any.whl",
+          "bytes": 556184,
+          "sha256": "ced75caf1d8cd3c0f568d31d3649fcba9a929d168441e53c8de497e3d294b8ab"
+        }
+      ],
+      "sbom_present": false
+    },
+    "verified_attestation_subjects": [
+      {
+        "name": "hive_mind_os-0.7.0-py3-none-any.whl",
+        "sha256": "ced75caf1d8cd3c0f568d31d3649fcba9a929d168441e53c8de497e3d294b8ab"
+      }
+    ],
+    "sbom_attested": false
+  },
+  "upstream_sources": [
+    {
+      "source_id": "SRC-V4-007",
+      "uri": "https://github.com/anchore/sbom-action/blob/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/action.yml",
+      "version": "f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "bytes": 1183,
+      "sha256": "8a8ad268a69c1ba8cc468d10eeb14137e648069d859066280d6547680d501779",
+      "license": "Apache-2.0"
+    },
+    {
+      "source_id": "SRC-V4-008",
+      "uri": "https://github.com/anchore/sbom-action/blob/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/download-syft/action.yml",
+      "version": "f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "bytes": 371,
+      "sha256": "a025ceb3598b59757472ba2ed15ec2a3352cb2e0ffb3de9ec084095856ad6a2b",
+      "license": "Apache-2.0"
+    },
+    {
+      "source_id": "SRC-V4-009",
+      "uri": "https://github.com/anchore/sbom-action/blob/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/src/SyftVersion.ts",
+      "version": "f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "bytes": 34,
+      "sha256": "ee161181a498f0f5c4ff2aa91f42c307257d31be4e147b79a42e025da9994451",
+      "license": "Apache-2.0"
+    },
+    {
+      "source_id": "SRC-V4-010",
+      "uri": "https://github.com/anchore/syft/blob/v0.42.2/README.md",
+      "version": "v0.42.2",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "bytes": 20674,
+      "sha256": "96b0a3def5de842c4f640045921910c1abbfa240e99cf57d3f8237c50e5545df",
+      "license": "Apache-2.0"
+    }
+  ],
+  "atomic_claims": [
+    {
+      "claim_id": "V4-C04-A",
+      "claim": "A successful workflow conclusion proves that both named subject paths were attested.",
+      "advocate_case": "The attestation step accepted both the wheel glob and the SBOM path and returned success.",
+      "cross_examination": "The artifact contains no SBOM and independent attestation verification returns only the wheel subject.",
+      "expert_evidence": "GitHub artifact 9871406573 and gh attestation verification of its sole file",
+      "disposition": "REJECT"
+    },
+    {
+      "claim_id": "V4-C04-B",
+      "claim": "The pinned Anchore action accepts output-file and upload suppression inputs.",
+      "advocate_case": "Those names are accepted by newer releases of related SBOM actions.",
+      "cross_examination": "The exact pinned action manifest omits all three inputs and the runner emitted an explicit warning.",
+      "expert_evidence": "SRC-V4-007 at exact commit and run 33694910734 logs",
+      "disposition": "REJECT"
+    },
+    {
+      "claim_id": "V4-C04-C",
+      "claim": "The successor can fail closed by invoking the pinned Syft binary directly, validating the file, and naming both exact upload and attestation paths.",
+      "advocate_case": "The pinned download sub-action exports the command, pins Syft v0.42.2, and official Syft documentation supports spdx-json=file output.",
+      "cross_examination": "Repository inspection alone cannot prove the remote runner will create, upload, and attest both subjects.",
+      "expert_evidence": "SRC-V4-008 through SRC-V4-010 and a local CI-contract regression test",
+      "disposition": "ADAPT_PENDING_CANDIDATE_CI"
+    }
+  ],
+  "successor_correction": {
+    "status": "IMPLEMENTED_PENDING_CANDIDATE_CI",
+    "workflow": ".github/workflows/ci.yml",
+    "test": "tests/test_ci_contract.py",
+    "requirements": [
+      "download Syft through the exact pinned sub-action",
+      "pin Syft v0.42.2 explicitly",
+      "scan the repository package and write dist/hive-mind-os.spdx.json explicitly",
+      "require one wheel and a non-empty parseable SPDX document with core fields and at least one discovered package",
+      "upload exactly the wheel and SBOM with if-no-files-found set to error",
+      "present both exact paths to the provenance attestation action"
+    ]
+  },
+  "rollback": "Revert the successor workflow and regression-test changes; retain this adverse audit and the original green-but-incomplete run evidence.",
+  "forbidden_claims": [
+    "R4 generated an SBOM",
+    "R4 attested an SBOM",
+    "the V4 correction is remotely proven before candidate CI"
+  ]
+}

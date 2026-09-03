@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-remote-ci-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "recorded_at_utc": "2026-09-03T11:50:54.380Z",
+  "candidate": {
+    "commit": "3743ad1e2bafaac2efd2b19d91510086ce48d478",
+    "tree": "8b79b072bd1d9634c4666744ade4e9fd0c3197f5",
+    "sole_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+  },
+  "run": {
+    "run_id": 33749585546,
+    "event": "push",
+    "workflow": "Constitutional CI",
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33749585546/attempts/1",
+    "artifact_producing_job": "sbom-and-build-provenance"
+  },
+  "artifact": {
+    "artifact_id": 9890981526,
+    "name": "hive-mind-os-build-evidence",
+    "archive_bytes": 679039,
+    "archive_sha256": "sha256:25fa146394ef4067401821be4a878281cf64a14355453f5ad0a2034724604c0f",
+    "wheel": {
+      "bytes": 701344,
+      "sha256": "sha256:b83992fb831c25a13bf0645a3d379c0eade788039e7afeb62f8515709ddbeecc"
+    },
+    "sbom": {
+      "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-3-sbom.spdx.json",
+      "bytes": 10025,
+      "sha256": "sha256:8138fbb9ee5b60046a3b97d54271b04113f9b6544a99358e8929fadd6ba300f4"
+    }
+  },
+  "attestation": {
+    "url": "https://github.com/kb4beast/hive-mind-os/attestations/44972209",
+    "statement_sha256": "sha256:546f8af6c39695a779de402ff03df6b090e86745a92247fb05c30ab7c0a78b86",
+    "verification": "gh attestation verify passed separately for the exact wheel and SBOM with repository, signer workflow, exact source digest and ref, and self-hosted runners denied",
+    "verification_transcript": {
+      "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-3-attestation-verification.txt",
+      "bytes": 5421,
+      "sha256": "sha256:b149ba8a0bb785ebe67d97c5c409397afe927cde8f23319f383356145a2965f9"
+    },
+    "statement": {
+      "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-3-attestation.jsonl",
+      "bytes": 11631,
+      "sha256": "sha256:546f8af6c39695a779de402ff03df6b090e86745a92247fb05c30ab7c0a78b86"
+    }
+  },
+  "finding": {
+    "finding_id": "V4-SBOM-P2-002",
+    "severity": "P2",
+    "summary": "The authentic, attested SPDX-2.2 SBOM is semantically invalid despite the successful build-evidence job.",
+    "original_bytes_preserved": true,
+    "validator": "spdx-tools==0.8.5",
+    "original_result": "exit 1: creationInfo.created includes fractional seconds and cannot be parsed as SPDX 2.2 whole-second UTC time",
+    "second_result": "after in-memory only whole-second normalization, the validator reported package copyright_text is mandatory in SPDX-2.2",
+    "repair_probe": "after in-memory only missing-field addition of copyrightText: NOASSERTION, the official validator produced zero messages",
+    "validator_transcript": {
+      "path": "evidence/audits/v4-successor-recovery/logs/remote-ci-push-attempt-3-spdx-tools-validation.txt",
+      "bytes": 3555,
+      "sha256": "sha256:10cf3042bda4cc3144d416dfb2dd559cbe941cce309b54aae681a5817d0a0c30"
+    },
+    "standards_basis": [
+      "SRC-V4-012 clause 6.9 requires Created exactly once in YYYY-MM-DDThh:mm:ssZ format.",
+      "SRC-V4-012 clause 7.17 requires package Copyright Text exactly once and permits NOASSERTION."
+    ]
+  },
+  "local_repair_replay": {
+    "input_sha256": "sha256:8138fbb9ee5b60046a3b97d54271b04113f9b6544a99358e8929fadd6ba300f4",
+    "normalizer": "scripts/normalize_spdx_json.py",
+    "normalized_sha256": "sha256:803004a2e6fb30e336b67d79deebcd7e06fda817838d4520a07991dd62cc1bea",
+    "validator": "spdx-tools==0.8.5",
+    "validator_exit_code": 0,
+    "validator_output": "",
+    "input_unchanged_after_copy_and_replay": true
+  },
+  "disposition": "REJECT_3743AD1_AS_FINAL_CANDIDATE_AND_ADAPT_WITH_DETERMINISTIC_SYFT_GAP_NORMALIZATION_PLUS_HASH_PINNED_OFFICIAL_SPDX_VALIDATION",
+  "nonclaims": [
+    "An authentic provenance attestation proves artifact origin and integrity, not SPDX semantic conformance.",
+    "The in-memory repair probe does not modify or rehabilitate the attested artifact.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this attempt."
+  ],
+  "rollback": "Preserve the original artifact, validator transcript, and attestation receipt; require a fresh candidate, local validation, and remote artifact observation after the repair."
+}

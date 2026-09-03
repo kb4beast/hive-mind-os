@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/portable-plan-v1.json",
+  "title": "PortablePlanBundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "plan_id", "request_id", "objective_digest", "subject", "standard",
+    "resources", "capabilities", "adapters", "authority", "budgets", "recovery",
+    "integration", "token_policy", "evidence", "nodes"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "plan_id": {"$ref": "#/$defs/identifier"},
+    "request_id": {"$ref": "#/$defs/digest"},
+    "objective_digest": {"$ref": "#/$defs/digest"},
+    "subject": {"$ref": "#/$defs/subject"},
+    "standard": {"$ref": "#/$defs/standard"},
+    "resources": {"type": "array", "items": {"$ref": "#/$defs/resource"}},
+    "capabilities": {"type": "array", "items": {"$ref": "#/$defs/capability"}},
+    "adapters": {"type": "array", "items": {"$ref": "#/$defs/adapter"}},
+    "authority": {"type": "array", "items": {"$ref": "#/$defs/authority"}},
+    "budgets": {"type": "array", "items": {"$ref": "#/$defs/budgetAllocation"}},
+    "recovery": {"$ref": "#/$defs/recovery"},
+    "integration": {"$ref": "#/$defs/integration"},
+    "token_policy": {"$ref": "#/$defs/tokenPolicy"},
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+    "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "gitObject": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "time": {"type": "string", "format": "date-time"},
+    "stringSet": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "repositorySubject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository_id", "commit", "tree", "target_branch"],
+      "properties": {
+        "repository_id": {"$ref": "#/$defs/digest"},
+        "commit": {"$ref": "#/$defs/gitObject"},
+        "tree": {"$ref": "#/$defs/gitObject"},
+        "target_branch": {"type": "string", "minLength": 1}
+      }
+    },
+    "nonRepositorySubject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["subject_type", "locator_digest", "version_digest"],
+      "properties": {
+        "subject_type": {"$ref": "#/$defs/identifier"},
+        "locator_digest": {"$ref": "#/$defs/digest"},
+        "version_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "subject_id", "repository", "non_repository"],
+      "properties": {
+        "kind": {"enum": ["repository", "non_repository"]},
+        "subject_id": {"$ref": "#/$defs/digest"},
+        "repository": {"oneOf": [{"$ref": "#/$defs/repositorySubject"}, {"type": "null"}]},
+        "non_repository": {"oneOf": [{"$ref": "#/$defs/nonRepositorySubject"}, {"type": "null"}]}
+      },
+      "oneOf": [
+        {"properties": {"kind": {"const": "repository"}, "repository": {"$ref": "#/$defs/repositorySubject"}, "non_repository": {"type": "null"}}},
+        {"properties": {"kind": {"const": "non_repository"}, "repository": {"type": "null"}, "non_repository": {"$ref": "#/$defs/nonRepositorySubject"}}}
+      ]
+    },
+    "standard": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "source_path", "raw_sha256", "byte_count", "git_blob", "package_id", "package_digest"],
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "source_path": {"type": "string", "minLength": 1},
+        "raw_sha256": {"$ref": "#/$defs/digest"},
+        "byte_count": {"type": "integer", "minimum": 1},
+        "git_blob": {"$ref": "#/$defs/gitObject"},
+        "package_id": {"$ref": "#/$defs/identifier"},
+        "package_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "resource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resource_id", "kind", "quantity", "unit", "constraints"],
+      "properties": {
+        "resource_id": {"$ref": "#/$defs/identifier"}, "kind": {"$ref": "#/$defs/identifier"},
+        "quantity": {"type": "integer", "minimum": 0}, "unit": {"$ref": "#/$defs/identifier"},
+        "constraints": {"$ref": "#/$defs/stringSet"}
+      }
+    },
+    "capability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capability_id", "operation", "effect_class", "authority_id", "adapter_id"],
+      "properties": {
+        "capability_id": {"$ref": "#/$defs/identifier"}, "operation": {"$ref": "#/$defs/identifier"},
+        "effect_class": {"enum": ["none", "local-reversible", "external-reversible"]}, "authority_id": {"$ref": "#/$defs/identifier"},
+        "adapter_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "adapter": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adapter_id", "interface", "version", "configuration_digest"],
+      "properties": {
+        "adapter_id": {"$ref": "#/$defs/identifier"}, "interface": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/identifier"}, "configuration_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["authority_id", "principal_id", "grant_digest", "allowed_actions", "denied_actions", "expires_at", "external_effects"],
+      "properties": {
+        "authority_id": {"$ref": "#/$defs/identifier"}, "principal_id": {"$ref": "#/$defs/identifier"},
+        "grant_digest": {"$ref": "#/$defs/digest"}, "allowed_actions": {"$ref": "#/$defs/stringSet"},
+        "denied_actions": {"$ref": "#/$defs/stringSet"}, "expires_at": {"$ref": "#/$defs/time"},
+        "external_effects": {"type": "boolean"}
+      }
+    },
+    "budget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["wall_seconds", "model_calls", "input_tokens", "output_tokens", "cost_microunits", "tool_calls", "concurrent_workers"],
+      "properties": {
+        "wall_seconds": {"type": "integer", "minimum": 0}, "model_calls": {"type": "integer", "minimum": 0},
+        "input_tokens": {"type": "integer", "minimum": 0}, "output_tokens": {"type": "integer", "minimum": 0},
+        "cost_microunits": {"type": "integer", "minimum": 0}, "tool_calls": {"type": "integer", "minimum": 0},
+        "concurrent_workers": {"type": "integer", "minimum": 0}
+      }
+    },
+    "budgetAllocation": {
+      "type": "object", "additionalProperties": false, "required": ["budget_id", "policy"],
+      "properties": {"budget_id": {"$ref": "#/$defs/identifier"}, "policy": {"$ref": "#/$defs/budget"}}
+    },
+    "recovery": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maximum_attempts", "checkpoint_required", "rollback_required", "stop_conditions"],
+      "properties": {
+        "maximum_attempts": {"type": "integer", "minimum": 1}, "checkpoint_required": {"type": "boolean"},
+        "rollback_required": {"type": "boolean"}, "stop_conditions": {"$ref": "#/$defs/stringSet", "minItems": 1}
+      }
+    },
+    "integration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["strategy", "target", "expected_base", "compare_and_swap", "protected_target"],
+      "properties": {
+        "strategy": {"$ref": "#/$defs/identifier"}, "target": {"type": "string", "minLength": 1},
+        "expected_base": {"$ref": "#/$defs/digest"}, "compare_and_swap": {"type": "boolean"},
+        "protected_target": {"type": "boolean"}
+      }
+    },
+    "tokenPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_tokens", "response_tokens", "reserve_tokens", "accounting", "overflow"],
+      "properties": {
+        "context_tokens": {"type": "integer", "minimum": 0}, "response_tokens": {"type": "integer", "minimum": 0},
+        "reserve_tokens": {"type": "integer", "minimum": 0}, "accounting": {"$ref": "#/$defs/identifier"},
+        "overflow": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence_id", "digest", "source", "claim_ids", "observed_at"],
+      "properties": {
+        "evidence_id": {"$ref": "#/$defs/identifier"}, "digest": {"$ref": "#/$defs/digest"},
+        "source": {"type": "string", "minLength": 1}, "claim_ids": {"$ref": "#/$defs/stringSet", "minItems": 1},
+        "observed_at": {"$ref": "#/$defs/time"}
+      }
+    },
+    "node": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "node_id", "objective", "dependencies", "resource_ids", "capability_ids", "adapter_ids",
+        "authority_id", "budget_id", "evidence_ids", "acceptance_criteria", "rollback", "roles", "lifecycle_stages"
+      ],
+      "properties": {
+        "node_id": {"$ref": "#/$defs/identifier"}, "objective": {"type": "string", "minLength": 1},
+        "dependencies": {"$ref": "#/$defs/stringSet"}, "resource_ids": {"$ref": "#/$defs/stringSet"},
+        "capability_ids": {"$ref": "#/$defs/stringSet"}, "adapter_ids": {"$ref": "#/$defs/stringSet"},
+        "authority_id": {"$ref": "#/$defs/identifier"}, "budget_id": {"$ref": "#/$defs/identifier"},
+        "evidence_ids": {"$ref": "#/$defs/stringSet"}, "acceptance_criteria": {"$ref": "#/$defs/stringSet", "minItems": 1},
+        "rollback": {"type": "string", "minLength": 1}, "roles": {"$ref": "#/$defs/stringSet", "minItems": 1},
+        "lifecycle_stages": {"$ref": "#/$defs/stringSet", "minItems": 1}
+      }
+    }
+  }
+}

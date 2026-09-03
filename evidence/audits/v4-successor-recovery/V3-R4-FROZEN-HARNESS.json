@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v3-r4-frozen-harness-audit-v1",
+  "recorded_at_utc": "2026-09-03T00:51:47.304Z",
+  "last_updated_at_utc": "2026-09-03T03:48:43.0094475Z",
+  "subject": {
+    "commit": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+    "tree": "86e502763fcfd924094ba8194dd0c31b114652a9",
+    "qualification_receipt": "evidence/audits/generic-v3-baseline-recovery/V3-R4-QUALIFICATION.json"
+  },
+  "finding": {
+    "finding_id": "V4-R4-HARNESS-001",
+    "severity": "P1_TEST_INTEGRITY",
+    "summary": "The R4 regression harness copied payload files from the live successor worktree, so legitimate V4 changes caused R4 checks to exercise mixed bytes instead of the frozen R4 object.",
+    "initial_observation": {
+      "command": "python -B -m unittest -v tests.test_generic_dag_v3_overlay",
+      "tests": 72,
+      "seconds": 197.317,
+      "failures": 24,
+      "skips": 1,
+      "common_first_cause": "committed payload size mismatch: .github/workflows/ci.yml"
+    },
+    "subsequent_observation": {
+      "receipt": "evidence/audits/v4-successor-recovery/PRE-CANDIDATE-FULL-GATE-ATTEMPT-2.json",
+      "tests": 1347,
+      "seconds": 1709.484,
+      "errors": 1,
+      "skips": 8,
+      "cause": "The first repair extracted the R4 payload and verifier but left several individual predecessor assertions reading through live ROOT/OVERLAY paths. A V4-only .gitattributes addition exposed the remaining mixed-generation read."
+    },
+    "remote_observations": [
+      {
+        "receipt": "evidence/audits/v4-successor-recovery/REMOTE-CI-PUSH-ATTEMPT-1.json",
+        "run_id": 33709101645,
+        "job_id": 100504577623,
+        "python": "3.11",
+        "tests": 1347,
+        "seconds": 292.083,
+        "failures": 8,
+        "errors": 1,
+        "skips": 16,
+        "cause": "The ambient verifier import created ignored __pycache__ state; the contaminated failures were followed by one non-empty commit-graphs cleanup error."
+      },
+      {
+        "receipt": "evidence/audits/v4-successor-recovery/REMOTE-CI-PUSH-ATTEMPT-1.json",
+        "run_id": 33709101645,
+        "job_id": 100504577645,
+        "python": "3.14.7",
+        "tests": 1347,
+        "seconds": 263.262,
+        "failures": 8,
+        "errors": 0,
+        "skips": 16,
+        "cause": "Importing the extracted verifier was still allowed to create ignored __pycache__ state when the ambient interpreter permitted bytecode. Linux Python 3.14 correctly caused the R4 verifier to reject that unapproved fixture path."
+      },
+      {
+        "receipt": "evidence/audits/v4-successor-recovery/REMOTE-CI-PUSH-ATTEMPT-1.json",
+        "run_id": 33709132840,
+        "event": "pull_request",
+        "failed_job_ids": [100504672183, 100504672195, 100504672192],
+        "python_versions": ["3.11", "3.12", "3.14"],
+        "tests_per_job": 1347,
+        "failures_per_job": 8,
+        "errors_per_job": 0,
+        "skips_per_job": 16,
+        "cause": "The duplicate pull-request matrix independently reproduced the same ambient dynamic-import bytecode contamination before the rejected run was cancelled; all three completed Linux logs are preserved exactly."
+      }
+    ],
+    "disposition": "ADAPT_HARNESS_TO_FROZEN_OBJECT"
+  },
+  "correction": {
+    "bundle": "tests/fixtures/generic-v3-r4.bundle",
+    "provenance": "tests/fixtures/generic-v3-r4.provenance.json",
+    "bytes": 683892,
+    "sha256": "sha256:265ee2e6dece8a47e649c55b5df7e0e714a60e631126bc76874731e20cfdabdf",
+    "prerequisite_commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+    "advertised_ref": "refs/heads/codex/v3-squash-proof-recovery-r4",
+    "advertised_commit": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+    "advertised_tree": "86e502763fcfd924094ba8194dd0c31b114652a9",
+    "method": "Integrity-check the raw bundle against its recorded SHA-256 before Git parsing, import it only after the existing history bundle supplies the exact prerequisite, extract every R4 payload path from the pinned object into the disposable authoring repository, and route every predecessor payload assertion through that extracted root.",
+    "live_successor_payload_reads_remaining": 0,
+    "ambient_bytecode_writes_from_verifier_loading_permitted": false,
+    "remote_ref_required_for_consumption": false,
+    "r4_bytes_modified": false
+  },
+  "atomic_claims": [
+    {
+      "claim_id": "V4-C05-A",
+      "claim": "A successor may reconstruct a frozen predecessor test fixture from its current working-tree copies.",
+      "advocate_case": "At R4 itself those copies were byte-identical and kept the harness simple.",
+      "cross_examination": "A successor must change shared files such as CI; live copies then mix candidate generations and make unrelated assertions fail at the first payload digest check.",
+      "disposition": "REJECT"
+    },
+    {
+      "claim_id": "V4-C05-B",
+      "claim": "A raw-digest-pinned, prerequisite-bound delta bundle can preserve the exact R4 test subject without a remote ref.",
+      "advocate_case": "The bundle advertises only the exact R4 commit, requires its exact parent, and supplies the frozen Git object for raw extraction.",
+      "cross_examination": "A bundle parsed before digest verification or fetched without its prerequisite could substitute history.",
+      "expert_evidence": "The harness checks SHA-256 before bundle verify/fetch, verifies the prerequisite, commit, tree, and sole advertised ref, and includes negative prerequisite coverage.",
+      "disposition": "ADOPT_FOR_SUCCESSOR_REGRESSION_HARNESS"
+    }
+  ],
+  "initial_validation": {
+    "command": "python -B -m unittest -v tests.test_generic_dag_v3_overlay",
+    "tests": 73,
+    "seconds": 803.273,
+    "result": "OK",
+    "skips": 1,
+    "new_negative_case": "The R4 delta bundle fails verification in a repository missing prerequisite 28463ae6dd842b0b316fcf99eab98804cdaf9735."
+  },
+  "bytecode_disabled_validation": {
+    "command": "python -B -m unittest -v tests.test_generic_dag_v3_overlay",
+    "tests": 73,
+    "seconds": 790.275,
+    "result": "OK",
+    "skips": 1,
+    "raw_log": {
+      "path": "evidence/audits/v4-successor-recovery/logs/frozen-r4-harness-final.log",
+      "bytes": 14949,
+      "sha256": "4e9732406b85aa566df8e5946b9468de45dbc094a20c612f48fa511d309917aa"
+    },
+    "boundary_assertion": "No predecessor payload read in tests/test_generic_dag_v3_overlay.py uses the live OVERLAY constant or live ROOT payload paths."
+  },
+  "ambient_bytecode_validation": {
+    "command": "python -m unittest -v tests.test_generic_dag_v3_overlay",
+    "bytecode_disabled": false,
+    "tests": 73,
+    "seconds": 868.623,
+    "result": "OK",
+    "skips": 1,
+    "raw_log": {
+      "path": "evidence/audits/v4-successor-recovery/logs/frozen-r4-harness-ambient-final.log",
+      "bytes": 14949,
+      "sha256": "76cc0c30f562b3a784511bd1556c82dbae4dadf1970b3cbf110bcc10f735f619"
+    },
+    "assertion": "The frozen R4 harness passes under an ambient interpreter that permits bytecode; dynamic verifier loading leaves no __pycache__ or .pyc entry in the authenticated fixture."
+  },
+  "rollback": "Revert the V4-only bundle, provenance, and harness extraction together. Do not modify, squash, or relabel R4 or its qualification receipt.",
+  "nonclaims": [
+    "The V4 candidate is not qualified by this focused pass.",
+    "The bundle does not grant execution or activation authority.",
+    "No remote CI result is claimed for the V4 harness until the frozen V4 candidate is pushed."
+  ]
+}
