@@ -39,16 +39,29 @@ each tournament inventory:
 
 - `prompts/shared/ULTIMATE_SOLUTION_TOURNAMENT.md`;
 - `docs/plan/genericprompt-execution-2026-08-09/TOURNAMENT_RESULTS.json`;
-- `.autopilot/plan.json` and `.autopilot/bin/dag_standard.py`;
+- `.autopilot/plan.json`, `.autopilot/bin/*`, `.autopilot/tests/*`, and the
+  control-room workflow;
 - `docs/execution/dags/generic-hive-mind-product-v3/*`;
 - `src/hive_mind_os/brain_kernel/*`, role manifests, prompts, skills, and tests.
 
 No unavailable external source was invented for this decision.
 
+Two adverse predecessor executions remain immutable outside the checkout:
+
+- `C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-002`
+  (`manifest sha256:325e00ce4578386722e2fc1299822d2c4b031036e27e8d1d0feeca58d458a400`,
+  `quarantine`) exposed product and harness failures under the original 26-node plan;
+- `C:\Users\beesp\.codex\tournament-smoke\agent-readiness-control-plane-coverage-smoke`
+  (`manifest sha256:6b4f3644af25ffbb49b725f77717bc89299070ef61695ea43868025a81ad1453`,
+  `adapt`) proved the expanded direct suite/doctor topology while preserving the
+  safe-path compatibility failure that motivated this successor.
+
+They are evidence inputs, not passing receipts, and are not overwritten or relabeled.
+
 ## Decision
 
 Add `hive_mind_os.agent_tournament` and the `hive-mind tournament` CLI. The runtime
-loads a digest-bound 26-node plan and executes dependency-ready nodes in real parallel
+loads a digest-bound 28-node plan and executes dependency-ready nodes in real parallel
 waves. Its output directory is create-only. A central recorder writes one receipt per
 node, lossless base64 command-transcript envelopes, bounded infrastructure-attempt
 records, exact wave records with derived positive-overlap evidence, and a chained
@@ -60,16 +73,18 @@ completed peer result plus a self-hashed incomplete-run diagnostic manifest befo
 failing closed. The completed-run verifier deliberately does not certify those
 partial diagnostics.
 
-The DAG has seven waves:
+The DAG has eight waves:
 
 ```text
 repository seal
       |
 eight parallel role grades
       |
-six parallel composition gates
+seven parallel composition gates
       |
-isolated full-suite gate
+serialized full doctor in a disposable clone
+      |
+serial canonical product-suite gate
       |
 declared-role cross-examination
       |
@@ -81,10 +96,15 @@ non-promoting championship
 The repository inventory hashes every versioned or unignored ordinary in-root file,
 subject to explicit per-file and aggregate evidence budgets; ignored files are outside
 v1 scope, and symlinks, junctions, tracked deletions, and gitlinks fail closed. Python and JSON
-artifacts are parsed. Role lanes execute role-specific tests. Composition lanes cover
+Python artifacts are parsed and compiled in memory, and JSON artifacts are parsed.
+Role lanes execute role-specific tests. Seven parallel composition lanes cover
 all-role lifecycle, scripted code-to-QA delivery, resilience/no-cheating, learning and
-promotion boundaries, and the predecessor control plane. The canonical CI command is
-then executed in full.
+promotion boundaries, predecessor strict lint, and its separately governed 447-test
+control-plane suite. The exact full bootstrap doctor then runs serially in a
+hardlink-free standalone clone, after the direct control-plane suite has completed.
+In-memory compilation covers the
+control-room syntax objective without writing ignored bytecode into the sealed checkout.
+The canonical product CI command is then executed in full.
 
 ## Grading and feedback
 
@@ -134,18 +154,39 @@ champion, materialize a successor, or automatically run the successor generation
   predecessor-control-plane module directory on a safe `PYTHONPATH`; they disable
   user-site and bytecode behavior and use a small credential-scrubbed environment with
   inherited Git-control variables removed, a fixed minimal executable search path,
-  and a best-effort proxy deny, and record resolved import provenance using a bounded,
-  non-importing probe. Their execution and captured streams have wall-time and byte
-  budgets. These processes are not protected by a kernel filesystem, process, or
-  network sandbox, so no hostile-code or production claim is allowed.
+  and a best-effort proxy deny. A repository-required Node runtime is admitted only
+  from fixed native operating-system locations; its availability, absolute path, and
+  SHA-256 are sealed and live-rederived, never selected from ambient `PATH`. The
+  default profile also enables safe-path mode. Only the exact sealed control-plane
+  tests and full-doctor commands use a narrow cwd-compatibility profile because the
+  sealed worktree worker replaces `PYTHONPATH` and imports `tests.*` from its controlled
+  working directory; the separate provenance probe retains safe-path mode. Every
+  command gets a disposable temporary root and has `TEMP`, `TMP`, and `TMPDIR` rebound
+  to it. The benchmark hidden checker replaces the parent `PYTHONPATH` with the exact isolated
+  candidate workspace when candidate import is its intended check. A bounded,
+  non-importing probe records resolved package provenance. Execution and captured
+  streams have wall-time and byte budgets. These processes are not protected by a
+  kernel filesystem, process, or network sandbox, so no hostile-code or production
+  claim is allowed.
 - Git inventory uses a native executable from a fixed operating-system installation
   location, disables hooks and filesystem monitors, has a deadline, verifies the
   requested top-level, fails on tracked deletions or omitted required role/tournament
   paths, and binds that executable by path and digest.
+- Tournament output and ambient temporary paths are rejected when they overlap the
+  selected/shared Git administrative roots or selected/shared-primary ignored
+  control-plane state. The full doctor receives an empty ignored-state seed in a
+  standalone no-hardlink clone. Its command temporary root is confined beside that
+  clone, and both are removed fail-closed. Selected and shared-primary state manifests
+  are compared before, after, and again during bundle verification. This proves the
+  tournament did not mutate those authority roots through the verification observation;
+  the clean-clone doctor does not certify the health of their live ignored contents.
 - The verifier binds plan, rubric-derived role scores, evidence-derived system-lane
   statuses, a rederived championship report, derived feedback, command receipts,
   transcripts, the Markdown report, execution attempts and waves, event chain, and
-  exact artifact inventory. It re-derives role and static-parser claims from the
+  exact artifact inventory. The full-doctor receipt additionally binds its launch cwd,
+  interpreter, exact nested controller-test success schema, containment and discarded
+  stream policy, ordered command/doctor/repair timestamps, live protected-state
+  manifests, and cleanup. It re-derives role and static-parser claims from the
   caller-selected exact checkout without rerunning tests, and requires the loaded
   verifier to be the digest-bound runtime recorded from that checkout. This proves checkout-bound
   internal derivation and content integrity, not an external signature or portable
@@ -153,8 +194,9 @@ champion, materialize a successor, or automatically run the successor generation
 - Court participants in this slice are non-overlapping declared labels, not evidence
   of separately authenticated principals. That missing independence blocks promotion.
 - Development scores cannot mask a critical system lane.
-- No method in this slice changes a prompt champion, production state, policy,
-  protected branch, or remote repository.
+- No method in this slice changes a prompt champion, source control-plane authority,
+  production state, policy, protected branch, or remote repository. It does create
+  explicitly selected evidence plus bounded disposable clone/temp artifacts.
 
 ## Migration and rollback
 
@@ -171,9 +213,10 @@ Autopilot release.
 
 - all eight role lanes appear in one actual positive-overlap parallel wave and a serial
   worker setting is rejected;
-- all six component gates appear in a second actual positive-overlap parallel wave;
-- existing code-to-QA bridge fixtures, resilience, evolution, and complete unittest
-  gates execute;
+- seven component gates appear in a second actual positive-overlap parallel wave, and
+  the full bootstrap doctor runs serially after the direct control-plane tests;
+- existing code-to-QA bridge fixtures, resilience, evolution, product unittests,
+  separately governed control-plane unittests, and the bootstrap doctor execute;
 - no unordered overlapping write scopes validate;
 - every role and feedback receipt is digest-bound;
 - report forgery, weakened plan policies, hostile ambient Git routing, extra files,

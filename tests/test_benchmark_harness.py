@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from unittest.mock import patch
 
 from hive_mind_os.autonomy import AutonomyBudget
 from hive_mind_os.benchmark_corpus import BudgetSpec, LaneTask, build_corpus
@@ -16,6 +17,7 @@ from hive_mind_os.benchmark_harness import (
     BenchmarkHarness,
     LaneExecution,
     MeasurementVerdict,
+    _run_hidden_check,
     bootstrap_interval,
     find_unauthorized_claims,
 )
@@ -157,6 +159,53 @@ class BenchmarkHarnessTests(unittest.TestCase):
             )
             self.assertNotIn(task.checker_id.encode(), content)
             self.assertFalse(hasattr(task.lane_view(), "checker_id"))
+
+    def test_hidden_check_safe_path_imports_only_evaluation_workspace(self) -> None:
+        task = build_corpus(
+            self.root / "corpus",
+            task_ids=("failing-test-fix",),
+        ).tasks[0]
+        workspace = self.root / "evaluation"
+        package = workspace / "tiny_pkg"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        (package / "maths.py").write_text(
+            "def increment(value: int) -> int:\n    return value + 1\n",
+            encoding="utf-8",
+        )
+
+        hostile = self.root / "ambient"
+        hostile_package = hostile / "tiny_pkg"
+        hostile_package.mkdir(parents=True)
+        (hostile_package / "__init__.py").write_text("", encoding="utf-8")
+        (hostile_package / "maths.py").write_text(
+            "def increment(value: int) -> int:\n    return 999\n",
+            encoding="utf-8",
+        )
+        observed_environment: dict[str, str] = {}
+        real_run = subprocess.run
+
+        def capture_environment(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+            observed_environment.update(kwargs["env"])
+            return real_run(*args, **kwargs)
+
+        with (
+            patch.dict(
+                os.environ,
+                {"PYTHONPATH": str(hostile), "PYTHONSAFEPATH": "1"},
+                clear=False,
+            ),
+            patch(
+                "hive_mind_os.benchmark_harness.subprocess.run",
+                side_effect=capture_environment,
+            ),
+        ):
+            result = _run_hidden_check(task, workspace)
+
+        self.assertTrue(result["passed"], result["stderr"])
+        self.assertEqual(str(workspace.resolve()), observed_environment["PYTHONPATH"])
+        self.assertNotIn(str(hostile), observed_environment["PYTHONPATH"].split(os.pathsep))
+        self.assertEqual("1", observed_environment["PYTHONSAFEPATH"])
 
     def test_equal_budget_and_overspend_fails_closed(self) -> None:
         spec = BudgetSpec(max_tool_calls=2, max_tool_calls_per_episode=2)

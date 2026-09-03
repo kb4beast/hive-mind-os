@@ -212,10 +212,18 @@ _CHECK_PROGRAMS = {
 
 def _run_hidden_check(task: CorpusTask, workspace: Path) -> dict[str, object]:
     program = _CHECK_PROGRAMS[task.checker_id]
+    environment = dict(os.environ)
+    environment.update(
+        {
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONPATH": str(workspace.resolve()),
+            "PYTHONSAFEPATH": "1",
+        }
+    )
     completed = subprocess.run(
-        [sys.executable, "-B", "-c", program],
+        [sys.executable, "-B", "-P", "-c", program],
         cwd=workspace,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        env=environment,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

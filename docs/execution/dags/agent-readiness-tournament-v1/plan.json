@@ -287,7 +287,7 @@
       "lane": "static",
       "max_attempts": 1,
       "node_id": "SYSTEM-STATIC",
-      "objective": "Parse every discovered Python and JSON artifact.",
+      "objective": "Parse JSON and compile every discovered Python artifact in memory.",
       "parallel_safe": true,
       "read_scope": [
         "**"
@@ -459,6 +459,78 @@
     },
     {
       "acceptance": [
+        "lane produces a reproducible receipt"
+      ],
+      "action": "control-plane-tests",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "control-plane-tests",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-CONTROL-PLANE-TESTS",
+      "objective": "Run the separately governed control-plane unittest suite.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-CONTROL-PLANE-TESTS.json",
+        "run://transcripts/SYSTEM-CONTROL-PLANE-TESTS.txt",
+        "resource://sealed-control-plane-tests"
+      ]
+    },
+    {
+      "acceptance": [
+        "native doctor reports READY with full scope and exact controller-test evidence",
+        "selected and shared-primary authority-state manifests remain unchanged",
+        "the standalone clone and its rebound command temporary root are removed"
+      ],
+      "action": "control-plane-doctor",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER",
+        "SYSTEM-CONTROL-PLANE-TESTS"
+      ],
+      "hard_gates": [
+        "reduced doctor output cannot qualify",
+        "source authority mutation or incomplete cleanup fails closed",
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "control-plane-doctor",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-CONTROL-PLANE-DOCTOR",
+      "objective": "Run the exact full bootstrap doctor in an isolated disposable clone.",
+      "parallel_safe": false,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-CONTROL-PLANE-DOCTOR.json",
+        "run://transcripts/SYSTEM-CONTROL-PLANE-DOCTOR.txt",
+        "resource://sealed-control-plane-tests",
+        "isolated://control-plane-doctor/**"
+      ]
+    },
+    {
+      "acceptance": [
         "the canonical full suite is executed or explicitly deferred"
       ],
       "action": "full-suite",
@@ -468,7 +540,9 @@
         "SYSTEM-CODE-QA",
         "SYSTEM-RESILIENCE",
         "SYSTEM-EVOLUTION",
-        "SYSTEM-CONTROL-PLANE"
+        "SYSTEM-CONTROL-PLANE",
+        "SYSTEM-CONTROL-PLANE-TESTS",
+        "SYSTEM-CONTROL-PLANE-DOCTOR"
       ],
       "hard_gates": [
         "failed tests are retained"
@@ -775,7 +849,7 @@
     }
   ],
   "objective": "Grade every constitutional agent separately and in composition, exercise the existing code-to-QA bridge fixtures, and route weaknesses into bounded immutable challenger re-entry contracts.",
-  "plan_digest": "sha256:5a6dadbdf39482bd32afdf3e3f1f87d64143aebed83be845e364151988ab3270",
+  "plan_digest": "sha256:3e04ce46f9f4b09ca8fa73d1e5ef0f890c61885f8600fc9e0eb3d1391bc3f3fc",
   "plan_id": "agent-readiness-tournament-v1",
   "retry_policy": {
     "record_every_wave_result_before_abort": true,

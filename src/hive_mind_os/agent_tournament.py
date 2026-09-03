@@ -16,17 +16,20 @@ import binascii
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 
 from .brain_kernel.canonical import canonical_digest
 from .brain_kernel.roles import KERNEL_IMPLEMENTED_ROLES, role_capabilities
@@ -57,6 +60,33 @@ _MAX_INVENTORY_FILE_BYTES = 256 * 1024 * 1024
 _MAX_INVENTORY_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 _MAX_RUN_ARTIFACT_BYTES = 64 * 1024 * 1024
 _MAX_RUN_TOTAL_BYTES = 1024 * 1024 * 1024
+_STRICT_CHILD_ENVIRONMENT = "strict-safe-path-v1"
+_SEALED_CONTROL_PLANE_ENVIRONMENT = "sealed-control-plane-cwd-compat-v1"
+_CHILD_ENVIRONMENT_PROFILES = frozenset(
+    {_STRICT_CHILD_ENVIRONMENT, _SEALED_CONTROL_PLANE_ENVIRONMENT}
+)
+_CONTROL_PLANE_RESOURCE_SCOPE = "resource://sealed-control-plane-tests"
+_DOCTOR_ISOLATION_KIND = "disposable-standalone-no-hardlink-clone-v1"
+_DOCTOR_REPAIR_KIND = "hive-mind-autopilot-full-doctor-evidence-v1"
+_COMMAND_TEMP_PREFIX = "hive-tournament-command-"
+_DOCTOR_TEMP_DIRECTORY_NAME = "tmp"
+_CONTROLLER_TEST_COMMAND_IDENTITY = "exact-checkout-isolated-unittest-discover"
+_CONTROLLER_TEST_TIMEOUT_SECONDS = 600
+_CONTROLLER_TEST_TERMINATION_SECONDS = 10
+_CONTROLLER_TEST_OUTPUT_POLICY = (
+    "stdout and stderr strictly UTF-8 validated then discarded"
+)
+_CONTROLLER_TEST_STREAM_POLICY = (
+    "strictly validated then discarded; no text, length, or digest retained"
+)
+_DOCTOR_EXPECTED_CHECKS = (
+    "configuration",
+    "repository",
+    "receipts",
+    "consultation-contracts",
+    "runtime-coordination",
+    "controller-tests",
+)
 _CANONICAL_SCORING_POLICY = {
     "development_scores_are_advisory": True,
     "fatal_gates_are_non_compensating": True,
@@ -96,7 +126,7 @@ _CHILD_OPTIONAL_ENV_NAMES = frozenset(
         "WINDIR",
     }
 )
-_CHILD_REQUIRED_ENV_NAMES = frozenset(
+_CHILD_BASE_REQUIRED_ENV_NAMES = frozenset(
     {
         "ALL_PROXY",
         "HTTP_PROXY",
@@ -107,14 +137,27 @@ _CHILD_REQUIRED_ENV_NAMES = frozenset(
         "PYTHONHASHSEED",
         "PYTHONNOUSERSITE",
         "PYTHONPATH",
-        "PYTHONSAFEPATH",
         "PYTHONUTF8",
     }
 )
+_CHILD_REQUIRED_ENV_NAMES = _CHILD_BASE_REQUIRED_ENV_NAMES | {"PYTHONSAFEPATH"}
 
 
 class TournamentError(RuntimeError):
     """The tournament cannot produce trustworthy evidence."""
+
+
+CommandRunner = Callable[[Path, Sequence[str]], tuple[dict[str, Any], str]]
+DoctorIsolationResult = tuple[
+    dict[str, Any],
+    str,
+    dict[str, Any],
+    dict[str, Any],
+]
+DoctorIsolationRunner = Callable[
+    [Path, Mapping[str, Any], CommandRunner],
+    DoctorIsolationResult,
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,9 +242,44 @@ SYSTEM_TEST_LANES: Mapping[str, tuple[str, ...]] = {
     ),
 }
 
+CONTROL_PLANE_COMMANDS: Mapping[str, tuple[str, ...]] = {
+    "control-plane": (
+        sys.executable,
+        "-B",
+        ".autopilot/bin/dag_standard.py",
+        "dag-lint",
+        "--strict",
+        "--plan",
+        ".autopilot/plan.json",
+        "--json",
+    ),
+    "control-plane-tests": (
+        sys.executable,
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".autopilot/tests",
+        "-v",
+    ),
+    "control-plane-doctor": (
+        sys.executable,
+        "-B",
+        ".autopilot/bin/autopilot.py",
+        "--repo-root",
+        ".",
+        "doctor",
+        "--json",
+    ),
+}
+
 
 def _required_inventory_paths() -> frozenset[str]:
     paths = {
+        ".autopilot/bin/autopilot.py",
+        ".autopilot/bin/dag_standard.py",
+        ".autopilot/plan.json",
         "pyproject.toml",
         "scripts/run_agent_tournament.py",
         "src/hive_mind_os/agent_tournament.py",
@@ -290,19 +368,45 @@ def _canonical_plan_document() -> dict[str, Any]:
         )
 
     role_dependencies = tuple(_role_node_id(role) for role in TOURNAMENT_ROLES)
-    for lane in ("static", *SYSTEM_TEST_LANES, "control-plane"):
+    for lane in ("static", *SYSTEM_TEST_LANES, *CONTROL_PLANE_COMMANDS):
         action = {
             "static": "static-repository",
             "control-plane": "control-plane-audit",
+            "control-plane-tests": "control-plane-tests",
+            "control-plane-doctor": "control-plane-doctor",
         }.get(lane, "system-test")
+        acceptance = (
+            (
+                "native doctor reports READY with full scope and exact controller-test evidence",
+                "selected and shared-primary authority-state manifests remain unchanged",
+                "the standalone clone and its rebound command temporary root are removed",
+            )
+            if lane == "control-plane-doctor"
+            else ("lane produces a reproducible receipt",)
+        )
+        hard_gates = (
+            (
+                "reduced doctor output cannot qualify",
+                "source authority mutation or incomplete cleanup fails closed",
+                "a catastrophic defect is not averaged away",
+            )
+            if lane == "control-plane-doctor"
+            else ("a catastrophic defect is not averaged away",)
+        )
         nodes.append(
             DagNode(
                 "SYSTEM-" + lane.upper(),
                 action,
-                role_dependencies,
-                True,
+                (
+                    (*role_dependencies, "SYSTEM-CONTROL-PLANE-TESTS")
+                    if lane == "control-plane-doctor"
+                    else role_dependencies
+                ),
+                lane != "control-plane-doctor",
                 {
-                    "static": "Parse every discovered Python and JSON artifact.",
+                    "static": (
+                        "Parse JSON and compile every discovered Python artifact in memory."
+                    ),
                     "lifecycle": "Prove all roles compose in the canonical lifecycle.",
                     "code-qa": (
                         "Exercise the existing code-to-QA bridge fixtures; this run does not "
@@ -311,6 +415,12 @@ def _canonical_plan_document() -> dict[str, Any]:
                     "resilience": "Exercise recovery, no-cheating, and learning-poisoning defenses.",
                     "evolution": "Exercise challenger, evaluation, learning, and promotion boundaries.",
                     "control-plane": "Cross-check the installed legacy control plane under strict lint.",
+                    "control-plane-tests": (
+                        "Run the separately governed control-plane unittest suite."
+                    ),
+                    "control-plane-doctor": (
+                        "Run the exact full bootstrap doctor in an isolated disposable clone."
+                    ),
                 }[lane],
                 lane=lane,
                 read_scope=("**",),
@@ -321,14 +431,20 @@ def _canonical_plan_document() -> dict[str, Any]:
                         if lane == "static"
                         else (f"run://transcripts/SYSTEM-{lane.upper()}.txt",)
                     ),
+                    *((_CONTROL_PLANE_RESOURCE_SCOPE,) if lane in {
+                        "control-plane-tests",
+                        "control-plane-doctor",
+                    } else ()),
+                    *(("isolated://control-plane-doctor/**",) if lane == "control-plane-doctor" else ()),
                 ),
-                acceptance=("lane produces a reproducible receipt",),
-                hard_gates=("a catastrophic defect is not averaged away",),
+                acceptance=acceptance,
+                hard_gates=hard_gates,
             )
         )
 
     component_nodes = tuple(
-        "SYSTEM-" + lane.upper() for lane in ("static", *SYSTEM_TEST_LANES, "control-plane")
+        "SYSTEM-" + lane.upper()
+        for lane in ("static", *SYSTEM_TEST_LANES, *CONTROL_PLANE_COMMANDS)
     )
     nodes.extend(
         (
@@ -486,6 +602,8 @@ def validate_tournament_plan(document: Mapping[str, Any]) -> tuple[tuple[str, ..
         "static-repository",
         "system-test",
         "control-plane-audit",
+        "control-plane-tests",
+        "control-plane-doctor",
         "full-suite",
         "cross-examine",
         "feedback",
@@ -545,6 +663,14 @@ def validate_tournament_plan(document: Mapping[str, Any]) -> tuple[tuple[str, ..
         "SYSTEM-RESILIENCE": ("system-test", "resilience"),
         "SYSTEM-EVOLUTION": ("system-test", "evolution"),
         "SYSTEM-CONTROL-PLANE": ("control-plane-audit", "control-plane"),
+        "SYSTEM-CONTROL-PLANE-TESTS": (
+            "control-plane-tests",
+            "control-plane-tests",
+        ),
+        "SYSTEM-CONTROL-PLANE-DOCTOR": (
+            "control-plane-doctor",
+            "control-plane-doctor",
+        ),
     }
     expected_ids = {
         "SCAN-REPOSITORY",
@@ -569,6 +695,10 @@ def validate_tournament_plan(document: Mapping[str, Any]) -> tuple[tuple[str, ..
     exact_contracts.update(
         {node_id: (action, tuple(role_nodes)) for node_id, (action, _lane) in component_actions.items()}
     )
+    exact_contracts["SYSTEM-CONTROL-PLANE-DOCTOR"] = (
+        "control-plane-doctor",
+        (*tuple(role_nodes), "SYSTEM-CONTROL-PLANE-TESTS"),
+    )
     exact_contracts.update(
         {
             node_id: ("feedback", (_role_node_id(role), "CROSS-EXAMINE"))
@@ -580,7 +710,14 @@ def validate_tournament_plan(document: Mapping[str, Any]) -> tuple[tuple[str, ..
         if raw["action"] != action or set(raw["dependencies"]) != set(dependencies):
             raise TournamentError(f"node {node_id} violates the canonical action topology")
     expected_parallel = {
-        node_id: node_id in role_nodes or node_id in feedback_nodes or node_id in component_actions
+        node_id: (
+            node_id in role_nodes
+            or node_id in feedback_nodes
+            or (
+                node_id in component_actions
+                and node_id != "SYSTEM-CONTROL-PLANE-DOCTOR"
+            )
+        )
         for node_id in expected_ids
     }
     expected_attempts = {
@@ -713,6 +850,22 @@ def _strict_json_value(text: str, *, label: str) -> Any:
         raise TournamentError(f"{label} contains invalid or ambiguous JSON") from error
 
 
+def _parse_canonical_utc_timestamp(value: object, *, label: str) -> datetime:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise TournamentError(f"{label} is not a canonical UTC timestamp")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError as error:
+        raise TournamentError(f"{label} is not a canonical UTC timestamp") from error
+    if (
+        parsed.tzinfo is None
+        or parsed.utcoffset() != timedelta(0)
+        or parsed.astimezone(UTC).isoformat().replace("+00:00", "Z") != value
+    ):
+        raise TournamentError(f"{label} is not a canonical UTC timestamp")
+    return parsed
+
+
 def _read_json(path: Path) -> Mapping[str, Any]:
     value = _strict_json_value(path.read_text(encoding="utf-8"), label=str(path))
     if not isinstance(value, Mapping):
@@ -720,20 +873,44 @@ def _read_json(path: Path) -> Mapping[str, Any]:
     return value
 
 
-def _child_environment(repository: Path) -> dict[str, str]:
+def _environment_profile_for_command(argv: Sequence[str]) -> str:
+    """Select the only compatibility exception from an exact code-owned command."""
+
+    command = tuple(argv)
+    if command in {
+        CONTROL_PLANE_COMMANDS["control-plane-tests"],
+        CONTROL_PLANE_COMMANDS["control-plane-doctor"],
+    }:
+        return _SEALED_CONTROL_PLANE_ENVIRONMENT
+    return _STRICT_CHILD_ENVIRONMENT
+
+
+def _child_environment(
+    repository: Path,
+    *,
+    profile: str = _STRICT_CHILD_ENVIRONMENT,
+    temporary_directory: Path | None = None,
+) -> dict[str, str]:
     """Build a small, credential-scrubbed environment for repository-owned checks.
 
     This is defense in depth, not a process or network sandbox.  The distinction is
     reported by the tournament and therefore cannot qualify a production agent.
     """
 
+    if profile not in _CHILD_ENVIRONMENT_PROFILES:
+        raise TournamentError(f"unsupported child-environment profile: {profile}")
+    repository = repository.resolve()
     environment = {
         key: value
         for key, value in os.environ.items()
         if key.upper() in _CHILD_OPTIONAL_ENV_NAMES
+        and key.upper() not in {"TEMP", "TMP", "TMPDIR"}
     }
     git_executable = _git_executable(repository)
     trusted_path = [str(Path(sys.executable).resolve().parent), str(git_executable.parent)]
+    node_executable = _node_executable()
+    if node_executable is not None:
+        trusted_path.append(str(node_executable.parent))
     if os.name == "nt":
         windows = Path(environment.get("SYSTEMROOT", r"C:\Windows"))
         trusted_path.extend((str(windows / "System32"), str(windows)))
@@ -753,7 +930,6 @@ def _child_environment(repository: Path) -> dict[str, str]:
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONHASHSEED": "0",
             "PYTHONNOUSERSITE": "1",
-            "PYTHONSAFEPATH": "1",
             "PYTHONUTF8": "1",
             "HTTP_PROXY": "http://127.0.0.1:9",
             "HTTPS_PROXY": "http://127.0.0.1:9",
@@ -761,7 +937,59 @@ def _child_environment(repository: Path) -> dict[str, str]:
             "NO_PROXY": "localhost,127.0.0.1,::1",
         }
     )
+    if temporary_directory is not None:
+        resolved_temporary_directory = str(temporary_directory.resolve())
+        environment.update(
+            {
+                "TEMP": resolved_temporary_directory,
+                "TMP": resolved_temporary_directory,
+                "TMPDIR": resolved_temporary_directory,
+            }
+        )
+    if profile == _STRICT_CHILD_ENVIRONMENT:
+        environment["PYTHONSAFEPATH"] = "1"
+    else:
+        # A non-empty value, including "0", enables safe-path mode.  The sealed
+        # worker deliberately replaces PYTHONPATH with <worktree>/src and relies
+        # on its controlled worktree cwd for ``tests.*``; omission is therefore
+        # the narrow compatibility boundary.
+        environment.pop("PYTHONSAFEPATH", None)
     return environment
+
+
+def _environment_policy(profile: str, environment: Mapping[str, str]) -> dict[str, Any]:
+    if profile not in _CHILD_ENVIRONMENT_PROFILES:
+        raise TournamentError(f"unsupported child-environment profile: {profile}")
+    safe_path = profile == _STRICT_CHILD_ENVIRONMENT
+    temporary_bindings = {
+        name: environment[name]
+        for name in ("TEMP", "TMP", "TMPDIR")
+        if name in environment
+    }
+    return {
+        "credential_environment_inherited": False,
+        "inherited_git_variables": False,
+        "git_configuration_isolation": "delegated to the repository code under test",
+        "user_site_disabled": True,
+        "network_control": "best-effort proxy deny; no kernel sandbox",
+        "inherited_names": sorted(environment),
+        "environment_profile": profile,
+        "python_safe_path_enabled": safe_path,
+        "pythonpath_policy": "exact-repository-src-root-and-control-plane-bin-v1",
+        "pythonpath_entries": environment["PYTHONPATH"].split(os.pathsep),
+        "cwd_import_authority": (
+            "disabled-by-safe-path"
+            if safe_path
+            else "sealed-control-plane-repository-worktrees-only"
+        ),
+        "temporary_directory_policy": (
+            "explicit-single-disposable-root-v1"
+            if len(set(temporary_bindings.values())) == 1
+            and set(temporary_bindings) == {"TEMP", "TMP", "TMPDIR"}
+            else "not-provided"
+        ),
+        "temporary_directory_bindings": temporary_bindings,
+    }
 
 
 def _git_environment(repository: Path) -> dict[str, str]:
@@ -788,12 +1016,38 @@ def _git_executable(repository: Path) -> Path:
         if os.name == "nt"
         else (Path("/usr/bin/git"), Path("/bin/git"))
     )
+    executable = _fixed_native_executable(candidates)
+    if executable is not None:
+        return executable
+    raise TournamentError("a native Git executable in a fixed operating-system location is required")
+
+
+def _node_candidates() -> tuple[Path, ...]:
+    if os.name == "nt":
+        return (
+            Path(r"C:\Program Files\nodejs\node.exe"),
+            Path(r"C:\Program Files (x86)\nodejs\node.exe"),
+        )
+    if sys.platform == "darwin":
+        return (Path("/usr/local/bin/node"), Path("/opt/homebrew/bin/node"))
+    return (Path("/usr/bin/node"), Path("/bin/node"), Path("/usr/local/bin/node"))
+
+
+def _fixed_native_executable(candidates: Iterable[Path]) -> Path | None:
     for candidate in candidates:
-        if not candidate.is_file() or candidate.is_symlink():
+        try:
+            if (
+                not candidate.is_file()
+                or _has_link_like_component(Path(candidate.anchor), candidate)
+            ):
+                continue
+            executable = candidate.resolve(strict=True)
+            if _has_link_like_component(Path(executable.anchor), executable):
+                continue
+            with executable.open("rb") as stream:
+                prefix = stream.read(4)
+        except OSError:
             continue
-        executable = candidate.resolve()
-        with executable.open("rb") as stream:
-            prefix = stream.read(4)
         if os.name == "nt" and executable.suffix.casefold() == ".exe" and prefix[:2] == b"MZ":
             return executable
         if sys.platform.startswith("linux") and prefix == b"\x7fELF":
@@ -805,7 +1059,26 @@ def _git_executable(repository: Path) -> Path:
             b"\xcf\xfa\xed\xfe",
         }:
             return executable
-    raise TournamentError("a native Git executable in a fixed operating-system location is required")
+    return None
+
+
+def _node_executable() -> Path | None:
+    """Resolve an optional Node runtime without consulting caller-controlled PATH."""
+
+    return _fixed_native_executable(_node_candidates())
+
+
+def _host_runtime_evidence() -> dict[str, dict[str, Any]]:
+    node_executable = _node_executable()
+    return {
+        "node": {
+            "available": node_executable is not None,
+            "path": str(node_executable) if node_executable is not None else None,
+            "sha256": (
+                _sha256_file(node_executable) if node_executable is not None else None
+            ),
+        }
+    }
 
 
 def _bounded_subprocess(
@@ -1064,6 +1337,7 @@ def inventory_repository(repository: str | Path, *, exclude: Path | None = None)
             "path": str(git_executable),
             "sha256": _sha256_file(git_executable),
         },
+        "host_runtimes": _host_runtime_evidence(),
         "head": head_value,
         "branch": branch_value,
         "dirty_path_count": len([item for item in status.stdout.split(b"\0") if item]),
@@ -1073,6 +1347,794 @@ def inventory_repository(repository: str | Path, *, exclude: Path | None = None)
     }
     document["inventory_digest"] = canonical_digest(document)
     return document
+
+
+def _checked_git(repository: Path, *arguments: str, label: str) -> str:
+    completed = _git(repository, *arguments)
+    if completed.returncode != 0:
+        raise TournamentError(f"isolated doctor Git operation failed: {label}")
+    try:
+        return completed.stdout.decode("utf-8", errors="strict").strip()
+    except UnicodeError as error:
+        raise TournamentError(
+            f"isolated doctor Git operation returned non-UTF-8 output: {label}"
+        ) from error
+
+
+def _inventory_content_digest(inventory: Mapping[str, Any]) -> str:
+    files = inventory.get("files")
+    if not isinstance(files, list):
+        raise TournamentError("isolated doctor source inventory lacks file evidence")
+    return canonical_digest({"files": files})
+
+
+def _control_plane_identity(repository: Path) -> dict[str, Any]:
+    control = _read_json(repository / ".autopilot/control-plane.json")
+    target = control.get("target")
+    branch = target.get("branch") if isinstance(target, Mapping) else None
+    plan_fingerprint = control.get("plan_fingerprint")
+    verify_git_objects = control.get("verify_git_objects", True)
+    if (
+        not isinstance(branch, str)
+        or not branch.strip()
+        or any(character in branch for character in "\r\n\0")
+        or not isinstance(plan_fingerprint, str)
+        or _DIGEST.fullmatch(plan_fingerprint) is None
+        or not isinstance(verify_git_objects, bool)
+    ):
+        raise TournamentError("isolated doctor control-plane identity is invalid")
+    candidates = (
+        f"refs/remotes/origin/{branch}",
+        f"refs/heads/{branch}",
+    )
+    for reference in candidates:
+        completed = _git(repository, "rev-parse", "--verify", reference)
+        if completed.returncode != 0:
+            continue
+        try:
+            target_sha = completed.stdout.decode("ascii", errors="strict").strip()
+        except UnicodeError:
+            continue
+        if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", target_sha):
+            return {
+                "target_branch": branch,
+                "source_target_ref": reference,
+                "source_target_sha": target_sha,
+                "plan_fingerprint": plan_fingerprint,
+                "verify_git_objects": verify_git_objects,
+            }
+    raise TournamentError("isolated doctor could not resolve the exact source target ref")
+
+
+def _materialize_inventory(
+    source: Path,
+    checkout: Path,
+    inventory: Mapping[str, Any],
+) -> str:
+    files = inventory.get("files")
+    if not isinstance(files, list):
+        raise TournamentError("isolated doctor source inventory lacks file rows")
+    for row in files:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"path", "bytes", "sha256", "category"}
+            or not isinstance(row.get("path"), str)
+        ):
+            raise TournamentError("isolated doctor source inventory contains a malformed row")
+        relative = str(row["path"])
+        parts = relative.split("/")
+        if (
+            not relative
+            or "\\" in relative
+            or any(part in {"", ".", ".."} for part in parts)
+            or parts[:2] == [".autopilot", "state"]
+        ):
+            raise TournamentError("isolated doctor source inventory contains an unsafe path")
+        source_path = source.joinpath(*parts)
+        target_path = checkout.joinpath(*parts)
+        if _has_link_like_component(source, source_path):
+            raise TournamentError(
+                f"isolated doctor source path contains a link-like component: {relative}"
+            )
+        content = source_path.read_bytes()
+        if (
+            type(row.get("bytes")) is not int
+            or row["bytes"] != len(content)
+            or row.get("sha256") != _sha256_bytes(content)
+        ):
+            raise TournamentError(
+                f"isolated doctor source changed after SCAN-REPOSITORY: {relative}"
+            )
+        if target_path.exists() and _has_link_like_component(checkout, target_path):
+            raise TournamentError(
+                f"isolated doctor checkout contains a link-like path: {relative}"
+            )
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target_path, follow_symlinks=False)
+    materialized = inventory_repository(checkout)
+    expected_files = files
+    if materialized.get("head") != inventory.get("head") or materialized.get(
+        "files"
+    ) != expected_files:
+        raise TournamentError("isolated doctor checkout differs from the sealed SCAN inventory")
+    return _inventory_content_digest(materialized)
+
+
+def _state_manifest(root: Path) -> dict[str, Any]:
+    absolute_root = root.absolute()
+    if _has_link_like_component(Path(absolute_root.anchor), absolute_root):
+        raise TournamentError(f"protected control-plane state has a link-like path: {root}")
+    root = absolute_root.resolve()
+    if root.exists() and not root.is_dir():
+        raise TournamentError(f"protected control-plane state is not a directory: {root}")
+    rows: list[dict[str, Any]] = []
+    total_bytes = 0
+    if root.is_dir():
+        for path in sorted(root.rglob("*")):
+            if _is_link_like(path):
+                raise TournamentError(
+                    f"protected control-plane state contains a link-like entry: {path}"
+                )
+            if path.is_dir():
+                continue
+            if not path.is_file():
+                raise TournamentError(
+                    f"protected control-plane state contains an unsupported entry: {path}"
+                )
+            content = path.read_bytes()
+            total_bytes += len(content)
+            if (
+                len(content) > _MAX_RUN_ARTIFACT_BYTES
+                or total_bytes > _MAX_RUN_TOTAL_BYTES
+            ):
+                raise TournamentError("protected control-plane state exceeds evidence budgets")
+            rows.append(
+                {
+                    "path": path.relative_to(root).as_posix(),
+                    "bytes": len(content),
+                    "sha256": _sha256_bytes(content),
+                }
+            )
+    rows.sort(key=lambda row: row["path"])
+    document: dict[str, Any] = {"exists": root.is_dir(), "files": rows}
+    document["manifest_digest"] = canonical_digest(document)
+    return document
+
+
+def _paths_overlap(left: Path, right: Path) -> bool:
+    left = left.resolve()
+    right = right.resolve()
+    return left == right or left.is_relative_to(right) or right.is_relative_to(left)
+
+
+def _source_git_authority_roots(
+    repository: Path,
+    inventory: Mapping[str, Any],
+) -> tuple[tuple[str, Path], ...]:
+    git_directory_value = inventory.get("git_directory")
+    if not isinstance(git_directory_value, str) or not Path(
+        git_directory_value
+    ).is_absolute():
+        raise TournamentError("source inventory lacks an absolute Git directory")
+    git_directory = Path(git_directory_value).resolve()
+    if (
+        not git_directory.is_dir()
+        or _has_link_like_component(Path(git_directory.anchor), git_directory)
+    ):
+        raise TournamentError("source Git administrative directory is unsafe")
+    roots: list[tuple[str, Path]] = [("selected-git-administration", git_directory)]
+    common_record = git_directory / "commondir"
+    if common_record.exists():
+        if (
+            not common_record.is_file()
+            or _has_link_like_component(Path(git_directory.anchor), common_record)
+            or common_record.stat().st_size > 4096
+        ):
+            raise TournamentError("source Git common-dir record is unsafe")
+        try:
+            common_text = common_record.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError) as error:
+            raise TournamentError("source Git common-dir record is unreadable") from error
+        common_directory = Path(common_text)
+        if not common_directory.is_absolute():
+            common_directory = git_directory / common_directory
+        common_directory = common_directory.resolve()
+        if (
+            common_directory.name != ".git"
+            or not common_directory.is_dir()
+            or _has_link_like_component(
+                Path(common_directory.anchor), common_directory
+            )
+        ):
+            raise TournamentError("source Git common directory is unsafe")
+        if common_directory != git_directory:
+            roots.append(("shared-git-common", common_directory))
+    return tuple(roots)
+
+
+def _source_authority_state_roots(
+    repository: Path,
+    inventory: Mapping[str, Any],
+) -> tuple[tuple[str, Path], ...]:
+    roots: list[tuple[str, Path]] = [
+        ("selected-checkout", repository / ".autopilot/state")
+    ]
+    for kind, git_root in _source_git_authority_roots(repository, inventory):
+        if kind != "shared-git-common":
+            continue
+        primary_state = git_root.parent / ".autopilot/state"
+        if primary_state.resolve() != roots[0][1].resolve():
+            roots.append(("shared-primary", primary_state))
+    return tuple(roots)
+
+
+def _source_authority_roots(
+    repository: Path,
+    inventory: Mapping[str, Any],
+) -> tuple[tuple[str, Path], ...]:
+    return (
+        *_source_git_authority_roots(repository, inventory),
+        *_source_authority_state_roots(repository, inventory),
+    )
+
+
+def _validate_path_outside_authority(
+    candidate: Path,
+    authority_roots: Sequence[tuple[str, Path]],
+    *,
+    label: str,
+) -> Path:
+    absolute = candidate.absolute()
+    if _has_link_like_component(Path(absolute.anchor), absolute):
+        raise TournamentError(f"{label} contains a symbolic link or junction")
+    resolved = absolute.resolve()
+    for kind, authority_root in authority_roots:
+        if _paths_overlap(resolved, authority_root):
+            raise TournamentError(f"{label} overlaps {kind} authority")
+    return resolved
+
+
+def _validated_ambient_temp_root(
+    authority_roots: Sequence[tuple[str, Path]],
+) -> Path:
+    temporary_root = Path(tempfile.gettempdir()).absolute()
+    if _has_link_like_component(Path(temporary_root.anchor), temporary_root):
+        raise TournamentError("ambient temporary root contains a symbolic link or junction")
+    temporary_root = temporary_root.resolve()
+    if not temporary_root.is_dir():
+        raise TournamentError("ambient temporary root is not a directory")
+    for kind, authority_root in authority_roots:
+        resolved_authority = authority_root.resolve()
+        if temporary_root == resolved_authority or temporary_root.is_relative_to(
+            resolved_authority
+        ):
+            raise TournamentError(f"ambient temporary root is inside {kind} authority")
+    return temporary_root
+
+
+def _live_source_authority_roots(repository: Path) -> tuple[tuple[str, Path], ...]:
+    git_marker = repository / ".git"
+    if git_marker.is_dir():
+        git_directory = str(git_marker.resolve())
+    elif git_marker.is_file():
+        if (
+            _has_link_like_component(repository, git_marker)
+            or git_marker.stat().st_size > 4096
+        ):
+            raise TournamentError("Git worktree marker is unsafe")
+        try:
+            marker_text = git_marker.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError) as error:
+            raise TournamentError("Git worktree marker is unreadable") from error
+        prefix = "gitdir: "
+        if not marker_text.startswith(prefix):
+            raise TournamentError("Git worktree marker is malformed")
+        marker_path = Path(marker_text[len(prefix) :])
+        if not marker_path.is_absolute():
+            marker_path = repository / marker_path
+        git_directory = str(marker_path.resolve())
+    else:
+        raise TournamentError("repository lacks Git administrative state")
+    return _source_authority_roots(
+        repository, {"git_directory": git_directory}
+    )
+
+
+@contextmanager
+def _disposable_command_temporary_directory(
+    repository: Path,
+    *,
+    requested: Path | None = None,
+) -> Iterator[Path]:
+    authority_roots = _live_source_authority_roots(repository)
+    if requested is None:
+        temporary_parent = _validated_ambient_temp_root(authority_roots)
+        temporary_directory = Path(
+            tempfile.mkdtemp(prefix=_COMMAND_TEMP_PREFIX, dir=temporary_parent)
+        ).resolve()
+    else:
+        absolute = requested.absolute()
+        if os.path.lexists(absolute):
+            raise TournamentError("requested command temporary directory already exists")
+        if not absolute.parent.is_dir():
+            raise TournamentError("requested command temporary parent does not exist")
+        temporary_directory = _validate_path_outside_authority(
+            absolute,
+            authority_roots,
+            label="requested command temporary directory",
+        )
+        temporary_directory.mkdir()
+    try:
+        temporary_directory = _validate_path_outside_authority(
+            temporary_directory,
+            authority_roots,
+            label="command temporary directory",
+        )
+    except TournamentError:
+        try:
+            shutil.rmtree(temporary_directory, onerror=_force_remove_readonly)
+        finally:
+            raise
+    try:
+        yield temporary_directory
+    finally:
+        cleanup_error: OSError | None = None
+        try:
+            shutil.rmtree(temporary_directory, onerror=_force_remove_readonly)
+        except OSError as error:
+            cleanup_error = error
+        if cleanup_error is not None or os.path.lexists(temporary_directory):
+            raise TournamentError(
+                "command temporary directory cleanup failed closed"
+            ) from cleanup_error
+
+
+def _snapshot_protected_states(
+    roots: Sequence[tuple[str, Path]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": kind,
+            "path": str(path.resolve()),
+            "manifest": _state_manifest(path),
+        }
+        for kind, path in roots
+    ]
+
+
+def _doctor_semantic_evidence(
+    command_receipt: Mapping[str, Any],
+    transcript: str,
+    *,
+    expected_plan_fingerprint: str,
+    verify_git_objects: bool,
+) -> tuple[dict[str, Any], Mapping[str, Any]]:
+    stdout, stderr = _decode_command_transcript(transcript, label="control-plane-doctor")
+    try:
+        stdout_text = stdout.decode("utf-8", errors="strict")
+    except UnicodeError as error:
+        raise TournamentError("control-plane doctor stdout is not UTF-8 JSON") from error
+    result = _strict_json_value(stdout_text, label="control-plane doctor stdout")
+    if not isinstance(result, Mapping) or set(result) != {
+        "schema_version",
+        "passed",
+        "state",
+        "validation_scope",
+        "controller_tests_run",
+        "plan_fingerprint",
+        "checks",
+        "generated_at",
+    }:
+        raise TournamentError("control-plane doctor JSON fields are invalid")
+    if (
+        type(result.get("schema_version")) is not int
+        or result["schema_version"] != 1
+        or not isinstance(result.get("passed"), bool)
+        or not isinstance(result.get("state"), str)
+        or not isinstance(result.get("validation_scope"), str)
+        or not isinstance(result.get("controller_tests_run"), bool)
+        or not isinstance(result.get("plan_fingerprint"), str)
+        or not isinstance(result.get("generated_at"), str)
+    ):
+        raise TournamentError("control-plane doctor JSON types are invalid")
+    generated_at = _parse_canonical_utc_timestamp(
+        result["generated_at"], label="control-plane doctor generated_at"
+    )
+    checks = result.get("checks")
+    if not isinstance(checks, list) or not checks:
+        raise TournamentError("control-plane doctor JSON lacks checks")
+    check_names: list[str] = []
+    failed_checks: list[str] = []
+    controller_check: Mapping[str, Any] | None = None
+    for check in checks:
+        if (
+            not isinstance(check, Mapping)
+            or not {"name", "passed", "details"} <= set(check)
+            or not set(check) <= {"name", "passed", "details", "evidence"}
+            or not isinstance(check.get("name"), str)
+            or not check["name"]
+            or not isinstance(check.get("passed"), bool)
+            or not isinstance(check.get("details"), list)
+            or any(not isinstance(detail, str) for detail in check["details"])
+            or ("evidence" in check and not isinstance(check["evidence"], Mapping))
+        ):
+            raise TournamentError("control-plane doctor contains a malformed check")
+        check_names.append(str(check["name"]))
+        if check["name"] == "controller-tests":
+            controller_check = check
+        if not check["passed"]:
+            failed_checks.append(str(check["name"]))
+    if len(set(check_names)) != len(check_names):
+        raise TournamentError("control-plane doctor contains duplicate checks")
+    expected_checks = list(_DOCTOR_EXPECTED_CHECKS)
+    if not verify_git_objects:
+        expected_checks.remove("repository")
+    all_checks_passed = not failed_checks and check_names == expected_checks
+    stderr_empty = stderr == b""
+    returncode_consistent = (
+        command_receipt.get("returncode") == 0
+    ) is (result["passed"] is True)
+    execution_cwd = command_receipt.get("execution_cwd")
+    argv = command_receipt.get("argv")
+    controller_evidence_qualified = False
+    if (
+        isinstance(controller_check, Mapping)
+        and controller_check.get("passed") is True
+        and controller_check.get("details") == []
+        and isinstance(controller_check.get("evidence"), Mapping)
+        and isinstance(execution_cwd, str)
+        and isinstance(argv, list)
+        and argv
+        and isinstance(argv[0], str)
+    ):
+        controller_evidence = controller_check["evidence"]
+        expected_stream = {
+            "observed": True,
+            "utf8_valid": True,
+            "stream_error": None,
+            "content_policy": _CONTROLLER_TEST_STREAM_POLICY,
+        }
+        duration = controller_evidence.get("duration_seconds")
+        controller_evidence_qualified = (
+            set(controller_evidence)
+            == {
+                "command_identity",
+                "interpreter",
+                "cwd",
+                "test_root",
+                "timeout_seconds",
+                "isolated",
+                "containment",
+                "output_policy",
+                "failure_kind",
+                "failure_kinds",
+                "returncode",
+                "duration_seconds",
+                "stdout",
+                "stderr",
+            }
+            and controller_evidence.get("command_identity")
+            == _CONTROLLER_TEST_COMMAND_IDENTITY
+            and controller_evidence.get("interpreter") == argv[0]
+            and controller_evidence.get("cwd") == execution_cwd
+            and controller_evidence.get("test_root")
+            == str((Path(execution_cwd) / ".autopilot/tests").resolve())
+            and type(controller_evidence.get("timeout_seconds")) is int
+            and controller_evidence["timeout_seconds"]
+            == _CONTROLLER_TEST_TIMEOUT_SECONDS
+            and controller_evidence.get("isolated") is True
+            and controller_evidence.get("containment")
+            == ("windows-job-object" if os.name == "nt" else "posix-process-group")
+            and controller_evidence.get("output_policy")
+            == _CONTROLLER_TEST_OUTPUT_POLICY
+            and controller_evidence.get("failure_kind") is None
+            and controller_evidence.get("failure_kinds") == []
+            and type(controller_evidence.get("returncode")) is int
+            and controller_evidence["returncode"] == 0
+            and type(duration) in {int, float}
+            and 0
+            <= duration
+            <= _CONTROLLER_TEST_TIMEOUT_SECONDS
+            + _CONTROLLER_TEST_TERMINATION_SECONDS
+            and controller_evidence.get("stdout") == expected_stream
+            and controller_evidence.get("stderr") == expected_stream
+        )
+    if (
+        result["passed"] is True
+        and result["validation_scope"] == "full"
+        and result["controller_tests_run"] is True
+        and not controller_evidence_qualified
+    ):
+        raise TournamentError(
+            "control-plane doctor controller-test success evidence is invalid"
+        )
+    generated_at_consistent = False
+    try:
+        command_started = _parse_canonical_utc_timestamp(
+            command_receipt["started_at"], label="control-plane doctor command start"
+        )
+        command_ended = _parse_canonical_utc_timestamp(
+            command_receipt["ended_at"], label="control-plane doctor command end"
+        )
+        generated_at_consistent = command_started <= generated_at <= command_ended
+    except (KeyError, TournamentError):
+        generated_at_consistent = False
+    qualified = (
+        command_receipt.get("status") == "passed"
+        and result["passed"] is True
+        and result["state"] == "READY"
+        and result["validation_scope"] == "full"
+        and result["controller_tests_run"] is True
+        and result["plan_fingerprint"] == expected_plan_fingerprint
+        and all_checks_passed
+        and stderr_empty
+        and returncode_consistent
+        and controller_evidence_qualified
+        and generated_at_consistent
+    )
+    evidence = {
+        "schema_version": result["schema_version"],
+        "reported_passed": result["passed"],
+        "state": result["state"],
+        "validation_scope": result["validation_scope"],
+        "controller_tests_run": result["controller_tests_run"],
+        "plan_fingerprint": result["plan_fingerprint"],
+        "check_names": check_names,
+        "failed_checks": failed_checks,
+        "all_checks_passed": all_checks_passed,
+        "stderr_empty": stderr_empty,
+        "returncode_consistent": returncode_consistent,
+        "controller_test_evidence_qualified": controller_evidence_qualified,
+        "command_started_at": command_receipt.get("started_at"),
+        "command_ended_at": command_receipt.get("ended_at"),
+        "generated_at": result["generated_at"],
+        "generated_at_consistent": generated_at_consistent,
+        "result_digest": canonical_digest(result),
+        "semantically_qualified": qualified,
+    }
+    return evidence, result
+
+
+def _force_remove_readonly(function: Callable[..., Any], path: str, _error: Any) -> None:
+    os.chmod(path, 0o700)
+    function(path)
+
+
+def _run_isolated_control_plane_doctor(
+    repository: Path,
+    inventory: Mapping[str, Any],
+    command_runner: CommandRunner,
+) -> DoctorIsolationResult:
+    """Run the full sealed doctor without granting it the source authority state."""
+
+    repository = repository.resolve()
+    if Path(str(inventory.get("repository_root"))).resolve() != repository:
+        raise TournamentError("isolated doctor inventory is not bound to the source repository")
+    identity = _control_plane_identity(repository)
+    protected_roots = _source_authority_state_roots(repository, inventory)
+    authority_roots = _source_authority_roots(repository, inventory)
+    protected_before = _snapshot_protected_states(protected_roots)
+    temporary_root = _validated_ambient_temp_root(authority_roots)
+    workspace = Path(
+        tempfile.mkdtemp(prefix="hive-tournament-doctor-", dir=temporary_root)
+    ).resolve()
+    try:
+        workspace = _validate_path_outside_authority(
+            workspace, authority_roots, label="isolated doctor workspace"
+        )
+    except TournamentError:
+        try:
+            shutil.rmtree(workspace, onerror=_force_remove_readonly)
+        finally:
+            raise
+    if workspace.is_relative_to(repository):
+        try:
+            shutil.rmtree(workspace, onerror=_force_remove_readonly)
+        finally:
+            raise TournamentError("isolated doctor workspace is not safely separated")
+    mirror = workspace / "origin.git"
+    checkout = workspace / "checkout"
+    operation_error: Exception | None = None
+    result: DoctorIsolationResult | None = None
+    try:
+        _checked_git(
+            workspace,
+            "clone",
+            "--quiet",
+            "--mirror",
+            "--no-local",
+            "--no-hardlinks",
+            str(repository),
+            str(mirror),
+            label="create disposable mirror",
+        )
+        _checked_git(
+            mirror,
+            "update-ref",
+            f"refs/heads/{identity['target_branch']}",
+            str(identity["source_target_sha"]),
+            label="seal target ref in disposable mirror",
+        )
+        _checked_git(
+            workspace,
+            "clone",
+            "--quiet",
+            "--no-local",
+            "--no-hardlinks",
+            "--no-checkout",
+            str(mirror),
+            str(checkout),
+            label="create disposable working clone",
+        )
+        _checked_git(
+            checkout,
+            "checkout",
+            "--quiet",
+            "--detach",
+            str(inventory.get("head")),
+            label="checkout sealed source HEAD",
+        )
+        materialized_digest = _materialize_inventory(repository, checkout, inventory)
+        if materialized_digest != _inventory_content_digest(inventory):
+            raise TournamentError("isolated doctor materialized inventory digest is stale")
+        common_directory = Path(
+            _checked_git(
+                checkout,
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-common-dir",
+                label="resolve disposable Git common directory",
+            )
+        ).resolve()
+        origin_url = Path(
+            _checked_git(
+                checkout,
+                "remote",
+                "get-url",
+                "origin",
+                label="resolve disposable origin",
+            )
+        ).resolve()
+        git_administration = checkout / ".git"
+        state_root = (checkout / ".autopilot/state").resolve()
+        if (
+            not git_administration.is_dir()
+            or _has_link_like_component(checkout, git_administration)
+            or common_directory != git_administration.resolve()
+            or not common_directory.is_relative_to(workspace)
+            or common_directory == Path(str(inventory["git_directory"])).resolve()
+            or origin_url != mirror.resolve()
+            or not state_root.is_relative_to(workspace)
+            or _has_link_like_component(workspace, common_directory)
+        ):
+            raise TournamentError("isolated doctor Git common directory or state escaped confinement")
+        isolated_before = _state_manifest(state_root)
+        if isolated_before != {
+            "exists": False,
+            "files": [],
+            "manifest_digest": canonical_digest({"exists": False, "files": []}),
+        }:
+            raise TournamentError("isolated doctor copied ignored control-plane state")
+        clone_target = _checked_git(
+            checkout,
+            "rev-parse",
+            "--verify",
+            f"refs/remotes/origin/{identity['target_branch']}",
+            label="verify disposable target ref",
+        )
+        if clone_target != identity["source_target_sha"]:
+            raise TournamentError("isolated doctor target ref differs from the source target")
+        doctor_temporary_root = workspace / _DOCTOR_TEMP_DIRECTORY_NAME
+        if command_runner is run_command_receipt:
+            command_receipt, transcript = run_command_receipt(
+                checkout,
+                CONTROL_PLANE_COMMANDS["control-plane-doctor"],
+                temporary_directory=doctor_temporary_root,
+            )
+        else:
+            command_receipt, transcript = command_runner(
+                checkout, CONTROL_PLANE_COMMANDS["control-plane-doctor"]
+            )
+        semantic, doctor_result = _doctor_semantic_evidence(
+            command_receipt,
+            transcript,
+            expected_plan_fingerprint=str(identity["plan_fingerprint"]),
+            verify_git_objects=bool(identity["verify_git_objects"]),
+        )
+        isolated_after = _state_manifest(state_root)
+        repair_path = state_root / "sealed-repair-doctor.json"
+        repair_evidence: Mapping[str, Any] | None = None
+        if repair_path.is_file():
+            repair_evidence = _read_json(repair_path)
+        expected_state_paths = (
+            ["sealed-repair-doctor.json"] if doctor_result.get("passed") is True else []
+        )
+        if [row["path"] for row in isolated_after["files"]] != expected_state_paths:
+            raise TournamentError("isolated doctor emitted unexpected control-plane state")
+        if doctor_result.get("passed") is True:
+            if (
+                not isinstance(repair_evidence, Mapping)
+                or set(repair_evidence)
+                != {
+                    "schema_version",
+                    "kind",
+                    "target_sha",
+                    "plan_fingerprint",
+                    "github_snapshot_digest",
+                    "reconciliation_digest",
+                    "doctor_result_digest",
+                    "controller_tests_run",
+                    "recorded_at",
+                }
+                or repair_evidence.get("schema_version") != 1
+                or repair_evidence.get("kind") != _DOCTOR_REPAIR_KIND
+                or repair_evidence.get("target_sha") != identity["source_target_sha"]
+                or repair_evidence.get("plan_fingerprint") != identity["plan_fingerprint"]
+                or repair_evidence.get("github_snapshot_digest") is not None
+                or repair_evidence.get("reconciliation_digest") is not None
+                or repair_evidence.get("doctor_result_digest")
+                != semantic["result_digest"]
+                or repair_evidence.get("controller_tests_run") is not True
+                or not isinstance(repair_evidence.get("recorded_at"), str)
+            ):
+                raise TournamentError("isolated doctor repair evidence is invalid")
+        elif repair_evidence is not None:
+            raise TournamentError("failed isolated doctor emitted success authority evidence")
+        isolation = {
+            "kind": _DOCTOR_ISOLATION_KIND,
+            "workspace_root": str(workspace),
+            "execution_repository_root": str(checkout),
+            "source_scan_digest": inventory.get("inventory_digest"),
+            "source_head": inventory.get("head"),
+            "source_inventory_content_digest": _inventory_content_digest(inventory),
+            "materialized_inventory_content_digest": materialized_digest,
+            "source_target_ref": identity["source_target_ref"],
+            "source_target_sha": identity["source_target_sha"],
+            "target_branch": identity["target_branch"],
+            "origin_policy": "disposable-local-mirror-no-hardlinks",
+            "ignored_state_seed_policy": "empty",
+            "standalone_git_directory": True,
+            "git_common_directory_confined": True,
+            "state_root_confined": True,
+            "command_temporary_root": str(doctor_temporary_root.resolve()),
+            "command_temporary_root_confined": True,
+            "isolated_state_before": isolated_before,
+            "isolated_state_after": isolated_after,
+            "sealed_repair_evidence": repair_evidence,
+            "protected_source_states": [],
+            "cleanup_completed": False,
+        }
+        result = command_receipt, transcript, isolation, semantic
+    except Exception as error:
+        operation_error = error
+    cleanup_error: OSError | None = None
+    try:
+        shutil.rmtree(workspace, onerror=_force_remove_readonly)
+    except OSError as error:
+        cleanup_error = error
+    protected_after = _snapshot_protected_states(protected_roots)
+    protected_rows = []
+    for before, after in zip(protected_before, protected_after):
+        protected_rows.append(
+            {
+                "kind": before["kind"],
+                "path": before["path"],
+                "before": before["manifest"],
+                "after": after["manifest"],
+                "unchanged": before["manifest"] == after["manifest"],
+            }
+        )
+    if any(row["unchanged"] is not True for row in protected_rows):
+        raise TournamentError("isolated doctor mutated source control-plane authority state")
+    if cleanup_error is not None or os.path.lexists(workspace):
+        raise TournamentError("isolated doctor cleanup failed closed") from cleanup_error
+    if operation_error is not None:
+        raise operation_error
+    if result is None:
+        raise TournamentError("isolated doctor produced no result")
+    result[2]["protected_source_states"] = protected_rows
+    result[2]["cleanup_completed"] = True
+    return result
 
 
 def _now() -> str:
@@ -1179,10 +2241,35 @@ def run_command_receipt(
     argv: Sequence[str],
     *,
     timeout_seconds: int = 1800,
+    temporary_directory: Path | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Execute a local read/test command and return digest-only metadata plus transcript."""
 
-    environment = _child_environment(repository)
+    repository = repository.resolve()
+    with _disposable_command_temporary_directory(
+        repository, requested=temporary_directory
+    ) as command_temporary_directory:
+        return _run_command_receipt_with_temporary_directory(
+            repository,
+            argv,
+            timeout_seconds=timeout_seconds,
+            temporary_directory=command_temporary_directory,
+        )
+
+
+def _run_command_receipt_with_temporary_directory(
+    repository: Path,
+    argv: Sequence[str],
+    *,
+    timeout_seconds: int,
+    temporary_directory: Path,
+) -> tuple[dict[str, Any], str]:
+    environment_profile = _environment_profile_for_command(argv)
+    environment = _child_environment(
+        repository,
+        profile=environment_profile,
+        temporary_directory=temporary_directory,
+    )
     provenance_argv = (
         sys.executable,
         "-B",
@@ -1259,15 +2346,11 @@ def run_command_receipt(
         "status": "passed" if command_passed else "failed",
         "resolved_package": resolved_package,
         "expected_package_root": str(expected_package),
+        "execution_cwd": str(repository.resolve()),
+        "temporary_directory": str(temporary_directory.resolve()),
+        "temporary_directory_cleanup_completed": True,
         "import_provenance_bound": import_is_bound,
-        "environment_policy": {
-            "credential_environment_inherited": False,
-            "inherited_git_variables": False,
-            "git_configuration_isolation": "delegated to the repository code under test",
-            "user_site_disabled": True,
-            "network_control": "best-effort proxy deny; no kernel sandbox",
-            "inherited_names": sorted(environment),
-        },
+        "environment_policy": _environment_policy(environment_profile, environment),
         "test_output_unambiguous": test_output_unambiguous,
         "tests_run": tests_run,
         "tests_skipped": tests_skipped,
@@ -1567,7 +2650,9 @@ def static_repository_gate(repository: Path, inventory: Mapping[str, Any]) -> di
                 errors.append({"path": relative, "error": "content changed after repository seal"})
                 continue
             if relative.endswith(".py"):
-                ast.parse(content.decode("utf-8"), filename=relative)
+                source = content.decode("utf-8")
+                ast.parse(source, filename=relative)
+                compile(source, relative, "exec", dont_inherit=True)
                 parsed["python"] += 1
             elif relative.endswith(".json"):
                 _strict_json_value(content.decode("utf-8"), label=relative)
@@ -1590,26 +2675,94 @@ def control_plane_gate(
     repository: Path,
     command_runner: Callable[[Path, Sequence[str]], tuple[dict[str, Any], str]] = run_command_receipt,
 ) -> tuple[dict[str, Any], str]:
-    command = (
-        sys.executable,
-        "-B",
-        ".autopilot/bin/dag_standard.py",
-        "dag-lint",
-        "--strict",
-        "--plan",
-        ".autopilot/plan.json",
-        "--json",
+    return _control_plane_command_gate(repository, "control-plane", command_runner)
+
+
+def control_plane_tests_gate(
+    repository: Path,
+    command_runner: Callable[[Path, Sequence[str]], tuple[dict[str, Any], str]] = run_command_receipt,
+) -> tuple[dict[str, Any], str]:
+    return _control_plane_command_gate(repository, "control-plane-tests", command_runner)
+
+
+def control_plane_doctor_gate(
+    repository: Path,
+    command_runner: CommandRunner = run_command_receipt,
+    *,
+    inventory: Mapping[str, Any] | None = None,
+    isolation_runner: DoctorIsolationRunner | None = None,
+) -> tuple[dict[str, Any], str]:
+    source_inventory = inventory or inventory_repository(repository)
+    runner = isolation_runner or _run_isolated_control_plane_doctor
+    command, transcript, isolation, semantic = runner(
+        repository.resolve(), source_inventory, command_runner
     )
+    protected_states = isolation.get("protected_source_states")
+    status = (
+        "passed"
+        if command.get("status") == "passed"
+        and semantic.get("semantically_qualified") is True
+        and isolation.get("cleanup_completed") is True
+        and isinstance(protected_states, list)
+        and bool(protected_states)
+        and all(
+            isinstance(row, Mapping) and row.get("unchanged") is True
+            for row in protected_states
+        )
+        else "failed"
+    )
+    document = {
+        "lane": "control-plane-doctor",
+        "status": status,
+        "critical": False,
+        "interpretation": _control_plane_interpretation(
+            "control-plane-doctor", status
+        ),
+        "command_receipt": command,
+        "doctor_semantics": semantic,
+        "doctor_isolation": isolation,
+    }
+    document["receipt_digest"] = canonical_digest(document)
+    return document, transcript
+
+
+def _control_plane_interpretation(lane: str, status: str) -> str:
+    messages = {
+        "control-plane": (
+            "legacy control plane is strictly valid",
+            "legacy control plane needs adaptation; this does not erase its retained ideas",
+        ),
+        "control-plane-tests": (
+            "separately governed control-plane tests pass",
+            "separately governed control-plane tests need adaptation",
+        ),
+        "control-plane-doctor": (
+            "isolated exact-checkout bootstrap doctor completed full validation",
+            "isolated exact-checkout bootstrap doctor needs adaptation",
+        ),
+    }
+    try:
+        passed, failed = messages[lane]
+    except KeyError:
+        raise TournamentError(f"unsupported control-plane lane: {lane}") from None
+    return passed if status == "passed" else failed
+
+
+def _control_plane_command_gate(
+    repository: Path,
+    lane: str,
+    command_runner: Callable[[Path, Sequence[str]], tuple[dict[str, Any], str]],
+) -> tuple[dict[str, Any], str]:
+    try:
+        command = CONTROL_PLANE_COMMANDS[lane]
+    except KeyError:
+        raise TournamentError(f"unsupported control-plane lane: {lane}") from None
     receipt, transcript = command_runner(repository, command)
     document = {
-        "lane": "control-plane",
+        "lane": lane,
         "status": receipt["status"],
         "critical": False,
-        "interpretation": (
-            "legacy control plane is strictly valid"
-            if receipt["status"] == "passed"
-            else "legacy control plane needs adaptation; this does not erase its retained ideas"
-        ),
+        "interpretation": _control_plane_interpretation(lane, str(receipt["status"])),
         "command_receipt": receipt,
     }
     document["receipt_digest"] = canonical_digest(document)
@@ -1684,10 +2837,20 @@ def cross_examine(
             (fatal if value.get("critical") else gaps).append(finding)
     if receipts.get("SYSTEM-CONTROL-PLANE", {}).get("status") != "passed":
         gaps.append("the installed predecessor DAG is not a releaseable strict-lint champion")
+    if receipts.get("SYSTEM-CONTROL-PLANE-TESTS", {}).get("status") != "passed":
+        gaps.append("the separately governed predecessor control-plane tests are not green")
+    if receipts.get("SYSTEM-CONTROL-PLANE-DOCTOR", {}).get("status") != "passed":
+        gaps.append("the installed predecessor bootstrap doctor is not healthy")
+    if not receipts["SCAN-REPOSITORY"]["host_runtimes"]["node"]["available"]:
+        gaps.append("a fixed native Node runtime is unavailable; TypeScript acceptance cannot qualify")
     gaps.extend(
         (
             "tournament court identities are declared labels, not separately authenticated principals",
             "repository checks are credential-scrubbed but lack a kernel-enforced filesystem/process/network sandbox",
+            (
+                "the isolated bootstrap doctor validates a clean disposable clone, not the live "
+                "ignored coordination state of the selected or shared-primary checkout"
+            ),
             (
                 "an interrupted tournament preserves self-hashed diagnostic remnants but must restart "
                 "in a new create-only directory; only completed bundles are independently verified"
@@ -1825,7 +2988,14 @@ def feedback_contract(
         "max_cycles": max_cycles,
         "cycles_executed": len(cycles),
         "cycles": cycles,
-        "restart_nodes": ["SCAN-REPOSITORY", _role_node_id(role), "SYSTEM-LIFECYCLE", "SYSTEM-FULL-SUITE"],
+        "restart_nodes": [
+            "SCAN-REPOSITORY",
+            _role_node_id(role),
+            "SYSTEM-LIFECYCLE",
+            "SYSTEM-CONTROL-PLANE-TESTS",
+            "SYSTEM-CONTROL-PLANE-DOCTOR",
+            "SYSTEM-FULL-SUITE",
+        ],
         "reentry_execution": (
             "challenge synthesis is complete; materializing or evaluating a changed challenger "
             "requires a create-only tournament run from SCAN-REPOSITORY"
@@ -1850,6 +3020,8 @@ def championship(receipts: Mapping[str, Mapping[str, Any]], plan_digest: str) ->
         receipts["SYSTEM-RESILIENCE"],
         receipts["SYSTEM-EVOLUTION"],
         receipts["SYSTEM-CONTROL-PLANE"],
+        receipts["SYSTEM-CONTROL-PLANE-TESTS"],
+        receipts["SYSTEM-CONTROL-PLANE-DOCTOR"],
         receipts["SYSTEM-FULL-SUITE"],
     ]
     lane_weights = {
@@ -1858,7 +3030,9 @@ def championship(receipts: Mapping[str, Mapping[str, Any]], plan_digest: str) ->
         "code-qa": 20,
         "resilience": 15,
         "evolution": 15,
-        "control-plane": 5,
+        "control-plane": 1,
+        "control-plane-tests": 3,
+        "control-plane-doctor": 1,
         "full-suite": 10,
     }
     system_score = sum(lane_weights[str(lane["lane"])] for lane in lanes if lane["status"] == "passed")
@@ -1877,7 +3051,7 @@ def championship(receipts: Mapping[str, Mapping[str, Any]], plan_digest: str) ->
     overall = round(role_average * 0.55 + system_score * 0.45, 2)
     claims = (
         "all eight constitutional roles received separately derived grades",
-        "all seven composition lanes produced explicit non-compensating statuses",
+        "all nine composition lanes produced explicit non-compensating statuses",
         "feedback synthesis preserved champions and emitted create-only re-entry requirements",
     )
     dissent = tuple(cross["development_gaps"])
@@ -2001,6 +3175,30 @@ def _manifest(run_dir: Path) -> dict[str, Any]:
     return document
 
 
+def _validate_host_runtime_evidence(value: object, *, label: str) -> None:
+    if not isinstance(value, Mapping) or set(value) != {"node"}:
+        raise TournamentError(f"{label} host-runtime evidence is invalid")
+    node_runtime = value.get("node")
+    if (
+        not isinstance(node_runtime, Mapping)
+        or set(node_runtime) != {"available", "path", "sha256"}
+        or not isinstance(node_runtime.get("available"), bool)
+    ):
+        raise TournamentError(f"{label} Node runtime evidence is invalid")
+    if node_runtime["available"]:
+        if (
+            not isinstance(node_runtime.get("path"), str)
+            or not Path(node_runtime["path"]).is_absolute()
+            or not isinstance(node_runtime.get("sha256"), str)
+            or _DIGEST.fullmatch(node_runtime["sha256"]) is None
+        ):
+            raise TournamentError(f"{label} Node runtime identity is invalid")
+    elif node_runtime.get("path") is not None or node_runtime.get("sha256") is not None:
+        raise TournamentError(f"{label} unavailable Node runtime contains identity claims")
+    if value != _host_runtime_evidence():
+        raise TournamentError(f"{label} host-runtime identity does not match the live host")
+
+
 def _validate_command_receipt(
     receipt: Mapping[str, Any],
     expected_argv: Sequence[str],
@@ -2020,6 +3218,9 @@ def _validate_command_receipt(
         "status",
         "resolved_package",
         "expected_package_root",
+        "execution_cwd",
+        "temporary_directory",
+        "temporary_directory_cleanup_completed",
         "import_provenance_bound",
         "environment_policy",
         "test_output_unambiguous",
@@ -2056,16 +3257,18 @@ def _validate_command_receipt(
     if tests_run is not None and (type(tests_run) is not int or tests_run < 0):
         raise TournamentError(f"{label} test-count evidence is invalid")
     try:
-        started = datetime.fromisoformat(str(receipt["started_at"]).replace("Z", "+00:00"))
-        ended = datetime.fromisoformat(str(receipt["ended_at"]).replace("Z", "+00:00"))
-    except (KeyError, TypeError, ValueError) as error:
+        started = _parse_canonical_utc_timestamp(
+            receipt["started_at"], label=f"{label} command start"
+        )
+        ended = _parse_canonical_utc_timestamp(
+            receipt["ended_at"], label=f"{label} command end"
+        )
+    except (KeyError, TournamentError) as error:
         raise TournamentError(f"{label} command timing is invalid") from error
     duration_ms = receipt.get("duration_ms")
     now = datetime.now(UTC)
     if (
-        started.tzinfo is None
-        or ended.tzinfo is None
-        or ended < started
+        ended < started
         or ended > now.replace(microsecond=0) + timedelta(minutes=5)
         or type(duration_ms) is not int
         or duration_ms < 0
@@ -2075,19 +3278,89 @@ def _validate_command_receipt(
     if abs(duration_ms - elapsed_ms) > 2_000:
         raise TournamentError(f"{label} wall and monotonic durations conflict")
     expected_package_root = (repository_root / "src/hive_mind_os").resolve()
+    expected_package_value = receipt.get("expected_package_root")
+    if not isinstance(expected_package_value, str):
+        raise TournamentError(f"{label} expected package root is invalid")
     try:
-        recorded_expected_root = Path(str(receipt["expected_package_root"])).resolve()
-    except (KeyError, OSError, ValueError) as error:
+        recorded_expected_root = Path(expected_package_value).resolve()
+    except (TypeError, OSError, ValueError) as error:
         raise TournamentError(f"{label} expected package root is invalid") from error
-    if recorded_expected_root != expected_package_root:
+    if (
+        expected_package_value != str(recorded_expected_root)
+        or recorded_expected_root != expected_package_root
+    ):
         raise TournamentError(f"{label} expected package root is not bound to the repository")
+    execution_cwd_value = receipt.get("execution_cwd")
+    if not isinstance(execution_cwd_value, str):
+        raise TournamentError(f"{label} execution working directory is invalid")
     try:
-        resolved_package = Path(str(receipt["resolved_package"])).resolve()
-    except (KeyError, OSError, ValueError) as error:
+        execution_cwd = Path(execution_cwd_value).resolve()
+    except (TypeError, OSError, ValueError) as error:
+        raise TournamentError(f"{label} execution working directory is invalid") from error
+    if (
+        execution_cwd_value != str(execution_cwd)
+        or execution_cwd != repository_root.resolve()
+    ):
+        raise TournamentError(f"{label} execution working directory is not repository-bound")
+    temporary_directory_value = receipt.get("temporary_directory")
+    if (
+        not isinstance(temporary_directory_value, str)
+        or not Path(temporary_directory_value).is_absolute()
+        or receipt.get("temporary_directory_cleanup_completed") is not True
+    ):
+        raise TournamentError(f"{label} temporary-directory evidence is invalid")
+    raw_temporary_directory = Path(temporary_directory_value).absolute()
+    if (
+        os.path.lexists(raw_temporary_directory)
+        or _has_link_like_component(
+            Path(raw_temporary_directory.anchor), raw_temporary_directory
+        )
+    ):
+        raise TournamentError(f"{label} temporary directory was not safely cleaned")
+    temporary_directory = raw_temporary_directory.resolve()
+    if (
+        temporary_directory_value != str(temporary_directory)
+        or os.path.lexists(temporary_directory)
+        or _paths_overlap(temporary_directory, repository_root)
+    ):
+        raise TournamentError(f"{label} temporary directory was not safely cleaned")
+    if tuple(expected_argv) == CONTROL_PLANE_COMMANDS["control-plane-doctor"]:
+        if temporary_directory != (
+            repository_root.parent / _DOCTOR_TEMP_DIRECTORY_NAME
+        ).resolve():
+            raise TournamentError(
+                f"{label} temporary directory escaped doctor isolation"
+            )
+    else:
+        if not temporary_directory.name.startswith(_COMMAND_TEMP_PREFIX):
+            raise TournamentError(f"{label} temporary directory identity is invalid")
+        authority_roots = _live_source_authority_roots(repository_root)
+        if temporary_directory.parent != _validated_ambient_temp_root(
+            authority_roots
+        ):
+            raise TournamentError(
+                f"{label} temporary directory escaped the validated ambient root"
+            )
+        _validate_path_outside_authority(
+            temporary_directory,
+            authority_roots,
+            label=f"{label} temporary directory",
+        )
+    resolved_package_value = receipt.get("resolved_package")
+    if not isinstance(resolved_package_value, str):
+        raise TournamentError(f"{label} resolved package is invalid")
+    try:
+        resolved_package = Path(resolved_package_value).resolve()
+    except (TypeError, OSError, ValueError) as error:
         raise TournamentError(f"{label} resolved package is invalid") from error
-    if resolved_package != (expected_package_root / "__init__.py").resolve():
+    if (
+        resolved_package_value != str(resolved_package)
+        or resolved_package != (expected_package_root / "__init__.py").resolve()
+    ):
         raise TournamentError(f"{label} resolved package escaped the repository")
     environment_policy = receipt.get("environment_policy")
+    expected_environment_profile = _environment_profile_for_command(expected_argv)
+    expected_safe_path = expected_environment_profile == _STRICT_CHILD_ENVIRONMENT
     if (
         not isinstance(environment_policy, Mapping)
         or set(environment_policy)
@@ -2098,6 +3371,13 @@ def _validate_command_receipt(
             "user_site_disabled",
             "network_control",
             "inherited_names",
+            "environment_profile",
+            "python_safe_path_enabled",
+            "pythonpath_policy",
+            "pythonpath_entries",
+            "cwd_import_authority",
+            "temporary_directory_policy",
+            "temporary_directory_bindings",
         }
         or environment_policy.get("credential_environment_inherited") is not False
         or environment_policy.get("inherited_git_variables") is not False
@@ -2106,6 +3386,31 @@ def _validate_command_receipt(
         != "delegated to the repository code under test"
         or environment_policy.get("network_control")
         != "best-effort proxy deny; no kernel sandbox"
+        or environment_policy.get("environment_profile")
+        != expected_environment_profile
+        or environment_policy.get("python_safe_path_enabled") is not expected_safe_path
+        or environment_policy.get("pythonpath_policy")
+        != "exact-repository-src-root-and-control-plane-bin-v1"
+        or environment_policy.get("pythonpath_entries")
+        != [
+            str(repository_root / "src"),
+            str(repository_root),
+            str(repository_root / ".autopilot/bin"),
+        ]
+        or environment_policy.get("cwd_import_authority")
+        != (
+            "disabled-by-safe-path"
+            if expected_safe_path
+                else "sealed-control-plane-repository-worktrees-only"
+        )
+        or environment_policy.get("temporary_directory_policy")
+        != "explicit-single-disposable-root-v1"
+        or environment_policy.get("temporary_directory_bindings")
+        != {
+            "TEMP": str(temporary_directory),
+            "TMP": str(temporary_directory),
+            "TMPDIR": str(temporary_directory),
+        }
     ):
         raise TournamentError(f"{label} child-environment evidence is invalid")
     available_names = environment_policy.get("inherited_names")
@@ -2116,8 +3421,13 @@ def _validate_command_receipt(
         not isinstance(available_names, list)
         or any(not isinstance(name, str) for name in available_names)
         or available_names != sorted(set(available_names))
-        or not _CHILD_REQUIRED_ENV_NAMES <= {name.upper() for name in available_names}
+        or not _CHILD_BASE_REQUIRED_ENV_NAMES
+        <= {name.upper() for name in available_names}
+        or not {"TEMP", "TMP", "TMPDIR"}
+        <= {name.upper() for name in available_names}
         or not {name.upper() for name in available_names} <= allowed_names
+        or ("PYTHONSAFEPATH" in {name.upper() for name in available_names})
+        is not expected_safe_path
     ):
         raise TournamentError(f"{label} child-environment name inventory is invalid")
     for field in ("transcript_sha256",):
@@ -2175,12 +3485,248 @@ def _validate_command_receipt(
         raise TournamentError(f"{label} command status is not derivable")
 
 
+def _validate_state_manifest(value: object, *, label: str) -> None:
+    if not isinstance(value, Mapping) or set(value) != {
+        "exists",
+        "files",
+        "manifest_digest",
+    }:
+        raise TournamentError(f"{label} fields are invalid")
+    if not isinstance(value.get("exists"), bool) or not isinstance(value.get("files"), list):
+        raise TournamentError(f"{label} types are invalid")
+    paths: list[str] = []
+    total_bytes = 0
+    for row in value["files"]:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"path", "bytes", "sha256"}
+            or not isinstance(row.get("path"), str)
+            or not row["path"]
+            or "\\" in row["path"]
+            or any(part in {"", ".", ".."} for part in row["path"].split("/"))
+            or type(row.get("bytes")) is not int
+            or row["bytes"] < 0
+            or row["bytes"] > _MAX_RUN_ARTIFACT_BYTES
+            or not isinstance(row.get("sha256"), str)
+            or _DIGEST.fullmatch(row["sha256"]) is None
+        ):
+            raise TournamentError(f"{label} contains a malformed file row")
+        paths.append(row["path"])
+        total_bytes += row["bytes"]
+    if (
+        paths != sorted(set(paths))
+        or total_bytes > _MAX_RUN_TOTAL_BYTES
+        or (not value["exists"] and bool(paths))
+    ):
+        raise TournamentError(f"{label} file inventory is invalid")
+    material = dict(value)
+    supplied = material.pop("manifest_digest", None)
+    if supplied != canonical_digest(material):
+        raise TournamentError(f"{label} digest is invalid")
+
+
+def _validate_doctor_isolation(
+    isolation: object,
+    semantics: Mapping[str, Any],
+    scan: Mapping[str, Any],
+    repository_root: Path,
+) -> Path:
+    expected_fields = {
+        "kind",
+        "workspace_root",
+        "execution_repository_root",
+        "source_scan_digest",
+        "source_head",
+        "source_inventory_content_digest",
+        "materialized_inventory_content_digest",
+        "source_target_ref",
+        "source_target_sha",
+        "target_branch",
+        "origin_policy",
+        "ignored_state_seed_policy",
+        "standalone_git_directory",
+        "git_common_directory_confined",
+        "state_root_confined",
+        "command_temporary_root",
+        "command_temporary_root_confined",
+        "isolated_state_before",
+        "isolated_state_after",
+        "sealed_repair_evidence",
+        "protected_source_states",
+        "cleanup_completed",
+    }
+    if not isinstance(isolation, Mapping) or set(isolation) != expected_fields:
+        raise TournamentError("control-plane doctor isolation fields are invalid")
+    identity = _control_plane_identity(repository_root)
+    source_content_digest = _inventory_content_digest(scan)
+    if (
+        isolation.get("kind") != _DOCTOR_ISOLATION_KIND
+        or isolation.get("source_scan_digest") != scan.get("inventory_digest")
+        or isolation.get("source_head") != scan.get("head")
+        or isolation.get("source_inventory_content_digest") != source_content_digest
+        or isolation.get("materialized_inventory_content_digest")
+        != source_content_digest
+        or isolation.get("source_target_ref") != identity["source_target_ref"]
+        or isolation.get("source_target_sha") != identity["source_target_sha"]
+        or isolation.get("target_branch") != identity["target_branch"]
+        or isolation.get("origin_policy")
+        != "disposable-local-mirror-no-hardlinks"
+        or isolation.get("ignored_state_seed_policy") != "empty"
+        or isolation.get("standalone_git_directory") is not True
+        or isolation.get("git_common_directory_confined") is not True
+        or isolation.get("state_root_confined") is not True
+        or isolation.get("command_temporary_root_confined") is not True
+        or isolation.get("cleanup_completed") is not True
+    ):
+        raise TournamentError("control-plane doctor isolation is not source-derived")
+    workspace_value = isolation.get("workspace_root")
+    execution_value = isolation.get("execution_repository_root")
+    if (
+        not isinstance(workspace_value, str)
+        or not isinstance(execution_value, str)
+        or not Path(workspace_value).is_absolute()
+        or not Path(execution_value).is_absolute()
+    ):
+        raise TournamentError("control-plane doctor isolation paths are invalid")
+    workspace = Path(workspace_value).resolve()
+    execution_root = Path(execution_value).resolve()
+    command_temporary_value = isolation.get("command_temporary_root")
+    if not isinstance(command_temporary_value, str) or not Path(
+        command_temporary_value
+    ).is_absolute():
+        raise TournamentError("control-plane doctor temporary root is invalid")
+    command_temporary_root = Path(command_temporary_value).resolve()
+    _validate_path_outside_authority(
+        workspace,
+        _source_authority_roots(repository_root, scan),
+        label="recorded isolated doctor workspace",
+    )
+    raw_temporary_root = Path(tempfile.gettempdir()).absolute()
+    if _has_link_like_component(
+        Path(raw_temporary_root.anchor), raw_temporary_root
+    ):
+        raise TournamentError("control-plane doctor temporary parent is unsafe")
+    temporary_root = raw_temporary_root.resolve()
+    if (
+        workspace_value != str(workspace)
+        or execution_value != str(execution_root)
+        or command_temporary_value != str(command_temporary_root)
+        or execution_root != workspace / "checkout"
+        or command_temporary_root != workspace / _DOCTOR_TEMP_DIRECTORY_NAME
+        or workspace.is_relative_to(repository_root)
+        or execution_root == repository_root
+        or not workspace.name.startswith("hive-tournament-doctor-")
+        or workspace.parent != temporary_root
+        or os.path.lexists(workspace)
+        or os.path.lexists(execution_root)
+        or os.path.lexists(command_temporary_root)
+    ):
+        raise TournamentError("control-plane doctor execution root was not isolated")
+    _validate_state_manifest(
+        isolation["isolated_state_before"], label="isolated doctor pre-state"
+    )
+    _validate_state_manifest(
+        isolation["isolated_state_after"], label="isolated doctor post-state"
+    )
+    expected_absent = {"exists": False, "files": []}
+    expected_absent["manifest_digest"] = canonical_digest(expected_absent)
+    if isolation["isolated_state_before"] != expected_absent:
+        raise TournamentError("control-plane doctor isolation was seeded with ignored state")
+    reported_passed = semantics.get("reported_passed") is True
+    expected_paths = ["sealed-repair-doctor.json"] if reported_passed else []
+    if [row["path"] for row in isolation["isolated_state_after"]["files"]] != expected_paths:
+        raise TournamentError("control-plane doctor isolated state transition is invalid")
+    repair = isolation.get("sealed_repair_evidence")
+    if reported_passed:
+        if not isinstance(repair, Mapping) or set(repair) != {
+            "schema_version",
+            "kind",
+            "target_sha",
+            "plan_fingerprint",
+            "github_snapshot_digest",
+            "reconciliation_digest",
+            "doctor_result_digest",
+            "controller_tests_run",
+            "recorded_at",
+        }:
+            raise TournamentError("control-plane doctor repair evidence fields are invalid")
+        try:
+            recorded_at = _parse_canonical_utc_timestamp(
+                repair["recorded_at"],
+                label="control-plane doctor repair recorded_at",
+            )
+            command_started = _parse_canonical_utc_timestamp(
+                semantics["command_started_at"],
+                label="control-plane doctor command start",
+            )
+            generated_at = _parse_canonical_utc_timestamp(
+                semantics["generated_at"], label="control-plane doctor generated_at"
+            )
+            command_ended = _parse_canonical_utc_timestamp(
+                semantics["command_ended_at"],
+                label="control-plane doctor command end",
+            )
+        except (KeyError, TournamentError) as error:
+            raise TournamentError(
+                "control-plane doctor evidence timing is invalid"
+            ) from error
+        if (
+            repair.get("schema_version") != 1
+            or repair.get("kind") != _DOCTOR_REPAIR_KIND
+            or repair.get("target_sha") != identity["source_target_sha"]
+            or repair.get("plan_fingerprint") != identity["plan_fingerprint"]
+            or repair.get("github_snapshot_digest") is not None
+            or repair.get("reconciliation_digest") is not None
+            or repair.get("doctor_result_digest") != semantics.get("result_digest")
+            or repair.get("controller_tests_run") is not True
+            or not command_started <= generated_at <= recorded_at <= command_ended
+        ):
+            raise TournamentError("control-plane doctor repair evidence is invalid")
+        encoded_repair_text = (
+            json.dumps(repair, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+        )
+        if os.linesep != "\n":
+            encoded_repair_text = encoded_repair_text.replace("\n", os.linesep)
+        encoded_repair = encoded_repair_text.encode("utf-8")
+        repair_row = isolation["isolated_state_after"]["files"][0]
+        if (
+            repair_row.get("bytes") != len(encoded_repair)
+            or repair_row.get("sha256") != _sha256_bytes(encoded_repair)
+        ):
+            raise TournamentError("control-plane doctor repair file is not content-bound")
+    elif repair is not None:
+        raise TournamentError("failed control-plane doctor contains repair evidence")
+    protected = isolation.get("protected_source_states")
+    expected_roots = _source_authority_state_roots(repository_root, scan)
+    if not isinstance(protected, list) or len(protected) != len(expected_roots):
+        raise TournamentError("control-plane doctor source-state guards are incomplete")
+    for row, (expected_kind, expected_path) in zip(protected, expected_roots):
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"kind", "path", "before", "after", "unchanged"}
+            or row.get("kind") != expected_kind
+            or row.get("path") != str(expected_path.resolve())
+            or row.get("unchanged") is not True
+        ):
+            raise TournamentError("control-plane doctor source-state guard is invalid")
+        _validate_state_manifest(row["before"], label=f"{expected_kind} pre-state")
+        _validate_state_manifest(row["after"], label=f"{expected_kind} post-state")
+        if row["before"] != row["after"]:
+            raise TournamentError("control-plane doctor mutated source authority state")
+        if row["after"] != _state_manifest(expected_path):
+            raise TournamentError(
+                "control-plane doctor source-state evidence differs from live state"
+            )
+    return execution_root
+
+
 def _validate_scan_receipt(scan: Mapping[str, Any]) -> None:
     if set(scan) != {
         "repository_root",
         "git_toplevel",
         "git_directory",
         "git_executable",
+        "host_runtimes",
         "head",
         "branch",
         "dirty_path_count",
@@ -2269,6 +3815,10 @@ def _validate_scan_receipt(scan: Mapping[str, Any]) -> None:
         or _DIGEST.fullmatch(git_executable["sha256"]) is None
     ):
         raise TournamentError("repository scan Git executable evidence is invalid")
+    _validate_host_runtime_evidence(
+        scan.get("host_runtimes"),
+        label="repository scan",
+    )
     execution = scan.get("execution")
     if not isinstance(execution, Mapping):
         raise TournamentError("repository scan lacks execution provenance")
@@ -2276,21 +3826,29 @@ def _validate_scan_receipt(scan: Mapping[str, Any]) -> None:
         set(execution)
         != {
             "runner_identity",
+            "doctor_isolation_runner_identity",
             "trusted_builtin_runner",
             "runtime_path",
             "runtime_sha256",
         }
         or not isinstance(execution.get("runner_identity"), str)
+        or not isinstance(execution.get("doctor_isolation_runner_identity"), str)
         or not isinstance(execution.get("trusted_builtin_runner"), bool)
         or execution.get("runtime_path") != "src/hive_mind_os/agent_tournament.py"
         or not isinstance(execution.get("runtime_sha256"), str)
         or _DIGEST.fullmatch(execution["runtime_sha256"]) is None
     ):
         raise TournamentError("repository scan execution provenance is invalid")
-    if execution["trusted_builtin_runner"] and execution["runner_identity"] != (
-        f"{run_command_receipt.__module__}:{run_command_receipt.__qualname__}"
+    if execution["trusted_builtin_runner"] and (
+        execution["runner_identity"]
+        != f"{run_command_receipt.__module__}:{run_command_receipt.__qualname__}"
+        or execution["doctor_isolation_runner_identity"]
+        != (
+            f"{_run_isolated_control_plane_doctor.__module__}:"
+            f"{_run_isolated_control_plane_doctor.__qualname__}"
+        )
     ):
-        raise TournamentError("repository scan falsely claims the built-in runner")
+        raise TournamentError("repository scan falsely claims the built-in runners")
 
 
 def _validate_role_grade(
@@ -2654,11 +4212,69 @@ def _validate_system_receipt(
         "SYSTEM-RESILIENCE": "resilience",
         "SYSTEM-EVOLUTION": "evolution",
         "SYSTEM-CONTROL-PLANE": "control-plane",
+        "SYSTEM-CONTROL-PLANE-TESTS": "control-plane-tests",
+        "SYSTEM-CONTROL-PLANE-DOCTOR": "control-plane-doctor",
     }
     lane = lane_by_node[node_id]
+    is_control_plane = lane in CONTROL_PLANE_COMMANDS
     command = receipt.get("command_receipt")
     if not isinstance(command, Mapping) or transcript is None:
         raise TournamentError(f"{lane} lane lacks command evidence")
+    if lane == "control-plane-doctor":
+        if set(receipt) != {
+            "lane",
+            "status",
+            "critical",
+            "interpretation",
+            "command_receipt",
+            "doctor_semantics",
+            "doctor_isolation",
+            "receipt_digest",
+        }:
+            raise TournamentError("control-plane-doctor system receipt fields are invalid")
+        identity = _control_plane_identity(repository_root)
+        derived_semantics, _doctor_result = _doctor_semantic_evidence(
+            command,
+            transcript,
+            expected_plan_fingerprint=str(identity["plan_fingerprint"]),
+            verify_git_objects=bool(identity["verify_git_objects"]),
+        )
+        semantics = receipt.get("doctor_semantics")
+        if not isinstance(semantics, Mapping) or semantics != derived_semantics:
+            raise TournamentError("control-plane doctor semantic evidence is not derivable")
+        execution_root = _validate_doctor_isolation(
+            receipt.get("doctor_isolation"), semantics, scan, repository_root
+        )
+        _validate_command_receipt(
+            command,
+            CONTROL_PLANE_COMMANDS[lane],
+            transcript,
+            execution_root,
+            require_tests=False,
+            label=lane,
+        )
+        isolation = receipt["doctor_isolation"]
+        expected_status = (
+            "passed"
+            if command.get("status") == "passed"
+            and semantics.get("semantically_qualified") is True
+            and isolation.get("cleanup_completed") is True
+            and all(
+                row.get("unchanged") is True
+                for row in isolation.get("protected_source_states", ())
+                if isinstance(row, Mapping)
+            )
+            else "failed"
+        )
+        if (
+            receipt.get("lane") != lane
+            or receipt.get("status") != expected_status
+            or receipt.get("critical") is not False
+            or receipt.get("interpretation")
+            != _control_plane_interpretation(lane, expected_status)
+        ):
+            raise TournamentError("control-plane doctor system receipt is not derivable")
+        return
     expected_fields = {
         "lane",
         "status",
@@ -2666,24 +4282,15 @@ def _validate_system_receipt(
         "command_receipt",
         "receipt_digest",
     }
-    if lane == "control-plane":
+    if is_control_plane:
         expected_fields.add("interpretation")
     else:
         expected_fields.add("test_modules")
     if set(receipt) != expected_fields:
         raise TournamentError(f"{lane} system receipt fields are invalid")
     expected_argv = (
-        (
-            sys.executable,
-            "-B",
-            ".autopilot/bin/dag_standard.py",
-            "dag-lint",
-            "--strict",
-            "--plan",
-            ".autopilot/plan.json",
-            "--json",
-        )
-        if lane == "control-plane"
+        CONTROL_PLANE_COMMANDS[lane]
+        if is_control_plane
         else _unittest_command(SYSTEM_TEST_LANES[lane])
     )
     _validate_command_receipt(
@@ -2691,25 +4298,25 @@ def _validate_system_receipt(
         expected_argv,
         transcript,
         repository_root,
-        require_tests=lane != "control-plane",
+        require_tests=lane in SYSTEM_TEST_LANES or lane == "control-plane-tests",
         label=lane,
     )
     expected_critical = lane in {"lifecycle", "code-qa", "resilience"} and command["status"] != "passed"
     expected_interpretation = (
-        "legacy control plane is strictly valid"
-        if command["status"] == "passed"
-        else "legacy control plane needs adaptation; this does not erase its retained ideas"
+        _control_plane_interpretation(lane, str(command["status"]))
+        if is_control_plane
+        else None
     )
     if (
         receipt.get("lane") != lane
         or receipt.get("status") != command["status"]
         or receipt.get("critical") is not expected_critical
         or (
-            lane == "control-plane"
+            is_control_plane
             and receipt.get("interpretation") != expected_interpretation
         )
         or (
-            lane != "control-plane"
+            not is_control_plane
             and receipt.get("test_modules") != list(SYSTEM_TEST_LANES[lane])
         )
     ):
@@ -2746,6 +4353,10 @@ def _validate_cross_receipt(
         "tournament court identities are declared labels, not separately authenticated principals",
         "repository checks are credential-scrubbed but lack a kernel-enforced filesystem/process/network sandbox",
         (
+            "the isolated bootstrap doctor validates a clean disposable clone, not the live "
+            "ignored coordination state of the selected or shared-primary checkout"
+        ),
+        (
             "an interrupted tournament preserves self-hashed diagnostic remnants but must restart "
             "in a new create-only directory; only completed bundles are independently verified"
         ),
@@ -2770,6 +4381,14 @@ def _validate_cross_receipt(
             (required_fatal if value.get("critical") else required_gaps).add(finding)
     if receipts["SYSTEM-CONTROL-PLANE"].get("status") != "passed":
         required_gaps.add("the installed predecessor DAG is not a releaseable strict-lint champion")
+    if receipts["SYSTEM-CONTROL-PLANE-TESTS"].get("status") != "passed":
+        required_gaps.add("the separately governed predecessor control-plane tests are not green")
+    if receipts["SYSTEM-CONTROL-PLANE-DOCTOR"].get("status") != "passed":
+        required_gaps.add("the installed predecessor bootstrap doctor is not healthy")
+    if not receipts["SCAN-REPOSITORY"]["host_runtimes"]["node"]["available"]:
+        required_gaps.add(
+            "a fixed native Node runtime is unavailable; TypeScript acceptance cannot qualify"
+        )
     drift_finding = "repository content changed between the opening seal and final cross-examination"
     if cross.get("source_drift") is True:
         required_fatal.add(drift_finding)
@@ -2809,7 +4428,10 @@ def verify_run_directory(
     *,
     repository: str | Path | None = None,
 ) -> dict[str, Any]:
-    root = Path(run_directory).resolve()
+    raw_root = Path(run_directory).absolute()
+    if _has_link_like_component(Path(raw_root.anchor), raw_root):
+        raise TournamentError("run evidence path contains a symbolic link or junction")
+    root = raw_root.resolve()
     manifest_path = root / "manifest.json"
     if (
         not manifest_path.is_file()
@@ -2920,6 +4542,8 @@ def verify_run_directory(
         "SYSTEM-RESILIENCE",
         "SYSTEM-EVOLUTION",
         "SYSTEM-CONTROL-PLANE",
+        "SYSTEM-CONTROL-PLANE-TESTS",
+        "SYSTEM-CONTROL-PLANE-DOCTOR",
         "SYSTEM-FULL-SUITE",
         "CROSS-EXAMINE",
         "CHAMPIONSHIP",
@@ -2983,6 +4607,13 @@ def verify_run_directory(
         raise TournamentError(
             "run evidence is not bound to the caller-selected repository checkout"
         )
+    _validate_path_outside_authority(
+        root,
+        _source_authority_roots(
+            trusted_repository, receipts["SCAN-REPOSITORY"]
+        ),
+        label="tournament output directory",
+    )
     execution = receipts["SCAN-REPOSITORY"]["execution"]
     selected_runtime = (
         trusted_repository / str(execution["runtime_path"])
@@ -3010,6 +4641,8 @@ def verify_run_directory(
         "SYSTEM-RESILIENCE",
         "SYSTEM-EVOLUTION",
         "SYSTEM-CONTROL-PLANE",
+        "SYSTEM-CONTROL-PLANE-TESTS",
+        "SYSTEM-CONTROL-PLANE-DOCTOR",
         "SYSTEM-FULL-SUITE",
     ):
         _validate_system_receipt(
@@ -3305,6 +4938,12 @@ def verify_run_directory(
     }
 
 
+def _callable_identity(value: Callable[..., Any]) -> str:
+    module = getattr(value, "__module__", type(value).__module__)
+    name = getattr(value, "__qualname__", getattr(value, "__name__", type(value).__qualname__))
+    return f"{module}:{name}"
+
+
 def run_tournament(
     repository: str | Path,
     output_directory: str | Path,
@@ -3313,17 +4952,30 @@ def run_tournament(
     full_suite: bool = True,
     plan: Mapping[str, Any] | None = None,
     command_runner: Callable[[Path, Sequence[str]], tuple[dict[str, Any], str]] = run_command_receipt,
+    doctor_isolation_runner: DoctorIsolationRunner | None = None,
 ) -> dict[str, Any]:
     root = Path(repository).resolve()
-    run_dir = Path(output_directory).resolve()
-    if run_dir.exists():
+    raw_run_dir = Path(output_directory).absolute()
+    if _has_link_like_component(Path(raw_run_dir.anchor), raw_run_dir):
+        raise TournamentError("output directory contains a symbolic link or junction")
+    run_dir = raw_run_dir.resolve()
+    if os.path.lexists(run_dir):
         raise TournamentError(f"output directory must not already exist: {run_dir}")
     if max_workers < 2 or max_workers > len(TOURNAMENT_ROLES):
         raise TournamentError(f"max_workers must be between 2 and {len(TOURNAMENT_ROLES)}")
     if not Path(__file__).resolve().is_relative_to((root / "src/hive_mind_os").resolve()):
         raise TournamentError("tournament runtime was not imported from the repository under test")
+    opening_inventory = inventory_repository(root, exclude=run_dir)
+    _validate_path_outside_authority(
+        run_dir,
+        _source_authority_roots(root, opening_inventory),
+        label="tournament output directory",
+    )
     plan_document = dict(plan or build_tournament_plan())
     waves = validate_tournament_plan(plan_document)
+    resolved_doctor_runner = (
+        doctor_isolation_runner or _run_isolated_control_plane_doctor
+    )
     run_dir.mkdir(parents=True)
     receipts_dir = run_dir / "receipts"
     transcripts_dir = run_dir / "transcripts"
@@ -3361,11 +5013,17 @@ def run_tournament(
         raw = next(item for item in plan_document["nodes"] if item["node_id"] == node_id)
         action = raw["action"]
         if action == "inventory":
-            inventory = inventory_repository(root, exclude=run_dir)
+            inventory = dict(opening_inventory)
             inventory.pop("inventory_digest")
             inventory["execution"] = {
-                "runner_identity": f"{command_runner.__module__}:{getattr(command_runner, '__qualname__', command_runner.__name__)}",
-                "trusted_builtin_runner": command_runner is run_command_receipt,
+                "runner_identity": _callable_identity(command_runner),
+                "doctor_isolation_runner_identity": _callable_identity(
+                    resolved_doctor_runner
+                ),
+                "trusted_builtin_runner": (
+                    command_runner is run_command_receipt
+                    and resolved_doctor_runner is _run_isolated_control_plane_doctor
+                ),
                 "runtime_path": "src/hive_mind_os/agent_tournament.py",
                 "runtime_sha256": _sha256_bytes(Path(__file__).read_bytes()),
             }
@@ -3384,6 +5042,15 @@ def run_tournament(
             )
         if action == "control-plane-audit":
             return control_plane_gate(root, command_runner)
+        if action == "control-plane-tests":
+            return control_plane_tests_gate(root, command_runner)
+        if action == "control-plane-doctor":
+            return control_plane_doctor_gate(
+                root,
+                command_runner,
+                inventory=receipts["SCAN-REPOSITORY"],
+                isolation_runner=resolved_doctor_runner,
+            )
         if action == "full-suite":
             return _full_suite(root, full_suite)
         if action == "cross-examine":
