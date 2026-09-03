@@ -1,0 +1,799 @@
+{
+  "executor": {
+    "command": "python -B scripts/run_agent_tournament.py run --repository . --output-dir <new-directory>",
+    "module": "hive_mind_os.agent_tournament"
+  },
+  "feedback_policy": {
+    "champions_are_immutable_during_generation": true,
+    "max_cycles": 3,
+    "promotion_requires_separate_independent_court": true,
+    "restart_from": "SCAN-REPOSITORY"
+  },
+  "kind": "hive-mind-agent-readiness-tournament-dag",
+  "max_parallelism": 8,
+  "nodes": [
+    {
+      "acceptance": [
+        "every discovered file has a path, size, and content digest"
+      ],
+      "action": "inventory",
+      "dependencies": [],
+      "hard_gates": [
+        "repository root and source package are present"
+      ],
+      "lane": null,
+      "max_attempts": 1,
+      "node_id": "SCAN-REPOSITORY",
+      "objective": "Hash and classify every versioned or unignored repository file.",
+      "parallel_safe": false,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SCAN-REPOSITORY.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-ORCHESTRATOR",
+      "objective": "Grade the orchestrator separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "orchestrator",
+      "write_scope": [
+        "run://receipts/ROLE-ORCHESTRATOR.json",
+        "run://transcripts/ROLE-ORCHESTRATOR.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-EXPLORER",
+      "objective": "Grade the explorer separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "explorer",
+      "write_scope": [
+        "run://receipts/ROLE-EXPLORER.json",
+        "run://transcripts/ROLE-EXPLORER.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-ARCHITECT",
+      "objective": "Grade the architect separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "architect",
+      "write_scope": [
+        "run://receipts/ROLE-ARCHITECT.json",
+        "run://transcripts/ROLE-ARCHITECT.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-BUILDER",
+      "objective": "Grade the builder separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "builder",
+      "write_scope": [
+        "run://receipts/ROLE-BUILDER.json",
+        "run://transcripts/ROLE-BUILDER.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-CURATOR",
+      "objective": "Grade the curator separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "curator",
+      "write_scope": [
+        "run://receipts/ROLE-CURATOR.json",
+        "run://transcripts/ROLE-CURATOR.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-INTEGRATOR",
+      "objective": "Grade the integrator separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "integrator",
+      "write_scope": [
+        "run://receipts/ROLE-INTEGRATOR.json",
+        "run://transcripts/ROLE-INTEGRATOR.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-STEWARD",
+      "objective": "Grade the steward separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "steward",
+      "write_scope": [
+        "run://receipts/ROLE-STEWARD.json",
+        "run://transcripts/ROLE-STEWARD.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "identity and artifacts validate",
+        "module-scope specialized implementation declaration is present",
+        "role-focused tests execute and pass",
+        "weaknesses remain visible even when the score passes"
+      ],
+      "action": "grade-role",
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "hard_gates": [
+        "role identity is registered",
+        "evidence is not fabricated"
+      ],
+      "lane": null,
+      "max_attempts": 2,
+      "node_id": "ROLE-OPTIMIZER",
+      "objective": "Grade the optimizer separately against its own declared purpose.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": "optimizer",
+      "write_scope": [
+        "run://receipts/ROLE-OPTIMIZER.json",
+        "run://transcripts/ROLE-OPTIMIZER.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "lane produces a reproducible receipt"
+      ],
+      "action": "static-repository",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "static",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-STATIC",
+      "objective": "Parse every discovered Python and JSON artifact.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-STATIC.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "lane produces a reproducible receipt"
+      ],
+      "action": "system-test",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "lifecycle",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-LIFECYCLE",
+      "objective": "Prove all roles compose in the canonical lifecycle.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-LIFECYCLE.json",
+        "run://transcripts/SYSTEM-LIFECYCLE.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "lane produces a reproducible receipt"
+      ],
+      "action": "system-test",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "code-qa",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-CODE-QA",
+      "objective": "Exercise the existing code-to-QA bridge fixtures; this run does not author a novel change.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-CODE-QA.json",
+        "run://transcripts/SYSTEM-CODE-QA.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "lane produces a reproducible receipt"
+      ],
+      "action": "system-test",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "resilience",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-RESILIENCE",
+      "objective": "Exercise recovery, no-cheating, and learning-poisoning defenses.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-RESILIENCE.json",
+        "run://transcripts/SYSTEM-RESILIENCE.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "lane produces a reproducible receipt"
+      ],
+      "action": "system-test",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "evolution",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-EVOLUTION",
+      "objective": "Exercise challenger, evaluation, learning, and promotion boundaries.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-EVOLUTION.json",
+        "run://transcripts/SYSTEM-EVOLUTION.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "lane produces a reproducible receipt"
+      ],
+      "action": "control-plane-audit",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "a catastrophic defect is not averaged away"
+      ],
+      "lane": "control-plane",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-CONTROL-PLANE",
+      "objective": "Cross-check the installed legacy control plane under strict lint.",
+      "parallel_safe": true,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-CONTROL-PLANE.json",
+        "run://transcripts/SYSTEM-CONTROL-PLANE.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "the canonical full suite is executed or explicitly deferred"
+      ],
+      "action": "full-suite",
+      "dependencies": [
+        "SYSTEM-STATIC",
+        "SYSTEM-LIFECYCLE",
+        "SYSTEM-CODE-QA",
+        "SYSTEM-RESILIENCE",
+        "SYSTEM-EVOLUTION",
+        "SYSTEM-CONTROL-PLANE"
+      ],
+      "hard_gates": [
+        "failed tests are retained"
+      ],
+      "lane": "full-suite",
+      "max_attempts": 1,
+      "node_id": "SYSTEM-FULL-SUITE",
+      "objective": "Run the repository's complete CI test gate from this checkout.",
+      "parallel_safe": false,
+      "read_scope": [
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/SYSTEM-FULL-SUITE.json",
+        "run://transcripts/SYSTEM-FULL-SUITE.txt"
+      ]
+    },
+    {
+      "acceptance": [
+        "fatal findings and development gaps are classified separately"
+      ],
+      "action": "cross-examine",
+      "dependencies": [
+        "SYSTEM-FULL-SUITE"
+      ],
+      "hard_gates": [
+        "the cross-examiner cannot erase or promote evidence"
+      ],
+      "lane": null,
+      "max_attempts": 1,
+      "node_id": "CROSS-EXAMINE",
+      "objective": "Attack every apparent pass and expose gaps hidden by aggregate scores.",
+      "parallel_safe": false,
+      "read_scope": [
+        "run://receipts/**",
+        "**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/CROSS-EXAMINE.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-ORCHESTRATOR",
+      "objective": "Execute bounded challenge synthesis for orchestrator and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-ORCHESTRATOR.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "orchestrator",
+      "write_scope": [
+        "run://receipts/FEEDBACK-ORCHESTRATOR.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-EXPLORER",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-EXPLORER",
+      "objective": "Execute bounded challenge synthesis for explorer and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-EXPLORER.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "explorer",
+      "write_scope": [
+        "run://receipts/FEEDBACK-EXPLORER.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-ARCHITECT",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-ARCHITECT",
+      "objective": "Execute bounded challenge synthesis for architect and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-ARCHITECT.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "architect",
+      "write_scope": [
+        "run://receipts/FEEDBACK-ARCHITECT.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-BUILDER",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-BUILDER",
+      "objective": "Execute bounded challenge synthesis for builder and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-BUILDER.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "builder",
+      "write_scope": [
+        "run://receipts/FEEDBACK-BUILDER.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-CURATOR",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-CURATOR",
+      "objective": "Execute bounded challenge synthesis for curator and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-CURATOR.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "curator",
+      "write_scope": [
+        "run://receipts/FEEDBACK-CURATOR.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-INTEGRATOR",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-INTEGRATOR",
+      "objective": "Execute bounded challenge synthesis for integrator and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-INTEGRATOR.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "integrator",
+      "write_scope": [
+        "run://receipts/FEEDBACK-INTEGRATOR.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-STEWARD",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-STEWARD",
+      "objective": "Execute bounded challenge synthesis for steward and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-STEWARD.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "steward",
+      "write_scope": [
+        "run://receipts/FEEDBACK-STEWARD.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "the live champion is not mutated",
+        "challenge hypotheses cite observed evidence",
+        "three challenge stages execute before a fresh-run re-entry contract is emitted"
+      ],
+      "action": "feedback",
+      "dependencies": [
+        "ROLE-OPTIMIZER",
+        "CROSS-EXAMINE"
+      ],
+      "hard_gates": [
+        "feedback cannot promote itself"
+      ],
+      "lane": null,
+      "max_attempts": 3,
+      "node_id": "FEEDBACK-OPTIMIZER",
+      "objective": "Execute bounded challenge synthesis for optimizer and define a fresh-run re-entry path.",
+      "parallel_safe": true,
+      "read_scope": [
+        "run://receipts/ROLE-OPTIMIZER.json",
+        "run://receipts/CROSS-EXAMINE.json"
+      ],
+      "role": "optimizer",
+      "write_scope": [
+        "run://receipts/FEEDBACK-OPTIMIZER.json"
+      ]
+    },
+    {
+      "acceptance": [
+        "all eight separately derived grades are present",
+        "whole-system gates are present",
+        "dissent, losing evidence, and feedback routes are retained"
+      ],
+      "action": "championship",
+      "dependencies": [
+        "FEEDBACK-ORCHESTRATOR",
+        "FEEDBACK-EXPLORER",
+        "FEEDBACK-ARCHITECT",
+        "FEEDBACK-BUILDER",
+        "FEEDBACK-CURATOR",
+        "FEEDBACK-INTEGRATOR",
+        "FEEDBACK-STEWARD",
+        "FEEDBACK-OPTIMIZER"
+      ],
+      "hard_gates": [
+        "declared judge and affected-champion identities do not overlap",
+        "actual independent execution remains mandatory before promotion",
+        "no score hides a fatal defect"
+      ],
+      "lane": null,
+      "max_attempts": 1,
+      "node_id": "CHAMPIONSHIP",
+      "objective": "Judge separately derived role readiness and whole-system readiness together.",
+      "parallel_safe": false,
+      "read_scope": [
+        "run://**"
+      ],
+      "role": null,
+      "write_scope": [
+        "run://receipts/CHAMPIONSHIP.json",
+        "run://report.json",
+        "run://report.md"
+      ]
+    }
+  ],
+  "objective": "Grade every constitutional agent separately and in composition, exercise the existing code-to-QA bridge fixtures, and route weaknesses into bounded immutable challenger re-entry contracts.",
+  "plan_digest": "sha256:5a6dadbdf39482bd32afdf3e3f1f87d64143aebed83be845e364151988ab3270",
+  "plan_id": "agent-readiness-tournament-v1",
+  "retry_policy": {
+    "record_every_wave_result_before_abort": true,
+    "retry_only_infrastructure_exceptions": true,
+    "write_terminal_manifest_on_exhaustion": true
+  },
+  "schema_version": 1,
+  "scoring_policy": {
+    "allowed_dispositions": [
+      "adapt",
+      "adopt",
+      "defer",
+      "quarantine",
+      "reject"
+    ],
+    "development_scores_are_advisory": true,
+    "fatal_gates_are_non_compensating": true,
+    "imperfect_champions_route_to_adapt_not_elimination": true
+  },
+  "source_of_truth": "live checkout plus immutable run receipts"
+}

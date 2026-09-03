@@ -538,6 +538,16 @@ def build_benchmark_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_tournament_parser() -> argparse.ArgumentParser:
+    """Build the repository-wide agent-readiness tournament command."""
+
+    from .agent_tournament import build_parser
+
+    parser = build_parser()
+    parser.prog = "hive-mind tournament"
+    return parser
+
+
 def build_pit_episode_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hive-mind pit-episode",
@@ -1123,6 +1133,51 @@ def _run_benchmark(args: argparse.Namespace) -> int:
         )
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _run_tournament(args: argparse.Namespace) -> int:
+    from .agent_tournament import (
+        TournamentError,
+        _load_plan,
+        _read_json,
+        _write_json,
+        build_tournament_plan,
+        run_tournament,
+        verify_run_directory,
+    )
+
+    try:
+        if args.command == "plan":
+            output = Path(args.output)
+            if output.exists():
+                raise TournamentError(f"output must not already exist: {output}")
+            _write_json(output, build_tournament_plan())
+            result = {
+                "status": "planned",
+                "path": str(output.resolve()),
+                "plan_digest": _read_json(output)["plan_digest"],
+            }
+        elif args.command == "run":
+            result = run_tournament(
+                args.repository,
+                args.output_dir,
+                max_workers=args.max_workers,
+                full_suite=not args.skip_full_suite,
+                plan=_load_plan(args.plan),
+            )
+        else:
+            result = verify_run_directory(args.run_dir, repository=args.repository)
+    except (OSError, ValueError, TournamentError, json.JSONDecodeError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
 
@@ -1864,6 +1919,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "benchmark":
         args = build_benchmark_parser().parse_args(arguments[1:])
         raise SystemExit(_run_benchmark(args))
+    if arguments and arguments[0] == "tournament":
+        args = build_tournament_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_tournament(args))
     if arguments and arguments[0] == "ingest":
         args = build_ingest_parser().parse_args(arguments[1:])
         raise SystemExit(_run_ingest(args))
