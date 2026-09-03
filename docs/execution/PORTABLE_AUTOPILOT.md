@@ -42,14 +42,28 @@ dag-lint` is written against it and enforces the mechanizable subset — the sta
 states per requirement which rules are machine-checked and which are author-verified. Lint
 errors block; lint warnings require a recorded justification.
 
-The standard is **not yet bound to the `BUILD_DAG` flow.** Binding the DAG-build task to
-the standard by digest — pinning it at `init`, materializing it in the target repository,
-and forbidding the task from reporting success without a zero-error `dag-lint` receipt — is
-specified in [`runbooks/PRODUCT-GENERIC-DAG.md`](runbooks/PRODUCT-GENERIC-DAG.md) §3.1-3.4
-and is **not implemented**. The `DAG-BUILD-<repository-digest>-<request-digest>` task
-prompt emitted today does not
-name the standard. Until that change lands, conformance for a DAG built by that task is an
-authoring discipline plus a separately run `dag-lint`, not a product gate.
+### DAG authoring standard binding
+
+`autopilot init` verifies the packaged standard by byte count and SHA-256, records that
+pin in the request, and materializes the exact bytes at
+`.hive-mind/dag-authoring-standard.md` in the target repository.
+
+The bootstrap contract and its content-addressed `contract_id` cover the version, path,
+byte count, and digest. A generated DAG is therefore bound to the standard version under
+which it was authored, rather than whichever version happens to be installed later.
+
+The DAG-build task may not report success until its generated controller runs `dag-lint`
+with zero errors and warnings and independent validation records a separate receipt.
+Missing, changed, stale, or substituted standard bytes fail before a build task is issued.
+
+The standard pin is deliberately outside the repeat-initialization stable-key comparison.
+A package upgrade cannot silently rewrite or retroactively invalidate a stored request.
+Rebinding is an explicit owner operation: preserve any evidence needed from the old
+request, remove `.hive-mind/autopilot-request.json`, and initialize again.
+
+A request created before standard binding remains parseable evidence, but `inspect` fails
+closed with that explicit reinitialization remedy. Read-only wording does not bypass the
+gate and still emits no task.
 
 The bootstrap task key, launch instruction, idempotency key, contract, and worker prompt
 bind the digest-verified portable request ID and the canonical objective digest. Repeating

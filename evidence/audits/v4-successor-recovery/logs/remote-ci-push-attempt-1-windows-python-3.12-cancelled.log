@@ -1,0 +1,976 @@
+﻿2026-09-03T02:49:55.9341555Z Current runner version: '2.337.0'
+2026-09-03T02:49:55.9368153Z ##[group]Runner Image Provisioner
+2026-09-03T02:49:55.9369081Z Hosted Compute Agent
+2026-09-03T02:49:55.9369640Z Version: 20260819.586
+2026-09-03T02:49:55.9370256Z Commit: 3cc4a88dfa507ef76119ad1bb3eccc6378bb2b76
+2026-09-03T02:49:55.9370973Z Build Date: 2026-08-18T23:20:18Z
+2026-09-03T02:49:55.9371613Z Worker ID: {5957e269-ae96-4df9-a787-633d5b478d6e}
+2026-09-03T02:49:55.9372319Z Azure Region: westus
+2026-09-03T02:49:55.9372851Z ##[endgroup]
+2026-09-03T02:49:55.9374250Z ##[group]Operating System
+2026-09-03T02:49:55.9374904Z Microsoft Windows Server 2025
+2026-09-03T02:49:55.9375488Z 10.0.26100
+2026-09-03T02:49:55.9376034Z Datacenter
+2026-09-03T02:49:55.9376535Z ##[endgroup]
+2026-09-03T02:49:55.9377045Z ##[group]Runner Image
+2026-09-03T02:49:55.9377626Z Image: windows-2025-vs2026
+2026-09-03T02:49:55.9378194Z Version: 20260824.214.3
+2026-09-03T02:49:55.9379711Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260824.214/images/windows/Windows2025-VS2026-Readme.md
+2026-09-03T02:49:55.9381836Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260824.214
+2026-09-03T02:49:55.9382824Z ##[endgroup]
+2026-09-03T02:49:55.9384097Z ##[group]GITHUB_TOKEN Permissions
+2026-09-03T02:49:55.9386184Z Contents: read
+2026-09-03T02:49:55.9386755Z Metadata: read
+2026-09-03T02:49:55.9387302Z ##[endgroup]
+2026-09-03T02:49:55.9389700Z Secret source: Actions
+2026-09-03T02:49:55.9390807Z Prepare workflow directory
+2026-09-03T02:49:55.9775911Z Prepare all required actions
+2026-09-03T02:49:55.9826561Z Getting action download info
+2026-09-03T02:49:56.2979490Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-09-03T02:49:56.4268624Z Download action repository 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97' (SHA:5fda3b95a4ea91299a34e894583c3862153e4b97)
+2026-09-03T02:49:56.7146456Z Complete job name: unit-tests (Windows, Python 3.12)
+2026-09-03T02:49:56.8592434Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+2026-09-03T02:49:56.8593696Z with:
+2026-09-03T02:49:56.8594104Z   fetch-depth: 0
+2026-09-03T02:49:56.8594550Z   persist-credentials: false
+2026-09-03T02:49:56.8595047Z   repository: kb4beast/hive-mind-os
+2026-09-03T02:49:56.8598846Z   token: ***
+2026-09-03T02:49:56.8599254Z   ssh-strict: true
+2026-09-03T02:49:56.8599660Z   ssh-user: git
+2026-09-03T02:49:56.8600053Z   clean: true
+2026-09-03T02:49:56.8600471Z   sparse-checkout-cone-mode: true
+2026-09-03T02:49:56.8600969Z   fetch-tags: false
+2026-09-03T02:49:56.8601384Z   show-progress: true
+2026-09-03T02:49:56.8601796Z   lfs: false
+2026-09-03T02:49:56.8602185Z   submodules: false
+2026-09-03T02:49:56.8602609Z   set-safe-directory: true
+2026-09-03T02:49:56.8603095Z   allow-unsafe-pr-checkout: false
+2026-09-03T02:49:56.8603788Z ##[endgroup]
+2026-09-03T02:49:57.0242514Z Syncing repository: kb4beast/hive-mind-os
+2026-09-03T02:49:57.0245593Z ##[group]Getting Git version info
+2026-09-03T02:49:57.0247196Z Working directory is 'D:\a\hive-mind-os\hive-mind-os'
+2026-09-03T02:49:57.1430789Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-09-03T02:49:57.5365124Z git version 2.55.0.windows.5
+2026-09-03T02:49:57.5416427Z ##[endgroup]
+2026-09-03T02:49:57.5435504Z Temporarily overriding HOME='D:\a\_temp\b249be9d-e6c5-453f-bbe1-910951d7edc5' before making global git config changes
+2026-09-03T02:49:57.5437890Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-03T02:49:57.5448532Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\hive-mind-os\hive-mind-os
+2026-09-03T02:49:57.6040200Z Deleting the contents of 'D:\a\hive-mind-os\hive-mind-os'
+2026-09-03T02:49:57.6045293Z ##[group]Determining repository object format
+2026-09-03T02:49:57.6047670Z ##[endgroup]
+2026-09-03T02:49:57.6048600Z ##[group]Initializing the repository
+2026-09-03T02:49:57.6059246Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\hive-mind-os\hive-mind-os
+2026-09-03T02:49:57.6889365Z Initialized empty Git repository in D:/a/hive-mind-os/hive-mind-os/.git/
+2026-09-03T02:49:57.6935990Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/kb4beast/hive-mind-os
+2026-09-03T02:49:57.7677660Z ##[endgroup]
+2026-09-03T02:49:57.7679928Z ##[group]Disabling automatic garbage collection
+2026-09-03T02:49:57.7688930Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-09-03T02:49:57.8012078Z ##[endgroup]
+2026-09-03T02:49:57.8014033Z ##[group]Setting up auth
+2026-09-03T02:49:57.8015454Z Removing SSH command configuration
+2026-09-03T02:49:57.8023207Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-09-03T02:49:57.8406034Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-09-03T02:49:59.2530714Z Removing HTTP extra header
+2026-09-03T02:49:59.2544865Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-03T02:49:59.2896327Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-09-03T02:49:59.8528765Z Removing includeIf entries pointing to credentials config files
+2026-09-03T02:49:59.8543006Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-03T02:49:59.8895574Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-09-03T02:50:00.4799921Z [command]"C:\Program Files\Git\bin\git.exe" config --file D:\a\_temp\git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-09-03T02:50:00.5120013Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:D:/a/hive-mind-os/hive-mind-os/.git.path D:\a\_temp\git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:00.5440234Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:D:/a/hive-mind-os/hive-mind-os/.git/worktrees/*.path D:\a\_temp\git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:00.5800644Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:00.6165326Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:00.6510459Z ##[endgroup]
+2026-09-03T02:50:00.6511130Z ##[group]Fetching the repository
+2026-09-03T02:50:00.6524574Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2026-09-03T02:50:02.6734746Z From https://github.com/kb4beast/hive-mind-os
+2026-09-03T02:50:02.6736073Z  * [new branch]      agent/phase5a-orchestrator-shadow -> origin/agent/phase5a-orchestrator-shadow
+2026-09-03T02:50:02.6737604Z  * [new branch]      agent/phase5b-architect-shadow -> origin/agent/phase5b-architect-shadow
+2026-09-03T02:50:02.6739037Z  * [new branch]      agent/phase5c-builder-shadow -> origin/agent/phase5c-builder-shadow
+2026-09-03T02:50:02.6739968Z  * [new branch]      agent/phase5d-curator-shadow -> origin/agent/phase5d-curator-shadow
+2026-09-03T02:50:02.6741050Z  * [new branch]      agent/phase5e-integrator-shadow -> origin/agent/phase5e-integrator-shadow
+2026-09-03T02:50:02.6743356Z  * [new branch]      agent/phase5f-steward-shadow -> origin/agent/phase5f-steward-shadow
+2026-09-03T02:50:02.6744423Z  * [new branch]      agent/phase5g-optimizer-shadow -> origin/agent/phase5g-optimizer-shadow
+2026-09-03T02:50:02.6745597Z  * [new branch]      agent/phase5h-role-deepening-court -> origin/agent/phase5h-role-deepening-court
+2026-09-03T02:50:02.6747139Z  * [new branch]      agent/phase5i-post-p13-adoption-docket -> origin/agent/phase5i-post-p13-adoption-docket
+2026-09-03T02:50:02.6748619Z  * [new branch]      agent/phase5j-independent-adoption-review-packet -> origin/agent/phase5j-independent-adoption-review-packet
+2026-09-03T02:50:02.6750182Z  * [new branch]      agent/phase5k-external-adoption-evidence-intake -> origin/agent/phase5k-external-adoption-evidence-intake
+2026-09-03T02:50:02.6751576Z  * [new branch]      agent/post-merge-repair-export-20260812 -> origin/agent/post-merge-repair-export-20260812
+2026-09-03T02:50:02.6752935Z  * [new branch]      agent/post-merge-repair-import-20260812 -> origin/agent/post-merge-repair-import-20260812
+2026-09-03T02:50:02.6754390Z  * [new branch]      agent/version-1.1-release-hardening -> origin/agent/version-1.1-release-hardening
+2026-09-03T02:50:02.6756019Z  * [new branch]      archive/hive-mind-os    -> origin/archive/hive-mind-os
+2026-09-03T02:50:02.6756929Z  * [new branch]      archive/hive-mind-os-060ec51 -> origin/archive/hive-mind-os-060ec51
+2026-09-03T02:50:02.6757991Z  * [new branch]      archive/hive-mind-os-autonomous-brain -> origin/archive/hive-mind-os-autonomous-brain
+2026-09-03T02:50:02.6759530Z  * [new branch]      archive/hive-mind-os-autonomous-brain-claude-curator-f3f7bbd -> origin/archive/hive-mind-os-autonomous-brain-claude-curator-f3f7bbd
+2026-09-03T02:50:02.6761791Z  * [new branch]      archive/hive-mind-os-autonomous-brain-curator-dfa-035669f -> origin/archive/hive-mind-os-autonomous-brain-curator-dfa-035669f
+2026-09-03T02:50:02.6764661Z  * [new branch]      archive/hive-mind-os-autonomous-brain-curator-dfa-4318c1e -> origin/archive/hive-mind-os-autonomous-brain-curator-dfa-4318c1e
+2026-09-03T02:50:02.6766626Z  * [new branch]      archive/hive-mind-os-autonomous-brain-curator-dfa-7880840 -> origin/archive/hive-mind-os-autonomous-brain-curator-dfa-7880840
+2026-09-03T02:50:02.6768486Z  * [new branch]      archive/hive-mind-os-autonomous-brain-curator-dfa-f3f7bbd -> origin/archive/hive-mind-os-autonomous-brain-curator-dfa-f3f7bbd
+2026-09-03T02:50:02.6770248Z  * [new branch]      archive/hive-mind-os-autonomous-brain-curator-f3f7bbd -> origin/archive/hive-mind-os-autonomous-brain-curator-f3f7bbd
+2026-09-03T02:50:02.6771675Z  * [new branch]      archive/hive-mind-os-autonomy-review -> origin/archive/hive-mind-os-autonomy-review
+2026-09-03T02:50:02.6772976Z  * [new branch]      archive/hive-mind-os-autopilot-explorer-310 -> origin/archive/hive-mind-os-autopilot-explorer-310
+2026-09-03T02:50:02.6774355Z  * [new branch]      archive/hive-mind-os-autopilot-orch-300 -> origin/archive/hive-mind-os-autopilot-orch-300
+2026-09-03T02:50:02.6775908Z  * [new branch]      archive/hive-mind-os-controller-trust-hardening -> origin/archive/hive-mind-os-controller-trust-hardening
+2026-09-03T02:50:02.6777681Z  * [new branch]      archive/hive-mind-os-doctor-checkpoint-tests -> origin/archive/hive-mind-os-doctor-checkpoint-tests
+2026-09-03T02:50:02.6778450Z  * [new branch]      archive/hive-mind-os-dp-bench-020 -> origin/archive/hive-mind-os-dp-bench-020
+2026-09-03T02:50:02.6779098Z  * [new branch]      archive/hive-mind-os-dp-contract-000 -> origin/archive/hive-mind-os-dp-contract-000
+2026-09-03T02:50:02.6779753Z  * [new branch]      archive/hive-mind-os-dp-fixture-030 -> origin/archive/hive-mind-os-dp-fixture-030
+2026-09-03T02:50:02.6780383Z  * [new branch]      archive/hive-mind-os-dp-judge-050 -> origin/archive/hive-mind-os-dp-judge-050
+2026-09-03T02:50:02.6781031Z  * [new branch]      archive/hive-mind-os-dp-qualify-040 -> origin/archive/hive-mind-os-dp-qualify-040
+2026-09-03T02:50:02.6782256Z  * [new branch]      archive/hive-mind-os-dp-tests-010 -> origin/archive/hive-mind-os-dp-tests-010
+2026-09-03T02:50:02.6783048Z  * [new branch]      archive/hive-mind-os-fe8e3ae -> origin/archive/hive-mind-os-fe8e3ae
+2026-09-03T02:50:02.6783682Z  * [new branch]      archive/hive-mind-os-fpc-discovery-010 -> origin/archive/hive-mind-os-fpc-discovery-010
+2026-09-03T02:50:02.6784408Z  * [new branch]      archive/hive-mind-os-fpc-discovery-source -> origin/archive/hive-mind-os-fpc-discovery-source
+2026-09-03T02:50:02.6785086Z  * [new branch]      archive/hive-mind-os-fpc-seal-000 -> origin/archive/hive-mind-os-fpc-seal-000
+2026-09-03T02:50:02.6786126Z  * [new branch]      archive/hive-mind-os-fpcr-cross-030 -> origin/archive/hive-mind-os-fpcr-cross-030
+2026-09-03T02:50:02.6786920Z  * [new branch]      archive/hive-mind-os-fpcr-discovery-010 -> origin/archive/hive-mind-os-fpcr-discovery-010
+2026-09-03T02:50:02.6787715Z  * [new branch]      archive/hive-mind-os-fpcr-discovery-source-b789 -> origin/archive/hive-mind-os-fpcr-discovery-source-b789
+2026-09-03T02:50:02.6788783Z  * [new branch]      archive/hive-mind-os-fpcr-execute-020 -> origin/archive/hive-mind-os-fpcr-execute-020
+2026-09-03T02:50:02.6789964Z  * [new branch]      archive/hive-mind-os-fpcr-integrate-040 -> origin/archive/hive-mind-os-fpcr-integrate-040
+2026-09-03T02:50:02.6790649Z  * [new branch]      archive/hive-mind-os-fpcr-judge-050 -> origin/archive/hive-mind-os-fpcr-judge-050
+2026-09-03T02:50:02.6791283Z  * [new branch]      archive/hive-mind-os-fpcr-seal-000 -> origin/archive/hive-mind-os-fpcr-seal-000
+2026-09-03T02:50:02.6791940Z  * [new branch]      archive/hive-mind-os-fpp-causality-010 -> origin/archive/hive-mind-os-fpp-causality-010
+2026-09-03T02:50:02.6792584Z  * [new branch]      archive/hive-mind-os-fpp-seal-000 -> origin/archive/hive-mind-os-fpp-seal-000
+2026-09-03T02:50:02.6793223Z  * [new branch]      archive/hive-mind-os-fpp-test-020 -> origin/archive/hive-mind-os-fpp-test-020
+2026-09-03T02:50:02.6794061Z  * [new branch]      archive/hive-mind-os-gco-arch-030 -> origin/archive/hive-mind-os-gco-arch-030
+2026-09-03T02:50:02.6795267Z  * [new branch]      archive/hive-mind-os-gco-baseline-010 -> origin/archive/hive-mind-os-gco-baseline-010
+2026-09-03T02:50:02.6796011Z  * [new branch]      archive/hive-mind-os-gco-build-040 -> origin/archive/hive-mind-os-gco-build-040
+2026-09-03T02:50:02.6797152Z  * [new branch]      archive/hive-mind-os-gco-erratum-seal-035 -> origin/archive/hive-mind-os-gco-erratum-seal-035
+2026-09-03T02:50:02.6797917Z  * [new branch]      archive/hive-mind-os-gco-integrate-050 -> origin/archive/hive-mind-os-gco-integrate-050
+2026-09-03T02:50:02.6798668Z  * [new branch]      archive/hive-mind-os-gco-integrate-baseline -> origin/archive/hive-mind-os-gco-integrate-baseline
+2026-09-03T02:50:02.6799839Z  * [new branch]      archive/hive-mind-os-gco-seal-000 -> origin/archive/hive-mind-os-gco-seal-000
+2026-09-03T02:50:02.6800471Z  * [new branch]      archive/hive-mind-os-gco-test-020 -> origin/archive/hive-mind-os-gco-test-020
+2026-09-03T02:50:02.6801194Z  * [new branch]      archive/hive-mind-os-vpr-integrate-030 -> origin/archive/hive-mind-os-vpr-integrate-030
+2026-09-03T02:50:02.6801864Z  * [new branch]      archive/hive-mind-os-vpr-judge-040 -> origin/archive/hive-mind-os-vpr-judge-040
+2026-09-03T02:50:02.6802890Z  * [new branch]      archive/hive-mind-os-vpr-ledger-010 -> origin/archive/hive-mind-os-vpr-ledger-010
+2026-09-03T02:50:02.6803517Z  * [new branch]      archive/hive-mind-os-vpr-seal-000 -> origin/archive/hive-mind-os-vpr-seal-000
+2026-09-03T02:50:02.6804122Z  * [new branch]      archive/hive-mind-os-vtc-cross-020 -> origin/archive/hive-mind-os-vtc-cross-020
+2026-09-03T02:50:02.6804771Z  * [new branch]      archive/hive-mind-os-vtc-discovery-010 -> origin/archive/hive-mind-os-vtc-discovery-010
+2026-09-03T02:50:02.6805451Z  * [new branch]      archive/hive-mind-os-vtc-integrate-030 -> origin/archive/hive-mind-os-vtc-integrate-030
+2026-09-03T02:50:02.6806104Z  * [new branch]      archive/hive-mind-os-vtc-judge-040 -> origin/archive/hive-mind-os-vtc-judge-040
+2026-09-03T02:50:02.6806947Z  * [new branch]      archive/hive-mind-os-vtc-seal-000 -> origin/archive/hive-mind-os-vtc-seal-000
+2026-09-03T02:50:02.6807499Z  * [new branch]      archive/hm-runtime-repair -> origin/archive/hm-runtime-repair
+2026-09-03T02:50:02.6808032Z  * [new branch]      archive/p5-1-evidence-corpus -> origin/archive/p5-1-evidence-corpus
+2026-09-03T02:50:02.6808751Z  * [new branch]      archive/release-version_1.1-pre-hardening-2026-07-30 -> origin/archive/release-version_1.1-pre-hardening-2026-07-30
+2026-09-03T02:50:02.6809403Z  * [new branch]      autopilot/a3-700        -> origin/autopilot/a3-700
+2026-09-03T02:50:02.6809808Z  * [new branch]      autopilot/a4-800        -> origin/autopilot/a4-800
+2026-09-03T02:50:02.6810465Z  * [new branch]      autopilot/a5-900        -> origin/autopilot/a5-900
+2026-09-03T02:50:02.6810906Z  * [new branch]      autopilot/arch-100      -> origin/autopilot/arch-100
+2026-09-03T02:50:02.6811339Z  * [new branch]      autopilot/bench-600     -> origin/autopilot/bench-600
+2026-09-03T02:50:02.6811772Z  * [new branch]      autopilot/builder-330   -> origin/autopilot/builder-330
+2026-09-03T02:50:02.6812225Z  * [new branch]      autopilot/challenger-510 -> origin/autopilot/challenger-510
+2026-09-03T02:50:02.6812668Z  * [new branch]      autopilot/cheat-440     -> origin/autopilot/cheat-440
+2026-09-03T02:50:02.6813098Z  * [new branch]      autopilot/contract-110  -> origin/autopilot/contract-110
+2026-09-03T02:50:02.6813534Z  * [new branch]      autopilot/delivery-420  -> origin/autopilot/delivery-420
+2026-09-03T02:50:02.6813971Z  * [new branch]      autopilot/durable-410   -> origin/autopilot/durable-410
+2026-09-03T02:50:02.6814403Z  * [new branch]      autopilot/effect-220    -> origin/autopilot/effect-220
+2026-09-03T02:50:02.6814822Z  * [new branch]      autopilot/eval-520      -> origin/autopilot/eval-520
+2026-09-03T02:50:02.6815251Z  * [new branch]      autopilot/humanless-430 -> origin/autopilot/humanless-430
+2026-09-03T02:50:02.6815911Z  * [new branch]      autopilot/learn-500     -> origin/autopilot/learn-500
+2026-09-03T02:50:02.6816346Z  * [new branch]      autopilot/legacy-620    -> origin/autopilot/legacy-620
+2026-09-03T02:50:02.6816771Z  * [new branch]      autopilot/migrate-260   -> origin/autopilot/migrate-260
+2026-09-03T02:50:02.6817212Z  * [new branch]      autopilot/migration-460 -> origin/autopilot/migration-460
+2026-09-03T02:50:02.6817655Z  * [new branch]      autopilot/mission-400   -> origin/autopilot/mission-400
+2026-09-03T02:50:02.6818135Z  * [new branch]      autopilot/poison-540    -> origin/autopilot/poison-540
+2026-09-03T02:50:02.6818618Z  * [new branch]      autopilot/promote-530   -> origin/autopilot/promote-530
+2026-09-03T02:50:02.6819057Z  * [new branch]      autopilot/qualify-610   -> origin/autopilot/qualify-610
+2026-09-03T02:50:02.6819507Z  * [new branch]      autopilot/selfheal-450  -> origin/autopilot/selfheal-450
+2026-09-03T02:50:02.6820062Z  * [new branch]      claude/app-workflow-visual-ft85vr -> origin/claude/app-workflow-visual-ft85vr
+2026-09-03T02:50:02.6820750Z  * [new branch]      claude/expanding-frontiers-ideas-2punb2 -> origin/claude/expanding-frontiers-ideas-2punb2
+2026-09-03T02:50:02.6821477Z  * [new branch]      claude/expanding-frontiers-ideas-okkz31 -> origin/claude/expanding-frontiers-ideas-okkz31
+2026-09-03T02:50:02.6822591Z  * [new branch]      claude/railway-cost-dag-execution-26zj3m -> origin/claude/railway-cost-dag-execution-26zj3m
+2026-09-03T02:50:02.6823442Z  * [new branch]      codex/autonomous-closeout-handoff -> origin/codex/autonomous-closeout-handoff
+2026-09-03T02:50:02.6824094Z  * [new branch]      codex/explorer-receipt-retirement -> origin/codex/explorer-receipt-retirement
+2026-09-03T02:50:02.6824753Z  * [new branch]      codex/explorer-receipt-retirement-r2 -> origin/codex/explorer-receipt-retirement-r2
+2026-09-03T02:50:02.6825417Z  * [new branch]      codex/explorer-retirement-ordering -> origin/codex/explorer-retirement-ordering
+2026-09-03T02:50:02.6827221Z  * [new branch]      codex/explorer-retirement-origin-hardening -> origin/codex/explorer-retirement-origin-hardening
+2026-09-03T02:50:02.6827956Z  * [new branch]      codex/governance-admin-enforcement -> origin/codex/governance-admin-enforcement
+2026-09-03T02:50:02.6828622Z  * [new branch]      codex/harden-extensible-architecture -> origin/codex/harden-extensible-architecture
+2026-09-03T02:50:02.6829282Z  * [new branch]      codex/l1-wave-integration-cef89b4 -> origin/codex/l1-wave-integration-cef89b4
+2026-09-03T02:50:02.6829971Z  * [new branch]      codex/l2-baseline-lint-integration-d682ad1 -> origin/codex/l2-baseline-lint-integration-d682ad1
+2026-09-03T02:50:02.6830656Z  * [new branch]      codex/l2-wave-integration-01ca563 -> origin/codex/l2-wave-integration-01ca563
+2026-09-03T02:50:02.6831377Z  * [new branch]      codex/master-implementation-bootstrap -> origin/codex/master-implementation-bootstrap
+2026-09-03T02:50:02.6832633Z  * [new branch]      codex/p03-curator-closeout-repair -> origin/codex/p03-curator-closeout-repair
+2026-09-03T02:50:02.6833690Z  * [new branch]      codex/p03-root-identity-ci -> origin/codex/p03-root-identity-ci
+2026-09-03T02:50:02.6834681Z  * [new branch]      codex/p03-timeout-pid-reuse-ci -> origin/codex/p03-timeout-pid-reuse-ci
+2026-09-03T02:50:02.6835752Z  * [new branch]      codex/p03-timeout-pid-reuse-final-ci -> origin/codex/p03-timeout-pid-reuse-final-ci
+2026-09-03T02:50:02.6836919Z  * [new branch]      codex/p03-timeout-pid-reuse-repair -> origin/codex/p03-timeout-pid-reuse-repair
+2026-09-03T02:50:02.6838032Z  * [new branch]      codex/p03-windows-tree-liveness -> origin/codex/p03-windows-tree-liveness
+2026-09-03T02:50:02.6839223Z  * [new branch]      codex/p04-audit-compatibility-handoff -> origin/codex/p04-audit-compatibility-handoff
+2026-09-03T02:50:02.6840337Z  * [new branch]      codex/p04-audit-loader-ci -> origin/codex/p04-audit-loader-ci
+2026-09-03T02:50:02.6842234Z  * [new branch]      codex/p04-evidence-confinement-ci -> origin/codex/p04-evidence-confinement-ci
+2026-09-03T02:50:02.6843864Z  * [new branch]      codex/p04-evidence-confinement-closeout -> origin/codex/p04-evidence-confinement-closeout
+2026-09-03T02:50:02.6844883Z  * [new branch]      codex/p05-historical-ci -> origin/codex/p05-historical-ci
+2026-09-03T02:50:02.6845804Z  * [new branch]      codex/p1-correctness-hardening -> origin/codex/p1-correctness-hardening
+2026-09-03T02:50:02.6846952Z  * [new branch]      codex/phase1-redesign-characterization -> origin/codex/phase1-redesign-characterization
+2026-09-03T02:50:02.6848448Z  * [new branch]      codex/phase2-additive-memory-telemetry-foundation -> origin/codex/phase2-additive-memory-telemetry-foundation
+2026-09-03T02:50:02.6849284Z  * [new branch]      codex/phase2-memory-usage-foundation -> origin/codex/phase2-memory-usage-foundation
+2026-09-03T02:50:02.6850647Z  * [new branch]      codex/phase3-federation-recursion-guards -> origin/codex/phase3-federation-recursion-guards
+2026-09-03T02:50:02.6852035Z  * [new branch]      codex/phase3-obsidian-bases-canvas -> origin/codex/phase3-obsidian-bases-canvas
+2026-09-03T02:50:02.6852725Z  * [new branch]      codex/phase3-obsidian-vault-refresh -> origin/codex/phase3-obsidian-vault-refresh
+2026-09-03T02:50:02.6853455Z  * [new branch]      codex/phase3-open-brain-obsidian-projection -> origin/codex/phase3-open-brain-obsidian-projection
+2026-09-03T02:50:02.6854275Z  * [new branch]      codex/phase3-public-private-memory-separation -> origin/codex/phase3-public-private-memory-separation
+2026-09-03T02:50:02.6855051Z  * [new branch]      codex/phase3-stable-id-cognitive-notes -> origin/codex/phase3-stable-id-cognitive-notes
+2026-09-03T02:50:02.6855772Z  * [new branch]      codex/phase4-explorer-behavior-fixtures -> origin/codex/phase4-explorer-behavior-fixtures
+2026-09-03T02:50:02.6856482Z  * [new branch]      codex/phase4-explorer-equal-comparison -> origin/codex/phase4-explorer-equal-comparison
+2026-09-03T02:50:02.6857179Z  * [new branch]      codex/phase4-explorer-idea-lifecycle -> origin/codex/phase4-explorer-idea-lifecycle
+2026-09-03T02:50:02.6858006Z  * [new branch]      codex/phase4-explorer-shadow -> origin/codex/phase4-explorer-shadow
+2026-09-03T02:50:02.6858594Z  * [new branch]      codex/phase4-explorer-v2-candidate -> origin/codex/phase4-explorer-v2-candidate
+2026-09-03T02:50:02.6859214Z  * [new branch]      codex/phase5-debt-reconciliation -> origin/codex/phase5-debt-reconciliation
+2026-09-03T02:50:02.6859871Z  * [new branch]      codex/phase5-evidence-inventory-chain -> origin/codex/phase5-evidence-inventory-chain
+2026-09-03T02:50:02.6860501Z  * [new branch]      codex/phase5-full-role-outputs -> origin/codex/phase5-full-role-outputs
+2026-09-03T02:50:02.6861082Z  * [new branch]      codex/phase5-governance-records -> origin/codex/phase5-governance-records
+2026-09-03T02:50:02.6861631Z  * [new branch]      codex/phase5-role-ancestry -> origin/codex/phase5-role-ancestry
+2026-09-03T02:50:02.6862265Z  * [new branch]      codex/phase5-worker-recovery-determinism -> origin/codex/phase5-worker-recovery-determinism
+2026-09-03T02:50:02.6863739Z  * [new branch]      codex/post-merge-integration-receipt-repair -> origin/codex/post-merge-integration-receipt-repair
+2026-09-03T02:50:02.6864471Z  * [new branch]      codex/release-1.1-stabilization -> origin/codex/release-1.1-stabilization
+2026-09-03T02:50:02.6865050Z  * [new branch]      codex/repair-ci-test-contract -> origin/codex/repair-ci-test-contract
+2026-09-03T02:50:02.6865618Z  * [new branch]      codex/restore-b-ops-03-blocker -> origin/codex/restore-b-ops-03-blocker
+2026-09-03T02:50:02.6866181Z  * [new branch]      codex/session-autonomy-lessons -> origin/codex/session-autonomy-lessons
+2026-09-03T02:50:02.6866743Z  * [new branch]      codex/v3-squash-proof-recovery -> origin/codex/v3-squash-proof-recovery
+2026-09-03T02:50:02.6867336Z  * [new branch]      codex/v3-squash-proof-recovery-r2 -> origin/codex/v3-squash-proof-recovery-r2
+2026-09-03T02:50:02.6868184Z  * [new branch]      codex/v3-squash-proof-recovery-r3 -> origin/codex/v3-squash-proof-recovery-r3
+2026-09-03T02:50:02.6869345Z  * [new branch]      codex/v3-squash-proof-recovery-r4 -> origin/codex/v3-squash-proof-recovery-r4
+2026-09-03T02:50:02.6870320Z  * [new branch]      codex/v4-successor-recovery -> origin/codex/v4-successor-recovery
+2026-09-03T02:50:02.6871586Z  * [new branch]      dependabot/github_actions/anchore/sbom-action-0.24.2 -> origin/dependabot/github_actions/anchore/sbom-action-0.24.2
+2026-09-03T02:50:02.6872620Z  * [new branch]      dependabot/github_actions/github/codeql-action/analyze-4.37.9 -> origin/dependabot/github_actions/github/codeql-action/analyze-4.37.9
+2026-09-03T02:50:02.6874080Z  * [new branch]      dependabot/github_actions/github/codeql-action/init-4.37.9 -> origin/dependabot/github_actions/github/codeql-action/init-4.37.9
+2026-09-03T02:50:02.6875416Z  * [new branch]      docs/explicit-dispatch-barrier -> origin/docs/explicit-dispatch-barrier
+2026-09-03T02:50:02.6876637Z  * [new branch]      integration/version_1.1/all-dependencies -> origin/integration/version_1.1/all-dependencies
+2026-09-03T02:50:02.6877400Z  * [new branch]      integration/version_1.1/dependency-history -> origin/integration/version_1.1/dependency-history
+2026-09-03T02:50:02.6878058Z  * [new branch]      integration/version_1.1/pr5-source -> origin/integration/version_1.1/pr5-source
+2026-09-03T02:50:02.6878647Z  * [new branch]      integration/version_1.1/pr7-source -> origin/integration/version_1.1/pr7-source
+2026-09-03T02:50:02.6879106Z  * [new branch]      main                    -> origin/main
+2026-09-03T02:50:02.6879510Z  * [new branch]      phase/P01-stage0-closeout -> origin/phase/P01-stage0-closeout
+2026-09-03T02:50:02.6879986Z  * [new branch]      phase/P02-model-adapter -> origin/phase/P02-model-adapter
+2026-09-03T02:50:02.6880450Z  * [new branch]      phase/P03-sandbox-runner -> origin/phase/P03-sandbox-runner
+2026-09-03T02:50:02.6880907Z  * [new branch]      phase/P04-git-adapter   -> origin/phase/P04-git-adapter
+2026-09-03T02:50:02.6881575Z  * [new branch]      phase/P05-vertical-slice -> origin/phase/P05-vertical-slice
+2026-09-03T02:50:02.6882059Z  * [new branch]      phase/P06-durable-missions -> origin/phase/P06-durable-missions
+2026-09-03T02:50:02.6882543Z  * [new branch]      phase/P07-github-delivery -> origin/phase/P07-github-delivery
+2026-09-03T02:50:02.6883507Z  * [new branch]      phase/P08-curator-independence -> origin/phase/P08-curator-independence
+2026-09-03T02:50:02.6884042Z  * [new branch]      phase/P09-pit-oracle    -> origin/phase/P09-pit-oracle
+2026-09-03T02:50:02.6884500Z  * [new branch]      phase/P10-learning-loop -> origin/phase/P10-learning-loop
+2026-09-03T02:50:02.6885034Z  * [new branch]      phase/P11-scheduler-operations -> origin/phase/P11-scheduler-operations
+2026-09-03T02:50:02.6885579Z  * [new branch]      phase/P12-source-ingestion -> origin/phase/P12-source-ingestion
+2026-09-03T02:50:02.6886060Z  * [new branch]      phase/P13-benchmark-mvp -> origin/phase/P13-benchmark-mvp
+2026-09-03T02:50:02.6886627Z  * [new branch]      plan/canonical-implementation-plan -> origin/plan/canonical-implementation-plan
+2026-09-03T02:50:02.6887309Z  * [new branch]      release/hive-mind-os-singleton-20260810 -> origin/release/hive-mind-os-singleton-20260810
+2026-09-03T02:50:02.6888044Z  * [new branch]      release/hive-mind-os-singleton-20260810-r2 -> origin/release/hive-mind-os-singleton-20260810-r2
+2026-09-03T02:50:02.6888781Z  * [new branch]      release/hive-mind-os-singleton-20260811-r3 -> origin/release/hive-mind-os-singleton-20260811-r3
+2026-09-03T02:50:02.6889517Z  * [new branch]      release/hive-mind-os-singleton-20260812-r5 -> origin/release/hive-mind-os-singleton-20260812-r5
+2026-09-03T02:50:02.6890097Z  * [new branch]      release/version_1.1     -> origin/release/version_1.1
+2026-09-03T02:50:02.6890589Z  * [new branch]      utility/phase5b-source-export -> origin/utility/phase5b-source-export
+2026-09-03T02:50:02.6891275Z  * [new tag]         archive/evidence-corpus-2026-08-03 -> archive/evidence-corpus-2026-08-03
+2026-09-03T02:50:02.6891932Z  * [new tag]         archive/p1-correctness-hardening-2026-08-03 -> archive/p1-correctness-hardening-2026-08-03
+2026-09-03T02:50:02.6892481Z  * [new tag]         legacy-620-rollback     -> legacy-620-rollback
+2026-09-03T02:50:02.6892818Z  * [new tag]         v0.7.0                  -> v0.7.0
+2026-09-03T02:50:02.6893758Z [command]"C:\Program Files\Git\bin\git.exe" branch --list --remote origin/codex/v4-successor-recovery
+2026-09-03T02:50:02.7278266Z   origin/codex/v4-successor-recovery
+2026-09-03T02:50:02.7321688Z [command]"C:\Program Files\Git\bin\git.exe" rev-parse refs/remotes/origin/codex/v4-successor-recovery
+2026-09-03T02:50:02.7698827Z 99bcfd1f5a10b55089b8b329e174f7f4fb70bc10
+2026-09-03T02:50:02.7734094Z ##[endgroup]
+2026-09-03T02:50:02.7734709Z ##[group]Determining the checkout info
+2026-09-03T02:50:02.7735457Z ##[endgroup]
+2026-09-03T02:50:02.7744579Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-09-03T02:50:02.8216073Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-09-03T02:50:02.8536551Z ##[group]Checking out the ref
+2026-09-03T02:50:02.8546616Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B codex/v4-successor-recovery refs/remotes/origin/codex/v4-successor-recovery
+2026-09-03T02:50:03.2872425Z Switched to a new branch 'codex/v4-successor-recovery'
+2026-09-03T02:50:03.2930612Z branch 'codex/v4-successor-recovery' set up to track 'origin/codex/v4-successor-recovery'.
+2026-09-03T02:50:03.2991256Z ##[endgroup]
+2026-09-03T02:50:03.3387308Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-09-03T02:50:03.3697315Z 99bcfd1f5a10b55089b8b329e174f7f4fb70bc10
+2026-09-03T02:50:03.3735787Z ##[group]Removing auth
+2026-09-03T02:50:03.3736219Z Removing SSH command configuration
+2026-09-03T02:50:03.3743821Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-09-03T02:50:03.4059989Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-09-03T02:50:03.9351047Z Removing HTTP extra header
+2026-09-03T02:50:03.9359018Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-03T02:50:03.9672440Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-09-03T02:50:04.5255430Z Removing includeIf entries pointing to credentials config files
+2026-09-03T02:50:04.5264606Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-03T02:50:04.5541019Z includeif.gitdir:D:/a/hive-mind-os/hive-mind-os/.git.path
+2026-09-03T02:50:04.5541850Z includeif.gitdir:D:/a/hive-mind-os/hive-mind-os/.git/worktrees/*.path
+2026-09-03T02:50:04.5542522Z includeif.gitdir:/github/workspace/.git.path
+2026-09-03T02:50:04.5543094Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-09-03T02:50:04.5582641Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:D:/a/hive-mind-os/hive-mind-os/.git.path
+2026-09-03T02:50:04.5856885Z D:\a\_temp\git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:04.5897439Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:D:/a/hive-mind-os/hive-mind-os/.git.path D\:\\a\\_temp\\git\-credentials\-3f277462\-1d0e\-43a6\-8ad1\-a56ec629f8a1\.config
+2026-09-03T02:50:04.6205892Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:D:/a/hive-mind-os/hive-mind-os/.git/worktrees/*.path
+2026-09-03T02:50:04.6461915Z D:\a\_temp\git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:04.6506668Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:D:/a/hive-mind-os/hive-mind-os/.git/worktrees/*.path D\:\\a\\_temp\\git\-credentials\-3f277462\-1d0e\-43a6\-8ad1\-a56ec629f8a1\.config
+2026-09-03T02:50:04.6829318Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-09-03T02:50:04.7100112Z /github/runner_temp/git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:04.7141561Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-3f277462\-1d0e\-43a6\-8ad1\-a56ec629f8a1\.config
+2026-09-03T02:50:04.7457507Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-09-03T02:50:04.7732557Z /github/runner_temp/git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config
+2026-09-03T02:50:04.7776323Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-3f277462\-1d0e\-43a6\-8ad1\-a56ec629f8a1\.config
+2026-09-03T02:50:04.8093958Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-09-03T02:50:05.3562180Z Removing credentials config 'D:\a\_temp\git-credentials-3f277462-1d0e-43a6-8ad1-a56ec629f8a1.config'
+2026-09-03T02:50:05.3563672Z ##[endgroup]
+2026-09-03T02:50:05.3928945Z ##[group]Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+2026-09-03T02:50:05.3929667Z with:
+2026-09-03T02:50:05.3929864Z   python-version: 3.12
+2026-09-03T02:50:05.3930067Z   cache: pip
+2026-09-03T02:50:05.3930237Z   check-latest: false
+2026-09-03T02:50:05.3932959Z   token: ***
+2026-09-03T02:50:05.3933165Z   update-environment: true
+2026-09-03T02:50:05.3934147Z   allow-prereleases: false
+2026-09-03T02:50:05.3934359Z   freethreaded: false
+2026-09-03T02:50:05.3934545Z ##[endgroup]
+2026-09-03T02:50:05.5459744Z ##[group]Installed versions
+2026-09-03T02:50:05.5660380Z Successfully set up CPython (3.12.10)
+2026-09-03T02:50:05.5661286Z ##[endgroup]
+2026-09-03T02:50:08.7549018Z Cache hit for: setup-python-Windows-x64-python-3.12.10-pip-01ffc033677cd256e704df3448aa3c8e91c517d91b5ff257afd6d5be6469757e
+2026-09-03T02:50:09.7672125Z Received 1318255 of 1318255 (100.0%), 1.8 MBs/sec
+2026-09-03T02:50:09.7673069Z Cache Size: ~1 MB (1318255 B)
+2026-09-03T02:50:09.7703275Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/04b4aceb-e1e2-46d1-a6a9-5e47ea7a70fe/cache.tzst -P -C D:/a/hive-mind-os/hive-mind-os --force-local --use-compress-program "zstd -d"
+2026-09-03T02:50:09.8929826Z Cache restored successfully
+2026-09-03T02:50:09.8939835Z Cache restored from key: setup-python-Windows-x64-python-3.12.10-pip-01ffc033677cd256e704df3448aa3c8e91c517d91b5ff257afd6d5be6469757e
+2026-09-03T02:50:09.9268049Z ##[group]Run python -m pip install --disable-pip-version-check --no-deps -e .
+2026-09-03T02:50:09.9268736Z [36;1mpython -m pip install --disable-pip-version-check --no-deps -e .[0m
+2026-09-03T02:50:10.1056517Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-09-03T02:50:10.1056984Z env:
+2026-09-03T02:50:10.1057334Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:10.1058265Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+2026-09-03T02:50:10.1058887Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:10.1059440Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:10.1059984Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:10.1060417Z ##[endgroup]
+2026-09-03T02:50:12.4706899Z Obtaining file:///D:/a/hive-mind-os/hive-mind-os
+2026-09-03T02:50:12.4779665Z   Installing build dependencies: started
+2026-09-03T02:50:14.9524050Z   Installing build dependencies: finished with status 'done'
+2026-09-03T02:50:14.9541314Z   Checking if build backend supports build_editable: started
+2026-09-03T02:50:15.4159716Z   Checking if build backend supports build_editable: finished with status 'done'
+2026-09-03T02:50:15.4185804Z   Getting requirements to build editable: started
+2026-09-03T02:50:15.9289015Z   Getting requirements to build editable: finished with status 'done'
+2026-09-03T02:50:15.9318961Z   Preparing editable metadata (pyproject.toml): started
+2026-09-03T02:50:16.2951622Z   Preparing editable metadata (pyproject.toml): finished with status 'done'
+2026-09-03T02:50:16.3011037Z Building wheels for collected packages: hive-mind-os
+2026-09-03T02:50:16.3037137Z   Building editable for hive-mind-os (pyproject.toml): started
+2026-09-03T02:50:16.6934153Z   Building editable for hive-mind-os (pyproject.toml): finished with status 'done'
+2026-09-03T02:50:16.6974859Z   Created wheel for hive-mind-os: filename=hive_mind_os-0.7.0-0.editable-py3-none-any.whl size=5662 sha256=f496da0168bef137161eb4e80f2ec840d61da42c206c49e0e343c4e5a0424fad
+2026-09-03T02:50:16.6977415Z   Stored in directory: C:\Users\runneradmin\AppData\Local\Temp\pip-ephem-wheel-cache-qha06vv5\wheels\45\13\2a\ac4a7916c4ce2e57837bdd2dc6d8af2e6975a4e13d2a845fbc
+2026-09-03T02:50:16.7018145Z Successfully built hive-mind-os
+2026-09-03T02:50:16.7194146Z Installing collected packages: hive-mind-os
+2026-09-03T02:50:16.7704237Z Successfully installed hive-mind-os-0.7.0
+2026-09-03T02:50:17.1096332Z ##[group]Run python -m compileall -q src tests
+2026-09-03T02:50:17.1096779Z [36;1mpython -m compileall -q src tests[0m
+2026-09-03T02:50:17.1199534Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-09-03T02:50:17.1199881Z env:
+2026-09-03T02:50:17.1200160Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:17.1200650Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+2026-09-03T02:50:17.1201294Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:17.1201725Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:17.1202131Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:17.1202888Z ##[endgroup]
+2026-09-03T02:50:18.6459580Z ##[group]Run python -m unittest discover -s tests -v
+2026-09-03T02:50:18.6460042Z [36;1mpython -m unittest discover -s tests -v[0m
+2026-09-03T02:50:18.6560212Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-09-03T02:50:18.6560565Z env:
+2026-09-03T02:50:18.6560824Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:18.6561490Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+2026-09-03T02:50:18.6561996Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:18.6562396Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:18.6562819Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-09-03T02:50:18.6563153Z ##[endgroup]
+2026-09-03T02:50:20.2066520Z test_acceptance_harness_self_tests (hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_acceptance_harness_self_tests) ... ok
+2026-09-03T02:50:20.2075891Z test_cross_language_fixture_tests (hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_cross_language_fixture_tests) ... ok
+2026-09-03T02:50:20.2078265Z test_humanless_gate_distinguishes_real_authority (hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_humanless_gate_distinguishes_real_authority) ... ok
+2026-09-03T02:50:20.2081898Z test_negative_control_tests (hive_cortex.test_acceptance_harness.AcceptanceHarnessTests.test_negative_control_tests) ... ok
+2026-09-03T02:50:20.2084585Z test_authority_claim_without_evidence_blocks_instead_of_escalating (hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_authority_claim_without_evidence_blocks_instead_of_escalating) ... ok
+2026-09-03T02:50:20.2089853Z test_every_genuine_authority_class_escalates (hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_every_genuine_authority_class_escalates) ... ok
+2026-09-03T02:50:20.2094250Z test_harness_accepts_only_genuine_authority_packets (hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_harness_accepts_only_genuine_authority_packets) ... ok
+2026-09-03T02:50:20.2096118Z test_result_contract_rejects_convenience_escalation (hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_result_contract_rejects_convenience_escalation) ... ok
+2026-09-03T02:50:20.2097928Z test_unknown_authority_class_is_rejected_at_construction (hive_cortex.test_humanless_operation.GenuineAuthorityClassificationSuiteTests.test_unknown_authority_class_is_rejected_at_construction) ... ok
+2026-09-03T02:50:20.2099599Z test_ambiguity_resolved_by_role_consultation (hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_ambiguity_resolved_by_role_consultation) ... ok
+2026-09-03T02:50:20.2103986Z test_ci_failure_creates_bounded_retry_repair (hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_ci_failure_creates_bounded_retry_repair) ... ok
+2026-09-03T02:50:20.2105525Z test_design_tradeoff_replans_with_recorded_dissent (hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_design_tradeoff_replans_with_recorded_dissent) ... ok
+2026-09-03T02:50:20.2106972Z test_end_to_end_run_passes_acceptance_harness (hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_end_to_end_run_passes_acceptance_harness) ... ok
+2026-09-03T02:50:20.2120620Z test_missing_tests_become_repair_work (hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_missing_tests_become_repair_work) ... ok
+2026-09-03T02:50:20.2127415Z test_recoverable_interruption_resumes_without_restating_context (hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_recoverable_interruption_resumes_without_restating_context) ... ok
+2026-09-03T02:50:20.3993325Z test_worker_retries_recoverable_execution_failure (hive_cortex.test_humanless_operation.HumanlessOperationSuiteTests.test_worker_retries_recoverable_execution_failure) ... ok
+2026-09-03T02:50:20.3997697Z test_defect_consultation_cannot_manufacture_authority (hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_defect_consultation_cannot_manufacture_authority) ... ok
+2026-09-03T02:50:20.3999547Z test_defect_within_budget_retries_not_escalates (hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_defect_within_budget_retries_not_escalates) ... ok
+2026-09-03T02:50:20.4001570Z test_exhausted_defect_quarantines_in_system (hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_exhausted_defect_quarantines_in_system) ... ok
+2026-09-03T02:50:20.4003315Z test_no_progress_quarantines_within_bound (hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_no_progress_quarantines_within_bound) ... ok
+2026-09-03T02:50:20.4005894Z test_repair_vocabulary_has_no_human_channel (hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_repair_vocabulary_has_no_human_channel) ... ok
+2026-09-03T02:50:20.4037105Z test_retained_evidence_packet_matches_recomputation (hive_cortex.test_humanless_operation.SoftwareDefectNotHumanSuiteTests.test_retained_evidence_packet_matches_recomputation) ... ok
+2026-09-03T02:50:20.4050674Z test_counterexamples_and_dissent_are_retained_and_reduce_confidence (hive_cortex.test_learning_poisoning.LearningRuntimePoisoningSuite.test_counterexamples_and_dissent_are_retained_and_reduce_confidence) ... ok
+2026-09-03T02:50:20.4067284Z test_lesson_identity_and_expiry_cannot_be_forged (hive_cortex.test_learning_poisoning.LearningRuntimePoisoningSuite.test_lesson_identity_and_expiry_cannot_be_forged) ... ok
+2026-09-03T02:50:20.4079268Z test_lesson_provenance_cannot_be_self_certified_or_unsourced (hive_cortex.test_learning_poisoning.LearningRuntimePoisoningSuite.test_lesson_provenance_cannot_be_self_certified_or_unsourced) ... ok
+2026-09-03T02:50:20.4092244Z test_unproven_future_dated_or_secret_signals_cannot_yield_a_lesson (hive_cortex.test_learning_poisoning.LearningRuntimePoisoningSuite.test_unproven_future_dated_or_secret_signals_cannot_yield_a_lesson) ... ok
+2026-09-03T02:50:20.4154488Z test_contradiction_preserves_history_and_terminates_both_sides (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_contradiction_preserves_history_and_terminates_both_sides) ... ok
+2026-09-03T02:50:20.4209171Z test_evidence_without_provenance_is_rejected (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_evidence_without_provenance_is_rejected) ... ok
+2026-09-03T02:50:20.4258453Z test_quarantine_retains_evidence_and_blocks_retrieval (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_quarantine_retains_evidence_and_blocks_retrieval) ... ok
+2026-09-03T02:50:20.4307336Z test_registered_records_cannot_be_rewritten (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_registered_records_cannot_be_rewritten) ... ok
+2026-09-03T02:50:20.4341595Z test_secret_and_transcript_bodies_are_rejected (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_secret_and_transcript_bodies_are_rejected) ... ok
+2026-09-03T02:50:20.4387883Z test_single_record_contradiction_is_rejected (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_single_record_contradiction_is_rejected) ... ok
+2026-09-03T02:50:20.4481556Z test_snapshot_tamper_fails_closed (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_snapshot_tamper_fails_closed) ... ok
+2026-09-03T02:50:20.4525016Z test_tampered_artifact_fails_closed_on_read (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_tampered_artifact_fails_closed_on_read) ... ok
+2026-09-03T02:50:20.4579547Z test_unresolved_conflict_reduces_rank_confidence (hive_cortex.test_learning_poisoning.MemoryPoisoningSuite.test_unresolved_conflict_reduces_rank_confidence) ... ok
+2026-09-03T02:50:20.4650991Z test_dependent_contexts_are_rejected (hive_cortex.test_learning_poisoning.OvergeneralizationSuite.test_dependent_contexts_are_rejected) ... ok
+2026-09-03T02:50:20.4697567Z test_too_few_episodes_is_rejected (hive_cortex.test_learning_poisoning.OvergeneralizationSuite.test_too_few_episodes_is_rejected) ... ok
+2026-09-03T02:50:20.4886116Z test_unevidenced_or_inactive_support_is_rejected (hive_cortex.test_learning_poisoning.OvergeneralizationSuite.test_unevidenced_or_inactive_support_is_rejected) ... ok
+2026-09-03T02:50:20.4961314Z test_unproven_lesson_is_rejected (hive_cortex.test_learning_poisoning.OvergeneralizationSuite.test_unproven_lesson_is_rejected) ... ok
+2026-09-03T02:50:20.5019243Z test_valid_consolidation_retires_episodes_and_lesson_expires (hive_cortex.test_learning_poisoning.OvergeneralizationSuite.test_valid_consolidation_retires_episodes_and_lesson_expires) ... ok
+2026-09-03T02:50:20.5087744Z test_expired_and_embargoed_records_are_not_retrievable (hive_cortex.test_learning_poisoning.StaleEvidenceSuite.test_expired_and_embargoed_records_are_not_retrievable) ... ok
+2026-09-03T02:50:20.5134167Z test_expiry_is_deterministic_and_terminal (hive_cortex.test_learning_poisoning.StaleEvidenceSuite.test_expiry_is_deterministic_and_terminal) ... ok
+2026-09-03T02:50:20.5190091Z test_scope_prevents_cross_mission_reuse (hive_cortex.test_learning_poisoning.StaleEvidenceSuite.test_scope_prevents_cross_mission_reuse) ... ok
+2026-09-03T02:50:20.5232077Z test_stale_evidence_ranks_below_fresh_evidence (hive_cortex.test_learning_poisoning.StaleEvidenceSuite.test_stale_evidence_ranks_below_fresh_evidence) ... ok
+2026-09-03T02:50:20.5242034Z test_child_envelope_cannot_broaden_parent (hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests.test_child_envelope_cannot_broaden_parent) ... ok
+2026-09-03T02:50:20.5255569Z test_orphan_child_cannot_self_register (hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests.test_orphan_child_cannot_self_register) ... ok
+2026-09-03T02:50:20.5273553Z test_registry_denies_scope_expansion_expiry_and_revocation (hive_cortex.test_no_cheating.AuthorityExpansionSuiteTests.test_registry_denies_scope_expansion_expiry_and_revocation) ... ok
+2026-09-03T02:50:20.5324492Z test_evaluator_mode_excludes_generator_material (hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests.test_evaluator_mode_excludes_generator_material) ... ok
+2026-09-03T02:50:20.5390409Z test_future_dated_memory_is_invisible_to_every_context (hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests.test_future_dated_memory_is_invisible_to_every_context) ... ok
+2026-09-03T02:50:20.5443634Z test_generator_manifest_never_claims_separation (hive_cortex.test_no_cheating.EvaluatorLeakageSuiteTests.test_generator_manifest_never_claims_separation) ... ok
+2026-09-03T02:50:20.5446750Z test_echo_chamber_testimony_is_rejected (hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_echo_chamber_testimony_is_rejected) ... ok
+2026-09-03T02:50:20.5453576Z test_friendly_court_is_structurally_impossible (hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_friendly_court_is_structurally_impossible) ... ok
+2026-09-03T02:50:20.5455631Z test_harness_flags_friendly_consultation (hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_harness_flags_friendly_consultation) ... ok
+2026-09-03T02:50:20.5458212Z test_requester_cannot_pack_its_own_council (hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_requester_cannot_pack_its_own_council) ... ok
+2026-09-03T02:50:20.5462193Z test_role_labels_are_never_independent_humans (hive_cortex.test_no_cheating.FriendlyConsultationSuiteTests.test_role_labels_are_never_independent_humans) ... ok
+2026-09-03T02:50:20.5465843Z test_confirmed_cheating_quarantines_and_disproved_cites_retained_evidence (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_confirmed_cheating_quarantines_and_disproved_cites_retained_evidence) ... ok
+2026-09-03T02:50:20.5470158Z test_fake_receipts_fail_closed_in_report_builder (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_fake_receipts_fail_closed_in_report_builder) ... ok
+2026-09-03T02:50:20.5649377Z test_fake_receipts_tampered_report_or_transcript_is_rejected (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_fake_receipts_tampered_report_or_transcript_is_rejected) ... ok
+2026-09-03T02:50:20.5651481Z test_future_access_observed_commits_must_be_sealed (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_future_access_observed_commits_must_be_sealed) ... ok
+2026-09-03T02:50:20.5655919Z test_stale_evidence_appeal_without_new_evidence_is_rejected (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_stale_evidence_appeal_without_new_evidence_is_rejected) ... ok
+2026-09-03T02:50:20.5701690Z test_stale_evidence_rewritten_artifact_is_denied (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_stale_evidence_rewritten_artifact_is_denied) ... ok
+2026-09-03T02:50:20.5704548Z test_suspected_cheating_triggers_role_council_before_continuation (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_suspected_cheating_triggers_role_council_before_continuation) ... ok
+2026-09-03T02:50:20.5707103Z test_test_weakening_cannot_convert_failure_into_adoption (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_test_weakening_cannot_convert_failure_into_adoption) ... ok
+2026-09-03T02:50:20.5728186Z test_test_weakening_tampered_seal_fails_closed (hive_cortex.test_no_cheating.NoCheatingSuiteTests.test_test_weakening_tampered_seal_fails_closed) ... ok
+2026-09-03T02:50:21.0050256Z test_cli_loader_rejects_non_object_documents (test_acceptance.AcceptanceSpecificationTests.test_cli_loader_rejects_non_object_documents) ... ok
+2026-09-03T02:50:21.4159631Z test_curator_requires_an_exact_specification_bound_check (test_acceptance.AcceptanceSpecificationTests.test_curator_requires_an_exact_specification_bound_check) ... ok
+2026-09-03T02:50:21.8325769Z test_normalization_is_canonical_by_identifier (test_acceptance.AcceptanceSpecificationTests.test_normalization_is_canonical_by_identifier) ... ok
+2026-09-03T02:50:22.2759120Z test_receipt_must_bind_the_specification_and_requested_argv (test_acceptance.AcceptanceSpecificationTests.test_receipt_must_bind_the_specification_and_requested_argv) ... ok
+2026-09-03T02:50:22.6774756Z test_schema_limits_are_enforced_at_construction (test_acceptance.AcceptanceSpecificationTests.test_schema_limits_are_enforced_at_construction) ... ok
+2026-09-03T02:50:23.0754257Z test_untyped_criterion_cannot_start_a_delivery (test_acceptance.AcceptanceSpecificationTests.test_untyped_criterion_cannot_start_a_delivery) ... ok
+2026-09-03T02:50:23.0756115Z test_missing_or_conflicting_authority_is_denied (test_adapter_registry.AdapterRegistryTests.test_missing_or_conflicting_authority_is_denied) ... ok
+2026-09-03T02:50:23.0759600Z test_registration_is_idempotent_but_substitution_is_rejected (test_adapter_registry.AdapterRegistryTests.test_registration_is_idempotent_but_substitution_is_rejected) ... ok
+2026-09-03T02:50:23.0763781Z test_selection_is_deterministic_and_lowest_sufficient (test_adapter_registry.AdapterRegistryTests.test_selection_is_deterministic_and_lowest_sufficient) ... ok
+2026-09-03T02:50:23.0765901Z test_unvalidated_third_party_adapter_remains_inert (test_adapter_registry.AdapterRegistryTests.test_unvalidated_third_party_adapter_remains_inert) ... ok
+2026-09-03T02:50:23.3710644Z test_bounded_supervision_grades_local_human_commits_without_remote_feedback (test_autonomous_os.AutonomousBrainTests.test_bounded_supervision_grades_local_human_commits_without_remote_feedback) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:390: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:23.3712529Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:28.1823820Z ok
+2026-09-03T02:50:28.4682265Z test_cli_kickoff_is_a_prompt_entrypoint_and_rejects_secret_like_prompts (test_autonomous_os.AutonomousBrainTests.test_cli_kickoff_is_a_prompt_entrypoint_and_rejects_secret_like_prompts) ... D:\a\hive-mind-os\hive-mind-os\src\hive_mind_os\cli.py:1393: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:28.4684231Z   with AutonomousBrain(args.state_dir) as brain:
+2026-09-03T02:50:29.5714517Z D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:564: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:29.5715710Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:29.5934226Z ok
+2026-09-03T02:50:30.0749275Z test_clone_remote_removal_fails_closed_for_missing_or_extra_remotes (test_autonomous_os.AutonomousBrainTests.test_clone_remote_removal_fails_closed_for_missing_or_extra_remotes) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:508: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:30.0752641Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:30.8910040Z D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:516: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:30.8911278Z   with AutonomousBrain(self.root / "extra-state") as brain:
+2026-09-03T02:50:31.3963291Z ok
+2026-09-03T02:50:31.7530236Z test_draft_delivery_is_refused_before_branch_push_or_pr_creation (test_autonomous_os.AutonomousBrainTests.test_draft_delivery_is_refused_before_branch_push_or_pr_creation) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:243: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:31.7532096Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:33.1546300Z ok
+2026-09-03T02:50:33.4361699Z test_every_later_human_commit_gets_a_sealed_point_in_time_grade (test_autonomous_os.AutonomousBrainTests.test_every_later_human_commit_gets_a_sealed_point_in_time_grade) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:279: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:33.4363466Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:38.2642311Z ok
+2026-09-03T02:50:38.5435160Z test_failed_pit_prediction_rolls_back_and_a_retry_gets_one_grade (test_autonomous_os.AutonomousBrainTests.test_failed_pit_prediction_rolls_back_and_a_retry_gets_one_grade) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:308: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:38.5436969Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:41.6886071Z ok
+2026-09-03T02:50:41.9728237Z test_host_environment_rejects_a_protected_merge_before_it_updates_the_ref (test_autonomous_os.AutonomousBrainTests.test_host_environment_rejects_a_protected_merge_before_it_updates_the_ref) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:486: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:41.9730371Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:43.6227279Z ok
+2026-09-03T02:50:43.9023738Z test_host_environment_scrubs_inherited_git_github_and_ssh_configuration (test_autonomous_os.AutonomousBrainTests.test_host_environment_scrubs_inherited_git_github_and_ssh_configuration) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:459: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:43.9025664Z   with AutonomousBrain(self.state) as brain, patch.dict(
+2026-09-03T02:50:44.3522121Z ok
+2026-09-03T02:50:44.6269572Z test_incomplete_pit_workspace_is_quarantined_and_the_same_episode_completes (test_autonomous_os.AutonomousBrainTests.test_incomplete_pit_workspace_is_quarantined_and_the_same_episode_completes) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:372: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:44.6271478Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:47.4808732Z ok
+2026-09-03T02:50:47.7589141Z test_interrupted_pit_episode_recovers_without_duplicate_oracle_events (test_autonomous_os.AutonomousBrainTests.test_interrupted_pit_episode_recovers_without_duplicate_oracle_events) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:334: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:47.7590988Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:51.2144414Z ok
+2026-09-03T02:50:51.4842741Z test_kickoff_refuses_caller_controlled_remote_delivery_flags (test_autonomous_os.AutonomousBrainTests.test_kickoff_refuses_caller_controlled_remote_delivery_flags) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:422: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:51.4844536Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:51.9154329Z ok
+2026-09-03T02:50:52.1946856Z test_kickoff_seals_the_complete_carry_forward_requirement_bundle (test_autonomous_os.AutonomousBrainTests.test_kickoff_seals_the_complete_carry_forward_requirement_bundle) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:165: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:52.1948681Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:53.2840802Z ok
+2026-09-03T02:50:53.5599258Z test_pit_host_workspace_has_no_remote_or_target_object (test_autonomous_os.AutonomousBrainTests.test_pit_host_workspace_has_no_remote_or_target_object) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:440: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:53.5601017Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:56.1248318Z ok
+2026-09-03T02:50:56.4119874Z test_pr_feedback_is_refused_before_any_gateway_call (test_autonomous_os.AutonomousBrainTests.test_pr_feedback_is_refused_before_any_gateway_call) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:198: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:56.4121861Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:50:57.5250321Z ok
+2026-09-03T02:50:57.8053970Z test_prompt_kickoff_uses_an_isolated_nonprotected_branch_for_each_host (test_autonomous_os.AutonomousBrainTests.test_prompt_kickoff_uses_an_isolated_nonprotected_branch_for_each_host) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:88: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:50:57.8055838Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:51:00.4812312Z ok
+2026-09-03T02:51:00.7624654Z test_read_only_host_patch_is_committed_only_to_the_isolated_run_branch (test_autonomous_os.AutonomousBrainTests.test_read_only_host_patch_is_committed_only_to_the_isolated_run_branch) ... D:\a\hive-mind-os\hive-mind-os\tests\test_autonomous_os.py:131: DeprecationWarning: hive_mind_os.autonomous_os.AutonomousBrain is a retired legacy runtime surface (LEGACY-620); the canonical owner is hive_mind_os.brain_kernel.mission_runtime; rollback tag legacy-620-rollback
+2026-09-03T02:51:00.7626504Z   with AutonomousBrain(self.state) as brain:
+2026-09-03T02:51:02.6534299Z ok
+2026-09-03T02:51:02.6535125Z test_retired_rest_gateway_refuses_before_any_network_access (test_autonomous_os.AutonomousBrainTests.test_retired_rest_gateway_refuses_before_any_network_access)
+2026-09-03T02:51:02.9553696Z Even private transport access is fail-closed while the runtime is retired. ... ok
+2026-09-03T02:51:02.9575523Z test_autonomous_loop_stops_at_budget (test_autonomy.AutonomyTests.test_autonomous_loop_stops_at_budget) ... ok
+2026-09-03T02:51:02.9578336Z test_challenger_requires_evidence_and_better_fitness (test_autonomy.AutonomyTests.test_challenger_requires_evidence_and_better_fitness) ... ok
+2026-09-03T02:51:02.9579673Z test_charter_mutation_is_detected (test_autonomy.AutonomyTests.test_charter_mutation_is_detected) ... ok
+2026-09-03T02:51:02.9588445Z test_episode_cannot_exceed_issued_allowance (test_autonomy.AutonomyTests.test_episode_cannot_exceed_issued_allowance) ... ok
+2026-09-03T02:51:02.9589818Z test_high_value_unsafe_variant_is_quarantined (test_autonomy.AutonomyTests.test_high_value_unsafe_variant_is_quarantined) ... ok
+2026-09-03T02:51:02.9591832Z test_teaching_packet_requires_repeated_support (test_autonomy.AutonomyTests.test_teaching_packet_requires_repeated_support) ... ok
+2026-09-03T02:51:03.4502748Z test_check_only_does_not_bootstrap_uninstalled_repository (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_check_only_does_not_bootstrap_uninstalled_repository) ... ok
+2026-09-03T02:51:04.6632740Z test_controller_trust_rejects_forgery_and_stale_bundle (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_controller_trust_rejects_forgery_and_stale_bundle) ... ok
+2026-09-03T02:51:05.4112746Z test_controller_trust_rejects_repository_owned_evidence (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_controller_trust_rejects_repository_owned_evidence) ... ok
+2026-09-03T02:51:06.3172854Z test_controller_trust_rejects_self_review_and_arbitrary_actor (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_controller_trust_rejects_self_review_and_arbitrary_actor) ... ok
+2026-09-03T02:51:07.2555969Z test_controller_trust_revalidates_resolvable_digest_bound_evidence (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_controller_trust_revalidates_resolvable_digest_bound_evidence) ... ok
+2026-09-03T02:51:08.0071042Z test_different_valid_requests_cannot_reuse_dag_build_identity (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_different_valid_requests_cannot_reuse_dag_build_identity) ... ok
+2026-09-03T02:51:08.4814212Z test_explanation_language_does_not_bootstrap (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_explanation_language_does_not_bootstrap) ... ok
+2026-09-03T02:51:08.9715059Z test_initialize_and_inspect_uninstalled_repository (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_initialize_and_inspect_uninstalled_repository) ... ok
+2026-09-03T02:51:10.0423572Z test_initialize_fails_closed_instead_of_overwriting_request (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_initialize_fails_closed_instead_of_overwriting_request) ... ok
+2026-09-03T02:51:10.9787818Z test_inspect_never_executes_target_repository_controller (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_inspect_never_executes_target_repository_controller) ... ok
+2026-09-03T02:51:12.0759913Z test_installed_controller_contract_requires_host_sandbox (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_installed_controller_contract_requires_host_sandbox) ... ok
+2026-09-03T02:51:12.5183797Z test_persisted_request_cannot_redeclare_target_as_protected (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_persisted_request_cannot_redeclare_target_as_protected) ... ok
+2026-09-03T02:51:13.5112024Z test_protected_or_invalid_target_branch_is_rejected (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_protected_or_invalid_target_branch_is_rejected) ... ok
+2026-09-03T02:51:14.0181803Z test_remote_credentials_are_not_persisted (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_remote_credentials_are_not_persisted) ... ok
+2026-09-03T02:51:14.4397760Z test_repository_state_symlink_escape_is_rejected (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_repository_state_symlink_escape_is_rejected) ... ok
+2026-09-03T02:51:14.9408005Z test_review_and_how_question_language_does_not_bootstrap (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_review_and_how_question_language_does_not_bootstrap) ... ok
+2026-09-03T02:51:15.4482426Z test_run_cli_accepts_a_single_subject_argument (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_run_cli_accepts_a_single_subject_argument) ... ok
+2026-09-03T02:51:15.9529785Z test_run_does_not_recheck_a_controller_that_appears_after_decision (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_run_does_not_recheck_a_controller_that_appears_after_decision) ... ok
+2026-09-03T02:51:16.4299766Z test_run_from_subdirectory_uses_initialized_git_root (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_run_from_subdirectory_uses_initialized_git_root) ... ok
+2026-09-03T02:51:16.9378208Z test_run_initializes_subject_and_emits_an_execution_contract (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_run_initializes_subject_and_emits_an_execution_contract) ... ok
+2026-09-03T02:51:17.8686953Z test_run_is_idempotent_for_the_same_subject_and_rejects_a_new_one (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_run_is_idempotent_for_the_same_subject_and_rejects_a_new_one) ... ok
+2026-09-03T02:51:18.1337539Z test_run_rejects_an_empty_subject (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_run_rejects_an_empty_subject) ... ok
+2026-09-03T02:51:18.7978952Z test_run_with_installed_controller_requires_a_subject_bound_plan (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_run_with_installed_controller_requires_a_subject_bound_plan) ... ok
+2026-09-03T02:51:19.2523485Z test_secret_like_operator_text_is_rejected_before_persistence (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_secret_like_operator_text_is_rejected_before_persistence) ... ok
+2026-09-03T02:51:19.5160386Z test_simple_prompt_is_repository_neutral (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_simple_prompt_is_repository_neutral) ... ok
+2026-09-03T02:51:20.5460179Z test_ssh_user_info_and_missing_origin_are_safe (test_autopilot_workflow.PortableAutopilotWorkflowTests.test_ssh_user_info_and_missing_origin_are_safe) ... ok
+2026-09-03T02:51:20.6915181Z test_archived_benchmark_receipts_are_retained_by_immutable_tag (test_benchmark_harness.BenchmarkHarnessTests.test_archived_benchmark_receipts_are_retained_by_immutable_tag) ... ok
+2026-09-03T02:51:20.6998155Z test_bootstrap_interval_is_seeded_and_rate_is_exact (test_benchmark_harness.BenchmarkHarnessTests.test_bootstrap_interval_is_seeded_and_rate_is_exact) ... ok
+2026-09-03T02:51:20.7060358Z test_claim_guard_rejects_unbound_comparative_marketing (test_benchmark_harness.BenchmarkHarnessTests.test_claim_guard_rejects_unbound_comparative_marketing) ... ok
+2026-09-03T02:51:23.2400403Z test_corpus_is_deterministic (test_benchmark_harness.BenchmarkHarnessTests.test_corpus_is_deterministic) ... ok
+2026-09-03T02:51:23.6975743Z test_equal_budget_and_overspend_fails_closed (test_benchmark_harness.BenchmarkHarnessTests.test_equal_budget_and_overspend_fails_closed) ... ok
+2026-09-03T02:51:24.6048740Z test_failed_attempts_retain_same_artifacts_as_successes (test_benchmark_harness.BenchmarkHarnessTests.test_failed_attempts_retain_same_artifacts_as_successes) ... ok
+2026-09-03T02:51:25.9887151Z test_hidden_checks_are_not_materialized_for_lanes (test_benchmark_harness.BenchmarkHarnessTests.test_hidden_checks_are_not_materialized_for_lanes) ... ok
+2026-09-03T02:51:25.9895861Z test_measurement_verdict_binds_digests_and_cannot_claim_superiority (test_benchmark_harness.BenchmarkHarnessTests.test_measurement_verdict_binds_digests_and_cannot_claim_superiority) ... ok
+2026-09-03T02:51:38.5300016Z test_two_task_two_repetition_run_completes_offline (test_benchmark_harness.BenchmarkHarnessTests.test_two_task_two_repetition_run_completes_offline) ... ok
+2026-09-03T02:51:38.5310230Z test_a_non_write_action_is_refused_outside_the_write_scope (test_brain_kernel_authority.ActionScopeTests.test_a_non_write_action_is_refused_outside_the_write_scope) ... ok
+2026-09-03T02:51:38.5319910Z test_a_read_action_is_bound_to_the_read_scope (test_brain_kernel_authority.ActionScopeTests.test_a_read_action_is_bound_to_the_read_scope) ... ok
+2026-09-03T02:51:38.5334038Z test_gateway_requires_matching_token_and_deduplicates (test_brain_kernel_authority.AuthorityTests.test_gateway_requires_matching_token_and_deduplicates) ... ok
+2026-09-03T02:51:38.5344099Z test_scope_expiry_revocation_and_action_denials_fail_closed (test_brain_kernel_authority.AuthorityTests.test_scope_expiry_revocation_and_action_denials_fail_closed) ... ok
+2026-09-03T02:51:38.5347749Z test_registry_refuses_an_envelope_whose_digest_is_not_its_content_digest (test_brain_kernel_authority.EnvelopeSealTests.test_registry_refuses_an_envelope_whose_digest_is_not_its_content_digest) ... ok
+2026-09-03T02:51:38.5357628Z test_two_authorities_cannot_share_one_digest (test_brain_kernel_authority.EnvelopeSealTests.test_two_authorities_cannot_share_one_digest) ... ok
+2026-09-03T02:51:38.5364835Z test_accepted_external_verification_is_bound_and_live (test_brain_kernel_authority.ExternalRootIntegrationTests.test_accepted_external_verification_is_bound_and_live) ... ok
+2026-09-03T02:51:38.5372597Z test_expired_or_revoked_external_root_cannot_be_required (test_brain_kernel_authority.ExternalRootIntegrationTests.test_expired_or_revoked_external_root_cannot_be_required) ... ok
+2026-09-03T02:51:38.5378576Z test_external_attestation_mismatch_rejects_before_verifier_call (test_brain_kernel_authority.ExternalRootIntegrationTests.test_external_attestation_mismatch_rejects_before_verifier_call) ... ok
+2026-09-03T02:51:38.5385638Z test_local_mint_is_not_external_verifier_evidence (test_brain_kernel_authority.ExternalRootIntegrationTests.test_local_mint_is_not_external_verifier_evidence) ... ok
+2026-09-03T02:51:38.5395234Z test_rejected_or_misattributed_verifier_output_fails_closed (test_brain_kernel_authority.ExternalRootIntegrationTests.test_rejected_or_misattributed_verifier_output_fails_closed) ... ok
+2026-09-03T02:51:38.5413076Z test_caller_supplied_parent_the_registry_never_admitted_is_refused (test_brain_kernel_authority.ParentResolutionTests.test_caller_supplied_parent_the_registry_never_admitted_is_refused) ... ok
+2026-09-03T02:51:38.5420206Z test_registry_resolved_parent_still_refuses_a_broadening_child (test_brain_kernel_authority.ParentResolutionTests.test_registry_resolved_parent_still_refuses_a_broadening_child) ... ok
+2026-09-03T02:51:38.5436352Z test_revoked_authority_cannot_be_reminted_under_a_new_digest (test_brain_kernel_authority.RevocationTests.test_revoked_authority_cannot_be_reminted_under_a_new_digest) ... ok
+2026-09-03T02:51:38.5453279Z test_revoking_a_parent_refuses_its_already_admitted_descendant (test_brain_kernel_authority.RevocationTests.test_revoking_a_parent_refuses_its_already_admitted_descendant) ... ok
+2026-09-03T02:51:38.5459663Z test_bare_root_registration_is_refused_and_the_ceremony_records_provenance (test_brain_kernel_authority.RootMintTests.test_bare_root_registration_is_refused_and_the_ceremony_records_provenance) ... ok
+2026-09-03T02:51:38.5466896Z test_ceremony_refuses_an_unattributed_or_undated_mint (test_brain_kernel_authority.RootMintTests.test_ceremony_refuses_an_unattributed_or_undated_mint) ... ok
+2026-09-03T02:51:39.5923275Z test_closeout_cli_is_read_only_and_requires_existing_state (test_brain_kernel_closeout.LocalTechnicalCloseoutTests.test_closeout_cli_is_read_only_and_requires_existing_state) ... ok
+2026-09-03T02:51:40.6350915Z test_replayed_closeout_requires_roles_integrated_work_and_intact_bundle (test_brain_kernel_closeout.LocalTechnicalCloseoutTests.test_replayed_closeout_requires_roles_integrated_work_and_intact_bundle) ... ok
+2026-09-03T02:51:41.6246909Z test_shared_required_identity_blocks_closeout (test_brain_kernel_closeout.LocalTechnicalCloseoutTests.test_shared_required_identity_blocks_closeout) ... ok
+2026-09-03T02:51:42.3735728Z test_unintegrated_but_valid_local_work_is_partial (test_brain_kernel_closeout.LocalTechnicalCloseoutTests.test_unintegrated_but_valid_local_work_is_partial) ... ok
+2026-09-03T02:51:43.1658707Z test_closeout_import_is_lazy_and_legacy_status_route_is_read_only (test_brain_kernel_compatibility.LocalCompatibilityFirewallTests.test_closeout_import_is_lazy_and_legacy_status_route_is_read_only) ... ok
+2026-09-03T02:51:45.1666836Z test_closeout_preserves_historical_receipt_bytes_for_all_local_outcomes (test_brain_kernel_compatibility.LocalCompatibilityFirewallTests.test_closeout_preserves_historical_receipt_bytes_for_all_local_outcomes) ... ok
+2026-09-03T02:51:48.8557133Z test_closeout_replays_phase_one_through_eight_fixtures_without_mutation (test_brain_kernel_compatibility.LocalCompatibilityFirewallTests.test_closeout_replays_phase_one_through_eight_fixtures_without_mutation) ... ok
+2026-09-03T02:51:48.8559030Z test_authority_can_only_narrow (test_brain_kernel_contracts.KernelContractTests.test_authority_can_only_narrow) ... ok
+2026-09-03T02:51:48.8560643Z test_canonical_digest_ignores_field_order_and_rejects_nan (test_brain_kernel_contracts.KernelContractTests.test_canonical_digest_ignores_field_order_and_rejects_nan) ... ok
+2026-09-03T02:51:48.8696164Z test_contracts_validate_and_round_trip_canonically (test_brain_kernel_contracts.KernelContractTests.test_contracts_validate_and_round_trip_canonically) ... ok
+2026-09-03T02:51:48.8708364Z test_envelope_seal_and_authority_key_are_pure_content_digests (test_brain_kernel_contracts.KernelContractTests.test_envelope_seal_and_authority_key_are_pure_content_digests) ... ok
+2026-09-03T02:51:48.8710168Z test_frozen_and_portable (test_brain_kernel_contracts.KernelContractTests.test_frozen_and_portable) ... ok
+2026-09-03T02:51:48.8715734Z test_invalid_values_fail_closed (test_brain_kernel_contracts.KernelContractTests.test_invalid_values_fail_closed) ... ok
+2026-09-03T02:51:48.8729052Z test_no_child_may_exceed_its_parent_on_any_authority_field (test_brain_kernel_contracts.KernelContractTests.test_no_child_may_exceed_its_parent_on_any_authority_field) ... ok
+2026-09-03T02:51:49.1326291Z test_ci_command_inventory_matches_the_constitutional_workflow (test_brain_kernel_doctor.KernelDoctorTests.test_ci_command_inventory_matches_the_constitutional_workflow) ... ok
+2026-09-03T02:51:49.4268301Z test_clean_fixture_reports_readiness_without_creating_state (test_brain_kernel_doctor.KernelDoctorTests.test_clean_fixture_reports_readiness_without_creating_state) ... ok
+2026-09-03T02:51:49.7193312Z test_cli_writes_redacted_json_report (test_brain_kernel_doctor.KernelDoctorTests.test_cli_writes_redacted_json_report) ... ok
+2026-09-03T02:51:50.0151277Z test_dirty_worktree_is_reported_honestly (test_brain_kernel_doctor.KernelDoctorTests.test_dirty_worktree_is_reported_honestly) ... ok
+2026-09-03T02:51:50.2063574Z test_kernel_cannot_import_repository_cortex (test_brain_kernel_doctor.KernelDoctorTests.test_kernel_cannot_import_repository_cortex) ... ok
+2026-09-03T02:51:50.2100168Z test_missing_git_and_unsupported_python_are_not_hidden (test_brain_kernel_doctor.KernelDoctorTests.test_missing_git_and_unsupported_python_are_not_hidden) ... ok
+2026-09-03T02:51:50.5490522Z test_protected_branch_uncertainty_is_explicit (test_brain_kernel_doctor.KernelDoctorTests.test_protected_branch_uncertainty_is_explicit) ... ok
+2026-09-03T02:51:50.8326300Z test_unusable_state_path_and_invalid_provider_are_reported_without_secrets (test_brain_kernel_doctor.KernelDoctorTests.test_unusable_state_path_and_invalid_provider_are_reported_without_secrets) ... ok
+2026-09-03T02:51:50.8329603Z test_mismatched_candidate_or_non_measurement_verdict_fails_closed (test_brain_kernel_local_assurance.LocalAssuranceTests.test_mismatched_candidate_or_non_measurement_verdict_fails_closed) ... ok
+2026-09-03T02:51:50.8331825Z test_missing_route_or_security_recovery_receipts_fails_closed (test_brain_kernel_local_assurance.LocalAssuranceTests.test_missing_route_or_security_recovery_receipts_fails_closed) ... ok
+2026-09-03T02:51:50.8334932Z test_report_is_deterministic_and_cannot_promote (test_brain_kernel_local_assurance.LocalAssuranceTests.test_report_is_deterministic_and_cannot_promote) ... ok
+2026-09-03T02:51:50.8492102Z test_rejects_mutated_transcript_and_unsafe_receipt_path (test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests.test_rejects_mutated_transcript_and_unsafe_receipt_path) ... ok
+2026-09-03T02:51:50.8626603Z test_verifies_report_and_content_addressed_receipts (test_brain_kernel_local_assurance_artifact.LocalAssuranceArtifactTests.test_verifies_report_and_content_addressed_receipts) ... ok
+2026-09-03T02:51:50.8663523Z test_retained_phase12_packet_is_content_addressable (test_brain_kernel_local_assurance_evidence.LocalAssuranceEvidenceTests.test_retained_phase12_packet_is_content_addressable) ... ok
+2026-09-03T02:51:50.9512033Z test_builder_uses_an_isolated_gateway_write_and_curator_verifies_after_seal (test_brain_kernel_local_execution.LocalKernelExecutionTests.test_builder_uses_an_isolated_gateway_write_and_curator_verifies_after_seal) ... ok
+2026-09-03T02:51:50.9525216Z test_workspace_adapter_refuses_path_escape_before_writing (test_brain_kernel_local_execution.LocalKernelExecutionTests.test_workspace_adapter_refuses_path_escape_before_writing) ... ok
+2026-09-03T02:51:51.0432530Z test_the_fixture_builds_an_authority_bound_gateway_over_a_sealed_intent (test_brain_kernel_local_execution.ProductionGatewayBindingTests.test_the_fixture_builds_an_authority_bound_gateway_over_a_sealed_intent) ... ok
+2026-09-03T02:51:51.1335489Z test_the_registry_the_fixture_built_refuses_a_forged_token (test_brain_kernel_local_execution.ProductionGatewayBindingTests.test_the_registry_the_fixture_built_refuses_a_forged_token) ... ok
+2026-09-03T02:51:51.1403539Z test_kernel_parser_exposes_only_local_memory_and_context_commands (test_brain_kernel_memory_cli.KernelMemoryCliTests.test_kernel_parser_exposes_only_local_memory_and_context_commands) ... ok
+2026-09-03T02:51:51.1554131Z test_local_memory_search_inspect_expire_and_context_commands (test_brain_kernel_memory_cli.KernelMemoryCliTests.test_local_memory_search_inspect_expire_and_context_commands) ... ok
+2026-09-03T02:51:51.1591181Z test_artifacts_are_immutable_and_reject_secrets_or_raw_transcripts (test_brain_kernel_memory_context.KernelMemoryContextTests.test_artifacts_are_immutable_and_reject_secrets_or_raw_transcripts) ... ok
+2026-09-03T02:51:51.1650871Z test_catalog_store_restores_only_immutable_verified_snapshots (test_brain_kernel_memory_context.KernelMemoryContextTests.test_catalog_store_restores_only_immutable_verified_snapshots) ... ok
+2026-09-03T02:51:51.1707553Z test_consolidation_requires_independent_evidenced_episodes (test_brain_kernel_memory_context.KernelMemoryContextTests.test_consolidation_requires_independent_evidenced_episodes) ... ok
+2026-09-03T02:51:51.1765782Z test_context_is_bounded_valid_and_cold_retrieval_creates_a_new_manifest (test_brain_kernel_memory_context.KernelMemoryContextTests.test_context_is_bounded_valid_and_cold_retrieval_creates_a_new_manifest) ... ok
+2026-09-03T02:51:51.1816269Z test_evaluator_mode_excludes_builder_scratchpad_without_dropping_valid_evidence (test_brain_kernel_memory_context.KernelMemoryContextTests.test_evaluator_mode_excludes_builder_scratchpad_without_dropping_valid_evidence) ... ok
+2026-09-03T02:51:51.1861354Z test_freshness_score_declines_deterministically_within_validity_window (test_brain_kernel_memory_context.KernelMemoryContextTests.test_freshness_score_declines_deterministically_within_validity_window) ... ok
+2026-09-03T02:51:51.1868182Z test_hot_context_never_slices_required_items_to_fit (test_brain_kernel_memory_context.KernelMemoryContextTests.test_hot_context_never_slices_required_items_to_fit) ... ok
+2026-09-03T02:51:51.1925645Z test_lifecycle_supersession_conflict_retraction_and_expiry_preserve_records (test_brain_kernel_memory_context.KernelMemoryContextTests.test_lifecycle_supersession_conflict_retraction_and_expiry_preserve_records) ... ok
+2026-09-03T02:51:51.2038980Z test_manifest_store_is_append_only_and_restores_canonical_manifests (test_brain_kernel_memory_context.KernelMemoryContextTests.test_manifest_store_is_append_only_and_restores_canonical_manifests) ... ok
+2026-09-03T02:51:51.2086368Z test_memory_classes_are_closed_and_working_memory_has_a_bounded_lifetime (test_brain_kernel_memory_context.KernelMemoryContextTests.test_memory_classes_are_closed_and_working_memory_has_a_bounded_lifetime) ... ok
+2026-09-03T02:51:51.2135441Z test_ranking_is_deterministic_and_unauthorized_records_are_omitted (test_brain_kernel_memory_context.KernelMemoryContextTests.test_ranking_is_deterministic_and_unauthorized_records_are_omitted) ... ok
+2026-09-03T02:51:51.2178113Z test_sensitivity_scope_filters_and_penalizes_nonrequired_memory (test_brain_kernel_memory_context.KernelMemoryContextTests.test_sensitivity_scope_filters_and_penalizes_nonrequired_memory) ... ok
+2026-09-03T02:51:51.2229836Z test_snapshot_rebuild_reproduces_the_active_memory_projection (test_brain_kernel_memory_context.KernelMemoryContextTests.test_snapshot_rebuild_reproduces_the_active_memory_projection) ... ok
+2026-09-03T02:51:51.2286774Z test_fixture_kinds_are_deterministic_and_identify_leaf_ready_work (test_brain_kernel_planner.KernelPlannerTests.test_fixture_kinds_are_deterministic_and_identify_leaf_ready_work) ... ok
+2026-09-03T02:51:51.2293227Z test_graph_rejects_cycles_orphans_missing_acceptance_limits_and_write_races (test_brain_kernel_planner.KernelPlannerTests.test_graph_rejects_cycles_orphans_missing_acceptance_limits_and_write_races) ... ok
+2026-09-03T02:51:51.7120398Z test_persisted_plan_survives_restart_and_replanning_supersedes (test_brain_kernel_planner.KernelPlannerTests.test_persisted_plan_survives_restart_and_replanning_supersedes) ... ok
+2026-09-03T02:51:52.1720739Z test_plan_and_graph_cli_use_only_local_fixture_state (test_brain_kernel_planner.KernelPlannerTests.test_plan_and_graph_cli_use_only_local_fixture_state) ... ok
+2026-09-03T02:51:52.1735769Z test_all_eight_roles_are_executable_and_evidence_bound (test_brain_kernel_roles.KernelRoleHandlerTests.test_all_eight_roles_are_executable_and_evidence_bound) ... ok
+2026-09-03T02:51:52.1738325Z test_curator_requires_a_fresh_evaluator_context (test_brain_kernel_roles.KernelRoleHandlerTests.test_curator_requires_a_fresh_evaluator_context) ... ok
+2026-09-03T02:51:52.2843070Z test_fixture_mission_runs_all_roles_and_persists_separate_results (test_brain_kernel_roles.KernelRoleHandlerTests.test_fixture_mission_runs_all_roles_and_persists_separate_results) ... ok
+2026-09-03T02:51:52.2846087Z test_integrator_requests_builder_work_instead_of_patching (test_brain_kernel_roles.KernelRoleHandlerTests.test_integrator_requests_builder_work_instead_of_patching) ... ok
+2026-09-03T02:51:52.4731656Z test_kernel_prompts_register_locally_without_champion_mutation (test_brain_kernel_roles.KernelRoleHandlerTests.test_kernel_prompts_register_locally_without_champion_mutation) ... ok
+2026-09-03T02:51:52.4733570Z test_optimizer_cannot_promote_or_change_a_champion (test_brain_kernel_roles.KernelRoleHandlerTests.test_optimizer_cannot_promote_or_change_a_champion) ... ok
+2026-09-03T02:51:52.4735848Z test_orchestrator_cannot_write_or_accept (test_brain_kernel_roles.KernelRoleHandlerTests.test_orchestrator_cannot_write_or_accept) ... ok
+2026-09-03T02:51:52.4794746Z test_result_is_appended_to_the_event_spine_and_replay_validates_it (test_brain_kernel_roles.KernelRoleHandlerTests.test_result_is_appended_to_the_event_spine_and_replay_validates_it) ... ok
+2026-09-03T02:51:52.4797067Z test_role_and_context_mismatch_fails_closed (test_brain_kernel_roles.KernelRoleHandlerTests.test_role_and_context_mismatch_fails_closed) ... ok
+2026-09-03T02:51:52.9339519Z test_append_only_chain_restart_and_rebuild (test_brain_kernel_store.KernelStoreTests.test_append_only_chain_restart_and_rebuild) ... ok
+2026-09-03T02:51:52.9356438Z test_batch_append_is_atomic_and_exact_retry_is_read_only (test_brain_kernel_store.KernelStoreTests.test_batch_append_is_atomic_and_exact_retry_is_read_only) ... ok
+2026-09-03T02:51:52.9369910Z test_batch_reducer_failure_rolls_back_every_event_and_projection (test_brain_kernel_store.KernelStoreTests.test_batch_reducer_failure_rolls_back_every_event_and_projection) ... ok
+2026-09-03T02:51:52.9383569Z test_batch_rejects_partial_retry_and_competing_bindings (test_brain_kernel_store.KernelStoreTests.test_batch_rejects_partial_retry_and_competing_bindings) ... ok
+2026-09-03T02:51:52.9830354Z test_concurrent_appends_are_uniquely_ordered (test_brain_kernel_store.KernelStoreTests.test_concurrent_appends_are_uniquely_ordered) ... ok
+2026-09-03T02:51:52.9845649Z test_corrupt_snapshot_is_replaced_from_the_event_spine (test_brain_kernel_store.KernelStoreTests.test_corrupt_snapshot_is_replaced_from_the_event_spine) ... ok
+2026-09-03T02:51:52.9850326Z test_database_path_is_portable_relative_to_a_windows_style_state_dir (test_brain_kernel_store.KernelStoreTests.test_database_path_is_portable_relative_to_a_windows_style_state_dir) ... ok
+2026-09-03T02:51:52.9862607Z test_failed_reducer_transaction_leaves_no_partial_event_or_projection (test_brain_kernel_store.KernelStoreTests.test_failed_reducer_transaction_leaves_no_partial_event_or_projection) ... ok
+2026-09-03T02:51:52.9874100Z test_idempotency_retry_is_not_a_second_event (test_brain_kernel_store.KernelStoreTests.test_idempotency_retry_is_not_a_second_event) ... ok
+2026-09-03T02:51:53.3520625Z test_kernel_status_reads_a_fixture_database_without_creating_missing_state (test_brain_kernel_store.KernelStoreTests.test_kernel_status_reads_a_fixture_database_without_creating_missing_state) ... ok
+2026-09-03T02:51:53.3534372Z test_rejects_wrong_chain_mutation_and_illegal_transition (test_brain_kernel_store.KernelStoreTests.test_rejects_wrong_chain_mutation_and_illegal_transition) ... ok
+2026-09-03T02:51:53.3548723Z test_snapshot_rejects_paired_state_and_digest_tampering (test_brain_kernel_store.KernelStoreTests.test_snapshot_rejects_paired_state_and_digest_tampering) ... ok
+2026-09-03T02:51:53.3735810Z test_candidate_mutation_or_direct_acceptance_fails_closed (test_brain_kernel_verification.ExactCandidateVerificationTests.test_candidate_mutation_or_direct_acceptance_fails_closed) ... ok
+2026-09-03T02:51:53.3915505Z test_passed_exact_candidate_can_be_accepted_only_with_its_verdict (test_brain_kernel_verification.ExactCandidateVerificationTests.test_passed_exact_candidate_can_be_accepted_only_with_its_verdict) ... ok
+2026-09-03T02:51:53.4085412Z test_same_identity_and_out_of_scope_candidate_fail_closed (test_brain_kernel_verification.ExactCandidateVerificationTests.test_same_identity_and_out_of_scope_candidate_fail_closed) ... ok
+2026-09-03T02:51:53.4147592Z test_seal_rejects_a_base_that_changed_after_plan_creation (test_brain_kernel_verification.ExactCandidateVerificationTests.test_seal_rejects_a_base_that_changed_after_plan_creation) ... ok
+2026-09-03T02:51:53.9577179Z test_idempotent_enqueue_and_independent_work_complete (test_brain_kernel_workers.KernelWorkerTests.test_idempotent_enqueue_and_independent_work_complete) ... ok
+2026-09-03T02:51:56.7796115Z test_kernel_events_precede_local_worker_completion (test_brain_kernel_workers.KernelWorkerTests.test_kernel_events_precede_local_worker_completion) ... ok
+2026-09-03T02:51:57.3091139Z test_locked_writer_retries_without_execution_and_expired_lock_recovers (test_brain_kernel_workers.KernelWorkerTests.test_locked_writer_retries_without_execution_and_expired_lock_recovers) ... ok
+2026-09-03T02:51:57.3098161Z test_documented_gate_matches_workflow (test_ci_contract.CIContractTests.test_documented_gate_matches_workflow) ... ok
+2026-09-03T02:51:58.1214189Z test_no_test_module_imports_third_party (test_ci_contract.CIContractTests.test_no_test_module_imports_third_party) ... ok
+2026-09-03T02:51:58.1217436Z test_readme_starts_with_status_and_a_runnable_entry_point (test_ci_contract.CIContractTests.test_readme_starts_with_status_and_a_runnable_entry_point) ... ok
+2026-09-03T02:51:58.1220347Z test_sbom_is_materialized_validated_uploaded_and_attested (test_ci_contract.CIContractTests.test_sbom_is_materialized_validated_uploaded_and_attested) ... ok
+2026-09-03T02:51:58.1223283Z test_workflow_exercises_windows_with_python_3_12 (test_ci_contract.CIContractTests.test_workflow_exercises_windows_with_python_3_12) ... ok
+2026-09-03T02:51:58.1225001Z test_workflow_installs_no_extras (test_ci_contract.CIContractTests.test_workflow_installs_no_extras) ... ok
+2026-09-03T02:51:58.1253402Z test_actor_cannot_verify_its_own_work (test_classic_gpt.ClassicGptSimulationTests.test_actor_cannot_verify_its_own_work) ... ok
+2026-09-03T02:51:58.1343960Z test_byte_inventory_fails_on_add_remove_substitute_and_reorder (test_classic_gpt.ClassicGptSimulationTests.test_byte_inventory_fails_on_add_remove_substitute_and_reorder) ... ok
+2026-09-03T02:51:58.1365633Z test_completion_requires_every_role_verifier_and_resolved_blockers (test_classic_gpt.ClassicGptSimulationTests.test_completion_requires_every_role_verifier_and_resolved_blockers) ... ok
+2026-09-03T02:51:58.1451543Z test_duplicate_action_ids_cannot_mask_a_failed_side_effect (test_classic_gpt.ClassicGptSimulationTests.test_duplicate_action_ids_cannot_mask_a_failed_side_effect) ... ok
+2026-09-03T02:51:58.1507527Z test_failed_receipt_cannot_support_completion (test_classic_gpt.ClassicGptSimulationTests.test_failed_receipt_cannot_support_completion) ... ok
+2026-09-03T02:51:58.1527614Z test_legacy_receipt_string_is_rejected (test_classic_gpt.ClassicGptSimulationTests.test_legacy_receipt_string_is_rejected) ... ok
+2026-09-03T02:51:58.1552883Z test_manifest_matches_lf_bytes_used_by_clean_checkouts (test_classic_gpt.ClassicGptSimulationTests.test_manifest_matches_lf_bytes_used_by_clean_checkouts) ... ok
+2026-09-03T02:51:58.1641963Z test_manifest_schema_incompatibility_fails_closed (test_classic_gpt.ClassicGptSimulationTests.test_manifest_schema_incompatibility_fails_closed) ... ok
+2026-09-03T02:51:58.1819121Z test_manifest_semantics_and_unknown_fields_are_fingerprint_bound (test_classic_gpt.ClassicGptSimulationTests.test_manifest_semantics_and_unknown_fields_are_fingerprint_bound) ... ok
+2026-09-03T02:51:58.1839795Z test_missing_source_or_required_marker_fails_closed (test_classic_gpt.ClassicGptSimulationTests.test_missing_source_or_required_marker_fails_closed) ... ok
+2026-09-03T02:51:58.1884043Z test_receipt_cannot_be_reused_for_another_action (test_classic_gpt.ClassicGptSimulationTests.test_receipt_cannot_be_reused_for_another_action) ... ok
+2026-09-03T02:51:58.1929338Z test_receipted_side_effect_is_allowed (test_classic_gpt.ClassicGptSimulationTests.test_receipted_side_effect_is_allowed) ... ok
+2026-09-03T02:51:58.1950867Z test_runtime_enum_type_confusion_is_rejected (test_classic_gpt.ClassicGptSimulationTests.test_runtime_enum_type_confusion_is_rejected) ... ok
+2026-09-03T02:51:58.1985113Z test_side_effect_receipt_fails_closed_without_validator (test_classic_gpt.ClassicGptSimulationTests.test_side_effect_receipt_fails_closed_without_validator) ... ok
+2026-09-03T02:51:58.2006280Z test_side_effect_remains_unverified_without_external_receipt (test_classic_gpt.ClassicGptSimulationTests.test_side_effect_remains_unverified_without_external_receipt) ... ok
+2026-09-03T02:51:58.2064681Z test_source_pack_files_exist_and_pass_marker_audit (test_classic_gpt.ClassicGptSimulationTests.test_source_pack_files_exist_and_pass_marker_audit) ... ok
+2026-09-03T02:51:58.2084383Z test_state_and_next_action_are_mandatory (test_classic_gpt.ClassicGptSimulationTests.test_state_and_next_action_are_mandatory) ... ok
+2026-09-03T02:51:58.2097185Z test_deliver_names_the_fixture_only_backend (test_cli_demo.DemoCliTests.test_deliver_names_the_fixture_only_backend) ... ok
+2026-09-03T02:52:03.0804821Z test_demo_repairs_the_fixture_and_prints_a_concise_honest_summary (test_cli_demo.DemoCliTests.test_demo_repairs_the_fixture_and_prints_a_concise_honest_summary) ... ok
+2026-09-03T02:52:03.9985837Z test_enqueue_pins_and_deduplicates_semantic_work (test_cli_enqueue.EnqueueCliTests.test_enqueue_pins_and_deduplicates_semantic_work) ... ok
+2026-09-03T02:52:04.4107140Z test_enqueue_rejects_a_mutable_pin (test_cli_enqueue.EnqueueCliTests.test_enqueue_rejects_a_mutable_pin) ... ok
+2026-09-03T02:52:05.2258180Z test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes (test_cli_enqueue.EnqueueCliTests.test_legacy_rollback_mode_reuses_the_existing_job_without_kernel_writes) ... ok
+2026-09-03T02:52:05.2271611Z test_deliver_help_exposes_non_secret_provider_overrides (test_cli_provider_config.DeliverProviderConfigurationTests.test_deliver_help_exposes_non_secret_provider_overrides) ... ok
+2026-09-03T02:52:05.2274643Z test_experiment_run_fails_until_a_real_evaluation_surface_exists (test_cli_provider_config.DeliverProviderConfigurationTests.test_experiment_run_fails_until_a_real_evaluation_surface_exists) ... ok
+2026-09-03T02:52:05.2297535Z test_flags_override_environment_for_primary_and_curator (test_cli_provider_config.DeliverProviderConfigurationTests.test_flags_override_environment_for_primary_and_curator) ... ok
+2026-09-03T02:52:05.2333557Z test_model_configuration_lists_each_missing_variable (test_cli_provider_config.DeliverProviderConfigurationTests.test_model_configuration_lists_each_missing_variable) ... ok
+2026-09-03T02:52:05.2355965Z test_subscription_provider_configuration_needs_no_api_key_or_model (test_cli_provider_config.DeliverProviderConfigurationTests.test_subscription_provider_configuration_needs_no_api_key_or_model) ... ok
+2026-09-03T02:52:24.7405848Z test_collector_writes_review_evidence_without_authorizing_activation (test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_writes_review_evidence_without_authorizing_activation) ... ok
+2026-09-03T02:52:26.2150230Z test_approved_has_no_reason_but_nonapproval_reason_is_short_and_safe (test_continuation.ContinuationPacketTests.test_approved_has_no_reason_but_nonapproval_reason_is_short_and_safe) ... ok
+2026-09-03T02:52:27.4965766Z test_export_validate_and_cli_round_trip (test_continuation.ContinuationPacketTests.test_export_validate_and_cli_round_trip) ... ok
+2026-09-03T02:52:28.2391431Z test_nonfinite_packet_is_rejected_without_cli_crash (test_continuation.ContinuationPacketTests.test_nonfinite_packet_is_rejected_without_cli_crash) ... ok
+2026-09-03T02:52:28.7392149Z test_output_cannot_dirty_the_bound_repository (test_continuation.ContinuationPacketTests.test_output_cannot_dirty_the_bound_repository) ... ok
+2026-09-03T02:52:29.7311430Z test_packet_tampering_unknown_fields_and_unsafe_paths_are_rejected (test_continuation.ContinuationPacketTests.test_packet_tampering_unknown_fields_and_unsafe_paths_are_rejected) ... ok
+2026-09-03T02:52:30.2034685Z test_remote_authority_cannot_be_granted (test_continuation.ContinuationPacketTests.test_remote_authority_cannot_be_granted) ... ok
+2026-09-03T02:52:31.1511296Z test_subdirectory_cannot_bypass_output_guard_or_store_unsafe_identifiers (test_continuation.ContinuationPacketTests.test_subdirectory_cannot_bypass_output_guard_or_store_unsafe_identifiers) ... ok
+2026-09-03T02:52:32.0037855Z test_unclean_and_stale_worktree_are_rejected (test_continuation.ContinuationPacketTests.test_unclean_and_stale_worktree_are_rejected) ... ok
+2026-09-03T02:52:32.6242435Z test_write_packet_returns_the_requested_path_when_windows_resolution_uses_an_alias (test_continuation.ContinuationPacketTests.test_write_packet_returns_the_requested_path_when_windows_resolution_uses_an_alias) ... ok
+2026-09-03T02:52:32.6311138Z test_actions_bind_mission_state_actor_digest_and_receipt_verifier (test_contracts.ContractSchemaTests.test_actions_bind_mission_state_actor_digest_and_receipt_verifier) ... ok
+2026-09-03T02:52:32.6446222Z test_catalog_is_complete_strict_and_draft_2020_12 (test_contracts.ContractSchemaTests.test_catalog_is_complete_strict_and_draft_2020_12) ... ok
+2026-09-03T02:52:32.6524002Z test_completion_requires_all_roles_independence_and_receipts (test_contracts.ContractSchemaTests.test_completion_requires_all_roles_independence_and_receipts) ... ok
+2026-09-03T02:52:32.6557601Z test_extension_component_identifiers_match_runtime_rules (test_contracts.ContractSchemaTests.test_extension_component_identifiers_match_runtime_rules) ... ok
+2026-09-03T02:52:32.6574137Z test_foreign_receipt_and_handoff_bindings_fail (test_contracts.ContractSchemaTests.test_foreign_receipt_and_handoff_bindings_fail) ... ok
+2026-09-03T02:52:32.6595238Z test_legacy_schema_names_and_identifiers_are_unchanged (test_contracts.ContractSchemaTests.test_legacy_schema_names_and_identifiers_are_unchanged) ... ok
+2026-09-03T02:52:32.6885016Z test_live_source_and_claim_records_conform_to_formal_contracts (test_contracts.ContractSchemaTests.test_live_source_and_claim_records_conform_to_formal_contracts) ... ok
+2026-09-03T02:52:32.6963073Z test_package_trust_and_ooda_contracts_fail_closed (test_contracts.ContractSchemaTests.test_package_trust_and_ooda_contracts_fail_closed) ... ok
+2026-09-03T02:52:32.6992344Z test_portable_path_contract_rejects_escape_and_windows_paths (test_contracts.ContractSchemaTests.test_portable_path_contract_rejects_escape_and_windows_paths) ... ok
+2026-09-03T02:52:32.7010499Z test_rfc3339_and_finite_number_contracts_fail_closed (test_contracts.ContractSchemaTests.test_rfc3339_and_finite_number_contracts_fail_closed) ... ok
+2026-09-03T02:52:32.7065767Z test_runtime_example_validates_against_formal_contract (test_contracts.ContractSchemaTests.test_runtime_example_validates_against_formal_contract) ... ok
+2026-09-03T02:52:32.7084876Z test_unknown_fields_and_runtime_type_confusion_fail_closed (test_contracts.ContractSchemaTests.test_unknown_fields_and_runtime_type_confusion_fail_closed) ... ok
+2026-09-03T02:52:32.7092563Z test_each_node_receives_only_direct_bodies_and_content_addressed_cold_refs (test_control_token_economy.ContextCapsuleTests.test_each_node_receives_only_direct_bodies_and_content_addressed_cold_refs) ... ok
+2026-09-03T02:52:32.7101966Z test_measured_fixture_is_materially_smaller_than_naive_fanout (test_control_token_economy.ContextCapsuleTests.test_measured_fixture_is_materially_smaller_than_naive_fanout) ... ok
+2026-09-03T02:52:32.7107735Z test_routes_must_disposition_every_item_exactly_once (test_control_token_economy.ContextCapsuleTests.test_routes_must_disposition_every_item_exactly_once) ... ok
+2026-09-03T02:52:32.7113641Z test_failure_retains_first_cause_and_every_distinct_material_error (test_control_token_economy.EvidenceCompactionTests.test_failure_retains_first_cause_and_every_distinct_material_error) ... ok
+2026-09-03T02:52:32.7116385Z test_passing_logs_compact_with_full_raw_digest (test_control_token_economy.EvidenceCompactionTests.test_passing_logs_compact_with_full_raw_digest) ... ok
+2026-09-03T02:52:32.7119865Z test_unrecognized_failure_is_not_compacted_to_empty_and_bound_is_closed (test_control_token_economy.EvidenceCompactionTests.test_unrecognized_failure_is_not_compacted_to_empty_and_bound_is_closed) ... ok
+2026-09-03T02:52:32.7232761Z test_concurrent_publication_refuses_a_non_file_destination (test_control_token_economy.TestResultCacheTests.test_concurrent_publication_refuses_a_non_file_destination) ... ok
+2026-09-03T02:52:32.7400822Z test_failure_is_retained_but_not_reused_and_corruption_blocks (test_control_token_economy.TestResultCacheTests.test_failure_is_retained_but_not_reused_and_corruption_blocks) ... ok
+2026-09-03T02:52:32.7713700Z test_only_exact_passing_candidate_context_is_reused (test_control_token_economy.TestResultCacheTests.test_only_exact_passing_candidate_context_is_reused) ... ok
+2026-09-03T02:52:32.7716596Z test_semantic_locks_must_have_one_canonical_order (test_control_token_economy.TestResultCacheTests.test_semantic_locks_must_have_one_canonical_order) ... ok
+2026-09-03T02:52:32.7718494Z test_independent_participants_are_required (test_courtroom.CourtroomTests.test_independent_participants_are_required) ... ok
+2026-09-03T02:52:32.7720210Z test_no_adversarial_evidence_defers_design (test_courtroom.CourtroomTests.test_no_adversarial_evidence_defers_design) ... ok
+2026-09-03T02:52:32.7721935Z test_pending_source_is_deferred_for_design (test_courtroom.CourtroomTests.test_pending_source_is_deferred_for_design) ... ok
+2026-09-03T02:52:32.7723878Z test_prohibited_finding_quarantines_even_high_value_idea (test_courtroom.CourtroomTests.test_prohibited_finding_quarantines_even_high_value_idea) ... ok
+2026-09-03T02:52:32.7725866Z test_superiority_requires_comparators_and_benchmarks (test_courtroom.CourtroomTests.test_superiority_requires_comparators_and_benchmarks) ... ok
+2026-09-03T02:52:32.7727840Z test_unresolved_objection_produces_adapt_verdict (test_courtroom.CourtroomTests.test_unresolved_objection_produces_adapt_verdict) ... ok
+2026-09-03T02:52:38.0338585Z test_blind_seal_precedes_head_access_and_reordering_is_rejected (test_curator.CuratorReviewTests.test_blind_seal_precedes_head_access_and_reordering_is_rejected) ... ok
+2026-09-03T02:52:41.7826935Z test_builder_receipt_contamination_fails_mission_closed (test_curator.CuratorReviewTests.test_builder_receipt_contamination_fails_mission_closed) ... ok
+2026-09-03T02:52:42.1946635Z test_check_added_after_seal_is_rejected (test_curator.CuratorReviewTests.test_check_added_after_seal_is_rejected) ... ok
+2026-09-03T02:52:51.3791656Z test_full_scripted_mission_passes_and_sabotage_stays_closed (test_curator.CuratorReviewTests.test_full_scripted_mission_passes_and_sabotage_stays_closed) ... ok
+2026-09-03T02:53:16.9943226Z test_malformed_context_manifest_fields_fail_mission_closed (test_curator.CuratorReviewTests.test_malformed_context_manifest_fields_fail_mission_closed) ... ok
+2026-09-03T02:53:21.8362147Z test_not_evaluated_is_recorded_and_non_blocking (test_curator.CuratorReviewTests.test_not_evaluated_is_recorded_and_non_blocking) ... ok
+2026-09-03T02:53:22.2576723Z test_role_override_and_shared_provider_are_explicit_in_receipts (test_curator.CuratorReviewTests.test_role_override_and_shared_provider_are_explicit_in_receipts) ... ok
+2026-09-03T02:53:26.9903953Z test_sabotage_fails_sealed_check_and_test_weakening_heuristic (test_curator.CuratorReviewTests.test_sabotage_fails_sealed_check_and_test_weakening_heuristic) ... ok
+2026-09-03T02:53:29.4832606Z test_same_identity_verification_is_rejected (test_curator.CuratorReviewTests.test_same_identity_verification_is_rejected) ... ok
+2026-09-03T02:53:29.4836213Z test_audit_timeout_covers_the_full_recovery_suite_budget (test_current_state_audit.CurrentStateAuditTests.test_audit_timeout_covers_the_full_recovery_suite_budget) ... ok
+2026-09-03T02:53:29.5212441Z test_boolean_schema_and_contradictory_complete_audit_are_rejected (test_current_state_audit.CurrentStateAuditTests.test_boolean_schema_and_contradictory_complete_audit_are_rejected) ... ok
+2026-09-03T02:53:29.5221672Z test_broken_reference_detector_rejects_missing_and_escaping_paths (test_current_state_audit.CurrentStateAuditTests.test_broken_reference_detector_rejects_missing_and_escaping_paths) ... ok
+2026-09-03T02:53:31.7124385Z test_collects_repository_docket_without_broken_receipts_or_running_tests (test_current_state_audit.CurrentStateAuditTests.test_collects_repository_docket_without_broken_receipts_or_running_tests) ... ok
+2026-09-03T02:53:31.7377702Z test_command_output_limit_applies_to_serialized_invalid_utf8 (test_current_state_audit.CurrentStateAuditTests.test_command_output_limit_applies_to_serialized_invalid_utf8) ... ok
+2026-09-03T02:53:31.9416026Z test_command_output_limit_counts_json_escape_expansion (test_current_state_audit.CurrentStateAuditTests.test_command_output_limit_counts_json_escape_expansion) ... ok
+2026-09-03T02:53:31.9647201Z test_command_output_limit_is_shared_across_both_streams (test_current_state_audit.CurrentStateAuditTests.test_command_output_limit_is_shared_across_both_streams) ... ok
+2026-09-03T02:53:31.9882636Z test_command_output_limit_stops_and_rejects_verbose_process (test_current_state_audit.CurrentStateAuditTests.test_command_output_limit_stops_and_rejects_verbose_process) ... ok
+2026-09-03T02:53:32.0007508Z test_command_timeout_is_a_visible_failed_observation (test_current_state_audit.CurrentStateAuditTests.test_command_timeout_is_a_visible_failed_observation) ... ok
+2026-09-03T02:53:32.0029341Z test_digest_detects_mutation (test_current_state_audit.CurrentStateAuditTests.test_digest_detects_mutation) ... ok
+2026-09-03T02:53:32.0033087Z test_free_form_success_text_is_not_a_test_receipt (test_current_state_audit.CurrentStateAuditTests.test_free_form_success_text_is_not_a_test_receipt) ... ok
+2026-09-03T02:53:32.0232694Z test_interrupted_atomic_publish_leaves_destination_retryable (test_current_state_audit.CurrentStateAuditTests.test_interrupted_atomic_publish_leaves_destination_retryable) ... ok
+2026-09-03T02:53:32.0236882Z test_lone_surrogate_in_untrusted_artifact_fails_closed (test_current_state_audit.CurrentStateAuditTests.test_lone_surrogate_in_untrusted_artifact_fails_closed) ... ok
+2026-09-03T02:53:32.0242560Z test_minimal_self_digested_payload_is_not_a_verified_audit (test_current_state_audit.CurrentStateAuditTests.test_minimal_self_digested_payload_is_not_a_verified_audit) ... ok
+2026-09-03T02:53:32.0319651Z test_noncanonical_json_values_fail_closed (test_current_state_audit.CurrentStateAuditTests.test_noncanonical_json_values_fail_closed) ... ok
+2026-09-03T02:53:32.0341011Z test_optional_signature_requires_matching_key (test_current_state_audit.CurrentStateAuditTests.test_optional_signature_requires_matching_key) ... ok
+2026-09-03T02:53:32.0742961Z test_output_cap_terminates_descendants_that_inherit_output_pipes (test_current_state_audit.CurrentStateAuditTests.test_output_cap_terminates_descendants_that_inherit_output_pipes) ... ok
+2026-09-03T02:53:32.0791720Z test_repository_docket_loader_passes_repository_when_supported (test_current_state_audit.CurrentStateAuditTests.test_repository_docket_loader_passes_repository_when_supported) ... ok
+2026-09-03T02:53:32.0835903Z test_repository_docket_loader_preserves_internal_type_error (test_current_state_audit.CurrentStateAuditTests.test_repository_docket_loader_preserves_internal_type_error) ... ok
+2026-09-03T02:53:32.0883707Z test_repository_docket_loader_rejects_uninspectable_signature (test_current_state_audit.CurrentStateAuditTests.test_repository_docket_loader_rejects_uninspectable_signature) ... ok
+2026-09-03T02:53:32.0928005Z test_repository_docket_loader_rejects_unsupported_signature (test_current_state_audit.CurrentStateAuditTests.test_repository_docket_loader_rejects_unsupported_signature) ... ok
+2026-09-03T02:53:32.0970884Z test_repository_docket_loader_supports_legacy_zero_argument_loader (test_current_state_audit.CurrentStateAuditTests.test_repository_docket_loader_supports_legacy_zero_argument_loader) ... ok
+2026-09-03T02:53:32.1032360Z test_schema6_rejects_fabricated_coverage_blockers_and_maturity (test_current_state_audit.CurrentStateAuditTests.test_schema6_rejects_fabricated_coverage_blockers_and_maturity) ... ok
+2026-09-03T02:53:34.3474045Z test_successful_parent_exit_still_terminates_pipe_retaining_descendants (test_current_state_audit.CurrentStateAuditTests.test_successful_parent_exit_still_terminates_pipe_retaining_descendants) ... ok
+2026-09-03T02:53:35.8106721Z test_test_time_worktree_mutation_is_reported (test_current_state_audit.CurrentStateAuditTests.test_test_time_worktree_mutation_is_reported) ... ok
+2026-09-03T02:53:35.8698512Z test_timeout_terminates_descendants_that_inherit_output_pipes (test_current_state_audit.CurrentStateAuditTests.test_timeout_terminates_descendants_that_inherit_output_pipes) ... ok
+2026-09-03T02:53:35.8712132Z test_unknown_schema_is_not_verified (test_current_state_audit.CurrentStateAuditTests.test_unknown_schema_is_not_verified) ... ok
+2026-09-03T02:53:37.3512045Z test_unrecognized_overall_pytest_result_cannot_complete (test_current_state_audit.CurrentStateAuditTests.test_unrecognized_overall_pytest_result_cannot_complete) ... ok
+2026-09-03T02:53:37.3521020Z test_version_three_shape_is_preserved_but_not_currently_verified (test_current_state_audit.CurrentStateAuditTests.test_version_three_shape_is_preserved_but_not_currently_verified) ... ok
+2026-09-03T02:53:37.3528770Z test_version_two_shape_is_preserved_but_not_currently_verified (test_current_state_audit.CurrentStateAuditTests.test_version_two_shape_is_preserved_but_not_currently_verified) ... ok
+2026-09-03T02:53:37.3663820Z test_written_artifact_is_newline_terminated (test_current_state_audit.CurrentStateAuditTests.test_written_artifact_is_newline_terminated) ... ok
+2026-09-03T02:53:37.3679759Z test_zero_exit_failed_or_mixed_pytest_summary_is_not_passing (test_current_state_audit.CurrentStateAuditTests.test_zero_exit_failed_or_mixed_pytest_summary_is_not_passing) ... ok
+2026-09-03T02:53:37.4936948Z test_all_permitted_workers_start_before_poll_and_run_is_repeat_idempotent (test_dag_executor.DagExecutorTests.test_all_permitted_workers_start_before_poll_and_run_is_repeat_idempotent) ... ok
+2026-09-03T02:53:37.6674394Z test_cancel_is_idempotent_but_cannot_rewrite_a_completed_run (test_dag_executor.DagExecutorTests.test_cancel_is_idempotent_but_cannot_rewrite_a_completed_run) ... ok
+2026-09-03T02:53:37.6691635Z test_execution_journal_rejects_invalid_transitions_before_append (test_dag_executor.DagExecutorTests.test_execution_journal_rejects_invalid_transitions_before_append) ... ok
+2026-09-03T02:53:39.3348351Z test_execution_journal_reopens_and_rejects_tamper (test_dag_executor.DagExecutorTests.test_execution_journal_reopens_and_rejects_tamper) ... ok
+2026-09-03T02:53:39.4703009Z test_failed_sibling_preserves_success_and_requires_exact_reconciliation (test_dag_executor.DagExecutorTests.test_failed_sibling_preserves_success_and_requires_exact_reconciliation) ... ok
+2026-09-03T02:53:39.4825762Z test_graph_patch_requires_signature_and_is_monotonic (test_dag_executor.DagExecutorTests.test_graph_patch_requires_signature_and_is_monotonic) ... ok
+2026-09-03T02:53:39.4984812Z test_stale_activation_missing_adapter_and_insufficient_authority_fail_before_host (test_dag_executor.DagExecutorTests.test_stale_activation_missing_adapter_and_insufficient_authority_fail_before_host) ... ok
+2026-09-03T02:53:39.5040446Z test_canonical_compiler_emits_repeatable_conflict_free_rounds (test_dag_standard_product.PackagedDagCompilerTests.test_canonical_compiler_emits_repeatable_conflict_free_rounds) ... ok
+2026-09-03T02:53:39.5128497Z test_digest_standard_package_and_canonical_substitution_fail_closed (test_dag_standard_product.PackagedDagCompilerTests.test_digest_standard_package_and_canonical_substitution_fail_closed) ... ok
+2026-09-03T02:53:39.5180695Z test_missing_role_evidence_or_lifecycle_fails_closed (test_dag_standard_product.PackagedDagCompilerTests.test_missing_role_evidence_or_lifecycle_fails_closed) ... ok
+2026-09-03T02:53:39.5210275Z test_product_compiler_has_no_execute_surface (test_dag_standard_product.PackagedDagCompilerTests.test_product_compiler_has_no_execute_surface) ... ok
+2026-09-03T02:53:39.5240398Z test_resource_capacity_splits_a_dependency_level (test_dag_standard_product.PackagedDagCompilerTests.test_resource_capacity_splits_a_dependency_level) ... ok
+2026-09-03T02:53:39.5252461Z test_a_fabricated_owner_authority_record_is_refused (test_delivery_grants.AttributionTests.test_a_fabricated_owner_authority_record_is_refused) ... ok
+2026-09-03T02:53:39.5262484Z test_a_grant_that_lies_about_its_issuer_is_never_recorded (test_delivery_grants.AttributionTests.test_a_grant_that_lies_about_its_issuer_is_never_recorded) ... ok
+2026-09-03T02:53:39.5269781Z test_a_self_issued_grant_is_refused_when_the_owner_authority_is_anchored (test_delivery_grants.AttributionTests.test_a_self_issued_grant_is_refused_when_the_owner_authority_is_anchored) ... ok
+2026-09-03T02:53:39.5279195Z test_an_anchored_owner_still_issues_usable_grants (test_delivery_grants.AttributionTests.test_an_anchored_owner_still_issues_usable_grants) ... ok
+2026-09-03T02:53:39.5289115Z test_issuance_records_the_authority_the_grant_was_issued_under (test_delivery_grants.AttributionTests.test_issuance_records_the_authority_the_grant_was_issued_under) ... ok
+2026-09-03T02:53:39.5304057Z test_issuance_under_a_foreign_authority_is_refused (test_delivery_grants.AttributionTests.test_issuance_under_a_foreign_authority_is_refused) ... ok
+2026-09-03T02:53:39.5309656Z test_self_issuance_is_refused_outright_while_an_anchor_stands (test_delivery_grants.AttributionTests.test_self_issuance_is_refused_outright_while_an_anchor_stands) ... ok
+2026-09-03T02:53:39.5326670Z test_the_anchored_owner_authority_cannot_be_replaced (test_delivery_grants.AttributionTests.test_the_anchored_owner_authority_cannot_be_replaced) ... ok
+2026-09-03T02:53:39.5333155Z test_a_grant_that_names_no_expiry_gets_a_finite_default (test_delivery_grants.ExpiryTests.test_a_grant_that_names_no_expiry_gets_a_finite_default) ... ok
+2026-09-03T02:53:39.5340994Z test_a_lifetime_beyond_the_maximum_is_refused_at_issuance (test_delivery_grants.ExpiryTests.test_a_lifetime_beyond_the_maximum_is_refused_at_issuance) ... ok
+2026-09-03T02:53:39.5347603Z test_an_elapsed_grant_is_refused_against_the_real_clock (test_delivery_grants.ExpiryTests.test_an_elapsed_grant_is_refused_against_the_real_clock) ... ok
+2026-09-03T02:53:39.5353788Z test_an_expired_grant_is_refused_at_every_use (test_delivery_grants.ExpiryTests.test_an_expired_grant_is_refused_at_every_use) ... ok
+2026-09-03T02:53:39.5362484Z test_an_expiry_that_does_not_follow_issuance_is_refused (test_delivery_grants.ExpiryTests.test_an_expiry_that_does_not_follow_issuance_is_refused) ... ok
+2026-09-03T02:53:39.5368747Z test_an_unreadable_time_is_refused (test_delivery_grants.ExpiryTests.test_an_unreadable_time_is_refused) ... ok
+2026-09-03T02:53:39.5374596Z test_expiry_is_refused_at_its_own_instant (test_delivery_grants.ExpiryTests.test_expiry_is_refused_at_its_own_instant) ... ok
+2026-09-03T02:53:39.5381691Z test_a_grant_carrying_no_issuance_or_expiry_fails_closed (test_delivery_grants.SealTests.test_a_grant_carrying_no_issuance_or_expiry_fails_closed) ... ok
+2026-09-03T02:53:39.5393053Z test_the_digest_seals_the_issuance_and_expiry_fields (test_delivery_grants.SealTests.test_the_digest_seals_the_issuance_and_expiry_fields) ... ok
+2026-09-03T02:53:39.5399558Z test_two_grants_differing_only_in_authority_have_different_digests (test_delivery_grants.SealTests.test_two_grants_differing_only_in_authority_have_different_digests) ... ok
+2026-09-03T02:53:39.5406809Z test_a_bare_ledger_cannot_issue_or_spend_a_grant (test_delivery_grants.UnissuedGrantTests.test_a_bare_ledger_cannot_issue_or_spend_a_grant) ... ok
+2026-09-03T02:53:39.5412592Z test_a_grant_from_the_issuance_path_is_honoured (test_delivery_grants.UnissuedGrantTests.test_a_grant_from_the_issuance_path_is_honoured) ... ok
+2026-09-03T02:53:39.5419275Z test_a_grant_the_ledger_never_admitted_authorizes_nothing (test_delivery_grants.UnissuedGrantTests.test_a_grant_the_ledger_never_admitted_authorizes_nothing) ... ok
+2026-09-03T02:53:39.5426020Z test_an_issuance_recorded_under_other_fields_does_not_carry (test_delivery_grants.UnissuedGrantTests.test_an_issuance_recorded_under_other_fields_does_not_carry) ... ok
+2026-09-03T02:53:39.5432137Z test_every_delivery_adapter_refuses_an_unissued_grant (test_delivery_grants.UnissuedGrantTests.test_every_delivery_adapter_refuses_an_unissued_grant) ... ok
+2026-09-03T02:53:39.6352648Z test_author_reveal_before_start_invalidates_and_records (test_experiment_runner.ExperimentRunnerTests.test_author_reveal_before_start_invalidates_and_records) ... ok
+2026-09-03T02:54:05.4694636Z test_committed_experiment_artifacts_match_git_bytes_or_adverse_manifest (test_experiment_runner.ExperimentRunnerTests.test_committed_experiment_artifacts_match_git_bytes_or_adverse_manifest) ... ok
+2026-09-03T02:54:05.5009644Z test_fixture_surface_is_disabled_until_it_uses_a_real_backend (test_experiment_runner.ExperimentRunnerTests.test_fixture_surface_is_disabled_until_it_uses_a_real_backend) ... ok
+2026-09-03T02:54:05.5966704Z test_keep_records_pending_appeal_without_self_promotion (test_experiment_runner.ExperimentRunnerTests.test_keep_records_pending_appeal_without_self_promotion) ... ok
+2026-09-03T02:54:05.6809910Z test_missing_surface_artifact_quarantines_instead_of_promoting (test_experiment_runner.ExperimentRunnerTests.test_missing_surface_artifact_quarantines_instead_of_promoting) ... ok
+2026-09-03T02:54:05.7186422Z test_model_backend_without_registry_preserves_generation_zero_prompt (test_experiment_runner.ExperimentRunnerTests.test_model_backend_without_registry_preserves_generation_zero_prompt) ... ok
+2026-09-03T02:54:05.8215441Z test_model_receipt_follows_promotion_and_rollback (test_experiment_runner.ExperimentRunnerTests.test_model_receipt_follows_promotion_and_rollback) ... ok
+2026-09-03T02:54:05.9395146Z test_noise_retests_then_stops_at_patience_without_promotion (test_experiment_runner.ExperimentRunnerTests.test_noise_retests_then_stops_at_patience_without_promotion) ... ok
+2026-09-03T02:54:05.9788094Z test_pit_surface_runs_each_pinned_oracle_episode (test_experiment_runner.ExperimentRunnerTests.test_pit_surface_runs_each_pinned_oracle_episode) ... ok
+2026-09-03T02:54:06.0749459Z test_self_builder_is_quarantined (test_experiment_runner.ExperimentRunnerTests.test_self_builder_is_quarantined) ... ok
+2026-09-03T02:54:06.1678557Z test_self_evaluator_is_quarantined (test_experiment_runner.ExperimentRunnerTests.test_self_evaluator_is_quarantined) ... ok
+2026-09-03T02:54:06.2544318Z test_tampered_surface_artifact_quarantines_instead_of_promoting (test_experiment_runner.ExperimentRunnerTests.test_tampered_surface_artifact_quarantines_instead_of_promoting) ... ok
+2026-09-03T02:54:06.3393933Z test_token_guardrail_regression_discards (test_experiment_runner.ExperimentRunnerTests.test_token_guardrail_regression_discards) ... ok
+2026-09-03T02:54:06.4617592Z test_concurrent_round_starts_and_duplicate_resume_do_not_repeat_effects (test_generic_dag_failure_matrix.GenericDagFailureMatrixTests.test_concurrent_round_starts_and_duplicate_resume_do_not_repeat_effects) ... ok
+2026-09-03T02:54:06.4661136Z test_hidden_dependency_and_candidate_mutation_fail_compiler_binding (test_generic_dag_failure_matrix.GenericDagFailureMatrixTests.test_hidden_dependency_and_candidate_mutation_fail_compiler_binding) ... ok
+2026-09-03T02:54:06.4851226Z test_host_loss_preserves_sibling_checkpoint_and_requires_reconciliation (test_generic_dag_failure_matrix.GenericDagFailureMatrixTests.test_host_loss_preserves_sibling_checkpoint_and_requires_reconciliation) ... ok
+2026-09-03T02:54:06.4857537Z test_integration_target_conflict_requires_replan_without_cas (test_generic_dag_failure_matrix.GenericDagFailureMatrixTests.test_integration_target_conflict_requires_replan_without_cas) ... ok
+2026-09-03T02:54:06.4945812Z test_target_snapshot_drift_fails_before_prepare_or_node_execution (test_generic_dag_failure_matrix.GenericDagFailureMatrixTests.test_target_snapshot_drift_fails_before_prepare_or_node_execution) ... ok
+2026-09-03T02:54:06.6470528Z test_cross_language_and_non_repository_matrix_uses_public_contracts (test_generic_dag_fixtures.GenericDagFixtureTests.test_cross_language_and_non_repository_matrix_uses_public_contracts) ... ok
+2026-09-03T02:54:06.6475027Z test_fixture_inventory_forbids_live_external_capabilities (test_generic_dag_fixtures.GenericDagFixtureTests.test_fixture_inventory_forbids_live_external_capabilities) ... ok
+2026-09-03T02:54:06.8889108Z test_repository_and_artifact_execute_only_against_disposable_inert_host (test_generic_dag_fixtures.GenericDagFixtureTests.test_repository_and_artifact_execute_only_against_disposable_inert_host) ... ok
+2026-09-03T02:54:06.8892537Z test_comparator_identity_and_controls_are_retained (test_generic_dag_token_benchmark.GenericDagTokenBenchmarkTests.test_comparator_identity_and_controls_are_retained) ... ok
+2026-09-03T02:54:06.8997995Z test_controlled_representative_lanes_exceed_thirty_percent (test_generic_dag_token_benchmark.GenericDagTokenBenchmarkTests.test_controlled_representative_lanes_exceed_thirty_percent) ... ok
+2026-09-03T02:54:06.9002671Z test_estimates_missing_measurements_and_losing_lane_fail_qualification (test_generic_dag_token_benchmark.GenericDagTokenBenchmarkTests.test_estimates_missing_measurements_and_losing_lane_fail_qualification) ... ok
+2026-09-03T02:54:18.2197020Z test_authenticated_attributes_defeat_system_and_global_autocrlf (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authenticated_attributes_defeat_system_and_global_autocrlf) ... ok
+2026-09-03T02:54:19.9045529Z test_authenticated_gitattributes_rules_bind_and_cover_every_raw_path (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authenticated_gitattributes_rules_bind_and_cover_every_raw_path) ... ok
+2026-09-03T02:54:24.1204404Z test_authoring_authenticates_root_attributes_and_rejects_info_attributes_before_filters (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_authenticates_root_attributes_and_rejects_info_attributes_before_filters) ... ok
+2026-09-03T02:54:29.7689141Z test_authoring_late_alternate_overlay_mutation_is_rejected (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_late_alternate_overlay_mutation_is_rejected) ... FAIL
+2026-09-03T02:54:35.5008236Z test_authoring_late_nested_attributes_creation_is_rejected (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_late_nested_attributes_creation_is_rejected) ... FAIL
+2026-09-03T02:54:41.2556971Z test_authoring_late_root_attributes_mutation_is_rejected (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_late_root_attributes_mutation_is_rejected) ... FAIL
+2026-09-03T02:55:08.1174124Z test_authoring_mode_rejects_any_state_beyond_exact_seventeen_payload_paths (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_mode_rejects_any_state_beyond_exact_seventeen_payload_paths) ... FAIL
+2026-09-03T02:55:08.3177430Z test_autopilot_snapshot_enforces_every_resource_bound (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_autopilot_snapshot_enforces_every_resource_bound) ... ok
+2026-09-03T02:55:08.4280943Z test_ci_contract_retains_windows_python_312_and_314 (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_ci_contract_retains_windows_python_312_and_314) ... ok
+2026-09-03T02:55:23.8794744Z test_committed_mode_rejects_detached_head_and_wrong_live_branch (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_committed_mode_rejects_detached_head_and_wrong_live_branch) ... ok
+2026-09-03T02:55:29.1842883Z test_contract_topology_durability_ownership_effect_trace_and_quarantine_corruption (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_contract_topology_durability_ownership_effect_trace_and_quarantine_corruption) ... ok
+2026-09-03T02:56:00.6017702Z test_default_mode_refuses_dirty_staged_and_other_untracked_state (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_default_mode_refuses_dirty_staged_and_other_untracked_state) ... ok
+2026-09-03T02:56:02.8332038Z test_default_mode_refuses_precommit_extra_commit_wrong_parent_and_path_change (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_default_mode_refuses_precommit_extra_commit_wrong_parent_and_path_change) ... Traceback (most recent call last):
+2026-09-03T02:56:02.8344079Z   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-09-03T02:56:02.8345379Z   File "<frozen runpy>", line 88, in _run_code
+2026-09-03T02:56:02.8346880Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\__main__.py", line 18, in <module>
+2026-09-03T02:56:02.8347978Z     main(module=None)
+2026-09-03T02:56:02.8348952Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\main.py", line 105, in __init__
+2026-09-03T02:56:02.8350144Z     self.runTests()
+2026-09-03T02:56:02.8351190Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\main.py", line 281, in runTests
+2026-09-03T02:56:02.8352328Z     self.result = testRunner.run(self.test)
+2026-09-03T02:56:02.8360903Z                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.8364187Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\runner.py", line 240, in run
+2026-09-03T02:56:02.8365936Z     test(result)
+2026-09-03T02:56:02.8367363Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\suite.py", line 84, in __call__
+2026-09-03T02:56:02.8368936Z     return self.run(*args, **kwds)
+2026-09-03T02:56:02.8369814Z            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.8371107Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\suite.py", line 122, in run
+2026-09-03T02:56:02.8373068Z     test(result)
+2026-09-03T02:56:02.8374042Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\suite.py", line 84, in __call__
+2026-09-03T02:56:02.8374955Z     return self.run(*args, **kwds)
+2026-09-03T02:56:02.8375475Z            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.8376314Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\suite.py", line 122, in run
+2026-09-03T02:56:02.8377168Z     test(result)
+2026-09-03T02:56:02.8378010Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\suite.py", line 84, in __call__
+2026-09-03T02:56:02.8378898Z     return self.run(*args, **kwds)
+2026-09-03T02:56:02.8379380Z            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.8380247Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\suite.py", line 122, in run
+2026-09-03T02:56:02.8381101Z     test(result)
+2026-09-03T02:56:02.8381873Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\case.py", line 690, in __call__
+2026-09-03T02:56:02.8382794Z     return self.run(*args, **kwds)
+2026-09-03T02:56:02.8383292Z            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.8384615Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\case.py", line 634, in run
+2026-09-03T02:56:02.8385504Z     self._callTestMethod(testMethod)
+2026-09-03T02:56:02.8386480Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\unittest\case.py", line 589, in _callTestMethod
+2026-09-03T02:56:02.8387412Z     if method() is not None:
+2026-09-03T02:56:02.8387873Z        ^^^^^^^^
+2026-09-03T02:56:02.8389200Z   File "D:\a\hive-mind-os\hive-mind-os\tests\test_generic_dag_v3_overlay.py", line 2817, in test_default_mode_refuses_precommit_extra_commit_wrong_parent_and_path_change
+2026-09-03T02:56:02.8390498Z     self.run_verifier(
+2026-09-03T02:56:02.8391355Z   File "D:\a\hive-mind-os\hive-mind-os\tests\test_generic_dag_v3_overlay.py", line 1328, in run_verifier
+2026-09-03T02:56:02.8392356Z     return self.assert_autopilot_preserved(
+2026-09-03T02:56:02.8392891Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.8393907Z   File "D:\a\hive-mind-os\hive-mind-os\tests\test_generic_dag_v3_overlay.py", line 1059, in assert_autopilot_preserved
+2026-09-03T02:56:02.8394896Z     return action()
+2026-09-03T02:56:02.8395331Z            ^^^^^^^^
+2026-09-03T02:56:02.8396101Z   File "D:\a\hive-mind-os\hive-mind-os\tests\test_generic_dag_v3_overlay.py", line 1329, in <lambda>
+2026-09-03T02:56:02.8396949Z     lambda: subprocess.run(
+2026-09-03T02:56:02.8398843Z             ^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.8399616Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\subprocess.py", line 550, in run
+2026-09-03T02:56:02.9239854Z     stdout, stderr = process.communicate(input, timeout=timeout)
+2026-09-03T02:56:02.9241038Z                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.9242162Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\subprocess.py", line 1209, in communicate
+2026-09-03T02:56:02.9441127Z     stdout, stderr = self._communicate(input, endtime, timeout)
+2026-09-03T02:56:02.9441946Z                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:02.9442987Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\subprocess.py", line 1628, in _communicate
+2026-09-03T02:56:03.0033539Z     self.stdout_thread.join(self._remaining_time(endtime))
+2026-09-03T02:56:03.0039522Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\threading.py", line 1149, in join
+2026-09-03T02:56:03.2588149Z     self._wait_for_tstate_lock()
+2026-09-03T02:56:03.2589555Z   File "C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\threading.py", line 1169, in _wait_for_tstate_lock
+2026-09-03T02:56:03.2594254Z     if lock.acquire(block, timeout):
+2026-09-03T02:56:03.2594759Z        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-03T02:56:03.2595170Z KeyboardInterrupt
+2026-09-03T02:56:05.7909732Z {
+2026-09-03T02:56:05.7910468Z   "mission_id": "MISSION-plan",
+2026-09-03T02:56:05.7911804Z   "plan_digest": "sha256:203dcdcfa015ba15a9762e2655aa5c0c672673a71413ba374ac52e89e65fd07c",
+2026-09-03T02:56:05.7912669Z   "sequences": [
+2026-09-03T02:56:05.7912980Z     2,
+2026-09-03T02:56:05.7913250Z     3
+2026-09-03T02:56:05.7913522Z   ]
+2026-09-03T02:56:05.7913782Z }
+2026-09-03T02:56:05.7914039Z {
+2026-09-03T02:56:05.7914645Z   "graph_digest": "sha256:7290603d81379220b97dc67184d7e47f3eb0cdfe24be0ec642f9d72e3e47d06d",
+2026-09-03T02:56:05.7915442Z   "mission_id": "MISSION-plan",
+2026-09-03T02:56:05.7915868Z   "ready_work_ids": [
+2026-09-03T02:56:05.7916271Z     "WORK-docs-implementation-1269e206227b"
+2026-09-03T02:56:05.7916720Z   ],
+2026-09-03T02:56:05.7917006Z   "work_items": [
+2026-09-03T02:56:05.7917304Z     {
+2026-09-03T02:56:05.7917591Z       "acceptance_specs": [
+2026-09-03T02:56:05.7917960Z         "ACCEPT-1"
+2026-09-03T02:56:05.7918277Z       ],
+2026-09-03T02:56:05.7918939Z       "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+2026-09-03T02:56:05.7919755Z       "context_request": {
+2026-09-03T02:56:05.7920125Z         "fixture_kind": "docs"
+2026-09-03T02:56:05.7920494Z       },
+2026-09-03T02:56:05.7920777Z       "dependencies": [],
+2026-09-03T02:56:05.7921122Z       "depth": 1,
+2026-09-03T02:56:05.7921441Z       "expected_outputs": [
+2026-09-03T02:56:05.7921801Z         "fixture:docs"
+2026-09-03T02:56:05.7922124Z       ],
+2026-09-03T02:56:05.7922754Z       "idempotency_key": "sha256:4e11e02b9a0a0068457ee601588b276148fec0771790f4e160f36391ed76b72b",
+2026-09-03T02:56:05.7923548Z       "max_attempts": 1,
+2026-09-03T02:56:05.7923927Z       "mission_id": "MISSION-plan",
+2026-09-03T02:56:05.7924396Z       "objective": "deliver a bounded change",
+2026-09-03T02:56:05.7924960Z       "parent_work_id": "WORK-docs-aggregate-1269e206227b",
+2026-09-03T02:56:05.7925508Z       "requested_actions": [],
+2026-09-03T02:56:05.7925896Z       "required_inputs": [],
+2026-09-03T02:56:05.7926276Z       "risk_tier": "R1",
+2026-09-03T02:56:05.7926622Z       "role": "builder",
+2026-09-03T02:56:05.7926965Z       "status": "PROPOSED",
+2026-09-03T02:56:05.7927345Z       "title": "docs implementation",
+2026-09-03T02:56:05.7927869Z       "work_id": "WORK-docs-implementation-1269e206227b",
+2026-09-03T02:56:05.7928648Z       "write_scope": [
+2026-09-03T02:56:05.7930786Z         "fixtures/docs.txt"
+2026-09-03T02:56:05.7931131Z       ]
+2026-09-03T02:56:05.7931371Z     },
+2026-09-03T02:56:05.7931602Z     {
+2026-09-03T02:56:05.7932219Z       "acceptance_specs": [],
+2026-09-03T02:56:05.7932917Z       "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+2026-09-03T02:56:05.7933650Z       "context_request": {
+2026-09-03T02:56:05.7933986Z         "fixture_kind": "docs"
+2026-09-03T02:56:05.7934321Z       },
+2026-09-03T02:56:05.7934787Z       "dependencies": [
+2026-09-03T02:56:05.7936646Z         "WORK-docs-implementation-1269e206227b"
+2026-09-03T02:56:05.7937373Z       ],
+2026-09-03T02:56:05.7937565Z       "depth": 0,
+2026-09-03T02:56:05.7937787Z       "expected_outputs": [],
+2026-09-03T02:56:05.7938227Z       "idempotency_key": "sha256:7029659549e78c1eabb1027b2838b66b81a12975e6116616513f90f766cf6594",
+2026-09-03T02:56:05.7938694Z       "max_attempts": 1,
+2026-09-03T02:56:05.7938929Z       "mission_id": "MISSION-plan",
+2026-09-03T02:56:05.7939203Z       "objective": "deliver a bounded change",
+2026-09-03T02:56:05.7939483Z       "parent_work_id": null,
+2026-09-03T02:56:05.7939740Z       "requested_actions": [],
+2026-09-03T02:56:05.7939978Z       "required_inputs": [
+2026-09-03T02:56:05.7940189Z         "fixture:docs"
+2026-09-03T02:56:05.7940374Z       ],
+2026-09-03T02:56:05.7940544Z       "risk_tier": "R0",
+2026-09-03T02:56:05.7940764Z       "role": "orchestrator",
+2026-09-03T02:56:05.7940991Z       "status": "PROPOSED",
+2026-09-03T02:56:05.7941214Z       "title": "docs aggregate",
+2026-09-03T02:56:05.7941489Z       "work_id": "WORK-docs-aggregate-1269e206227b",
+2026-09-03T02:56:05.7941786Z       "write_scope": []
+2026-09-03T02:56:05.7941978Z     }
+2026-09-03T02:56:05.7942132Z   ]
+2026-09-03T02:56:05.7942285Z }
+2026-09-03T02:56:06.1323261Z ##[error]The operation was canceled.
+2026-09-03T02:56:06.3417209Z Post job cleanup.
+2026-09-03T02:56:06.8943443Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-09-03T02:56:06.9367398Z git version 2.55.0.windows.5
+2026-09-03T02:56:06.9465581Z Temporarily overriding HOME='D:\a\_temp\8896fd5d-7b0f-407f-bccd-7df328210be9' before making global git config changes
+2026-09-03T02:56:06.9466909Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-03T02:56:06.9480705Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\hive-mind-os\hive-mind-os
+2026-09-03T02:56:06.9837265Z Removing SSH command configuration
+2026-09-03T02:56:06.9852186Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-09-03T02:56:07.0224251Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-09-03T02:56:07.7194810Z Removing HTTP extra header
+2026-09-03T02:56:07.7205621Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-03T02:56:07.7620233Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-09-03T02:56:08.4315886Z Removing includeIf entries pointing to credentials config files
+2026-09-03T02:56:08.4328740Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-03T02:56:08.4676831Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-09-03T02:56:09.2530734Z Cleaning up orphan processes

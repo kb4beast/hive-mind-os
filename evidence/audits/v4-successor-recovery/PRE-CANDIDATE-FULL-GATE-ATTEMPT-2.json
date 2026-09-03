@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-pre-candidate-local-gate-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-LOCAL-FULL-GATE-ATTEMPT-2",
+  "started_at": "2026-09-03T01:30:43Z",
+  "completed_at": "2026-09-03T01:59:14Z",
+  "candidate_state": "DIRTY_PRE_FREEZE",
+  "command": "python -B -m unittest discover -s tests -v",
+  "host": {
+    "os": "Microsoft Windows 10.0.26200",
+    "python": "3.14.4",
+    "git": "2.53.0.windows.3",
+    "powershell": "7.6.4"
+  },
+  "result": {
+    "exit_code": 1,
+    "tests_run": 1347,
+    "elapsed_seconds": 1709.484,
+    "failures": 0,
+    "errors": 1,
+    "skips": 8,
+    "disposition": "REJECT_ATTEMPT_AND_CORRECT"
+  },
+  "observation": {
+    "id": "V4-R4-HARNESS-002",
+    "kind": "remaining_live_successor_read_in_predecessor_test",
+    "affected_test": "test_authenticated_gitattributes_rules_bind_and_cover_every_raw_path",
+    "cause": "The initial frozen-object repair extracted the complete R4 payload and loaded the R4 verifier from it, but several test assertions still read predecessor payload paths through the live ROOT/OVERLAY constants. Adding a legitimate V4-only raw-log attribute rule therefore supplied V4 .gitattributes bytes to the R4 verifier.",
+    "correction": "Route every predecessor payload read in the R4 regression module through the extracted authoring_root/overlay. Keep only the V4-owned bundle, provenance, current-repository mutation sentinel, and Git object-source operations rooted in the live successor checkout."
+  },
+  "raw_log": {
+    "path": "evidence/audits/v4-successor-recovery/logs/pre-candidate-full-gate-attempt-2.log",
+    "bytes": 258837,
+    "sha256": "1a4ac6ffd6cdf4041050823fec079d83f30e4f2fd249dae3a1c88d200ca46f08",
+    "content_policy": "Exact PowerShell redirection output from the failed attempt; retained without line-ending normalization or text diff."
+  },
+  "nonclaims": [
+    "The first focused R4 harness pass did not prove that every individual test read used frozen R4 bytes.",
+    "This failure does not modify or requalify R4.",
+    "No V4 full-gate success is claimed until a later exact run completes with exit code zero."
+  ],
+  "rollback": "Revert the live-read correction only if a replacement keeps every predecessor payload read bound to the exact R4 Git object. Preserve this adverse receipt and raw log."
+}

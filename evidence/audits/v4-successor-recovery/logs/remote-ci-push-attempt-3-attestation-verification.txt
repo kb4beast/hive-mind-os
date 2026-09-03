@@ -1,0 +1,88 @@
+**********************
+PowerShell transcript start
+Start time: 20260903063531
+Username: AI-WORKHORSE\beesp
+RunAs User: AI-WORKHORSE\beesp
+Configuration Name: 
+Machine: AI-WORKHORSE (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Users\beesp\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.dll -Command try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}
+$root='C:\Users\beesp\AppData\Local\Temp\hive-v4-ci-33749585546-3743ad1e2bafaac2efd2b19d91510086ce48d478'; $log=Join-Path $root 'attestation-verification-transcript.txt'; Start-Transcript -LiteralPath $log -Force | Out-Null; foreach($leaf in @('hive_mind_os-0.7.0-py3-none-any.whl','hive-mind-os.spdx.json')) { $path=Join-Path $root "hive-mind-os-build-evidence\$leaf"; "COMMAND: gh attestation verify $path --repo kb4beast/hive-mind-os --signer-workflow kb4beast/hive-mind-os/.github/workflows/ci.yml --source-digest 3743ad1e2bafaac2efd2b19d91510086ce48d478 --source-ref refs/heads/codex/v4-successor-recovery --deny-self-hosted-runners --format json"; $raw=gh attestation verify $path --repo kb4beast/hive-mind-os --signer-workflow kb4beast/hive-mind-os/.github/workflows/ci.yml --source-digest 3743ad1e2bafaac2efd2b19d91510086ce48d478 --source-ref refs/heads/codex/v4-successor-recovery --deny-self-hosted-runners --format json; $exit=$LASTEXITCODE; $item=($raw | ConvertFrom-Json)[0].verificationResult; [pscustomobject]@{VerifiedFile=$leaf;Exit=$exit;PredicateType=$item.statement.predicateType;Subjects=$item.statement.subject;Workflow=$item.signature.certificate.buildConfigURI;SourceDigest=$item.signature.certificate.sourceRepositoryDigest;SourceRef=$item.signature.certificate.sourceRepositoryRef;Runner=$item.signature.certificate.runnerEnvironment;Invocation=$item.signature.certificate.runInvocationURI;Timestamps=$item.verifiedTimestamps} | ConvertTo-Json -Depth 8 }; Stop-Transcript | Out-Null; $h=Get-FileHash -LiteralPath $log -Algorithm SHA256; [pscustomobject]@{Path=$log;Bytes=(Get-Item -LiteralPath $log).Length;SHA256=$h.Hash.ToLowerInvariant()} | ConvertTo-Json
+Process ID: 31844
+PSVersion: 7.6.4
+PSEdition: Core
+GitCommitId: 7.6.4
+OS: Microsoft Windows 10.0.26200
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+COMMAND: gh attestation verify C:\Users\beesp\AppData\Local\Temp\hive-v4-ci-33749585546-3743ad1e2bafaac2efd2b19d91510086ce48d478\hive-mind-os-build-evidence\hive_mind_os-0.7.0-py3-none-any.whl --repo kb4beast/hive-mind-os --signer-workflow kb4beast/hive-mind-os/.github/workflows/ci.yml --source-digest 3743ad1e2bafaac2efd2b19d91510086ce48d478 --source-ref refs/heads/codex/v4-successor-recovery --deny-self-hosted-runners --format json
+{
+  "VerifiedFile": "hive_mind_os-0.7.0-py3-none-any.whl",
+  "Exit": 0,
+  "PredicateType": "https://slsa.dev/provenance/v1",
+  "Subjects": [
+    {
+      "name": "hive-mind-os.spdx.json",
+      "digest": {
+        "sha256": "8138fbb9ee5b60046a3b97d54271b04113f9b6544a99358e8929fadd6ba300f4"
+      }
+    },
+    {
+      "name": "hive_mind_os-0.7.0-py3-none-any.whl",
+      "digest": {
+        "sha256": "b83992fb831c25a13bf0645a3d379c0eade788039e7afeb62f8515709ddbeecc"
+      }
+    }
+  ],
+  "Workflow": "https://github.com/kb4beast/hive-mind-os/.github/workflows/ci.yml@refs/heads/codex/v4-successor-recovery",
+  "SourceDigest": "3743ad1e2bafaac2efd2b19d91510086ce48d478",
+  "SourceRef": "refs/heads/codex/v4-successor-recovery",
+  "Runner": "github-hosted",
+  "Invocation": "https://github.com/kb4beast/hive-mind-os/actions/runs/33749585546/attempts/1",
+  "Timestamps": [
+    {
+      "type": "Tlog",
+      "uri": "https://rekor.sigstore.dev",
+      "timestamp": "2026-09-03T06:25:44-05:00"
+    }
+  ]
+}
+COMMAND: gh attestation verify C:\Users\beesp\AppData\Local\Temp\hive-v4-ci-33749585546-3743ad1e2bafaac2efd2b19d91510086ce48d478\hive-mind-os-build-evidence\hive-mind-os.spdx.json --repo kb4beast/hive-mind-os --signer-workflow kb4beast/hive-mind-os/.github/workflows/ci.yml --source-digest 3743ad1e2bafaac2efd2b19d91510086ce48d478 --source-ref refs/heads/codex/v4-successor-recovery --deny-self-hosted-runners --format json
+{
+  "VerifiedFile": "hive-mind-os.spdx.json",
+  "Exit": 0,
+  "PredicateType": "https://slsa.dev/provenance/v1",
+  "Subjects": [
+    {
+      "name": "hive-mind-os.spdx.json",
+      "digest": {
+        "sha256": "8138fbb9ee5b60046a3b97d54271b04113f9b6544a99358e8929fadd6ba300f4"
+      }
+    },
+    {
+      "name": "hive_mind_os-0.7.0-py3-none-any.whl",
+      "digest": {
+        "sha256": "b83992fb831c25a13bf0645a3d379c0eade788039e7afeb62f8515709ddbeecc"
+      }
+    }
+  ],
+  "Workflow": "https://github.com/kb4beast/hive-mind-os/.github/workflows/ci.yml@refs/heads/codex/v4-successor-recovery",
+  "SourceDigest": "3743ad1e2bafaac2efd2b19d91510086ce48d478",
+  "SourceRef": "refs/heads/codex/v4-successor-recovery",
+  "Runner": "github-hosted",
+  "Invocation": "https://github.com/kb4beast/hive-mind-os/actions/runs/33749585546/attempts/1",
+  "Timestamps": [
+    {
+      "type": "Tlog",
+      "uri": "https://rekor.sigstore.dev",
+      "timestamp": "2026-09-03T06:25:44-05:00"
+    }
+  ]
+}
+**********************
+PowerShell transcript end
+End time: 20260903063538
+**********************

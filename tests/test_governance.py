@@ -29,7 +29,7 @@ class RepositoryGovernanceTests(unittest.TestCase):
             "dependency-and-license-review",
             "sbom-and-build-provenance",
             "actions/attest@",
-            "anchore/sbom-action@",
+            "anchore/sbom-action/download-syft@",
         ):
             self.assertIn(required, workflow)
         self.assertIn("persist-credentials: false", workflow)

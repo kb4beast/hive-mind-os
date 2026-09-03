@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-3",
+  "candidate_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "candidate_tree": "764549def53b10766752a74b4ea61adfb20bf6d9",
+  "observer": "/root/v4_quality_reviewer",
+  "command": "python -B -W error::ResourceWarning -m unittest tests.test_collect_v4_activation_evidence -v",
+  "result": {
+    "module_tests": 7,
+    "passed": 6,
+    "failures": 1,
+    "seconds": 189.155,
+    "failed_test": "test_collector_writes_review_evidence_without_authorizing_activation",
+    "inner_result": "FOCUSED_CHILD_EXCEEDED_180_SECONDS_AND_WAS_TERMINATED_FAIL_CLOSED",
+    "repository_clean_after": true,
+    "bytecode_free_after": true
+  },
+  "evidence_limit": {
+    "retained_child_transcript": false,
+    "reason": "The test used TemporaryDirectory and deleted the collector package while unwinding the failed assertion; the exact inner module and stack therefore remain unknown.",
+    "prohibited_inference": "Do not invent an internal deadlock cause."
+  },
+  "counterevidence": {
+    "sequential_parent_python_repetitions": "12 of 12 passed in 14.599s to 15.356s with persistent packages and a 75-second bound.",
+    "concurrent_parent_python_repetitions": "4 of 4 passed in one concurrent wave.",
+    "interpretation": "The bounded failure is intermittent; passing repetitions do not erase it."
+  },
+  "proposed_correction": [
+    "Run each focused module in a fresh isolated Python child so one stall cannot erase module attribution.",
+    "Enforce both an overall collector deadline and a smaller per-module deadline.",
+    "Retain exact per-module PID, duration, exit, timeout, termination, stdout, and stderr framing.",
+    "Include the retained collector transcript in the outer regression failure message before its temporary directory is removed."
+  ],
+  "disposition": "REJECT_SINGLE_PROCESS_FOCUSED_VALIDATION_AS_SUFFICIENTLY_ATTRIBUTABLE_AND_ADAPT_WITH_MODULE_ISOLATION_AND_RETAINED_FAILURE_OUTPUT",
+  "nonclaims": [
+    "The bounded runner behaved correctly by terminating and refusing qualification.",
+    "No deterministic runtime deadlock has been proven.",
+    "Fresh-child focused validation does not exercise cross-module interpreter-state interactions; the combined exact full-suite gate and remote matrix remain separate required controls.",
+    "The earlier clean collector pass remains a genuine pass but is insufficient to erase this later independent failure.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this attempt."
+  ],
+  "rollback": "Preserve this adverse receipt; refreeze only after module-isolated stress and an independent warning-fatal replay succeed."
+}

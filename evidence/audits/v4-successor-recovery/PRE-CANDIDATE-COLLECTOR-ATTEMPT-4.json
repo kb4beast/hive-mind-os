@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-4",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "head_tree": "764549def53b10766752a74b4ea61adfb20bf6d9",
+  "worktree_state": "UNFROZEN_DIRTY_C68_C69_REPAIR_SNAPSHOT_NO_CANDIDATE_TREE_CLAIM",
+  "observer": "/root",
+  "command": "python -B -W error::ResourceWarning -m unittest tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_writes_review_evidence_without_authorizing_activation -q",
+  "stress_result": {
+    "concurrent_wave": {
+      "passed": 4,
+      "failed": 0,
+      "duration_milliseconds": [31601, 31487, 31527, 31543]
+    },
+    "sequential_wave": {
+      "passed": 11,
+      "failed": 1,
+      "duration_milliseconds": [31510, 28087, 28062, 27626, 74671, 27736, 27677, 27483, 27204, 26981, 27041, 27225],
+      "failed_iteration": 5,
+      "failed_outer_test_seconds": 74.577
+    }
+  },
+  "first_cause": {
+    "classification": "EMPTY_CHILD_STDOUT_REJECTED_BEFORE_TRANSCRIPT_MATERIALIZATION",
+    "powershell_error": "Cannot bind argument to parameter 'Text' because it is an empty string.",
+    "explanation": "Get-TextSha256 required a nonempty mandatory string and was called for the module stdout before any aggregate transcript was written. The outer regression retained only a missing-transcript marker, so the exact stalled module remained unknown.",
+    "retained_inner_transcript": false,
+    "prohibited_inference": "Do not infer which module stalled or invent an internal deadlock cause."
+  },
+  "correction": [
+    "Accept and hash empty streams using the SHA-256 digest of their exact zero-byte content.",
+    "Materialize the active module name and pending state before starting its child.",
+    "Flush bound executable and package markers immediately from the child bootstrap.",
+    "Replace pending frames with returned stdout and stderr before computing per-module metadata.",
+    "Distinguish a module-process timeout from exhaustion before the next module starts.",
+    "Use millisecond remaining-budget accounting rather than rounding away or extending a sub-second remainder."
+  ],
+  "additional_cross_examination": {
+    "classification": "ORDINARY_UNITTEST_PROSE_IS_NOT_A_PINNED_TEST_COUNT_RECEIPT",
+    "finding": "Parsing the first candidate-printable 'Ran N tests' stderr line cannot prove the expected focused inventory.",
+    "correction": "Require exactly one parent-generated terminal marker after unittest returns, bind every module to its pinned expected count, and require the exact 29-module 282-test aggregate.",
+    "residual_nonclaim": "The marker nonce prevents accidental transcript collision but cannot resist hostile code in the same Python process; exact full-suite and remote controls remain required."
+  },
+  "disposition": "REJECT_FIRST_MODULE_ISOLATION_REPAIR_SNAPSHOT_AND_ADAPT_WITH_PRELAUNCH_TRANSCRIPT_AND_EMPTY_STREAM_SAFE_HASHING",
+  "nonclaims": [
+    "The other fifteen stress executions do not erase the one observed failure.",
+    "No exact stalled module or deterministic runtime deadlock has been proven.",
+    "Human-readable transcript framing and a process-local marker are diagnostic integrity controls, not hostile same-process isolation.",
+    "The unfrozen dirty worktree is not a candidate commit or qualification artifact.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this attempt."
+  ],
+  "rollback": "Preserve this receipt, rerun warning-fatal module and stress validation from zero after the correction, and refreeze only if every required gate passes."
+}

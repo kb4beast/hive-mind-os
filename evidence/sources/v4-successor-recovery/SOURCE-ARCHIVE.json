@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-successor-source-archive-v1",
+  "captured_at_utc": "2026-09-03T11:50:54.380Z",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "policy": {
+    "raw_source_bytes_archived_locally": true,
+    "identity_binding": "PATH_PLUS_BYTE_COUNT_PLUS_SHA256",
+    "point_in_time_limit": "GitHub API documents are retained provider snapshots, not immutable endpoints or execution authority.",
+    "reused_archive_rule": "Exact immutable sources already archived and bound by the qualified R4 predecessor are referenced by source id, member path, and archive digest instead of duplicated."
+  },
+  "sources": [
+    {
+      "source_id": "SRC-V4-001",
+      "captured_at_utc": "2026-09-03T03:05:59.4696167Z",
+      "preservation": "COMPLETE_GIT_BUNDLE",
+      "path": "evidence/sources/v4-successor-recovery/src-v4-001-local-draft.bundle",
+      "bytes": 7493301,
+      "sha256": "sha256:9fa24683f1b8883cf0d465a95845699201338814d04097c59ead91e1dddd0a58",
+      "provenance_path": "evidence/sources/v4-successor-recovery/src-v4-001-local-draft.provenance.json",
+      "provenance_bytes": 2671,
+      "provenance_sha256": "sha256:963e3981c8879b05f0ce4f30ad14952e3eafc6b634ac6cb3419f1c4be444931f"
+    },
+    {
+      "source_id": "SRC-V4-002",
+      "preservation": "POINT_IN_TIME_PROVIDER_SNAPSHOTS_AND_DERIVED_SCOUT_ASSESSMENT",
+      "captured_at_utc": "2026-09-03T03:06:00Z",
+      "derived_assessment": {
+        "path": "evidence/audits/v4-successor-recovery/OPEN-PR-DISPOSITIONS.json",
+        "bytes": 3075,
+        "sha256": "sha256:1a02f5fd4214429ab862f148ddf480a11202fc9e6758c5bf5e164bab0502e658"
+      },
+      "pull_requests": [
+        {"number": 157, "head": "c0a0df8004ec7edff1238129e5356cdfe4e87246", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/157/pull.json", "bytes": 30232, "sha256": "sha256:b2c1b22d4b283ac10dba0c8eb72324e79ba8bcc1df62564933d95f6b78f3a0d6"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/157/files.json", "bytes": 472744, "sha256": "sha256:bd6da87af1154876e1abff29e96ba5daa79ecd51db197f94784d7dfb56d8d127"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/157/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}},
+        {"number": 158, "head": "6c88f3a80acaca8da33f7f73fcdb7fdd727f15de", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/158/pull.json", "bytes": 23560, "sha256": "sha256:dbe971099b29b48aaf09fc7be4ca9d8281206065c19098c5c1725858063f0bd8"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/158/files.json", "bytes": 133836, "sha256": "sha256:afc83b29455e03f73d4dd29d0574aa2284984c81c5504bf4d0bfefc24cd97188"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/158/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}},
+        {"number": 159, "head": "889323f084c4a7aaa9318eeced8cacca5f8b70d1", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/159/pull.json", "bytes": 24516, "sha256": "sha256:afd781508d9777eba3a37d55e103aac5f0e26fdaa706213fc3a966a44b51e7ad"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/159/files.json", "bytes": 119312, "sha256": "sha256:bbf5e3a639281fd1d6efcde08c96cac28eeb093d16d4f8f658325de268bcf1ea"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/159/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}},
+        {"number": 160, "head": "97b9e0f3469fa0cbe1572d4080b4d5276a79b0ea", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/160/pull.json", "bytes": 20866, "sha256": "sha256:960e0f37f44d984ab8ab4ed7bc65e9f9c85d99131e1d986c146b41ae27e931da"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/160/files.json", "bytes": 22848, "sha256": "sha256:41ec469ecfecf0c846cb391f5a4e1e874e688bc041326eb5d5fe3fb55a1355dd"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/160/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}},
+        {"number": 161, "head": "00b5dc95ed1090ea603218dbcd02d59b05d05603", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/161/pull.json", "bytes": 30730, "sha256": "sha256:0636dc495c41f5ac804a592412d0645cdf5b98c5c4ce80294965ed4a3c68eaec"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/161/files.json", "bytes": 1004, "sha256": "sha256:795e25b83709ddc3fb6e755aea3a67a8b95c30e57dded3a4f0b0681796ced47b"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/161/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}},
+        {"number": 162, "head": "9497832cc3d867387884f102e1ddd5791cf463fa", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/162/pull.json", "bytes": 29685, "sha256": "sha256:e6ad5699531ef86598c392dbc00d98823cb37471cebe11870c7a9d3bdc7dbb6f"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/162/files.json", "bytes": 1092, "sha256": "sha256:d91720e2f96a4d225b74e44c0254d3ae1db9fa35a643c3bb934aaae87b0d6491"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/162/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}},
+        {"number": 163, "head": "eecae8d5de85aae3b5fa572aea4559ec687bb4de", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/163/pull.json", "bytes": 30751, "sha256": "sha256:806e1ac4be3b81e07bc71123c2205c2ed0d9df9bc117eeb647b9813469160590"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/163/files.json", "bytes": 965, "sha256": "sha256:f0cd44e79db5b108abdcac1290696d9b795c4717329274f1c9cbd8594fcf1193"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/163/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}},
+        {"number": 164, "head": "1e299b5238518f36b5be72c82cc615e9c5101238", "pull": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/164/pull.json", "bytes": 23399, "sha256": "sha256:595635ca69dab5a061b5f5eabf059f760e8ca9c560b9323953673648a3163c56"}, "files": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/164/files.json", "bytes": 8295, "sha256": "sha256:25daa082b8eebc5823a1d7126e8627573f663f1108be55c45948372803833d06"}, "reviews": {"path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/pulls/164/reviews.json", "bytes": 5, "sha256": "sha256:2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"}}
+      ]
+    },
+    {
+      "source_id": "SRC-V4-003",
+      "retrieved_at_utc": "2026-09-02T22:42:54.057Z",
+      "preservation": "REUSED_PINNED_R4_RAW_ARCHIVE",
+      "source_intake_path": "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+      "source_intake_sha256": "sha256:4d90fadba15120788ce24ea480a3847b8f8df192ff0f072d5982ebebe773cf51",
+      "reused_source_id": "SRC-V3R-PYTHON-STAT-001",
+      "archive_path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+      "archive_sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e",
+      "member": "cpython/ebf955df7a89ed0c7968f79faec1de49f61ed7cb/Doc/library/os.rst",
+      "member_bytes": 206006,
+      "member_sha256": "sha256:7bab91c6d5dcc0f88e476567d190388e94ddb3940768e0713c70f0280130e964"
+    },
+    {
+      "source_id": "SRC-V4-004",
+      "retrieved_at_utc": "2026-09-02T22:42:54.057Z",
+      "preservation": "REUSED_PINNED_R4_RAW_ARCHIVE",
+      "source_intake_path": "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+      "source_intake_sha256": "sha256:4d90fadba15120788ce24ea480a3847b8f8df192ff0f072d5982ebebe773cf51",
+      "reused_source_id": "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001",
+      "archive_path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+      "archive_sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e",
+      "member": "microsoftdocs-sdk-api/788888c51ea955dae21e60c5e243c0a8593df8a6/sdk-api-src/content/winbase/ns-winbase-file_basic_info.md",
+      "member_bytes": 3607,
+      "member_sha256": "sha256:a0f5398981241723394996a8e5a25a21ba6aea0af8e34cab577a37d4f2b7289a"
+    },
+    {
+      "source_id": "SRC-V4-005",
+      "retrieved_at_utc": "2026-09-02T22:42:54.057Z",
+      "preservation": "REUSED_PINNED_R4_RAW_ARCHIVE",
+      "source_intake_path": "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+      "source_intake_sha256": "sha256:4d90fadba15120788ce24ea480a3847b8f8df192ff0f072d5982ebebe773cf51",
+      "reused_source_id": "SRC-V3R-GIT-BUNDLE-001",
+      "archive_path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+      "archive_sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e",
+      "member": "git/67ad42147a7acc2af6074753ebd03d904476118f/Documentation/git-bundle.adoc",
+      "member_bytes": 13310,
+      "member_sha256": "sha256:77a4e701115f70bc471681f9dec00fe7e1701e4f2090e27950efc0c66e1325ca"
+    },
+    {
+      "source_id": "SRC-V4-006",
+      "preservation": "POINT_IN_TIME_PROVIDER_SNAPSHOT_AND_BOUND_ASSESSMENTS",
+      "captured_at_utc": "2026-09-03T03:06:00Z",
+      "files": [
+        {"role": "run", "path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/actions/runs/33694910734/run.json", "bytes": 13546, "sha256": "sha256:7f70d1ba655ccf65539f3ddf7dd5b8038bb45e17bbe9e3d91e19a5a324e2d183"},
+        {"role": "jobs", "path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/actions/runs/33694910734/jobs.json", "bytes": 30373, "sha256": "sha256:345392a3083c87ad6c1e8f629f02d002c91a0b0f07afa56282d76c94e3337d2c"},
+        {"role": "artifacts", "path": "evidence/sources/v4-successor-recovery/github/kb4beast-hive-mind-os/actions/runs/33694910734/artifacts.json", "bytes": 1803, "sha256": "sha256:c8144a7b05786133e7b1ed19ef6fb33c8fcffda7082a2b1eb45a077581cca435"},
+        {"role": "qualified_predecessor_receipt", "path": "evidence/audits/generic-v3-baseline-recovery/V3-R4-QUALIFICATION.json", "bytes": 6942, "sha256": "sha256:e4b1a287bb49b961afa4c68ab3849a975853e4b8ebd324bd7761c059cccb51fb"},
+        {"role": "artifact_cross_examination", "path": "evidence/audits/v4-successor-recovery/SBOM-EVIDENCE-GAP.json", "bytes": 6277, "sha256": "sha256:5b42b5d58b59c19f4391c4d55fdff1d6f095857febddee5faaf00e573c03ec89"}
+      ]
+    },
+    {
+      "source_id": "SRC-V4-007",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "preservation": "PINNED_UPSTREAM_RAW_FILE",
+      "path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/action.yml",
+      "bytes": 1183,
+      "sha256": "sha256:8a8ad268a69c1ba8cc468d10eeb14137e648069d859066280d6547680d501779",
+      "license_path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/LICENSE",
+      "license_sha256": "sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "source_id": "SRC-V4-008",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "preservation": "PINNED_UPSTREAM_RAW_FILE",
+      "path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/download-syft/action.yml",
+      "bytes": 371,
+      "sha256": "sha256:a025ceb3598b59757472ba2ed15ec2a3352cb2e0ffb3de9ec084095856ad6a2b",
+      "license_path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/LICENSE",
+      "license_sha256": "sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "source_id": "SRC-V4-009",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "preservation": "PINNED_UPSTREAM_RAW_FILE",
+      "path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/src/SyftVersion.ts",
+      "bytes": 34,
+      "sha256": "sha256:ee161181a498f0f5c4ff2aa91f42c307257d31be4e147b79a42e025da9994451",
+      "license_path": "evidence/sources/v4-successor-recovery/anchore-sbom-action/f6c3d0fe42c3cf876e3462574e4c9416b5e0f07a/LICENSE",
+      "license_sha256": "sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "source_id": "SRC-V4-010",
+      "retrieved_at_utc": "2026-09-03T00:10:00Z",
+      "preservation": "PINNED_UPSTREAM_RAW_FILE",
+      "path": "evidence/sources/v4-successor-recovery/syft/v0.42.2/README.md",
+      "bytes": 20674,
+      "sha256": "sha256:96b0a3def5de842c4f640045921910c1abbfa240e99cf57d3f8237c50e5545df",
+      "license_path": "evidence/sources/v4-successor-recovery/syft/v0.42.2/LICENSE",
+      "license_sha256": "sha256:c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "source_id": "SRC-V4-011",
+      "captured_at_utc": "2026-09-03T00:36:57.194Z",
+      "preservation": "PREREQUISITE_BOUND_GIT_BUNDLE",
+      "path": "tests/fixtures/generic-v3-r4.bundle",
+      "bytes": 683892,
+      "sha256": "sha256:265ee2e6dece8a47e649c55b5df7e0e714a60e631126bc76874731e20cfdabdf",
+      "provenance_path": "tests/fixtures/generic-v3-r4.provenance.json",
+      "provenance_bytes": 1905,
+      "provenance_sha256": "sha256:a21ad70a1972afb98819615fa55ff0c2a40288740aaef86a1eac43c744c20fa1"
+    },
+    {
+      "source_id": "SRC-V4-012",
+      "retrieved_at_utc": "2026-09-03T11:50:54.380Z",
+      "preservation": "PINNED_UPSTREAM_RAW_FILES",
+      "artifacts": [
+        {"role": "document_creation_information", "path": "evidence/sources/v4-successor-recovery/spdx-spec/v2.2.2/chapters/document-creation-information.md", "bytes": 18451, "sha256": "sha256:111e61e420c8d235d9bd4676e7e33b348357d779e0a57b8ffc485c76f987bbc1"},
+        {"role": "package_information", "path": "evidence/sources/v4-successor-recovery/spdx-spec/v2.2.2/chapters/package-information.md", "bytes": 50927, "sha256": "sha256:f5e8b86fa0ed3e1d39c9bf60ec9f84400f3e7001a391053da384cfe051ffb86b"}
+      ],
+      "license_path": "evidence/sources/v4-successor-recovery/spdx-spec/v2.2.2/LICENSE",
+      "license_sha256": "sha256:017e38491cccbd2bdb6da0a32a33db9ec245b5dab30fdcd09f2c742c975e5b35"
+    },
+    {
+      "source_id": "SRC-V4-013",
+      "retrieved_at_utc": "2026-09-03T11:50:54.380Z",
+      "preservation": "PINNED_UPSTREAM_SOURCE_AND_RELEASE_ARTIFACT",
+      "artifacts": [
+        {"role": "project_metadata", "path": "evidence/sources/v4-successor-recovery/spdx-tools/v0.8.5/pyproject.toml", "bytes": 2865, "sha256": "sha256:f9d4f2f6b7be3a998c0dc3518b9a3eb112d97bf27e784f827588f8ab6680d340"},
+        {"role": "validator_cli_source", "path": "evidence/sources/v4-successor-recovery/spdx-tools/v0.8.5/src/spdx_tools/spdx/clitools/pyspdxtools.py", "bytes": 5643, "sha256": "sha256:45cb53e69829f58e8435431b5e8fee2561fd3b239595d7af83f8a3634aae63ce"},
+        {"role": "pypi_release_metadata", "path": "evidence/sources/v4-successor-recovery/spdx-tools/v0.8.5/pypi-0.8.5.json", "bytes": 17179, "sha256": "sha256:0200dcbeded4a87f4f698e2e0e440493c424e63450136d1ad51b44a13de8bc25"},
+        {"role": "wheel", "path": "evidence/sources/v4-successor-recovery/spdx-tools/v0.8.5/spdx_tools-0.8.5-py3-none-any.whl", "bytes": 286573, "sha256": "sha256:7c2d5865941be9d2e898f5b084e8d5422dd298dc5a29320ddb198fec304f59c4"}
+      ],
+      "license_path": "evidence/sources/v4-successor-recovery/spdx-tools/v0.8.5/LICENSE",
+      "license_sha256": "sha256:c5accbbd8546e94c34aed24afe689a617627d18eed5a6c48277e48db57c23851"
+    }
+  ],
+  "unavailable_sources": [],
+  "nonclaims": [
+    "Provider snapshots do not prove that a provider will continue serving the same endpoint.",
+    "Archived source bytes do not grant activation, merge, deployment, or production authority.",
+    "The local draft bundle is preserved as losing/adapted source evidence and is not the V4 successor candidate."
+  ]
+}

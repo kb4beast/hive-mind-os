@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from dataclasses import asdict, dataclass
 from hashlib import sha256
@@ -29,6 +30,7 @@ from .model_provider import (
 from .models import AgentResult, Evidence, Objective, Role, WorkItem
 from .prompt_registry import PromptRegistry, generation_zero_prompt, prompt_digest
 from .roles import RoleContract
+from .token_ledger import measure_call
 
 
 class ModelTurnError(RuntimeError):
@@ -57,6 +59,92 @@ class RepositoryContext:
             ],
             "file_tree": list(self.file_tree),
             "current_diff": self.current_diff,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ContextEnvelope:
+    """Caller-compiled, token-bound context that the backend renders verbatim."""
+
+    manifest_digest: str
+    token_budget: int
+    estimated_tokens: int
+    full_bodies: tuple[tuple[str, str], ...]
+    digests: tuple[tuple[str, str], ...]
+    omitted_roles: tuple[str, ...]
+    cold_references: tuple[str, ...]
+    generator_evaluator_separated: bool
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", self.manifest_digest) is None:
+            raise ValueError("context envelope manifest digest is invalid")
+        if type(self.token_budget) is not int or self.token_budget < 0:
+            raise ValueError("context envelope token budget must be non-negative")
+        if type(self.estimated_tokens) is not int or self.estimated_tokens < 0:
+            raise ValueError("context envelope estimate must be non-negative")
+        if type(self.generator_evaluator_separated) is not bool:
+            raise ValueError("context envelope separation flag must be boolean")
+        for values, label in (
+            (self.full_bodies, "full bodies"),
+            (self.digests, "digests"),
+        ):
+            if type(values) is not tuple or any(
+                type(item) is not tuple
+                or len(item) != 2
+                or any(type(part) is not str or not part for part in item)
+                for item in values
+            ):
+                raise ValueError(f"context envelope {label} are invalid")
+        for values, label in (
+            (self.omitted_roles, "omitted roles"),
+            (self.cold_references, "cold references"),
+        ):
+            if type(values) is not tuple or any(
+                type(item) is not str or not item for item in values
+            ):
+                raise ValueError(f"context envelope {label} are invalid")
+            if len(set(values)) != len(values):
+                raise ValueError(f"context envelope {label} contain duplicates")
+        full_roles = [role for role, _ in self.full_bodies]
+        digest_roles = [role for role, _ in self.digests]
+        all_roles = [*full_roles, *digest_roles, *self.omitted_roles]
+        if len(all_roles) != len(set(all_roles)):
+            raise ValueError("context envelope assigns a role to multiple tiers")
+        for _role, value in self.digests:
+            if re.fullmatch(r"sha256:[0-9a-f]{64}", value) is None:
+                raise ValueError("context envelope result digest is invalid")
+
+    def to_prompt(self) -> dict[str, object]:
+        return {
+            "manifest_digest": self.manifest_digest,
+            "token_budget": self.token_budget,
+            "estimated_tokens": self.estimated_tokens,
+            "full_bodies": [
+                {"role": role, "body": body} for role, body in self.full_bodies
+            ],
+            "digests": [
+                {"role": role, "result_digest": value} for role, value in self.digests
+            ],
+            "omitted_roles": list(self.omitted_roles),
+            "cold_references": list(self.cold_references),
+            "generator_evaluator_separated": self.generator_evaluator_separated,
+        }
+
+    def to_receipt(self) -> dict[str, object]:
+        return {
+            "manifest_digest": self.manifest_digest,
+            "token_budget": self.token_budget,
+            "estimated_tokens": self.estimated_tokens,
+            "full_body_digests": [
+                {"role": role, "sha256": _digest(body.encode("utf-8"))}
+                for role, body in self.full_bodies
+            ],
+            "result_digests": [
+                {"role": role, "result_digest": value} for role, value in self.digests
+            ],
+            "omitted_roles": list(self.omitted_roles),
+            "cold_reference_count": len(self.cold_references),
+            "generator_evaluator_separated": self.generator_evaluator_separated,
         }
 
 
@@ -112,9 +200,10 @@ class ModelBackend:
         *,
         repository_context: RepositoryContext | None = None,
         result_validator: Callable[[AgentResult], None] | None = None,
+        context_envelope: ContextEnvelope | None = None,
     ) -> AgentResult:
         system, user, truncated, prompt_artifact_digest = self._prompt(
-            contract, work_item, objective, context, repository_context
+            contract, work_item, objective, context, repository_context, context_envelope
         )
         corrective: str | None = None
         last_error = "model did not return a valid turn"
@@ -123,6 +212,7 @@ class ModelBackend:
             context,
             role=contract.role,
             provider=provider,
+            context_envelope=context_envelope,
         )
         allowance = self.budget.issue_allowance()
         used_calls = 0
@@ -240,6 +330,7 @@ class ModelBackend:
         objective: Objective,
         context: tuple[AgentResult, ...],
         repository_context: RepositoryContext | None,
+        context_envelope: ContextEnvelope | None = None,
     ) -> tuple[str, str, bool, str]:
         system = generation_zero_prompt(contract)
         artifact_digest = prompt_digest(system)
@@ -263,20 +354,31 @@ class ModelBackend:
                     experiment_id="generation-0",
                     expected_current=None,
                 )
-        prior_roles = [
-            {
-                "role": item.role.value,
-                "summary": item.summary,
-                "evidence": [asdict(evidence) for evidence in item.evidence],
-            }
-            for item in context
-        ]
-        omitted_roles: list[str] = []
-        rendered = _render_context(prior_roles, omitted_roles)
-        while prior_roles and len(rendered) > self.context_limit_chars:
-            omitted_roles.append(str(prior_roles.pop(0)["role"]))
+        if context_envelope is None:
+            prior_roles = [
+                {
+                    "role": item.role.value,
+                    "summary": item.summary,
+                    "evidence": [asdict(evidence) for evidence in item.evidence],
+                }
+                for item in context
+            ]
+            omitted_roles: list[str] = []
             rendered = _render_context(prior_roles, omitted_roles)
-        truncated = bool(omitted_roles)
+            while prior_roles and len(rendered) > self.context_limit_chars:
+                omitted_roles.append(str(prior_roles.pop(0)["role"]))
+                rendered = _render_context(prior_roles, omitted_roles)
+            truncated = bool(omitted_roles)
+        else:
+            if context_envelope.estimated_tokens > context_envelope.token_budget:
+                raise ValueError("context envelope exceeds its declared token budget")
+            rendered = json.dumps(
+                context_envelope.to_prompt(),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            truncated = bool(context_envelope.omitted_roles)
         user = json.dumps(
             {
                 "objective": objective.goal,
@@ -382,6 +484,12 @@ class ModelBackend:
             "response_digest": _digest(response.raw_body) if response else None,
             "prompt_tokens": response.prompt_tokens if response else None,
             "completion_tokens": response.completion_tokens if response else None,
+            "token_accounting": measure_call(
+                request_bytes=len(request_body),
+                prompt_tokens=response.prompt_tokens if response else None,
+                completion_tokens=response.completion_tokens if response else None,
+                max_output_tokens=provider.config.max_output_tokens,
+            ).to_document(),
             "retry_index": retry_index,
             "transport_retry_index": (
                 response.transport_retry_index if response else None
@@ -416,8 +524,9 @@ class ModelBackend:
         *,
         role: Role,
         provider: ModelProvider,
+        context_envelope: ContextEnvelope | None = None,
     ) -> dict[str, object]:
-        return {
+        manifest: dict[str, object] = {
             "role": role.value,
             "prior_roles": [item.role.value for item in context],
             "summaries": [item.summary for item in context],
@@ -436,3 +545,7 @@ class ModelBackend:
                 else "role-override"
             ),
         }
+        if context_envelope is not None:
+            manifest["context_envelope"] = context_envelope.to_receipt()
+            manifest["manifest_digest"] = context_envelope.manifest_digest
+        return manifest

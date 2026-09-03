@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-1",
+  "discovered_at_utc": "2026-09-03T07:23:00Z",
+  "collector_output": {
+    "created_at_utc": "2026-09-03T07:19:54.7718299Z",
+    "candidate_commit": "7a0bb65eae971ddcf6d77d86356213f3b406786a",
+    "candidate_tree": "9c3c2bc48dd1715963e51ff6cf9a5fd54b90d715",
+    "candidate_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+    "qualification_eligible_json": true,
+    "activation_authorized_json": false,
+    "focused_tests": 282,
+    "focused_test_seconds": 13.438,
+    "focused_test_outcome": "OK",
+    "evidence_json_sha256": "f31ca08ebfbe9f6d31334ea7d4cf56a1cb5b8e62bd3beb3684bbd68768bfc40b",
+    "focused_test_output_sha256": "b072647a9357acd879e210e2dc1566d8a038e0337ad4983337f95837359edaff",
+    "review_request_bytes": 1067,
+    "review_request_sha256": "9d43c66f53d0d1977083a2476fb7ea551755f13890b826a0be20500714b85e49"
+  },
+  "first_cause": {
+    "classification": "REVIEW_ARTIFACT_IDENTITY_INTERPOLATION_DEFECT",
+    "severity": "P2_RELEASE_EVIDENCE_CORRECTNESS",
+    "summary": "PowerShell escape characters before variable references caused the human-facing independent review request to emit unresolved literal names instead of the exact candidate identity and evidence digests.",
+    "unresolved_literals": [
+      "$head",
+      "$tree",
+      "$parent",
+      "$parentTree",
+      "$manifestSha256",
+      "$planSha256",
+      "$predecessorReceiptSha256",
+      "$qualificationEligible"
+    ],
+    "unaffected_authoritative_outputs": [
+      "evidence.json",
+      "unsigned-activation-template.json",
+      "SHA256SUMS.txt"
+    ]
+  },
+  "superseded_remote_runs": [
+    {
+      "run_id": 33727596601,
+      "event": "push",
+      "head_sha": "7a0bb65eae971ddcf6d77d86356213f3b406786a",
+      "conclusion": "cancelled_after_curator_rejection"
+    },
+    {
+      "run_id": 33727597888,
+      "event": "pull_request",
+      "head_sha": "7a0bb65eae971ddcf6d77d86356213f3b406786a",
+      "conclusion": "cancelled_after_curator_rejection"
+    },
+    {
+      "run_id": 33727598266,
+      "event": "pull_request",
+      "workflow": "Autopilot Control Room",
+      "head_sha": "7a0bb65eae971ddcf6d77d86356213f3b406786a",
+      "conclusion": "success_but_not_reusable_for_amended_candidate"
+    }
+  ],
+  "disposition": "REJECT_AS_FINAL_REVIEW_PACKAGE_AND_ADAPT_WITH_EXACT_FIELD_BINDING_REGRESSION",
+  "nonclaims": [
+    "The correctly bound JSON does not repair or replace the defective human-facing review request.",
+    "Successful partial CI jobs from the superseded commit do not qualify an amended candidate.",
+    "The defect did not authorize activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority."
+  ],
+  "rollback": "Preserve this adverse receipt; interpolate every review field, test it against the authoritative evidence JSON, amend the sole candidate commit, and rerun the exact full gate and clean collector before requesting fresh CI."
+}

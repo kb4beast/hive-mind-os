@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-exact-full-gate-receipt-v1",
+  "attempt_id": "V4-PRE-CANDIDATE-FULL-GATE-ATTEMPT-8",
+  "captured_at_utc": "2026-09-03T10:27:42.3744355Z",
+  "candidate_tree": "c55ac7c357687aa0902d1aaef5c898c041ad9519",
+  "pre_amend_head": "89ff95b3547eb487b69087e7326c202369e73126",
+  "sole_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9",
+  "command": "python -m unittest discover -s tests -v",
+  "python_executable": "C:\\Python314\\python.exe",
+  "python_sha256": "sha256:7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a",
+  "source_probe": {
+    "executable": "C:\\Python314\\python.exe",
+    "package": "C:\\Users\\beesp\\.codex\\worktrees\\b7eb\\hive-mind-os\\src\\hive_mind_os\\__init__.py",
+    "expected_package": "C:\\Users\\beesp\\.codex\\worktrees\\b7eb\\hive-mind-os\\src\\hive_mind_os\\__init__.py",
+    "matched": true
+  },
+  "environment": {
+    "pythonpath": "C:\\Users\\beesp\\.codex\\worktrees\\b7eb\\hive-mind-os\\src;C:\\Users\\beesp\\.codex\\worktrees\\b7eb\\hive-mind-os",
+    "pythondontwritebytecode": "1",
+    "pythonutf8": "1",
+    "inherited_git_names": []
+  },
+  "timeout_seconds": 2400,
+  "timed_out": false,
+  "duration_milliseconds": 314870,
+  "actual_exit_code": 1,
+  "effective_exit_code": 1,
+  "tree_after": "c55ac7c357687aa0902d1aaef5c898c041ad9519",
+  "tree_stable": true,
+  "unstaged_paths_after": [],
+  "bytecode_paths_after": [],
+  "raw_logs": {
+    "stdout": {
+      "path": "C:\\Users\\beesp\\AppData\\Local\\Temp\\hive-v4-full-gate-c55ac7c357687aa0902d1aaef5c898c041ad9519-attempt-8\\stdout.log",
+      "bytes": 0,
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "C:\\Users\\beesp\\AppData\\Local\\Temp\\hive-v4-full-gate-c55ac7c357687aa0902d1aaef5c898c041ad9519-attempt-8\\stderr.log",
+      "bytes": 86185,
+      "sha256": "sha256:ce17510bcc2749d25771c4faf0822431bc2adda79200e6ec4b4f2a841dd78bd4"
+    }
+  },
+  "stderr_tail": [
+    "ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "C:\\Users\\beesp\\AppData\\Local\\Temp\\tmpa9n8jney\\authoring\\docs\\execution\\dags\\generic-hive-mind-product-v3\\verify_plan.py:3061: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002597A5404F0>",
+    "  def _gitattribute_pattern_matches(pattern: str, relative: str) -> bool:",
+    "ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "ok",
+    "test_authoring_late_nested_attributes_creation_is_rejected (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_late_nested_attributes_creation_is_rejected) ... ok",
+    "test_authoring_late_root_attributes_mutation_is_rejected (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_late_root_attributes_mutation_is_rejected) ... ok",
+    "test_authoring_mode_rejects_any_state_beyond_exact_seventeen_payload_paths (test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_mode_rejects_any_state_beyond_exact_seventeen_payload_paths) ... "
+  ],
+  "passed": false,
+  "activation_authorized": false
+}

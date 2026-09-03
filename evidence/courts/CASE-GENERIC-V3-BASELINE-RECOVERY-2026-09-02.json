@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "case_id": "CASE-GENERIC-V3-BASELINE-RECOVERY-2026-09-02",
+  "status": "ADAPTED_AS_INERT_V4_PREDECESSOR",
+  "clerk": "/root",
+  "explorer": "/root/baseline_explorer",
+  "advocate": "/root/verifier_architect",
+  "cross_examiner": "/root/pr_integrator",
+  "expert_witnesses": [
+    "/root/baseline_explorer",
+    "/root/verifier_architect"
+  ],
+  "architect": "/root/verifier_architect",
+  "builder": "/root",
+  "curator": "/root/v3_r2_curator",
+  "judge": "/root/v3_r4_judge",
+  "proposed_disposition": "adapt",
+  "claims": [
+    "a pinned Git bundle is required to make the severed V3 history available after squash merges",
+    "Windows executable identity must use birth time rather than raw ChangeTime where birth time is available",
+    "full native-image parsing and SHA-256 remain load-bearing",
+    "none of open pull requests 157 through 164 is a valid canonical V4 input as submitted"
+  ],
+  "acceptance_receipts": [
+    "evidence/audits/generic-v3-baseline-recovery/V3-R4-QUALIFICATION.json"
+  ],
+  "dissent": [
+    "A real merge commit would be smaller, but repository settings permit future squash or rebase loss.",
+    "Windows ChangeTime is useful diagnostic evidence even though it is not stable enough for acceptance.",
+    "The green build-evidence job produced and attested only the wheel; no SBOM was retained or attested.",
+    "Dependency and license review was skipped on the qualifying push event."
+  ],
+  "verdict": "adapt",
+  "verdict_scope": "Exact commit ce692c0145d9c7611b34383974fde1c78903c5ef is technically adequate only as an immutable, non-activatable V4 predecessor.",
+  "conditions": [
+    "Preserve R4 unchanged and retain all dissent.",
+    "Repair and remotely prove SBOM generation, artifact retention, and attestation in V4.",
+    "Execute pull-request-only dependency and license review.",
+    "Do not claim execution, activation, release, deployment, production, A5, protected merge, or superiority."
+  ],
+  "appeal": "CLOSED_FOR_R4_SCOPE_NEW_SUCCESSOR_REQUIRES_FRESH_COURT"
+}

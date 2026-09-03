@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-repair-validation-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-9",
+  "captured_at_utc": "2026-09-03T10:19:15.7054400Z",
+  "head_commit": "89ff95b3547eb487b69087e7326c202369e73126",
+  "implementation_staged_tree": "c858449dc35de15548757e4458cfed5b7041bc6f",
+  "source_binding": {
+    "candidate_source": "C:/Users/beesp/.codex/worktrees/b7eb/hive-mind-os/src",
+    "python": "C:/Python314/python.exe",
+    "bytecode_suppressed": true,
+    "warning_policy": "error::ResourceWarning",
+    "focused_module_count": 29,
+    "focused_test_count": 286,
+    "zero_skips_required": true,
+    "zero_expected_failures_required": true
+  },
+  "root_validation": {
+    "wave_and_integration_modules": {
+      "tests_run": 45,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "duration_seconds": 1.089
+    },
+    "bounded_integration_alias_repetitions": {
+      "tests_run": 500,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "duration_seconds": 13.325
+    },
+    "collector_regression_module": {
+      "tests_run": 10,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "duration_seconds": 40.764
+    },
+    "constructor_failure_probe": {
+      "constructor_error": "CandidateStateError: candidate snapshot has an unknown shape",
+      "resource_warning_present": false,
+      "process_exit_code": 0
+    }
+  },
+  "collector_stress": {
+    "test": "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_writes_review_evidence_without_authorizing_activation",
+    "sequential": {
+      "planned_iterations": 12,
+      "completed_iterations": 12,
+      "passes": 12,
+      "failures": 0,
+      "duration_milliseconds": [33161, 28835, 28561, 28101, 28025, 27996, 28036, 27911, 28200, 27859, 27906, 28002]
+    },
+    "concurrent": {
+      "planned_iterations": 4,
+      "completed_iterations": 4,
+      "passes": 4,
+      "failures": 0,
+      "duration_milliseconds": [33155, 33051, 33126, 33224]
+    },
+    "qualification_predicate_exercised": "Every run required exact per-module terminal markers, 286 exact tests, zero failures, errors, skips, expected failures, and unexpected successes, stable executable/source hashes, no bytecode, and inert activation state.",
+    "result": "PASS"
+  },
+  "independent_curator_validation": {
+    "observer": "/root/v4_quality_reviewer",
+    "staged_tree_verified": "c858449dc35de15548757e4458cfed5b7041bc6f",
+    "staged_tree_verification_method": "git diff --cached c858449dc35de15548757e4458cfed5b7041bc6f --exit-code",
+    "unstaged_drift": false,
+    "wave_and_integration_tests": 45,
+    "integration_alias_repetitions": 100,
+    "concurrent_verify_calls": 1000,
+    "failures": 0,
+    "constructor_resource_warning": false,
+    "distinct_handle_same_path_transition": "one winner, one denial, both reopened histories verify at sequences [1,2]",
+    "static_result": "NO_UNRESOLVED_P1_OR_P2"
+  },
+  "independent_judge_validation": {
+    "observer": "/root/v4_final_judge",
+    "staged_tree_recomputed": "c858449dc35de15548757e4458cfed5b7041bc6f",
+    "focused_inventory": "29 modules; exact 286/286",
+    "warning_fatal_targeted_tests": 5,
+    "failures": 0,
+    "court_claims": "continuous unique V4-C01 through V4-C75",
+    "static_result": "NO_C73_TO_C75_IMPLEMENTATION_BLOCKER"
+  },
+  "disposition": "ACCEPT_C73_TO_C75_REPAIR_FOR_CANDIDATE_FREEZE_AND_DOWNSTREAM_GATING",
+  "remaining_gates": [
+    "Freeze the receipt-bearing final staged tree and run the exact complete local CI command against that tree.",
+    "Amend the sole direct-child commit without changing its parent, run a clean collector against that exact commit, and force-push only with the exact remote lease.",
+    "Require fresh exact-head remote CI, artifact inventory and attestation validation, independent Curator verdict, and Judge disposition."
+  ],
+  "nonclaims": [
+    "This repair validation is not the complete repository CI gate and does not qualify a later receipt-bearing tree by itself.",
+    "Future.result timeouts do not terminate arbitrary Python workers; the collector's child-process deadline remains the hard containment boundary.",
+    "Same-handle locking does not become a claim of process-external or cross-host journal serialization.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority claim follows from this receipt."
+  ],
+  "rollback": "If any downstream gate fails, preserve its adverse receipt, supersede this pre-freeze tree, and re-enter repair without activation or protected-branch mutation."
+}

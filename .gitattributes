@@ -26,3 +26,14 @@ evidence/experiments/_failed/** -text -diff
 
 # Local-assurance transcripts are content-addressed evidentiary bytes.
 evidence/local_assurance/**/logs/** -text -diff
+
+# The V3 history recovery fixture is a Git bundle whose exact binary bytes are
+# authenticated by its adjacent provenance manifest and regression tests.
+tests/fixtures/*.bundle -text -diff
+
+# Preserved V4 source branches are complete Git bundles, not text exhibits.
+evidence/sources/v4-successor-recovery/** -text -diff
+evidence/sources/**/*.bundle -text -diff
+
+# Local V4 gate transcripts are retained as exact adverse evidence.
+evidence/audits/v4-successor-recovery/logs/** -text -diff

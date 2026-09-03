@@ -1,0 +1,45 @@
+{
+  "total_count": 2,
+  "artifacts": [
+    {
+      "id": 9871406573,
+      "node_id": "MDg6QXJ0aWZhY3Q5ODcxNDA2NTcz",
+      "name": "hive-mind-os-build-evidence",
+      "size_in_bytes": 534554,
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/artifacts/9871406573",
+      "archive_download_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/artifacts/9871406573/zip",
+      "expired": false,
+      "digest": "sha256:c08a4740401b3edb274ad73c8fd99d3820f1d010d49a37e445f62887822b5091",
+      "created_at": "2026-09-02T23:24:18Z",
+      "updated_at": "2026-09-02T23:24:18Z",
+      "expires_at": "2026-10-02T23:24:18Z",
+      "workflow_run": {
+        "id": 33694910734,
+        "repository_id": 1313414798,
+        "head_repository_id": 1313414798,
+        "head_branch": "codex/v3-squash-proof-recovery-r4",
+        "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef"
+      }
+    },
+    {
+      "id": 9871404621,
+      "node_id": "MDg6QXJ0aWZhY3Q5ODcxNDA0NjIx",
+      "name": "gitleaks-results.sarif",
+      "size_in_bytes": 6780,
+      "url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/artifacts/9871404621",
+      "archive_download_url": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/artifacts/9871404621/zip",
+      "expired": false,
+      "digest": "sha256:8a88413c574ec73c7aa000dba3ccbf3f49b1eff8e4b7cdc7db297d3b13de6f20",
+      "created_at": "2026-09-02T23:24:14Z",
+      "updated_at": "2026-09-02T23:24:14Z",
+      "expires_at": "2026-12-01T23:24:07Z",
+      "workflow_run": {
+        "id": 33694910734,
+        "repository_id": 1313414798,
+        "head_repository_id": 1313414798,
+        "head_branch": "codex/v3-squash-proof-recovery-r4",
+        "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef"
+      }
+    }
+  ]
+}

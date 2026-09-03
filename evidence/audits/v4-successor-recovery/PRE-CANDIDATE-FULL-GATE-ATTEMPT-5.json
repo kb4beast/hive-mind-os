@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-full-gate-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-FULL-GATE-ATTEMPT-5",
+  "started_at_utc": "2026-09-03T07:27:45.8203180Z",
+  "last_observed_at_utc": "2026-09-03T07:38:58.5534963Z",
+  "command": "python -m unittest discover -s tests -v",
+  "environment": {
+    "python": "3.14.4",
+    "bytecode_disabled": true,
+    "git_environment_names_in_child": [],
+    "candidate_source_path_bound": false,
+    "ambient_hive_mind_os_path": "C:\\Agentic AI\\temporary\\hive-mind-os\\src\\hive_mind_os\\__init__.py"
+  },
+  "validated_index_tree": {
+    "commit_before_amend": "7a0bb65eae971ddcf6d77d86356213f3b406786a",
+    "tree": "918cb0921b4fb41d946a0ec67fca8b98a295a7bd",
+    "sole_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+  },
+  "result": {
+    "outcome": "INTERRUPTED_NONQUALIFYING",
+    "terminal_summary_present": false,
+    "completed_ok_lines": 240,
+    "visible_fail_lines": 0,
+    "visible_error_lines": 1,
+    "last_completed_test": "test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_requires_exactly_one_parent_from_the_candidate_object",
+    "stalled_next_test": "test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_writes_review_evidence_without_authorizing_activation"
+  },
+  "raw_log": {
+    "path": "evidence/audits/v4-successor-recovery/logs/pre-candidate-full-gate-attempt-5.log",
+    "bytes": 51134,
+    "sha256": "6ed7907252dc31665dff31a0dfdc6ccc9f331f039b37eb84e9658dd2800aae73",
+    "last_write_utc": "2026-09-03T07:29:01.0440364Z"
+  },
+  "proven_findings": [
+    {
+      "classification": "LOCAL_GATE_SOURCE_BINDING_ERROR",
+      "evidence": "The bare interpreter resolved hive_mind_os from C:\\Agentic AI\\temporary\\hive-mind-os, and the partial transcript records test_adapter_registry as an import error before the stall.",
+      "correction": "Bind the candidate source path explicitly and prove the imported package path before accepting a local full gate."
+    },
+    {
+      "classification": "UNBOUNDED_COLLECTOR_CHILD_AND_INCOMPLETE_HANG_OBSERVABILITY",
+      "evidence": "The collector's focused Python child remained responsive but idle for more than nine minutes; the collector had no child deadline and did not materialize either captured stream until child exit.",
+      "correction": "Use an exact isolated bootstrap, asynchronously drain both streams, emit periodic faulthandler stacks, enforce a 180-second deadline, and terminate only the spawned PID tree."
+    }
+  ],
+  "unknowns": [
+    "The exact internal cause of the intermittent focused-child stall was not recovered; a Python 3.14 remote stack request could not execute while the main thread remained in its native wait.",
+    "No runtime deadlock is inferred from the stall: the exact 282-test focused suite later passed directly, and the 57-test host-runtime suite passed 25 consecutive warning-fatal repetitions."
+  ],
+  "bounded_correction_evidence": {
+    "direct_focused_suite": "282 tests in 13.402s, OK with ResourceWarning fatal and exact worktree source binding",
+    "host_runtime_stress": "25 consecutive runs of 57 tests, all OK with ResourceWarning fatal",
+    "instrumented_collector_repetitions": "6 consecutive parent-to-PowerShell-to-isolated-Python packages completed in 14.860s to 15.252s",
+    "integrated_collector_module": "6 tests in 21.321s, OK with ResourceWarning fatal",
+    "adversarial_runner_coverage": [
+      "more than 1 MiB drained exactly from each of stdout and stderr without deadlock",
+      "nonzero child exit 7 preserved",
+      "one-second timeout mapped to effective exit 124",
+      "spawned parent and grandchild terminated while an unrelated sentinel remained alive",
+      "poisoned ambient PYTHONPATH replaced with the exact candidate source and repository roots"
+    ]
+  },
+  "disposition": "REJECT_AS_QUALIFYING_RECEIPT_AND_ADAPT_GATE_SOURCE_BINDING_AND_COLLECTOR_PROCESS_BOUNDARY",
+  "residual_nonclaims": [
+    "taskkill /T has a small PID-reuse race; this is not Windows Job Object custody.",
+    "Executable and source rehashing detects substitution but is not immutable handle-based custody.",
+    "Passing bounded reproductions do not invent a root cause for the earlier intermittent stall."
+  ],
+  "nonclaims": [
+    "This interrupted run does not qualify tree 918cb0921b4fb41d946a0ec67fca8b98a295a7bd.",
+    "No activation, signing, nonce consumption, merge, release, deployment, A5, production-readiness, or superiority claim follows from this receipt."
+  ],
+  "rollback": "Preserve this receipt and exact partial log append-only; rerun the exact full gate only on a newly frozen tree with explicit current-source binding, then run the hardened clean collector before fresh CI."
+}

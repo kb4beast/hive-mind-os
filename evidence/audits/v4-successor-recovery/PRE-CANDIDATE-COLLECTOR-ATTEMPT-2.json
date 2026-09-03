@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-local-collector-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-PRE-CANDIDATE-COLLECTOR-ATTEMPT-2",
+  "discovered_at_utc": "2026-09-03T08:04:41Z",
+  "test": "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_times_out_and_terminates_the_focused_process_tree",
+  "result": {
+    "outcome": "FAILED_NONQUALIFYING",
+    "module_tests_run": 6,
+    "module_seconds": 21.259,
+    "failure_count": 1,
+    "observed_diagnostic": "taskkill.exe reported that PID 32248, a child of PID 27540, could not be terminated; PowerShell surfaced the native stderr as a terminating NativeCommandError before the runner could evaluate the exact spawned process state."
+  },
+  "first_cause": {
+    "classification": "NATIVE_STDERR_POLICY_RACE_DURING_BOUNDED_TREE_TERMINATION",
+    "summary": "The collector's Stop error policy converted taskkill stderr into a terminating PowerShell error even when the owned Python process had exited during the termination race.",
+    "correction": "Temporarily use Continue only around the pinned taskkill invocation, capture its merged output and exit code, restore the caller's policy in finally, then decide failure from the exact spawned process state and bounded wait."
+  },
+  "correction_evidence": {
+    "integrated_module": "7 tests in 23.247s, OK with ResourceWarning fatal.",
+    "race_stress": "The original collector timeout regression passed eight consecutive warning-fatal repetitions after correction.",
+    "deterministic_regression": "A wrapper terminated the owned tree, emitted synthetic native stderr, returned 128, and proved the runner still emitted a typed timeout result with effective exit 124 while preserving the termination diagnostic in eight consecutive warning-fatal repetitions."
+  },
+  "disposition": "REJECT_AS_QUALIFYING_VALIDATION_AND_ADAPT_NATIVE_STDERR_CAPTURE_WITH_EXACT_PROCESS_STATE_JUDGMENT",
+  "nonclaims": [
+    "A nonzero taskkill exit is accepted only after the exact spawned process handle reports exit within the bounded termination wait.",
+    "The correction does not remove the documented PID-reuse race or provide Windows Job Object custody.",
+    "This pre-candidate validation failure does not authorize activation, signing, nonce consumption, merge, release, deployment, A5, production readiness, or superiority."
+  ],
+  "rollback": "Preserve this adverse receipt; retain the deterministic native-stderr regression and fail closed if the exact spawned process does not exit within the bounded post-taskkill wait."
+}

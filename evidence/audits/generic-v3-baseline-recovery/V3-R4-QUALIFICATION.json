@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v3-qualification-receipt-v1",
+  "receipt_id": "V3-R4-QUALIFICATION-2026-09-03",
+  "recorded_at_utc": "2026-09-03T00:27:23.411Z",
+  "case_id": "CASE-GENERIC-V3-BASELINE-RECOVERY-2026-09-02",
+  "status": "QUALIFIED_INERT_PREDECESSOR",
+  "disposition": "ADAPT",
+  "scope": "Immutable historical-recovery evidence and a non-activatable predecessor for the V4 successor only.",
+  "candidate_commit": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+  "candidate_tree": "86e502763fcfd924094ba8194dd0c31b114652a9",
+  "parent_commit": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+  "parent_tree": "72696b27cdd2c9cd08085c05c98513ece733cc8d",
+  "commit_time": "2026-09-02T18:23:46-05:00",
+  "published_branch": "codex/v3-squash-proof-recovery-r4",
+  "remote_ref": "origin/codex/v3-squash-proof-recovery-r4",
+  "worktree_clean_after_validation": true,
+  "delta": {
+    "path_count": 17,
+    "modified_paths": 8,
+    "added_paths": 9,
+    "insertions": 3010,
+    "deletions": 152,
+    "sole_parent_verified": true
+  },
+  "artifact_bindings": {
+    "manifest": {
+      "path": "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
+      "bytes": 24140,
+      "sha256": "sha256:75255fd77f9e622ed0ae1d7bf50cc2d232a83dfbfe7f7ccc73d7c3f96cb82e31",
+      "payload_inventory_count": 23,
+      "exact_non_manifest_bindings": 22
+    },
+    "source_intake": {
+      "path": "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+      "bytes": 17952,
+      "sha256": "sha256:4d90fadba15120788ce24ea480a3847b8f8df192ff0f072d5982ebebe773cf51",
+      "source_count": 5,
+      "atomic_claim_count": 10,
+      "counterclaim_count": 6
+    },
+    "raw_source_archive": {
+      "path": "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+      "bytes": 593920,
+      "sha256": "sha256:79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e",
+      "regular_member_count": 10,
+      "deterministic_metadata_verified": true
+    },
+    "history_bundle": {
+      "path": "tests/fixtures/generic-v3-history.bundle",
+      "bytes": 298169,
+      "sha256": "sha256:2de9a9db506e8561d21b86f7887c9030868337862ae755074d447f19dfcd2ae7",
+      "prerequisite_commit": "44224532dc25b94a95c3184054ec81762a258259",
+      "advertised_tip": "28463ae6dd842b0b316fcf99eab98804cdaf9735",
+      "linear_commit_count": 12,
+      "named_checkpoint_count": 5,
+      "prerequisite_only_recovery_verified": true
+    },
+    "history_provenance": {
+      "path": "tests/fixtures/generic-v3-history.provenance.json",
+      "bytes": 1474,
+      "sha256": "sha256:de7a40bbcdf431750239b39d2c91ce015951d204dc433ba641ac62057a9b70e4"
+    }
+  },
+  "validation": {
+    "curator_focused": {
+      "actor": "/root/v3_r2_curator",
+      "tests": 98,
+      "seconds": 700.598,
+      "result": "OK",
+      "skips": 2,
+      "additional_checks": [
+        "five CI-contract tests",
+        "Ruff",
+        "DAG materializer",
+        "DAG lint and rounds",
+        "committed-payload verifier"
+      ]
+    },
+    "judge_focused": {
+      "actor": "/root/v3_r4_judge",
+      "tests": 98,
+      "seconds": 776.038,
+      "result": "OK",
+      "skips": 2
+    },
+    "clean_local_full_gate": {
+      "actor": "/root",
+      "command": "python -m unittest discover -s tests -v",
+      "python_source_binding": "exact candidate src through PYTHONPATH",
+      "inherited_git_environment": "removed",
+      "tests": 1195,
+      "seconds": 1755.243,
+      "result": "OK",
+      "skips": 8
+    },
+    "github": {
+      "workflow": "Constitutional CI",
+      "run_id": 33694910734,
+      "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33694910734",
+      "event": "push",
+      "created_at": "2026-09-02T23:24:07Z",
+      "completed_at": "2026-09-03T00:05:42Z",
+      "head_sha": "ce692c0145d9c7611b34383974fde1c78903c5ef",
+      "conclusion": "success",
+      "jobs": [
+        {"name": "unit-tests (Python 3.11)", "tests": 1195, "skips": 15, "conclusion": "success"},
+        {"name": "unit-tests (Python 3.12)", "tests": 1195, "skips": 15, "conclusion": "success"},
+        {"name": "unit-tests (Python 3.14)", "tests": 1195, "skips": 15, "conclusion": "success"},
+        {"name": "unit-tests (Windows, Python 3.12)", "tests": 1195, "seconds": 1963.277, "skips": 1, "conclusion": "success"},
+        {"name": "unit-tests (Windows, Python 3.14)", "tests": 1195, "seconds": 2462.451, "skips": 1, "conclusion": "success"},
+        {"name": "static-and-type-checks", "conclusion": "success"},
+        {"name": "codeql-security", "conclusion": "success"},
+        {"name": "secret-scan", "conclusion": "success"},
+        {"name": "sbom-and-build-provenance", "conclusion": "success_with_material_evidence_defect"},
+        {"name": "dependency-and-license-review", "conclusion": "skipped_on_push"}
+      ]
+    }
+  },
+  "court": {
+    "clerk": "/root",
+    "explorer": "/root/baseline_explorer",
+    "architect": "/root/verifier_architect",
+    "builder": "/root",
+    "integrator_and_cross_examiner": "/root/pr_integrator",
+    "curator": "/root/v3_r2_curator",
+    "judge": "/root/v3_r4_judge",
+    "identities_distinct_from_builder": true,
+    "verdict": "ADAPT"
+  },
+  "material_dissent": [
+    {
+      "finding_id": "V4-SBOM-P2-001",
+      "severity": "P2",
+      "finding": "The pinned Anchore action rejected three unsupported inputs; the retained artifact and verified attestation contain only the wheel and no SBOM.",
+      "carried_to": "evidence/audits/v4-successor-recovery/SBOM-EVIDENCE-GAP.json",
+      "blocks": "release readiness and every claim that R4 generated, retained, or attested an SBOM"
+    },
+    {
+      "finding_id": "V3-R4-PR-ONLY-REVIEW",
+      "severity": "gate",
+      "finding": "Dependency and license review was skipped because the qualifying GitHub event was a push.",
+      "blocks": "release readiness until a pull-request run completes"
+    }
+  ],
+  "conditions": [
+    "Preserve R4 unchanged and use it only as historical recovery and predecessor evidence.",
+    "The V4 successor must repair and prove SBOM generation, retention, and attestation.",
+    "A pull-request run must execute dependency and license review.",
+    "External frozen-host custody, dependency closure, minimum-version and revocation policy, signatures, lease, nonce, and protected-merge authority remain separate unsatisfied gates.",
+    "Every modified successor requires a fresh Curator and distinct Judge review."
+  ],
+  "execution_authorized": false,
+  "activation_authorized": false,
+  "release_ready": false,
+  "deployment_ready": false,
+  "production_ready": false,
+  "protected_merge_authorized": false,
+  "a5_ready": false,
+  "superiority_claimed": false,
+  "signature": null,
+  "external_attestation": false,
+  "rollback": "Revert only a consuming successor or close its unmerged pull request; preserve R4, this receipt, dissent, failed predecessors, and the original CI evidence append-only."
+}

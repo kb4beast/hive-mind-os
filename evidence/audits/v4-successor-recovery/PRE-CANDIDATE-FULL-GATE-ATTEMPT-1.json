@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-pre-candidate-local-gate-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "attempt_id": "V4-LOCAL-FULL-GATE-ATTEMPT-1",
+  "started_at": "2026-09-03T00:59:18Z",
+  "completed_at": "2026-09-03T01:27:47Z",
+  "candidate_state": "DIRTY_PRE_FREEZE",
+  "command": "python -B -m unittest discover -s tests -v",
+  "host": {
+    "os": "Microsoft Windows 10.0.26200",
+    "python": "3.14.4",
+    "git": "2.53.0.windows.3",
+    "powershell": "7.6.4"
+  },
+  "result": {
+    "exit_code": 1,
+    "tests_run": 1347,
+    "elapsed_seconds": 1708.003,
+    "failures": 1,
+    "errors": 2,
+    "skips": 8,
+    "disposition": "REJECT_ATTEMPT_AND_CORRECT"
+  },
+  "observations": [
+    {
+      "id": "V4-LOCAL-001",
+      "kind": "invocation_environment_error",
+      "affected_tests": [
+        "test_explorer_can_read_history_and_discover_tests_through_receipts",
+        "test_fake_git_path_entry_is_not_invoked"
+      ],
+      "cause": "The local wrapper attempted to scrub inherited GIT_* variables with Environment.SetEnvironmentVariable(name, null, Process). On this PowerShell host that left GIT_PAGER present with an empty value, and the Explorer correctly rejected the inherited Git environment.",
+      "correction": "Remove inherited GIT_* entries from the process environment provider before the next exact gate invocation. No product or test behavior is weakened for this observation."
+    },
+    {
+      "id": "V4-LOCAL-002",
+      "kind": "stale_governance_assertion",
+      "affected_tests": [
+        "test_ci_covers_required_constitutional_checks"
+      ],
+      "cause": "The governance test required the obsolete top-level action token anchore/sbom-action@ after V4 intentionally replaced the false-green generator invocation with the pinned download-syft sub-action and explicit fail-closed Syft execution.",
+      "correction": "Require anchore/sbom-action/download-syft@. The dedicated CI contract test continues to require explicit SBOM generation, semantic validation, exact upload paths, and exact attestation subjects."
+    }
+  ],
+  "raw_log": {
+    "path": "evidence/audits/v4-successor-recovery/logs/pre-candidate-full-gate-attempt-1.log",
+    "bytes": 268652,
+    "sha256": "5c019bc5ab759087b96b01cda48e2e917b13ad5a69f216f92d3ab70b374b82dd",
+    "content_policy": "Exact PowerShell redirection output from the failed attempt; retained without line-ending normalization or text diff."
+  },
+  "nonclaims": [
+    "This failed pre-candidate attempt is not evidence that the V4 candidate passed the full local gate.",
+    "The two Explorer errors do not justify relaxing inherited Git-environment rejection.",
+    "The governance assertion correction does not establish that the SBOM exists in remote CI; the exact candidate artifact and attestation must still be observed after push."
+  ],
+  "rollback": "Revert the governance assertion correction only together with a replacement test that recognizes the explicit pinned Syft path without permitting the unsupported false-green action interface. Preserve this adverse receipt and raw log."
+}

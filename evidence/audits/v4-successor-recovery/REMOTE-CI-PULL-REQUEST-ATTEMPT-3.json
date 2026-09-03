@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "hive-mind-v4-remote-ci-adverse-receipt-v1",
+  "case_id": "CASE-V4-SUCCESSOR-RECOVERY-2026-09-02",
+  "recorded_at_utc": "2026-09-03T12:08:00.333Z",
+  "candidate": {
+    "commit": "3743ad1e2bafaac2efd2b19d91510086ce48d478",
+    "sole_parent": "59a5364501c5e49ceb28574aad7a4ac1512291b9"
+  },
+  "run": {
+    "run_id": 33749590483,
+    "event": "pull_request",
+    "workflow": "Constitutional CI",
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33749590483",
+    "head_branch": "codex/v4-successor-recovery",
+    "head_sha": "3743ad1e2bafaac2efd2b19d91510086ce48d478",
+    "final_status": "completed",
+    "final_conclusion": "failure",
+    "completed_at_utc": "2026-09-03T12:10:44Z"
+  },
+  "failed_job": {
+    "job_id": 100629827595,
+    "name": "unit-tests (Windows, Python 3.12)",
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33749590483/job/100629827595",
+    "started_at_utc": "2026-09-03T11:25:24Z",
+    "completed_at_utc": "2026-09-03T12:00:57Z",
+    "failure_step": "Run deterministic test suite",
+    "exit_code": 1,
+    "unittest_summary": "Ran 1488 tests in 2102.183s; FAILED (failures=3, skipped=1)",
+    "three_failures": [
+      "test_collector_attributes_a_module_process_timeout_with_empty_streams",
+      "test_collector_records_bounded_focused_validation_timeout",
+      "test_collector_writes_review_evidence_without_authorizing_activation"
+    ],
+    "shared_observed_error": "The V4 candidate must be exactly one direct-child commit with one sole parent.",
+    "provider_log_endpoint": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100629827595/logs",
+    "provider_log_observation": {
+      "http_status": 200,
+      "content_type": "text/plain",
+      "content_length": 354479,
+      "content_md5": "wW/Y9cK0zQ2axTv2VjUPDA==",
+      "etag": "\"0x8DF09B3034ABD7A\"",
+      "last_modified": "2026-09-03T12:00:56Z",
+      "retrieval_command": "gh api -i repos/kb4beast/hive-mind-os/actions/jobs/100629827595/logs"
+    }
+  },
+  "additional_failed_job": {
+    "job_id": 100629827545,
+    "name": "unit-tests (Windows, Python 3.14)",
+    "url": "https://github.com/kb4beast/hive-mind-os/actions/runs/33749590483/job/100629827545",
+    "started_at_utc": "2026-09-03T11:25:24Z",
+    "completed_at_utc": "2026-09-03T12:10:43Z",
+    "failure_step": "Run deterministic test suite",
+    "exit_code": 1,
+    "unittest_summary": "Ran 1488 tests in 2686.621s; FAILED (failures=3, skipped=1)",
+    "shared_observed_error": "The V4 candidate must be exactly one direct-child commit with one sole parent.",
+    "provider_log_endpoint": "https://api.github.com/repos/kb4beast/hive-mind-os/actions/jobs/100629827545/logs"
+  },
+  "finding": {
+    "finding_id": "V4-CI-P2-003",
+    "severity": "P2",
+    "summary": "GitHub Actions default pull_request checkout supplied a synthetic two-parent merge commit to the Windows collector; the collector correctly refused it instead of accepting or guessing a parent.",
+    "root_cause": "The workflow ran the PowerShell collector tests in GitHub's default pull_request merge checkout even though the collector's explicit candidate invariant is one direct-child commit.",
+    "repair": "Retain default merge-result checkout for Linux unit tests, but pin the Windows collector lane to github.event.pull_request.head.sha (or github.sha for push) with complete history.",
+    "nonclaim": "This receipt does not rehabilitate the rejected 3743ad1 candidate, weaken the collector, or authorize activation, signing, nonce consumption, merge, deployment, release, or production use."
+  },
+  "disposition": "REJECT_3743AD1_AS_FINAL_CANDIDATE_AND_ADAPT_WITH_A_WINDOWS_DIRECT_HEAD_COLLECTOR_LANE_PLUS_FRESH_GATES"
+}

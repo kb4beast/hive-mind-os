@@ -28,7 +28,7 @@ from hive_mind_os.autopilot_workflow import (
 class PortableAutopilotWorkflowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve(strict=True)
         self.host_state = self.root.parent / f"{self.root.name}-host-state"
         self.environment = patch.dict(
             os.environ,

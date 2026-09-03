@@ -20,27 +20,60 @@ from contextlib import contextmanager
 from ctypes import wintypes
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
+from typing import Any
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-OVERLAY = ROOT / "docs" / "execution" / "dags" / "generic-hive-mind-product-v3"
+HISTORY_BUNDLE = ROOT / "tests" / "fixtures" / "generic-v3-history.bundle"
+HISTORY_BUNDLE_PROVENANCE = ROOT / "tests" / "fixtures" / "generic-v3-history.provenance.json"
+R4_BUNDLE = ROOT / "tests" / "fixtures" / "generic-v3-r4.bundle"
+R4_BUNDLE_PROVENANCE = (
+    ROOT / "tests" / "fixtures" / "generic-v3-r4.provenance.json"
+)
+RECOVERY_SOURCE_INTAKE = (
+    ROOT / "evidence" / "audits" / "generic-v3-baseline-recovery" / "SOURCE-INTAKE.json"
+)
+RECOVERY_SOURCE_INTAKE_SHA256 = "4d90fadba15120788ce24ea480a3847b8f8df192ff0f072d5982ebebe773cf51"
+RECOVERY_SOURCE_ARCHIVE = (
+    ROOT
+    / "evidence"
+    / "sources"
+    / "generic-v3-baseline-recovery"
+    / "raw"
+    / "source-exhibits.tar"
+)
+RECOVERY_SOURCE_ARCHIVE_SHA256 = "79bb85616e54f7575880240ed198182c330044c8d0cd44791941873cca8b968e"
+HISTORY_BUNDLE_SHA256 = "2de9a9db506e8561d21b86f7887c9030868337862ae755074d447f19dfcd2ae7"
+HISTORY_BUNDLE_REF = "refs/heads/release/hive-mind-autopilot"
+HISTORY_EVIDENCE_REF = "refs/hive-mind-evidence/generic-v3-history"
+R4_BUNDLE_SHA256 = "265ee2e6dece8a47e649c55b5df7e0e714a60e631126bc76874731e20cfdabdf"
+R4_BUNDLE_REF = "refs/heads/codex/v3-squash-proof-recovery-r4"
+R4_EVIDENCE_REF = "refs/hive-mind-evidence/generic-v3-r4"
+R4_COMMIT = "ce692c0145d9c7611b34383974fde1c78903c5ef"
+R4_TREE = "86e502763fcfd924094ba8194dd0c31b114652a9"
 PLAN_AUTHORING_BASE = "42b4aeef17f816430a7d8a435102635afea8761a"
 PAYLOAD_A = "4e2b81b932e5145f24c4b52ceeee664bff91df2e"
 GIT_ENVIRONMENT_CORRECTION_PARENT = "f06e52c43a1e2d1d53523378c0d6f5564fb984bf"
-CORRECTION_PARENT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
-CORRECTION_PARENT_TREE = "0d0a251b6ff1557ca014b6b50c6f62ae787c4459"
-CORRECTION_PARENT_MANIFEST_SHA256 = "sha256:87b9fa29dbcd0577328eb1298413994433c43a150f0f9c3b1ca2f498e0929f9e"
-CORRECTION_PARENT_AGGREGATE_SHA256 = "sha256:5eb7aee3582095465a7e1a030d360ca205048ae0e8abaceab6f63f212df88477"
-CORRECTION_PARENT_REPORT_SHA256 = "sha256:a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff"
-CORRECTION_PARENT_STATUS = "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS"
-V4_MANIFEST_KIND = "hive-mind-generic-product-overlay-manifest-v4"
-V4_CONTRACT_MODE = "exact-append-only-native-executable-matrix-correction-v4"
-V4_AUTHORING_MODE = "authoring-native-executable-matrix-correction-v4-non-executing"
-V4_COMMITTED_MODE = "committed-native-executable-matrix-correction-v4"
+GIT_BOUNDARY_CORRECTION_PARENT = "9b1cbcfe500e2253c70cb407b6c5e0493b63aaa8"
+CORRECTION_PARENT = "28463ae6dd842b0b316fcf99eab98804cdaf9735"
+CORRECTION_PARENT_TREE = "72696b27cdd2c9cd08085c05c98513ece733cc8d"
+CORRECTION_PARENT_PARENT = "9dfa1823edc9cd56cd1f404606a261a1d623f6cb"
+CORRECTION_PARENT_PARENT_TREE = "7e8becaebef2ca88922c9099ae1e497f978f43f1"
+CORRECTION_PARENT_MANIFEST_SHA256 = "sha256:c2f0ae0dcee177213f219eaa3031b45d6f5526fd1f2d98d73b11672068f81377"
+CORRECTION_PARENT_AGGREGATE_SHA256 = "sha256:ecbeb374fc8adbb711391568d8a2f2fa8b0ef022c233ca932f24bd9ab0b4fb23"
+CORRECTION_PARENT_REPORT_SHA256 = "sha256:1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944"
+CORRECTION_PARENT_STATUS = "PUBLISHED_TREE_WITH_SQUASH_SEVERED_HISTORY_AND_RED_CONSTITUTIONAL_CI"
+V5_MANIFEST_KIND = "hive-mind-generic-product-overlay-manifest-v5"
+V5_CONTRACT_MODE = "exact-append-only-squash-proof-windows-identity-correction-v5"
+V5_AUTHORING_MODE = "authoring-squash-proof-windows-identity-correction-v5-non-executing"
+V5_COMMITTED_MODE = "committed-squash-proof-windows-identity-correction-v5"
 TARGET_BRANCH = "release/hive-mind-autopilot"
 PAYLOAD_PATHS = (
     ".gitattributes",
+    ".github/workflows/ci.yml",
     "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
     "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
@@ -50,15 +83,45 @@ PAYLOAD_PATHS = (
     "docs/execution/dags/generic-hive-mind-product-v3/plan.json",
     "docs/execution/dags/generic-hive-mind-product-v3/traceability.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+    "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+    "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+    "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+    "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
+    "tests/test_autopilot_workflow.py",
     "tests/test_generic_dag_v3_overlay.py",
 )
 CORRECTION_PATHS = (
     ".gitattributes",
-    "docs/architecture/ADR-069-GENERIC-HIVE-MIND-V3-EXECUTION-DAG.md",
+    ".github/workflows/ci.yml",
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "docs/architecture/ADR_INDEX.md",
     "docs/execution/dags/generic-hive-mind-product-v3/README.md",
     "docs/execution/dags/generic-hive-mind-product-v3/manifest.json",
     "docs/execution/dags/generic-hive-mind-product-v3/verify_plan.py",
+    "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+    "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+    "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+    "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+    "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
+    "tests/test_autopilot_workflow.py",
     "tests/test_generic_dag_v3_overlay.py",
+)
+ADDED_CORRECTION_PATHS = (
+    "docs/architecture/ADR-070-GENERIC-V3-BASELINE-RECOVERY.md",
+    "docs/architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md",
+    "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json",
+    "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json",
+    "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md",
+    "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md",
+    "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+    "tests/fixtures/generic-v3-history.bundle",
+    "tests/fixtures/generic-v3-history.provenance.json",
 )
 
 WINDOWS_ERROR_HANDLE_EOF = 38
@@ -146,7 +209,12 @@ def load_module(name: str, path: Path) -> ModuleType:
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load verifier module: {path}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    previous_dont_write_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous_dont_write_bytecode
     return module
 
 
@@ -521,15 +589,91 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             check=True,
             env=cls.git_environment,
         )
+        cls.authoring_root = cls.authoring_root.resolve(strict=True)
+        provenance = json.loads(HISTORY_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        bundle_contract = provenance["bundle"]
+        if bundle_contract["sha256"] != "sha256:" + HISTORY_BUNDLE_SHA256:
+            raise AssertionError("V3 history bundle provenance digest mismatch")
+        if hashlib.sha256(HISTORY_BUNDLE.read_bytes()).hexdigest() != HISTORY_BUNDLE_SHA256:
+            raise AssertionError("V3 history bundle raw digest mismatch")
+        cls.run_git(cls.authoring_root, "bundle", "verify", str(HISTORY_BUNDLE))
+        cls.run_git(
+            cls.authoring_root,
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            str(HISTORY_BUNDLE),
+            f"{HISTORY_BUNDLE_REF}:{HISTORY_EVIDENCE_REF}",
+        )
+        advertised = cls.run_git(
+            cls.authoring_root,
+            "rev-parse",
+            "--verify",
+            HISTORY_EVIDENCE_REF,
+        ).stdout.strip()
+        if advertised != CORRECTION_PARENT:
+            raise AssertionError("V3 history bundle advertised commit mismatch")
+        for required_commit in provenance["required_commits"]:
+            cls.run_git(cls.authoring_root, "cat-file", "-e", f"{required_commit}^{{commit}}")
+        r4_provenance = json.loads(R4_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        if r4_provenance["bundle"]["sha256"] != "sha256:" + R4_BUNDLE_SHA256:
+            raise AssertionError("V3 R4 bundle provenance digest mismatch")
+        if hashlib.sha256(R4_BUNDLE.read_bytes()).hexdigest() != R4_BUNDLE_SHA256:
+            raise AssertionError("V3 R4 bundle raw digest mismatch")
+        cls.run_git(cls.authoring_root, "bundle", "verify", str(R4_BUNDLE))
+        cls.run_git(
+            cls.authoring_root,
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            str(R4_BUNDLE),
+            f"{R4_BUNDLE_REF}:{R4_EVIDENCE_REF}",
+        )
+        advertised_r4 = cls.run_git(
+            cls.authoring_root, "rev-parse", "--verify", R4_EVIDENCE_REF
+        ).stdout.strip()
+        if advertised_r4 != R4_COMMIT:
+            raise AssertionError("V3 R4 bundle advertised commit mismatch")
+        observed_r4_tree = cls.run_git(
+            cls.authoring_root, "rev-parse", f"{R4_EVIDENCE_REF}^{{tree}}"
+        ).stdout.strip()
+        if observed_r4_tree != R4_TREE:
+            raise AssertionError("V3 R4 bundle advertised tree mismatch")
         cls.run_git(cls.authoring_root, "switch", "--quiet", "-C", TARGET_BRANCH, CORRECTION_PARENT)
         for relative in PAYLOAD_PATHS:
             destination = cls.authoring_root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(ROOT / relative, destination)
-        cls.verifier = load_module(
-            "_generic_dag_v4_verifier_under_test",
-            OVERLAY / "verify_plan.py",
+            extracted = subprocess.run(
+                [
+                    str(cls.git_executable),
+                    "--no-pager",
+                    "-C",
+                    str(cls.authoring_root),
+                    "show",
+                    f"{R4_EVIDENCE_REF}:{relative}",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                check=True,
+                env=cls.git_environment,
+            ).stdout
+            destination.write_bytes(extracted)
+        cls.overlay = (
+            cls.authoring_root
+            / "docs"
+            / "execution"
+            / "dags"
+            / "generic-hive-mind-product-v3"
         )
+        cls.verifier = load_module(
+            "_generic_dag_v5_verifier_under_test",
+            cls.overlay / "verify_plan.py",
+        )
+        if bytecode := python_bytecode_inventory(cls.authoring_root):
+            raise AssertionError(
+                "loading the frozen R4 verifier created bytecode in the fixture: "
+                + ", ".join(bytecode)
+            )
         cls.addClassCleanup(cls.reset_verifier_boundary)
 
     def setUp(self) -> None:
@@ -565,6 +709,329 @@ class GenericDagV3OverlayTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.reset_verifier_boundary()
         super().tearDown()
+
+    def test_history_bundle_is_digest_pinned_complete_and_prerequisite_bound(self) -> None:
+        provenance = json.loads(HISTORY_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        self.assertEqual(
+            hashlib.sha256(HISTORY_BUNDLE.read_bytes()).hexdigest(),
+            HISTORY_BUNDLE_SHA256,
+        )
+        self.assertEqual(
+            provenance["bundle"]["sha256"],
+            "sha256:" + HISTORY_BUNDLE_SHA256,
+        )
+        heads = self.run_git(
+            self.authoring_root,
+            "bundle",
+            "list-heads",
+            str(HISTORY_BUNDLE),
+        ).stdout.splitlines()
+        self.assertEqual(heads, [f"{CORRECTION_PARENT} {HISTORY_BUNDLE_REF}"])
+        self.run_git(self.authoring_root, "bundle", "verify", str(HISTORY_BUNDLE))
+        for required_commit in provenance["required_commits"]:
+            self.run_git(
+                self.authoring_root,
+                "cat-file",
+                "-e",
+                f"{required_commit}^{{commit}}",
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            tampered = Path(directory) / "tampered.bundle"
+            raw = bytearray(HISTORY_BUNDLE.read_bytes())
+            raw[0] ^= 0xFF
+            tampered.write_bytes(raw)
+            self.assertNotEqual(hashlib.sha256(raw).hexdigest(), HISTORY_BUNDLE_SHA256)
+            result = subprocess.run(
+                [str(self.git_executable), "-C", str(self.authoring_root), "bundle", "verify", str(tampered)],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=self.git_environment,
+            )
+            self.assertNotEqual(result.returncode, 0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            empty_repository = Path(directory) / "empty"
+            self.run_git(Path(directory), "init", "--quiet", str(empty_repository))
+            result = subprocess.run(
+                [
+                    str(self.git_executable),
+                    "-C",
+                    str(empty_repository),
+                    "bundle",
+                    "verify",
+                    str(HISTORY_BUNDLE),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=self.git_environment,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("prerequisite", (result.stdout + result.stderr).casefold())
+
+    def test_history_bundle_supplies_required_objects_to_prerequisite_only_repository(self) -> None:
+        provenance = json.loads(HISTORY_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        prerequisite = provenance["bundle"]["prerequisite_commit"]
+        expected_trees = {
+            PLAN_AUTHORING_BASE: "b896e16755a1d6864989757732fdc5ca9d2b5eed",
+            PAYLOAD_A: "8c42aeaf4ed480dd3ccc353356b7fa9f3ed49157",
+            GIT_ENVIRONMENT_CORRECTION_PARENT: "8730203c89835c4d1d9dac4be9b2086dacd2d869",
+            GIT_BOUNDARY_CORRECTION_PARENT: "0d0a251b6ff1557ca014b6b50c6f62ae787c4459",
+            CORRECTION_PARENT: CORRECTION_PARENT_TREE,
+        }
+        self.assertEqual(list(expected_trees), provenance["required_commits"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "prerequisite-only"
+            self.run_git(Path(directory), "init", "--quiet", str(repository))
+            self.run_git(
+                repository,
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                str(ROOT),
+                f"{prerequisite}:refs/hive-mind-evidence/prerequisite",
+            )
+            self.assertEqual(
+                self.run_git(
+                    repository,
+                    "rev-parse",
+                    "--verify",
+                    "refs/hive-mind-evidence/prerequisite",
+                ).stdout.strip(),
+                prerequisite,
+            )
+            for required_commit in expected_trees:
+                with self.subTest(required_commit=required_commit, phase="before_bundle_fetch"):
+                    result = subprocess.run(
+                        [
+                            str(self.git_executable),
+                            "-C",
+                            str(repository),
+                            "cat-file",
+                            "-e",
+                            f"{required_commit}^{{commit}}",
+                        ],
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                        env=self.git_environment,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+
+            self.run_git(repository, "bundle", "verify", str(HISTORY_BUNDLE))
+            self.run_git(
+                repository,
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                str(HISTORY_BUNDLE),
+                f"{HISTORY_BUNDLE_REF}:{HISTORY_EVIDENCE_REF}",
+            )
+            self.assertEqual(
+                self.run_git(repository, "rev-parse", HISTORY_EVIDENCE_REF).stdout.strip(),
+                CORRECTION_PARENT,
+            )
+            for required_commit, expected_tree in expected_trees.items():
+                with self.subTest(required_commit=required_commit, phase="after_bundle_fetch"):
+                    observed_tree = self.run_git(
+                        repository,
+                        "rev-parse",
+                        f"{required_commit}^{{tree}}",
+                    ).stdout.strip()
+                    self.assertEqual(observed_tree, expected_tree)
+            self.run_git(
+                repository,
+                "merge-base",
+                "--is-ancestor",
+                prerequisite,
+                CORRECTION_PARENT,
+            )
+
+    def test_r4_delta_bundle_reconstructs_the_frozen_successor_without_remote_refs(
+        self,
+    ) -> None:
+        provenance = json.loads(R4_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        contract = provenance["bundle"]
+        self.assertEqual("sha256:" + R4_BUNDLE_SHA256, contract["sha256"])
+        self.assertEqual(CORRECTION_PARENT, contract["prerequisite_commit"])
+        self.assertEqual(R4_COMMIT, contract["advertised_commit"])
+        self.assertEqual(R4_TREE, contract["advertised_tree"])
+        self.assertEqual(
+            R4_BUNDLE_SHA256,
+            hashlib.sha256(R4_BUNDLE.read_bytes()).hexdigest(),
+        )
+        heads = self.run_git(
+            self.authoring_root, "bundle", "list-heads", str(R4_BUNDLE)
+        ).stdout.splitlines()
+        self.assertEqual(heads, [f"{R4_COMMIT} {R4_BUNDLE_REF}"])
+        self.run_git(self.authoring_root, "bundle", "verify", str(R4_BUNDLE))
+        self.assertEqual(
+            R4_COMMIT,
+            self.run_git(
+                self.authoring_root, "rev-parse", R4_EVIDENCE_REF
+            ).stdout.strip(),
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            empty_repository = Path(directory) / "empty"
+            self.run_git(Path(directory), "init", "--quiet", str(empty_repository))
+            result = subprocess.run(
+                [
+                    str(self.git_executable),
+                    "-C",
+                    str(empty_repository),
+                    "bundle",
+                    "verify",
+                    str(R4_BUNDLE),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=self.git_environment,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("prerequisite", (result.stdout + result.stderr).casefold())
+
+    def test_recovery_source_intake_is_closed_pinned_and_adversarially_bound(self) -> None:
+        raw = RECOVERY_SOURCE_INTAKE.read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), RECOVERY_SOURCE_INTAKE_SHA256)
+        intake = self.verifier.validate_recovery_source_intake(raw)
+        self.assertEqual(
+            [source["source_id"] for source in intake["sources"]],
+            [
+                "SRC-V3R-GIT-BUNDLE-001",
+                "SRC-V3R-PYTHON-STAT-001",
+                "SRC-V3R-MICROSOFT-FILE-BASIC-INFO-001",
+                "SRC-V3R-PR154-001",
+                "SRC-V3R-CI32674854589-001",
+            ],
+        )
+        archive_raw = RECOVERY_SOURCE_ARCHIVE.read_bytes()
+        self.assertEqual(
+            hashlib.sha256(archive_raw).hexdigest(),
+            RECOVERY_SOURCE_ARCHIVE_SHA256,
+        )
+        archive_result = self.verifier.validate_recovery_source_archive(archive_raw)
+        self.assertEqual(len(archive_result["members"]), 10)
+        self.assertEqual(
+            {member["path"] for member in archive_result["members"]},
+            set(self.verifier.RECOVERY_SOURCE_ARCHIVE_MEMBERS),
+        )
+        mutated_archive = bytearray(archive_raw)
+        mutated_archive[len(mutated_archive) // 2] ^= 0xFF
+        with self.assertRaises(self.verifier.VerificationError):
+            self.verifier.validate_recovery_source_archive(bytes(mutated_archive))
+
+        def rendered(value: dict[str, Any]) -> bytes:
+            return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+
+        def clone() -> dict[str, Any]:
+            return json.loads(json.dumps(intake))
+
+        for mutation, mutate in {
+            "archive_policy": lambda value: value["snapshot_policy"].__setitem__(
+                "raw_source_bytes_archived_locally", False
+            ),
+            "archive_path": lambda value: value["raw_exhibit_archive"].__setitem__(
+                "path", "evidence/sources/substituted.tar"
+            ),
+            "archive_digest": lambda value: value["raw_exhibit_archive"].__setitem__(
+                "sha256", "sha256:" + "0" * 64
+            ),
+            "archive_member_digest": lambda value: value["raw_exhibit_archive"]["members"][
+                0
+            ].__setitem__("sha256", "sha256:" + "0" * 64),
+        }.items():
+            with self.subTest(mutation=mutation):
+                mutated = clone()
+                mutate(mutated)
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+
+        for index, source_id in enumerate(self.verifier.RECOVERY_SOURCE_IDS):
+            with self.subTest(source=source_id, mutation="drop_source"):
+                mutated = clone()
+                mutated["sources"].pop(index)
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+            with self.subTest(source=source_id, mutation="source_digest"):
+                mutated = clone()
+                mutated["sources"][index]["sha256"] = "sha256:" + "0" * 64
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+            with self.subTest(source=source_id, mutation="drop_license"):
+                mutated = clone()
+                mutated["sources"][index].pop("license")
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+            with self.subTest(source=source_id, mutation="license_spdx"):
+                mutated = clone()
+                mutated["sources"][index]["license"]["spdx"] = "MIT"
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+            with self.subTest(source=source_id, mutation="license_digest"):
+                mutated = clone()
+                mutated["sources"][index]["license"]["sha256"] = "sha256:" + "0" * 64
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+
+        for index, claim_id in enumerate(self.verifier.RECOVERY_ATOMIC_CLAIM_IDS):
+            with self.subTest(claim=claim_id, mutation="drop_claim"):
+                mutated = clone()
+                mutated["atomic_claims"].pop(index)
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+            with self.subTest(claim=claim_id, mutation="claim_statement"):
+                mutated = clone()
+                mutated["atomic_claims"][index]["statement"] += " substituted"
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+
+        for index, counterclaim_id in enumerate(self.verifier.RECOVERY_COUNTERCLAIM_IDS):
+            with self.subTest(counterclaim=counterclaim_id, mutation="drop_counterclaim"):
+                mutated = clone()
+                mutated["counterclaims"].pop(index)
+                with self.assertRaises(self.verifier.VerificationError):
+                    self.verifier.validate_recovery_source_intake(rendered(mutated))
+
+    def test_predecessor_reports_are_present_and_exactly_digest_bound(self) -> None:
+        expected = {
+            "evidence/audits/generic-v3-baseline-recovery/PREDECESSOR-28463AE-ASSESSMENT.json": (
+                1509,
+                "1ac71b791a36f5c2e543039d89604123a9b8f744e022bab23f549d481e472944",
+            ),
+            "evidence/autopilot/GENERIC-V3-DAG-GIT-BOUNDARY-CORRECTION-QUALIFICATION-2026-08-23.md": (
+                23865,
+                "a4714e5d3f6ec01d77fed4e722a7f781ea7e83a2300001ebc3ed70463af693ff",
+            ),
+            "evidence/autopilot/GENERIC-V3-DAG-QUALIFICATION-2026-08-23.md": (
+                17703,
+                "731beb68c2fed2c1a3d8666530c1f193b2e21144428448816216b4f9b0bba810",
+            ),
+        }
+        for relative, (expected_bytes, expected_digest) in expected.items():
+            with self.subTest(relative=relative):
+                raw = (self.authoring_root / relative).read_bytes()
+                self.assertEqual(len(raw), expected_bytes)
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), expected_digest)
+
+        provenance = json.loads(HISTORY_BUNDLE_PROVENANCE.read_text(encoding="utf-8"))
+        self.assertEqual(
+            provenance["source_documentation"],
+            {
+                "source_id": "SRC-V3R-GIT-BUNDLE-001",
+                "authoritative_record": (
+                    "evidence/audits/generic-v3-baseline-recovery/SOURCE-INTAKE.json"
+                ),
+                "status": "SUPERSEDED_BY_PINNED_SOURCE_RECORD",
+                "nonclaim": (
+                    "This pointer does not replace validation of the bound source-intake record."
+                ),
+            },
+        )
 
     def copy_git_executable(self, directory: Path) -> Path:
         executable = directory / self.git_executable.name
@@ -612,7 +1079,8 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         expected_digest: str | None = None,
     ):
         self.reset_verifier_boundary()
-        autopilot_before = complete_tree_snapshot(self.authoring_root / ".autopilot")
+        authoring_root = self.authoring_root.resolve()
+        autopilot_before = complete_tree_snapshot(authoring_root / ".autopilot")
         hostile_ambient = {
             "HOME": str(executable.parent / "hostile-home"),
             "XDG_CONFIG_HOME": str(executable.parent / "hostile-xdg"),
@@ -621,14 +1089,14 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         try:
             with mock.patch.dict(os.environ, hostile_ambient, clear=True):
                 self.verifier.configure_git_boundary(
-                    self.authoring_root,
+                    authoring_root,
                     git_executable=executable,
                     expected_git_executable_sha256=expected_digest or "sha256:" + raw_digest(executable),
                 )
                 yield self.verifier._GIT_BOUNDARY
         finally:
             self.reset_verifier_boundary()
-            autopilot_after = complete_tree_snapshot(self.authoring_root / ".autopilot")
+            autopilot_after = complete_tree_snapshot(authoring_root / ".autopilot")
             self.assertEqual(autopilot_after, autopilot_before)
 
     def assert_executable_changed(self, action) -> None:
@@ -986,11 +1454,11 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         )
 
     def test_authenticated_gitattributes_rules_bind_and_cover_every_raw_path(self) -> None:
-        manifest = json.loads((OVERLAY / "manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads((self.overlay / "manifest.json").read_text(encoding="utf-8"))
         contracts = json.loads(
-            (OVERLAY / "node-contracts.json").read_text(encoding="utf-8")
+            (self.overlay / "node-contracts.json").read_text(encoding="utf-8")
         )
-        raw = (ROOT / ".gitattributes").read_bytes()
+        raw = (self.authoring_root / ".gitattributes").read_bytes()
         rules = self.verifier.parse_authenticated_gitattributes(raw)
         coverage = self.verifier.verify_authenticated_checkout_reproducibility(
             raw,
@@ -1013,10 +1481,16 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         }
         expected = repository_paths | payload_paths | overlay_paths | frozen_paths
         self.assertEqual(set(coverage), expected)
+        raw_evidence_paths = {
+            "evidence/sources/generic-v3-baseline-recovery/raw/source-exhibits.tar",
+            "tests/fixtures/generic-v3-history.bundle",
+        }
+        for path in raw_evidence_paths:
+            self.assertEqual(coverage[path], "explicit--text")
         self.assertEqual(
-            set(coverage.values()),
+            {value for path, value in coverage.items() if path not in raw_evidence_paths},
             {"text-eol-lf"},
-            "all currently bound inputs are repository-authored text",
+            "all non-binary-evidence bound inputs are repository-authored text",
         )
         with self.configured_boundary(self.git_executable):
             self.verifier.verify_no_applicable_nested_gitattributes(
@@ -1077,7 +1551,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                         )
             finally:
                 self.reset_verifier_boundary()
-        self.assertEqual(len(CORRECTION_PATHS), 6)
+        self.assertEqual(len(CORRECTION_PATHS), 17)
         self.assertEqual(CORRECTION_PATHS[0], ".gitattributes")
         self.assertIn(".gitattributes", PAYLOAD_PATHS)
         with self.assertRaisesRegex(
@@ -1089,9 +1563,26 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 ["future/raw-bound-input.opaque"],
             )
 
+    def test_ci_contract_retains_windows_python_312_and_314(self) -> None:
+        workflow = (self.authoring_root / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        windows_start = workflow.index("\n  unit-tests-windows:\n")
+        windows_end = workflow.index("\n  quality:\n", windows_start)
+        windows_job = workflow[windows_start:windows_end]
+        self.assertEqual(windows_job.count('python-version: ["3.12"]'), 1)
+        self.assertEqual(
+            windows_job.count('include:\n          - python-version: "3.14"'),
+            1,
+        )
+        self.assertEqual(
+            windows_job.count("python-version: ${{ matrix.python-version }}"),
+            1,
+        )
+
     def test_gitattributes_payload_binding_and_every_required_rule_fail_closed(self) -> None:
-        manifest = json.loads((OVERLAY / "manifest.json").read_text(encoding="utf-8"))
-        manifest_raw = (OVERLAY / "manifest.json").read_bytes()
+        manifest = json.loads((self.overlay / "manifest.json").read_text(encoding="utf-8"))
+        manifest_raw = (self.overlay / "manifest.json").read_bytes()
         bindings = manifest["committed_payload_contract"]["payload_bindings"]
         attribute_row = next(row for row in bindings if row["path"] == ".gitattributes")
 
@@ -1138,9 +1629,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             )
 
         contracts = json.loads(
-            (OVERLAY / "node-contracts.json").read_text(encoding="utf-8")
+            (self.overlay / "node-contracts.json").read_text(encoding="utf-8")
         )
-        raw = (ROOT / ".gitattributes").read_bytes()
+        raw = (self.authoring_root / ".gitattributes").read_bytes()
         hostile_whitespace = {
             "nbsp": "\u00a0".encode("utf-8"),
             "nel": "\u0085".encode("utf-8"),
@@ -1319,7 +1810,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "user.email",
                 "attribute-fixture@example.invalid",
             )
-            shutil.copy2(ROOT / ".gitattributes", fixture / ".gitattributes")
+            shutil.copy2(
+                self.authoring_root / ".gitattributes",
+                fixture / ".gitattributes",
+            )
             text_samples = {
                 "LICENSE",
                 "probe.ps1",
@@ -1415,9 +1909,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             for label, verifier_copy in variants.items():
                 with self.subTest(depth=label):
                     verifier_copy.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(OVERLAY / "verify_plan.py", verifier_copy)
+                    shutil.copy2(self.overlay / "verify_plan.py", verifier_copy)
                     imported = load_module(
-                        f"_generic_dag_v4_{label}_help_probe",
+                        f"_generic_dag_v5_{label}_help_probe",
                         verifier_copy,
                     )
                     self.assertTrue(callable(imported.main))
@@ -1458,7 +1952,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         self.assertEqual(payload["durability_semantics"], "typed-v2")
         self.assertEqual(payload["topology"], {"nodes": 20, "raw_edges": 28, "levels": 17, "rounds": 20})
         self.assertFalse(payload["materializer_imported_or_executed"])
-        self.assertEqual(payload["verification_mode"], V4_AUTHORING_MODE)
+        self.assertEqual(payload["verification_mode"], V5_AUTHORING_MODE)
         self.assertFalse(payload["committed_payload_qualification"])
         self.assertFalse(payload["execution_qualification"])
         self.assertFalse(payload["execution"]["authorized"])
@@ -2005,7 +2499,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "complete-autopilot-tree-point-observation-v2",
             )
 
-    def test_authoring_mode_rejects_any_state_beyond_exact_six_payload_paths(self) -> None:
+    def test_authoring_mode_rejects_any_state_beyond_exact_seventeen_payload_paths(self) -> None:
         overlay = self.authoring_root / "docs/execution/dags/generic-hive-mind-product-v3"
         changed = tuple(
             sorted(
@@ -2019,7 +2513,20 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 if line
             )
         )
-        self.assertEqual(changed, tuple(sorted(CORRECTION_PATHS)))
+        untracked = tuple(
+            sorted(
+                line
+                for line in self.run_git(
+                    self.authoring_root,
+                    "ls-files",
+                    "--others",
+                    "--exclude-standard",
+                ).stdout.splitlines()
+                if line
+            )
+        )
+        self.assertEqual(changed, tuple(sorted(set(CORRECTION_PATHS) - set(ADDED_CORRECTION_PATHS))))
+        self.assertEqual(untracked, tuple(sorted(ADDED_CORRECTION_PATHS)))
 
         tracked = self.authoring_root / "CONTRIBUTING.md"
         tracked_before = tracked.read_bytes()
@@ -2216,7 +2723,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             result = self.run_verifier(overlay, repo_root=checkout, authoring_check=False)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["verification_mode"], V4_COMMITTED_MODE)
+            self.assertEqual(payload["verification_mode"], V5_COMMITTED_MODE)
             self.assertTrue(payload["committed_payload_qualification"])
             self.assertFalse(payload["execution_qualification"])
             self.assertFalse(payload["execution"]["authorized"])
@@ -2825,7 +3332,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     baseline = list(
                         boundary["path_state" if label == "path" else "handle_identity"]
                     )
-                    baseline[-2] += 1
+                    baseline[3] += 1
                     with mock.patch.object(
                         self.verifier,
                         identity_function,
@@ -2835,6 +3342,121 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                             lambda: self.verifier.git(self.authoring_root, "--version")
                         )
                         popen.assert_not_called()
+
+    def test_git_executable_continuity_keys_are_platform_scoped(self) -> None:
+        baseline = (11, 22, 33, 44, 55, 66)
+        ctime_drift = (11, 22, 33, 44, 99, 66)
+        self.assertEqual(
+            self.verifier._git_executable_continuity_key(
+                baseline,
+                host_platform="win32",
+            ),
+            self.verifier._git_executable_continuity_key(
+                ctime_drift,
+                host_platform="win32",
+            ),
+        )
+        self.assertNotEqual(
+            self.verifier._git_executable_continuity_key(
+                baseline,
+                host_platform="linux",
+            ),
+            self.verifier._git_executable_continuity_key(
+                ctime_drift,
+                host_platform="linux",
+            ),
+        )
+        legacy = (11, 22, 33, 44, 55, None)
+        self.assertEqual(
+            self.verifier._git_executable_continuity_key(
+                legacy,
+                host_platform="win32",
+            ),
+            (11, 22, 33, 44, 55),
+        )
+        for field in (0, 1, 2, 3, 5):
+            with self.subTest(windows_continuity_field=field):
+                mutated = list(baseline)
+                mutated[field] += 1
+                self.assertNotEqual(
+                    self.verifier._git_executable_continuity_key(
+                        baseline,
+                        host_platform="win32",
+                    ),
+                    self.verifier._git_executable_continuity_key(
+                        tuple(mutated),
+                        host_platform="win32",
+                    ),
+                )
+
+    @unittest.skipUnless(sys.platform == "win32", "requires a native Windows Git executable")
+    def test_windows_ctime_drift_accepts_stable_bytes_and_rejects_changed_bytes_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            executable = self.copy_git_executable(Path(directory))
+            process = FakeProcess(b"git version synthetic\n")
+            with self.configured_boundary(executable) as boundary:
+                birthtime = 1776656106008279900
+                path_identity = tuple(boundary["path_state"][:5]) + (birthtime,)
+                handle_identity = tuple(boundary["handle_identity"][:5]) + (birthtime,)
+                boundary["path_state"] = path_identity
+                boundary["handle_identity"] = handle_identity
+                boundary["identity_platform"] = "win32"
+                path_drift = list(path_identity)
+                handle_drift = list(handle_identity)
+                path_drift[4] += 100
+                handle_drift[4] += 200
+                with mock.patch.object(
+                    self.verifier,
+                    "_git_executable_path_state",
+                    return_value=tuple(path_drift),
+                ), mock.patch.object(
+                    self.verifier,
+                    "_open_file_identity",
+                    return_value=tuple(handle_drift),
+                ), mock.patch.object(
+                    self.verifier.subprocess,
+                    "Popen",
+                    return_value=process,
+                ) as popen:
+                    self.assertEqual(
+                        self.verifier.git(self.authoring_root, "--version"),
+                        "git version synthetic",
+                    )
+                    popen.assert_called_once()
+
+        with tempfile.TemporaryDirectory() as directory:
+            executable = self.copy_git_executable(Path(directory))
+            with self.configured_boundary(executable) as boundary:
+                birthtime = 1776656106008279900
+                path_identity = tuple(boundary["path_state"][:5]) + (birthtime,)
+                handle_identity = tuple(boundary["handle_identity"][:5]) + (birthtime,)
+                boundary["path_state"] = path_identity
+                boundary["handle_identity"] = handle_identity
+                boundary["identity_platform"] = "win32"
+                path_drift = list(path_identity)
+                handle_drift = list(handle_identity)
+                path_drift[4] += 100
+                handle_drift[4] += 200
+                changed = bytearray(executable.read_bytes())
+                changed[-1] ^= 0xFF
+                original_handle = boundary["handle"]
+                original_handle.close()
+                boundary["handle"] = io.BytesIO(changed)
+                with mock.patch.object(
+                    self.verifier,
+                    "_git_executable_path_state",
+                    return_value=tuple(path_drift),
+                ), mock.patch.object(
+                    self.verifier,
+                    "_open_file_identity",
+                    return_value=tuple(handle_drift),
+                ), mock.patch.object(self.verifier.subprocess, "Popen") as popen:
+                    with self.assertRaisesRegex(
+                        self.verifier.VerificationError,
+                        "retained Git executable bytes changed",
+                    ):
+                        self.verifier.git(self.authoring_root, "--version")
+                    popen.assert_not_called()
 
     def test_native_format_and_digest_mutations_are_detected_at_lifecycle_checks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -3836,12 +4458,12 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             self.assert_rejected(result, "materialize_plan.py")
             self.assertFalse(marker.exists())
 
-    def test_v4_manifest_binds_predecessor_report_status_lineage_and_anti_downgrade(self) -> None:
-        manifest = json.loads((OVERLAY / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["schema_version"], 4)
-        self.assertEqual(manifest["kind"], V4_MANIFEST_KIND)
+    def test_v5_manifest_binds_predecessor_report_status_lineage_and_anti_downgrade(self) -> None:
+        manifest = json.loads((self.overlay / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["schema_version"], 5)
+        self.assertEqual(manifest["kind"], V5_MANIFEST_KIND)
         contract = manifest["committed_payload_contract"]
-        self.assertEqual(contract["mode"], V4_CONTRACT_MODE)
+        self.assertEqual(contract["mode"], V5_CONTRACT_MODE)
         self.assertEqual(
             contract["correction_parent"],
             {"commit": CORRECTION_PARENT, "tree": CORRECTION_PARENT_TREE},
@@ -3849,7 +4471,8 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         predecessor = contract["predecessor_payload"]
         self.assertEqual(predecessor["commit"], CORRECTION_PARENT)
         self.assertEqual(predecessor["tree"], CORRECTION_PARENT_TREE)
-        self.assertEqual(predecessor["parent_commit"], GIT_ENVIRONMENT_CORRECTION_PARENT)
+        self.assertEqual(predecessor["parent_commit"], CORRECTION_PARENT_PARENT)
+        self.assertEqual(predecessor["parent_tree"], CORRECTION_PARENT_PARENT_TREE)
         self.assertEqual(predecessor["manifest_raw_sha256"], CORRECTION_PARENT_MANIFEST_SHA256)
         self.assertEqual(
             predecessor["full_payload_aggregate"]["sha256"],
@@ -3858,22 +4481,29 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         self.assertEqual(predecessor["qualification_report_sha256"], CORRECTION_PARENT_REPORT_SHA256)
         self.assertEqual(predecessor["observed_status"], CORRECTION_PARENT_STATUS)
         self.assertEqual(predecessor["author_proposed_disposition"], "ADAPT_REMAND")
+        remanded_git_boundary = contract["remanded_git_boundary_predecessor"]
+        self.assertEqual(remanded_git_boundary["commit"], GIT_BOUNDARY_CORRECTION_PARENT)
+        self.assertEqual(
+            remanded_git_boundary["observed_status"],
+            "QUALIFICATION_REMANDED_NATIVE_EXECUTABLE_FORMAT_AND_ADVERSARIAL_MATRIX_GAPS",
+        )
         self.assertEqual(
             manifest["snapshot_lineage"]["correction_parent"],
             {"commit": CORRECTION_PARENT, "tree": CORRECTION_PARENT_TREE},
         )
         anti_downgrade = contract["activation_anti_downgrade"]
-        self.assertEqual(anti_downgrade["required_contract_mode"], V4_CONTRACT_MODE)
+        self.assertEqual(anti_downgrade["required_contract_mode"], V5_CONTRACT_MODE)
         self.assertEqual(
             anti_downgrade["required_git_executable_format_policy"],
             "host-native-image-format-v1",
         )
+        self.assertEqual(anti_downgrade["published_v4_activation"], "PROHIBITED")
         self.assertEqual(anti_downgrade["v3_git_boundary_activation"], "PROHIBITED")
 
     def test_manifest_identity_snapshot_and_tool_substitution_fail_closed(self) -> None:
         mutations = {
-            "schema_downgrade": lambda m: m.__setitem__("schema_version", 3),
-            "kind_downgrade": lambda m: m.__setitem__("kind", "hive-mind-generic-product-overlay-manifest-v3"),
+            "schema_downgrade": lambda m: m.__setitem__("schema_version", 4),
+            "kind_downgrade": lambda m: m.__setitem__("kind", "hive-mind-generic-product-overlay-manifest-v4"),
             "request": lambda m: m["request_binding"].__setitem__("request_id", "sha256:stale"),
             "objective": lambda m: m["request_binding"].__setitem__("objective_digest", "sha256:stale"),
             "repository": lambda m: m["request_binding"].__setitem__("repository_id", "sha256:stale"),
@@ -3888,11 +4518,13 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "predecessor_status": lambda m: m["committed_payload_contract"]["predecessor_payload"].__setitem__("observed_status", "QUALIFIED"),
             "predecessor_lineage": lambda m: m["committed_payload_contract"]["predecessor_payload"].__setitem__("parent_commit", "0" * 40),
             "predecessor_disposition": lambda m: m["committed_payload_contract"]["predecessor_payload"].__setitem__("author_proposed_disposition", "ADOPT"),
+            "v3_git_boundary_record": lambda m: m["committed_payload_contract"]["remanded_git_boundary_predecessor"].__setitem__("commit", "0" * 40),
             "f06_record": lambda m: m["committed_payload_contract"]["remanded_git_environment_predecessor"].__setitem__("commit", "0" * 40),
             "payload_a_record": lambda m: m["committed_payload_contract"]["historical_payload_a"].__setitem__("commit", "0" * 40),
             "contract_mode_downgrade": lambda m: m["committed_payload_contract"].__setitem__("mode", "exact-append-only-git-boundary-correction-v3"),
             "payload_inventory": lambda m: m["committed_payload_contract"]["payload_inventory"].pop(),
             "anti_downgrade": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("v3_git_boundary_activation", "ALLOWED"),
+            "published_v4_activation": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("published_v4_activation", "ALLOWED"),
             "f06_activation": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("f06_activation", "ALLOWED"),
             "payload_a_activation": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("historical_payload_a_activation", "ALLOWED"),
             "v1_fallback": lambda m: m["committed_payload_contract"]["activation_anti_downgrade"].__setitem__("legacy_v1_fallback", "ALLOWED"),
@@ -3934,11 +4566,13 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             "predecessor_status": "predecessor correction identity/status mismatch",
             "predecessor_lineage": "predecessor correction identity/status mismatch",
             "predecessor_disposition": "predecessor correction identity/status mismatch",
+            "v3_git_boundary_record": "remanded Git-boundary predecessor identity/status mismatch",
             "f06_record": "remanded Git-environment predecessor identity/status mismatch",
             "payload_a_record": "historical Payload A identity/status mismatch",
             "contract_mode_downgrade": "committed payload mode mismatch",
             "payload_inventory": "committed payload inventory mismatch",
             "anti_downgrade": "activation anti-downgrade contract mismatch",
+            "published_v4_activation": "activation anti-downgrade contract mismatch",
             "f06_activation": "activation anti-downgrade contract mismatch",
             "payload_a_activation": "activation anti-downgrade contract mismatch",
             "v1_fallback": "activation anti-downgrade contract mismatch",
@@ -3970,7 +4604,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             overlay = self.copy_overlay(Path(directory))
             manifest = overlay / "manifest.json"
             text = manifest.read_text(encoding="utf-8")
-            manifest.write_text(text.replace('"schema_version": 4,', '"schema_version": 4,\n  "schema_version": 4,', 1), encoding="utf-8")
+            manifest.write_text(text.replace('"schema_version": 5,', '"schema_version": 5,\n  "schema_version": 5,', 1), encoding="utf-8")
             self.assert_rejected(self.run_verifier(overlay))
 
         with tempfile.TemporaryDirectory() as directory:
@@ -4061,9 +4695,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                         path.write_bytes(original)
 
     def test_frozen_host_files_pointer_is_strict_and_resealed_substitutions_fail(self) -> None:
-        manifest = json.loads((OVERLAY / "manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads((self.overlay / "manifest.json").read_text(encoding="utf-8"))
         contracts = json.loads(
-            (OVERLAY / "node-contracts.json").read_text(encoding="utf-8")
+            (self.overlay / "node-contracts.json").read_text(encoding="utf-8")
         )
         location = manifest["frozen_host_prerequisite"]["manifest_location"]
         self.assertEqual(
@@ -4202,7 +4836,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             self.assert_rejected(self.run_verifier(overlay))
 
     def test_invalid_v3_has_no_legacy_fallback_and_activation_attacks_are_explicit(self) -> None:
-        plan = json.loads((OVERLAY / "plan.json").read_text(encoding="utf-8"))
+        plan = json.loads((self.overlay / "plan.json").read_text(encoding="utf-8"))
         activation = plan["activation_contract"]
         self.assertEqual(activation["invalid_v3_legacy_fallback"], "PROHIBITED")
         self.assertEqual(activation["concurrent_activation"], "single_winner_compare_and_swap_ledger")
@@ -4233,9 +4867,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
             self.assert_rejected(self.run_verifier(overlay))
 
     def test_exact_host_evidence_lineage_and_manual_parent_boundaries(self) -> None:
-        contracts = json.loads((OVERLAY / "node-contracts.json").read_text(encoding="utf-8"))
-        ownership = json.loads((OVERLAY / "ownership-effects.json").read_text(encoding="utf-8"))
-        plan = json.loads((OVERLAY / "plan.json").read_text(encoding="utf-8"))
+        contracts = json.loads((self.overlay / "node-contracts.json").read_text(encoding="utf-8"))
+        ownership = json.loads((self.overlay / "ownership-effects.json").read_text(encoding="utf-8"))
+        plan = json.loads((self.overlay / "plan.json").read_text(encoding="utf-8"))
         host = contracts["frozen_host_contract"]
         self.assertEqual(host["extraction_commit"], "ca43709591313c1c166a2e655b8982ccff16daf3")
         self.assertEqual(host["file_count"], 16)
@@ -4252,7 +4886,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         self.assertFalse(plan["execution"]["executable_dispatch_command_available"])
 
     def test_literal_powershell_recipes_check_every_python_last_exit_code(self) -> None:
-        readme = (OVERLAY / "README.md").read_text(encoding="utf-8")
+        readme = (self.overlay / "README.md").read_text(encoding="utf-8")
         powershell_blocks = []
         cursor = 0
         opening = "```powershell\n"
