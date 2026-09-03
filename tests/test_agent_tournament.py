@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,13 +16,19 @@ from typing import Any, Mapping, Sequence
 from unittest.mock import patch
 
 from hive_mind_os.agent_tournament import (
+    _COMMAND_TEMP_PREFIX,
     _DOCTOR_REPAIR_KIND,
+    _DOCTOR_TEMP_DIRECTORY_NAME,
+    _DOCTOR_WORKSPACE_PREFIX,
+    _SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET,
+    _WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT,
     CONTROL_PLANE_COMMANDS,
     SYSTEM_TEST_LANES,
     TOURNAMENT_ROLES,
     TournamentError,
     _bounded_subprocess,
     _child_environment,
+    _CommandEvidenceFailure,
     _control_plane_identity,
     _decode_command_transcript,
     _doctor_semantic_evidence,
@@ -40,9 +47,11 @@ from hive_mind_os.agent_tournament import (
     _source_authority_roots,
     _source_authority_state_roots,
     _state_manifest,
+    _validate_command_cleanup_diagnostic,
     _validate_command_receipt,
     _validate_doctor_isolation,
     _validate_scan_receipt,
+    _validate_sealed_control_plane_temp_path_budget,
     _validate_system_receipt,
     _write_json,
     build_tournament_plan,
@@ -217,10 +226,10 @@ def _fake_command_receipt(
     transcript = _encode_command_transcript(stdout, stderr)
     profile = _environment_profile_for_command(argv)
     temporary_directory = (
-        repository.parent / "tmp"
+        repository.parent / _DOCTOR_TEMP_DIRECTORY_NAME
         if tuple(argv) == CONTROL_PLANE_COMMANDS["control-plane-doctor"]
         else Path(tempfile.gettempdir()).resolve()
-        / f"hive-tournament-command-fixture-{os.getpid()}-{time.time_ns()}"
+        / f"{_COMMAND_TEMP_PREFIX}fixture"
     )
     environment = _child_environment(
         repository,
@@ -340,7 +349,7 @@ def _fake_doctor_isolation_result(
         "git_common_directory_confined": True,
         "standalone_git_directory": True,
         "state_root_confined": True,
-        "command_temporary_root": str(workspace / "tmp"),
+        "command_temporary_root": str(workspace / _DOCTOR_TEMP_DIRECTORY_NAME),
         "command_temporary_root_confined": True,
         "isolated_state_before": deepcopy(absent),
         "isolated_state_after": after,
@@ -358,7 +367,7 @@ def passing_doctor_isolation_runner(
 ):
     workspace = (
         Path(tempfile.gettempdir()).resolve()
-        / f"hive-tournament-doctor-fixture-{os.getpid()}"
+        / f"{_DOCTOR_WORKSPACE_PREFIX}fixture"
     )
     command, transcript = command_runner(
         workspace / "checkout",
@@ -908,6 +917,27 @@ class TournamentDagTests(unittest.TestCase):
                 label="forged ambient parent",
             )
 
+        legacy_prefix = deepcopy(receipt)
+        legacy_temporary_root = (
+            Path(tempfile.gettempdir()).resolve()
+            / "hive-tournament-command-legacy"
+        )
+        legacy_prefix["temporary_directory"] = str(legacy_temporary_root)
+        legacy_prefix["environment_policy"]["temporary_directory_bindings"] = {
+            name: str(legacy_temporary_root) for name in ("TEMP", "TMP", "TMPDIR")
+        }
+        legacy_prefix.pop("receipt_digest")
+        legacy_prefix["receipt_digest"] = canonical_digest(legacy_prefix)
+        with self.assertRaisesRegex(TournamentError, "identity"):
+            _validate_command_receipt(
+                legacy_prefix,
+                command,
+                transcript,
+                ROOT,
+                require_tests=True,
+                label="legacy temporary prefix",
+            )
+
         aliased_temporary_root = deepcopy(receipt)
         real_temporary_root = Path(receipt["temporary_directory"])
         temporary_alias = str(
@@ -938,7 +968,7 @@ class TournamentDagTests(unittest.TestCase):
         identity = _control_plane_identity(ROOT)
         workspace = (
             Path(tempfile.gettempdir()).resolve()
-            / f"hive-tournament-doctor-semantic-{os.getpid()}"
+            / f"{_DOCTOR_WORKSPACE_PREFIX}semantic"
         )
         execution_root = workspace / "checkout"
         valid_result = _doctor_result(
@@ -999,7 +1029,7 @@ class TournamentDagTests(unittest.TestCase):
         inventory = inventory_repository(ROOT)
         workspace = (
             Path(tempfile.gettempdir()).resolve()
-            / f"hive-tournament-doctor-json-{os.getpid()}"
+            / f"{_DOCTOR_WORKSPACE_PREFIX}json"
         )
         execution_root = workspace / "checkout"
 
@@ -1067,7 +1097,7 @@ class TournamentDagTests(unittest.TestCase):
         inventory = inventory_repository(ROOT)
         command, transcript = passing_runner(
             Path(tempfile.gettempdir()).resolve()
-            / f"hive-tournament-doctor-fixture-{os.getpid()}"
+            / f"{_DOCTOR_WORKSPACE_PREFIX}fixture"
             / "checkout",
             CONTROL_PLANE_COMMANDS["control-plane-doctor"],
         )
@@ -1087,6 +1117,19 @@ class TournamentDagTests(unittest.TestCase):
         outside_temp["execution_repository_root"] = str(forged_workspace / "checkout")
         with self.assertRaises(TournamentError):
             _validate_doctor_isolation(outside_temp, semantics, inventory, ROOT)
+
+        legacy_prefix = deepcopy(isolation)
+        legacy_workspace = (
+            Path(tempfile.gettempdir()).resolve()
+            / f"hive-tournament-doctor-legacy-{time.time_ns()}"
+        )
+        legacy_prefix["workspace_root"] = str(legacy_workspace)
+        legacy_prefix["execution_repository_root"] = str(legacy_workspace / "checkout")
+        legacy_prefix["command_temporary_root"] = str(
+            legacy_workspace / _DOCTOR_TEMP_DIRECTORY_NAME
+        )
+        with self.assertRaisesRegex(TournamentError, "execution root"):
+            _validate_doctor_isolation(legacy_prefix, semantics, inventory, ROOT)
 
         with tempfile.TemporaryDirectory(
             prefix="hive-tournament-doctor-retained-"
@@ -1197,7 +1240,7 @@ class TournamentDagTests(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory(
-            prefix="hive-tournament-doctor-cleanup-test-"
+            prefix=f"{_DOCTOR_WORKSPACE_PREFIX}c-"
         ) as temporary:
             workspace = Path(temporary).resolve()
             with (
@@ -1222,7 +1265,7 @@ class TournamentDagTests(unittest.TestCase):
                 _run_isolated_control_plane_doctor(ROOT, inventory, passing_runner)
 
         with tempfile.TemporaryDirectory(
-            prefix="hive-tournament-doctor-dangling-cleanup-test-"
+            prefix=f"{_DOCTOR_WORKSPACE_PREFIX}d-"
         ) as temporary:
             workspace = Path(temporary).resolve()
             with (
@@ -1248,7 +1291,7 @@ class TournamentDagTests(unittest.TestCase):
                 _run_isolated_control_plane_doctor(ROOT, inventory, passing_runner)
 
         with tempfile.TemporaryDirectory(
-            prefix="hive-tournament-doctor-mutation-test-"
+            prefix=f"{_DOCTOR_WORKSPACE_PREFIX}m-"
         ) as temporary:
             workspace = Path(temporary).resolve()
             with (
@@ -2095,6 +2138,196 @@ class TournamentExecutionTests(unittest.TestCase):
             receipt["environment_policy"]["temporary_directory_bindings"],
         )
 
+    @unittest.skipUnless(os.name == "nt", "classic path budget is Windows-specific")
+    def test_short_temp_roots_preserve_the_sealed_arena_path_budget(self) -> None:
+        script = (
+            "import os,pathlib,shutil,tempfile;"
+            "t=pathlib.Path(os.environ['TEMP']).resolve();"
+            "r=pathlib.Path(tempfile.mkdtemp(prefix='hive-par-',dir=t));"
+            f"n=len(str(t))+{_SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET}"
+            "-len(str(r))-1;"
+            "p=r/('x'*n);p.mkdir();"
+            f"assert len(str(p))==len(str(t))+"
+            f"{_SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET};"
+            "shutil.rmtree(r)"
+        )
+        receipt, _transcript = run_command_receipt(
+            ROOT, (sys.executable, "-B", "-c", script)
+        )
+        command_root = Path(receipt["temporary_directory"])
+        self.assertEqual("passed", receipt["status"])
+        self.assertTrue(command_root.name.startswith(_COMMAND_TEMP_PREFIX))
+        self.assertLessEqual(
+            len(str(command_root)) + _SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET,
+            _WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT,
+        )
+        self.assertFalse(os.path.lexists(command_root))
+
+        workspace = Path(
+            tempfile.mkdtemp(
+                prefix=_DOCTOR_WORKSPACE_PREFIX,
+                dir=Path(tempfile.gettempdir()).resolve(),
+            )
+        ).resolve()
+        doctor_root = workspace / _DOCTOR_TEMP_DIRECTORY_NAME
+        try:
+            doctor_root.mkdir()
+            _validate_sealed_control_plane_temp_path_budget(doctor_root)
+            arena = Path(tempfile.mkdtemp(prefix="hive-par-", dir=doctor_root))
+            remaining = (
+                len(str(doctor_root))
+                + _SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET
+                - len(str(arena))
+                - 1
+            )
+            deepest = arena / ("x" * remaining)
+            deepest.mkdir()
+            self.assertEqual(
+                len(str(doctor_root))
+                + _SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET,
+                len(str(deepest)),
+            )
+            shutil.rmtree(arena)
+        finally:
+            shutil.rmtree(workspace)
+        self.assertFalse(os.path.lexists(workspace))
+
+    @unittest.skipUnless(os.name == "nt", "classic path budget is Windows-specific")
+    def test_overlong_control_plane_temp_root_fails_before_execution(self) -> None:
+        overlong = Path(tempfile.gettempdir()).resolve() / ("x" * 100)
+        with self.assertRaisesRegex(TournamentError, "Windows path budget"):
+            _validate_sealed_control_plane_temp_path_budget(overlong)
+
+        with tempfile.TemporaryDirectory() as parent:
+            requested = Path(parent).resolve() / f"{_COMMAND_TEMP_PREFIX}budget"
+            with (
+                patch(
+                    "hive_mind_os.agent_tournament._validate_sealed_control_plane_temp_path_budget",
+                    side_effect=TournamentError("injected Windows path budget failure"),
+                ),
+                patch(
+                    "hive_mind_os.agent_tournament._run_command_receipt_with_temporary_directory"
+                ) as command_execution,
+                self.assertRaisesRegex(TournamentError, "Windows path budget"),
+            ):
+                run_command_receipt(
+                    ROOT,
+                    CONTROL_PLANE_COMMANDS["control-plane-tests"],
+                    temporary_directory=requested,
+                )
+            command_execution.assert_not_called()
+            self.assertFalse(os.path.lexists(requested))
+
+    @unittest.skipUnless(os.name == "nt", "classic path budget is Windows-specific")
+    def test_doctor_path_budget_fails_before_clone(self) -> None:
+        inventory = inventory_repository(ROOT)
+        with tempfile.TemporaryDirectory() as parent:
+            workspace = Path(parent).resolve() / f"{_DOCTOR_WORKSPACE_PREFIX}fixture"
+            workspace.mkdir()
+            with (
+                patch(
+                    "hive_mind_os.agent_tournament.tempfile.mkdtemp",
+                    return_value=str(workspace),
+                ),
+                patch(
+                    "hive_mind_os.agent_tournament._validate_sealed_control_plane_temp_path_budget",
+                    side_effect=TournamentError("injected Windows path budget failure"),
+                ),
+                patch("hive_mind_os.agent_tournament._checked_git") as checked_git,
+                self.assertRaisesRegex(TournamentError, "Windows path budget"),
+            ):
+                _run_isolated_control_plane_doctor(ROOT, inventory, passing_runner)
+            checked_git.assert_not_called()
+            self.assertFalse(os.path.lexists(workspace))
+
+    def test_cleanup_failure_preserves_non_certifying_command_evidence(self) -> None:
+        command = (
+            sys.executable,
+            "-B",
+            "-m",
+            "unittest",
+            "tests.synthetic_cleanup_fixture",
+            "-v",
+        )
+        provenance = str((ROOT / "src/hive_mind_os/__init__.py").resolve()).encode(
+            "utf-8"
+        ) + b"\n"
+        fake_results = (
+            (0, provenance, b"", False),
+            (0, b"", b"Ran 1 test in 0.001s\n\nOK\n", False),
+        )
+        captured: _CommandEvidenceFailure | None = None
+        try:
+            with (
+                patch(
+                    "hive_mind_os.agent_tournament._bounded_subprocess",
+                    side_effect=fake_results,
+                ),
+                patch(
+                    "hive_mind_os.agent_tournament.shutil.rmtree",
+                    side_effect=OSError("simulated cleanup failure"),
+                ),
+            ):
+                run_command_receipt(ROOT, command)
+        except _CommandEvidenceFailure as error:
+            captured = error
+        self.assertIsNotNone(captured)
+        assert captured is not None
+        diagnostic = captured.command_receipt
+        diagnostic_root = Path(diagnostic["temporary_directory"])
+        try:
+            self.assertEqual("failed", diagnostic["status"])
+            self.assertEqual("passed", diagnostic["command_status_before_cleanup"])
+            self.assertFalse(diagnostic["temporary_directory_cleanup_completed"])
+            self.assertEqual(0, diagnostic["returncode"])
+            self.assertEqual(1, diagnostic["tests_run"])
+            self.assertEqual(0, diagnostic["tests_skipped"])
+            self.assertEqual(
+                diagnostic["transcript_sha256"],
+                "sha256:" + sha256(captured.transcript.encode("utf-8")).hexdigest(),
+            )
+            _validate_command_cleanup_diagnostic(
+                diagnostic,
+                command,
+                captured.transcript,
+                ROOT,
+                label="valid cleanup diagnostic",
+            )
+            invalid_digest = deepcopy(diagnostic)
+            invalid_digest["receipt_digest"] = "sha256:" + "0" * 64
+            with self.assertRaisesRegex(TournamentError, "digest"):
+                _validate_command_cleanup_diagnostic(
+                    invalid_digest,
+                    command,
+                    captured.transcript,
+                    ROOT,
+                    label="invalid cleanup diagnostic",
+                )
+            invalid_transcript = deepcopy(diagnostic)
+            invalid_transcript["transcript_sha256"] = "sha256:" + "0" * 64
+            invalid_transcript.pop("receipt_digest")
+            invalid_transcript["receipt_digest"] = canonical_digest(invalid_transcript)
+            with self.assertRaisesRegex(TournamentError, "transcript|hashes"):
+                _validate_command_cleanup_diagnostic(
+                    invalid_transcript,
+                    command,
+                    captured.transcript,
+                    ROOT,
+                    label="invalid cleanup diagnostic",
+                )
+            with self.assertRaises(TournamentError):
+                _validate_command_receipt(
+                    diagnostic,
+                    command,
+                    captured.transcript,
+                    ROOT,
+                    require_tests=True,
+                    label="cleanup-failed diagnostic",
+                )
+        finally:
+            shutil.rmtree(diagnostic_root, ignore_errors=True)
+        self.assertFalse(os.path.lexists(diagnostic_root))
+
     def test_subprocess_output_budget_fails_closed_during_execution(self) -> None:
         with self.assertRaisesRegex(TournamentError, "output exceeded"):
             _bounded_subprocess(
@@ -2313,6 +2546,168 @@ class TournamentExecutionTests(unittest.TestCase):
             self.assertEqual(1, calls)
             self.assertEqual(1, len(attempts))
             self.assertEqual("contract-or-evidence-exception", attempts[0]["outcome"])
+
+    def test_executor_persists_cleanup_failure_command_diagnostics(self) -> None:
+        expected_transcript: str | None = None
+
+        def cleanup_failure_runner(repository: Path, argv: Sequence[str]):
+            nonlocal expected_transcript
+            receipt, transcript = passing_runner(repository, argv)
+            if tuple(argv) != CONTROL_PLANE_COMMANDS["control-plane-tests"]:
+                return receipt, transcript
+            receipt["status"] = "failed"
+            receipt["command_status_before_cleanup"] = "passed"
+            receipt["temporary_directory_cleanup_completed"] = False
+            receipt["temporary_directory_cleanup_error"] = "OSError: injected"
+            receipt.pop("receipt_digest")
+            receipt["receipt_digest"] = canonical_digest(receipt)
+            expected_transcript = transcript
+            raise _CommandEvidenceFailure(
+                "injected command temporary cleanup failure",
+                receipt,
+                transcript,
+                repository,
+                argv,
+                Path(receipt["temporary_directory"]),
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "run"
+            with self.assertRaisesRegex(TournamentError, "node execution failed"):
+                run_tournament(
+                    ROOT,
+                    output,
+                    max_workers=8,
+                    full_suite=False,
+                    command_runner=cleanup_failure_runner,
+                    doctor_isolation_runner=passing_doctor_isolation_runner,
+                )
+            failure = json.loads(
+                (output / "receipts/SYSTEM-CONTROL-PLANE-TESTS.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            transcript = (
+                output / "transcripts/SYSTEM-CONTROL-PLANE-TESTS.txt"
+            ).read_text(encoding="utf-8")
+            self.assertEqual("contract-failed", failure["status"])
+            self.assertTrue(failure["critical"])
+            self.assertTrue(failure["diagnostic_only"])
+            self.assertEqual(
+                expected_transcript,
+                transcript,
+            )
+            self.assertEqual(
+                failure["diagnostic_transcript_sha256"],
+                "sha256:" + sha256(transcript.encode("utf-8")).hexdigest(),
+            )
+            self.assertFalse(
+                failure["diagnostic_command_receipt"][
+                    "temporary_directory_cleanup_completed"
+                ]
+            )
+            with self.assertRaises((OSError, TournamentError)):
+                verify_run_directory(output, repository=ROOT)
+
+    def test_executor_rejects_forged_cleanup_diagnostics(self) -> None:
+        def forged_cleanup_runner(repository: Path, argv: Sequence[str]):
+            receipt, transcript = passing_runner(repository, argv)
+            if tuple(argv) != CONTROL_PLANE_COMMANDS["control-plane-tests"]:
+                return receipt, transcript
+            receipt["status"] = "failed"
+            receipt["command_status_before_cleanup"] = "passed"
+            receipt["temporary_directory_cleanup_completed"] = False
+            receipt["temporary_directory_cleanup_error"] = "OSError: injected"
+            receipt.pop("receipt_digest")
+            receipt["receipt_digest"] = canonical_digest(receipt)
+            raise _CommandEvidenceFailure(
+                "injected forged cleanup evidence",
+                receipt,
+                transcript,
+                repository,
+                argv,
+                Path(tempfile.gettempdir()).resolve() / f"{_COMMAND_TEMP_PREFIX}other",
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "run"
+            with self.assertRaisesRegex(TournamentError, "node execution failed"):
+                run_tournament(
+                    ROOT,
+                    output,
+                    max_workers=8,
+                    full_suite=False,
+                    command_runner=forged_cleanup_runner,
+                    doctor_isolation_runner=passing_doctor_isolation_runner,
+                )
+            failure = json.loads(
+                (output / "receipts/SYSTEM-CONTROL-PLANE-TESTS.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            unsigned = dict(failure)
+            supplied = unsigned.pop("receipt_digest")
+            self.assertEqual(supplied, canonical_digest(unsigned))
+            self.assertIn("diagnostic rejected", failure["error"])
+            self.assertNotIn("diagnostic_command_receipt", failure)
+            self.assertNotIn("diagnostic_transcript_sha256", failure)
+            self.assertFalse(
+                (output / "transcripts/SYSTEM-CONTROL-PLANE-TESTS.txt").exists()
+            )
+            manifest = json.loads(
+                (output / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertNotIn(
+                "transcripts/SYSTEM-CONTROL-PLANE-TESTS.txt",
+                {row["path"] for row in manifest["files"]},
+            )
+
+    def test_executor_rejects_unbound_doctor_cleanup_diagnostics(self) -> None:
+        def forged_doctor_runner(
+            _repository: Path,
+            _inventory: Mapping[str, Any],
+            command_runner,
+        ):
+            workspace = Path(tempfile.gettempdir()).resolve() / "htd-never-created"
+            checkout = workspace / "checkout"
+            command = CONTROL_PLANE_COMMANDS["control-plane-doctor"]
+            receipt, transcript = command_runner(checkout, command)
+            receipt["status"] = "failed"
+            receipt["command_status_before_cleanup"] = "passed"
+            receipt["temporary_directory_cleanup_completed"] = False
+            receipt["temporary_directory_cleanup_error"] = "OSError: injected"
+            receipt.pop("receipt_digest")
+            receipt["receipt_digest"] = canonical_digest(receipt)
+            raise _CommandEvidenceFailure(
+                "injected unbound doctor cleanup evidence",
+                receipt,
+                transcript,
+                checkout,
+                command,
+                workspace / _DOCTOR_TEMP_DIRECTORY_NAME,
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "run"
+            with self.assertRaisesRegex(TournamentError, "node execution failed"):
+                run_tournament(
+                    ROOT,
+                    output,
+                    max_workers=8,
+                    full_suite=False,
+                    command_runner=passing_runner,
+                    doctor_isolation_runner=forged_doctor_runner,
+                )
+            failure = json.loads(
+                (output / "receipts/SYSTEM-CONTROL-PLANE-DOCTOR.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertIn("diagnostic rejected", failure["error"])
+            self.assertNotIn("diagnostic_command_receipt", failure)
+            self.assertFalse(
+                (output / "transcripts/SYSTEM-CONTROL-PLANE-DOCTOR.txt").exists()
+            )
 
     def test_executor_rejects_serial_configuration(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

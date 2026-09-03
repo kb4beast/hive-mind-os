@@ -68,8 +68,11 @@ _CHILD_ENVIRONMENT_PROFILES = frozenset(
 _CONTROL_PLANE_RESOURCE_SCOPE = "resource://sealed-control-plane-tests"
 _DOCTOR_ISOLATION_KIND = "disposable-standalone-no-hardlink-clone-v1"
 _DOCTOR_REPAIR_KIND = "hive-mind-autopilot-full-doctor-evidence-v1"
-_COMMAND_TEMP_PREFIX = "hive-tournament-command-"
-_DOCTOR_TEMP_DIRECTORY_NAME = "tmp"
+_COMMAND_TEMP_PREFIX = "htc-"
+_DOCTOR_WORKSPACE_PREFIX = "htd-"
+_DOCTOR_TEMP_DIRECTORY_NAME = "t"
+_SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET = 196
+_WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT = 259
 _CONTROLLER_TEST_COMMAND_IDENTITY = "exact-checkout-isolated-unittest-discover"
 _CONTROLLER_TEST_TIMEOUT_SECONDS = 600
 _CONTROLLER_TEST_TERMINATION_SECONDS = 10
@@ -145,6 +148,65 @@ _CHILD_REQUIRED_ENV_NAMES = _CHILD_BASE_REQUIRED_ENV_NAMES | {"PYTHONSAFEPATH"}
 
 class TournamentError(RuntimeError):
     """The tournament cannot produce trustworthy evidence."""
+
+
+class _CommandTemporaryCleanupError(TournamentError):
+    """A command completed, but its disposable temporary root survived cleanup."""
+
+    def __init__(self, path: Path, cause: OSError | None) -> None:
+        detail = (
+            f"{type(cause).__name__}: {cause}"
+            if cause is not None
+            else "the path still exists after cleanup"
+        )
+        super().__init__(
+            f"command temporary directory cleanup failed closed: {path} ({detail})"
+        )
+        self.path = path
+        self.cleanup_detail = detail
+
+
+class _CommandEvidenceFailure(TournamentError):
+    """Non-certifying command evidence retained after a cleanup contract failure."""
+
+    def __init__(
+        self,
+        message: str,
+        command_receipt: dict[str, Any],
+        transcript: str,
+        repository_root: Path,
+        expected_argv: Sequence[str],
+        cleanup_path: Path,
+    ) -> None:
+        super().__init__(message)
+        self.command_receipt = command_receipt
+        self.transcript = transcript
+        self.repository_root = repository_root.resolve()
+        self.expected_argv = tuple(expected_argv)
+        self.cleanup_path = cleanup_path.resolve()
+
+
+class _DoctorCommandEvidenceFailure(_CommandEvidenceFailure):
+    """A cleanup diagnostic bound to one source-derived doctor workspace."""
+
+    def __init__(
+        self,
+        failure: _CommandEvidenceFailure,
+        selected_repository_root: Path,
+        workspace_root: Path,
+        checkout_root: Path,
+    ) -> None:
+        super().__init__(
+            str(failure),
+            failure.command_receipt,
+            failure.transcript,
+            failure.repository_root,
+            failure.expected_argv,
+            failure.cleanup_path,
+        )
+        self.selected_repository_root = selected_repository_root.resolve()
+        self.workspace_root = workspace_root.resolve()
+        self.checkout_root = checkout_root.resolve()
 
 
 CommandRunner = Callable[[Path, Sequence[str]], tuple[dict[str, Any], str]]
@@ -273,6 +335,16 @@ CONTROL_PLANE_COMMANDS: Mapping[str, tuple[str, ...]] = {
         "--json",
     ),
 }
+_FULL_SUITE_COMMAND = (
+    sys.executable,
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-v",
+)
 
 
 def _required_inventory_paths() -> frozenset[str]:
@@ -1612,6 +1684,30 @@ def _validated_ambient_temp_root(
     return temporary_root
 
 
+def _validate_sealed_control_plane_temp_path_budget(path: Path) -> None:
+    """Fail before sealed tests exceed the classic Windows path boundary.
+
+    The immutable parallel-worktree arena can create a 196-character descendant
+    beneath ``TEMP``.  Some Python and native-tool operations remain limited to
+    259 visible path characters even when the host supports newer path syntax.
+    Short tournament-owned names preserve that arena's cleanup contract without
+    changing its source or granting a broader filesystem authority.
+    """
+
+    if os.name != "nt":
+        return
+    resolved = path.resolve()
+    projected_characters = (
+        len(str(resolved)) + _SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET
+    )
+    if projected_characters > _WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT:
+        raise TournamentError(
+            "sealed control-plane temporary root exceeds the Windows path budget: "
+            f"{resolved} projects to {projected_characters} characters "
+            f"(limit {_WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT})"
+        )
+
+
 def _live_source_authority_roots(repository: Path) -> tuple[tuple[str, Path], ...]:
     git_marker = repository / ".git"
     if git_marker.is_dir():
@@ -1684,8 +1780,8 @@ def _disposable_command_temporary_directory(
         except OSError as error:
             cleanup_error = error
         if cleanup_error is not None or os.path.lexists(temporary_directory):
-            raise TournamentError(
-                "command temporary directory cleanup failed closed"
+            raise _CommandTemporaryCleanupError(
+                temporary_directory, cleanup_error
             ) from cleanup_error
 
 
@@ -1916,7 +2012,7 @@ def _run_isolated_control_plane_doctor(
     protected_before = _snapshot_protected_states(protected_roots)
     temporary_root = _validated_ambient_temp_root(authority_roots)
     workspace = Path(
-        tempfile.mkdtemp(prefix="hive-tournament-doctor-", dir=temporary_root)
+        tempfile.mkdtemp(prefix=_DOCTOR_WORKSPACE_PREFIX, dir=temporary_root)
     ).resolve()
     try:
         workspace = _validate_path_outside_authority(
@@ -1936,7 +2032,9 @@ def _run_isolated_control_plane_doctor(
     checkout = workspace / "checkout"
     operation_error: Exception | None = None
     result: DoctorIsolationResult | None = None
+    doctor_temporary_root = workspace / _DOCTOR_TEMP_DIRECTORY_NAME
     try:
+        _validate_sealed_control_plane_temp_path_budget(doctor_temporary_root)
         _checked_git(
             workspace,
             "clone",
@@ -2024,7 +2122,6 @@ def _run_isolated_control_plane_doctor(
         )
         if clone_target != identity["source_target_sha"]:
             raise TournamentError("isolated doctor target ref differs from the source target")
-        doctor_temporary_root = workspace / _DOCTOR_TEMP_DIRECTORY_NAME
         if command_runner is run_command_receipt:
             command_receipt, transcript = run_command_receipt(
                 checkout,
@@ -2129,6 +2226,13 @@ def _run_isolated_control_plane_doctor(
     if cleanup_error is not None or os.path.lexists(workspace):
         raise TournamentError("isolated doctor cleanup failed closed") from cleanup_error
     if operation_error is not None:
+        if isinstance(operation_error, _CommandEvidenceFailure):
+            raise _DoctorCommandEvidenceFailure(
+                operation_error,
+                repository,
+                workspace,
+                checkout,
+            ) from operation_error
         raise operation_error
     if result is None:
         raise TournamentError("isolated doctor produced no result")
@@ -2246,15 +2350,45 @@ def run_command_receipt(
     """Execute a local read/test command and return digest-only metadata plus transcript."""
 
     repository = repository.resolve()
-    with _disposable_command_temporary_directory(
-        repository, requested=temporary_directory
-    ) as command_temporary_directory:
-        return _run_command_receipt_with_temporary_directory(
-            repository,
-            argv,
-            timeout_seconds=timeout_seconds,
-            temporary_directory=command_temporary_directory,
-        )
+    result: tuple[dict[str, Any], str] | None = None
+    try:
+        with _disposable_command_temporary_directory(
+            repository, requested=temporary_directory
+        ) as command_temporary_directory:
+            if tuple(argv) in {
+                CONTROL_PLANE_COMMANDS["control-plane-tests"],
+                CONTROL_PLANE_COMMANDS["control-plane-doctor"],
+            }:
+                _validate_sealed_control_plane_temp_path_budget(
+                    command_temporary_directory
+                )
+            result = _run_command_receipt_with_temporary_directory(
+                repository,
+                argv,
+                timeout_seconds=timeout_seconds,
+                temporary_directory=command_temporary_directory,
+            )
+    except _CommandTemporaryCleanupError as error:
+        if result is None:
+            raise
+        receipt, transcript = result
+        command_status = str(receipt["status"])
+        receipt["status"] = "failed"
+        receipt["command_status_before_cleanup"] = command_status
+        receipt["temporary_directory_cleanup_completed"] = False
+        receipt["temporary_directory_cleanup_error"] = error.cleanup_detail
+        receipt.pop("receipt_digest", None)
+        receipt["receipt_digest"] = canonical_digest(receipt)
+        raise _CommandEvidenceFailure(
+            str(error), receipt, transcript, repository, argv, error.path
+        ) from error
+    if result is None:
+        raise TournamentError("command execution produced no result")
+    receipt, transcript = result
+    receipt["temporary_directory_cleanup_completed"] = True
+    receipt.pop("receipt_digest", None)
+    receipt["receipt_digest"] = canonical_digest(receipt)
+    return receipt, transcript
 
 
 def _run_command_receipt_with_temporary_directory(
@@ -2348,7 +2482,7 @@ def _run_command_receipt_with_temporary_directory(
         "expected_package_root": str(expected_package),
         "execution_cwd": str(repository.resolve()),
         "temporary_directory": str(temporary_directory.resolve()),
-        "temporary_directory_cleanup_completed": True,
+        "temporary_directory_cleanup_completed": False,
         "import_provenance_bound": import_is_bound,
         "environment_policy": _environment_policy(environment_profile, environment),
         "test_output_unambiguous": test_output_unambiguous,
@@ -2364,6 +2498,23 @@ def _run_command_receipt_with_temporary_directory(
 
 def _unittest_command(modules: Iterable[str]) -> tuple[str, ...]:
     return (sys.executable, "-B", "-m", "unittest", *tuple(modules), "-v")
+
+
+def _expected_command_for_plan_node(node: Mapping[str, Any]) -> tuple[str, ...]:
+    action = node.get("action")
+    if action == "grade-role":
+        return _unittest_command(ROLE_AUDIT_SPECS[str(node["role"])].test_modules)
+    if action == "system-test":
+        return _unittest_command(SYSTEM_TEST_LANES[str(node["lane"])])
+    if action == "control-plane-audit":
+        return CONTROL_PLANE_COMMANDS["control-plane"]
+    if action == "control-plane-tests":
+        return CONTROL_PLANE_COMMANDS["control-plane-tests"]
+    if action == "control-plane-doctor":
+        return CONTROL_PLANE_COMMANDS["control-plane-doctor"]
+    if action == "full-suite":
+        return _FULL_SUITE_COMMAND
+    raise TournamentError("node cannot emit command-cleanup diagnostics")
 
 
 def _criterion(
@@ -2803,7 +2954,7 @@ def _full_suite(repository: Path, enabled: bool) -> tuple[dict[str, Any], str | 
 def _full_discovery(repository: Path) -> tuple[dict[str, Any], str]:
     receipt, transcript = run_command_receipt(
         repository,
-        (sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"),
+        _FULL_SUITE_COMMAND,
         timeout_seconds=3600,
     )
     document = {
@@ -3207,6 +3358,7 @@ def _validate_command_receipt(
     *,
     require_tests: bool,
     label: str,
+    allow_existing_temporary_directory: bool = False,
 ) -> None:
     expected_fields = {
         "argv",
@@ -3311,7 +3463,10 @@ def _validate_command_receipt(
         raise TournamentError(f"{label} temporary-directory evidence is invalid")
     raw_temporary_directory = Path(temporary_directory_value).absolute()
     if (
-        os.path.lexists(raw_temporary_directory)
+        (
+            os.path.lexists(raw_temporary_directory)
+            and not allow_existing_temporary_directory
+        )
         or _has_link_like_component(
             Path(raw_temporary_directory.anchor), raw_temporary_directory
         )
@@ -3320,10 +3475,18 @@ def _validate_command_receipt(
     temporary_directory = raw_temporary_directory.resolve()
     if (
         temporary_directory_value != str(temporary_directory)
-        or os.path.lexists(temporary_directory)
+        or (
+            os.path.lexists(temporary_directory)
+            and not allow_existing_temporary_directory
+        )
         or _paths_overlap(temporary_directory, repository_root)
     ):
         raise TournamentError(f"{label} temporary directory was not safely cleaned")
+    if tuple(expected_argv) in {
+        CONTROL_PLANE_COMMANDS["control-plane-tests"],
+        CONTROL_PLANE_COMMANDS["control-plane-doctor"],
+    }:
+        _validate_sealed_control_plane_temp_path_budget(temporary_directory)
     if tuple(expected_argv) == CONTROL_PLANE_COMMANDS["control-plane-doctor"]:
         if temporary_directory != (
             repository_root.parent / _DOCTOR_TEMP_DIRECTORY_NAME
@@ -3485,6 +3648,61 @@ def _validate_command_receipt(
         raise TournamentError(f"{label} command status is not derivable")
 
 
+def _validate_command_cleanup_diagnostic(
+    receipt: Mapping[str, Any],
+    expected_argv: Sequence[str],
+    transcript: str,
+    repository_root: Path,
+    *,
+    label: str,
+) -> None:
+    """Validate a cleanup-failed command without making it certifying evidence."""
+
+    diagnostic_fields = {
+        "command_status_before_cleanup",
+        "temporary_directory_cleanup_error",
+    }
+    if not diagnostic_fields <= set(receipt):
+        raise TournamentError(f"{label} cleanup diagnostic fields are incomplete")
+    supplied_digest = receipt.get("receipt_digest")
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_digest", None)
+    if (
+        not isinstance(supplied_digest, str)
+        or _DIGEST.fullmatch(supplied_digest) is None
+        or supplied_digest != canonical_digest(unsigned)
+    ):
+        raise TournamentError(f"{label} cleanup diagnostic digest is invalid")
+    prior_status = receipt.get("command_status_before_cleanup")
+    cleanup_error = receipt.get("temporary_directory_cleanup_error")
+    if (
+        receipt.get("status") != "failed"
+        or prior_status not in {"passed", "failed"}
+        or receipt.get("temporary_directory_cleanup_completed") is not False
+        or not isinstance(cleanup_error, str)
+        or not cleanup_error.strip()
+        or len(cleanup_error.encode("utf-8")) > 4096
+    ):
+        raise TournamentError(f"{label} cleanup diagnostic state is invalid")
+
+    normalized = dict(receipt)
+    normalized.pop("command_status_before_cleanup")
+    normalized.pop("temporary_directory_cleanup_error")
+    normalized["status"] = prior_status
+    normalized["temporary_directory_cleanup_completed"] = True
+    normalized.pop("receipt_digest", None)
+    normalized["receipt_digest"] = canonical_digest(normalized)
+    _validate_command_receipt(
+        normalized,
+        expected_argv,
+        transcript,
+        repository_root,
+        require_tests=_is_unittest_command(expected_argv),
+        label=label,
+        allow_existing_temporary_directory=True,
+    )
+
+
 def _validate_state_manifest(value: object, *, label: str) -> None:
     if not isinstance(value, Mapping) or set(value) != {
         "exists",
@@ -3615,7 +3833,7 @@ def _validate_doctor_isolation(
         or command_temporary_root != workspace / _DOCTOR_TEMP_DIRECTORY_NAME
         or workspace.is_relative_to(repository_root)
         or execution_root == repository_root
-        or not workspace.name.startswith("hive-tournament-doctor-")
+        or not workspace.name.startswith(_DOCTOR_WORKSPACE_PREFIX)
         or workspace.parent != temporary_root
         or os.path.lexists(workspace)
         or os.path.lexists(execution_root)
@@ -4193,7 +4411,7 @@ def _validate_system_receipt(
             raise TournamentError("full-suite receipt fields are invalid")
         _validate_command_receipt(
             command,
-            (sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"),
+            _FULL_SUITE_COMMAND,
             transcript,
             repository_root,
             require_tests=True,
@@ -5086,6 +5304,110 @@ def run_tournament(
                     }
                 )
                 return value, transcript, attempt_rows
+            except _CommandEvidenceFailure as error:
+                diagnostic_rejection: str | None = None
+                try:
+                    expected_argv = _expected_command_for_plan_node(raw)
+                    if error.expected_argv != expected_argv:
+                        raise TournamentError(
+                            "cleanup diagnostic is not bound to the failed node command"
+                        )
+                    cleanup_path_value = error.command_receipt.get(
+                        "temporary_directory"
+                    )
+                    if (
+                        not isinstance(cleanup_path_value, str)
+                        or cleanup_path_value != str(error.cleanup_path)
+                        or Path(cleanup_path_value).resolve() != error.cleanup_path
+                    ):
+                        raise TournamentError(
+                            "cleanup diagnostic path differs from the failed cleanup"
+                        )
+                    diagnostic_repository = error.repository_root.resolve()
+                    if expected_argv == CONTROL_PLANE_COMMANDS["control-plane-doctor"]:
+                        if (
+                            not isinstance(error, _DoctorCommandEvidenceFailure)
+                            or resolved_doctor_runner
+                            is not _run_isolated_control_plane_doctor
+                        ):
+                            raise TournamentError(
+                                "cleanup diagnostic lacks source-derived doctor identity"
+                            )
+                        workspace = error.workspace_root
+                        ambient_root = _validated_ambient_temp_root(
+                            _source_authority_roots(root, opening_inventory)
+                        )
+                        if (
+                            error.selected_repository_root != root
+                            or error.checkout_root != diagnostic_repository
+                            or diagnostic_repository != workspace / "checkout"
+                            or diagnostic_repository.name != "checkout"
+                            or not workspace.name.startswith(_DOCTOR_WORKSPACE_PREFIX)
+                            or workspace.parent != ambient_root
+                            or os.path.lexists(workspace)
+                        ):
+                            raise TournamentError(
+                                "cleanup diagnostic doctor repository is not isolated"
+                            )
+                    elif diagnostic_repository != root:
+                        raise TournamentError(
+                            "cleanup diagnostic repository is not the selected checkout"
+                        )
+                    _validate_command_cleanup_diagnostic(
+                        error.command_receipt,
+                        expected_argv,
+                        error.transcript,
+                        diagnostic_repository,
+                        label=f"{node_id} cleanup diagnostic",
+                    )
+                except Exception as validation_error:
+                    diagnostic_rejection = (
+                        f"{type(validation_error).__name__}: {validation_error}"
+                    )
+                attempt_rows.append(
+                    {
+                        "attempt": attempt,
+                        "outcome": "contract-or-evidence-exception",
+                        "error": (
+                            f"{type(error).__name__}: {error}"
+                            if diagnostic_rejection is None
+                            else (
+                                f"{type(error).__name__}: {error}; "
+                                f"diagnostic rejected: {diagnostic_rejection}"
+                            )
+                        ),
+                        "started_at": attempt_started_at,
+                        "ended_at": _now(),
+                        "duration_ms": round(
+                            (time.monotonic() - started_monotonic) * 1000
+                        ),
+                    }
+                )
+                failure: dict[str, Any] = {
+                    "node_id": node_id,
+                    "status": "contract-failed",
+                    "critical": True,
+                    "error": attempt_rows[-1]["error"],
+                    "attempts_executed": len(attempt_rows),
+                }
+                if diagnostic_rejection is None:
+                    failure.update(
+                        {
+                            "diagnostic_only": True,
+                            "diagnostic_command_receipt": dict(
+                                error.command_receipt
+                            ),
+                            "diagnostic_transcript_sha256": _sha256_bytes(
+                                error.transcript.encode("utf-8")
+                            ),
+                        }
+                    )
+                failure["receipt_digest"] = canonical_digest(failure)
+                return (
+                    failure,
+                    error.transcript if diagnostic_rejection is None else None,
+                    attempt_rows,
+                )
             except (OSError, TimeoutError, subprocess.SubprocessError) as error:
                 attempt_rows.append(
                     {

@@ -51,7 +51,12 @@ Git administration or ignored control-plane authority state. Test subprocesses r
 credential-scrubbed environment with inherited Git-control variables removed and a
 fixed minimal executable search path plus a best-effort proxy deny. Each command gets
 one create-only disposable temporary root; `TEMP`, `TMP`, and `TMPDIR` are rebound to
-it and its removal is verified. That path can add
+it and its removal is verified. The tournament uses short internal temp/workspace
+basenames and, before either exact sealed control-plane command, verifies that its
+known 196-character nested arena fits under the 259-character classic Windows path
+boundary. A command that finishes but cannot clean its temp root still fails the run;
+its result and lossless transcript are retained only as non-certifying diagnostics in
+the incomplete bundle. That path can add
 a native Node runtime only from fixed operating-system locations; its resolved path,
 availability, and SHA-256 are recorded in the repository seal and re-derived during
 verification. Ambient `PATH` entries are never consulted for that runtime. Inventory

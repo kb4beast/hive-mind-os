@@ -46,7 +46,7 @@ each tournament inventory:
 
 No unavailable external source was invented for this decision.
 
-Two adverse predecessor executions remain immutable outside the checkout:
+Three adverse predecessor executions remain immutable outside the checkout:
 
 - `C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-002`
   (`manifest sha256:325e00ce4578386722e2fc1299822d2c4b031036e27e8d1d0feeca58d458a400`,
@@ -54,7 +54,15 @@ Two adverse predecessor executions remain immutable outside the checkout:
 - `C:\Users\beesp\.codex\tournament-smoke\agent-readiness-control-plane-coverage-smoke`
   (`manifest sha256:6b4f3644af25ffbb49b725f77717bc89299070ef61695ea43868025a81ad1453`,
   `adapt`) proved the expanded direct suite/doctor topology while preserving the
-  safe-path compatibility failure that motivated this successor.
+  safe-path compatibility failure that motivated this successor;
+- `C:\Users\beesp\.codex\tournament-smoke\agent-readiness-isolated-doctor-smoke`
+  (`manifest sha256:271f136d36eca8e8f082a3a0d82810e4291e2a28bec884dda7c45a595cda32df`,
+  `incomplete sha256:cccf655f374a8e2292237231e5fe09064b8b3832ecef79e3e86d3bb5d44a0dd8`)
+  failed closed in the direct control-plane lane. Its 66-character tournament temp
+  root pushed 21 sealed-arena paths to 262 characters on a host with classic long
+  paths disabled. No process, reparse point, or read-only artifact explained the
+  residue. The 2,664-item temporary tree was removed only after this observation was
+  preserved; the immutable failed bundle itself was not changed.
 
 They are evidence inputs, not passing receipts, and are not overwritten or relabeled.
 
@@ -70,8 +78,10 @@ from enclosed command-receipt intervals, so outer orchestration timing cannot st
 in for parallel test execution. A final manifest binds the complete artifact set, and the
 verifier rejects both omissions and additions. Exhausted retries preserve every
 completed peer result plus a self-hashed incomplete-run diagnostic manifest before
-failing closed. The completed-run verifier deliberately does not certify those
-partial diagnostics.
+failing closed. If a command finishes but its temp cleanup fails, the incomplete
+bundle also preserves the command result and lossless transcript as explicitly
+non-certifying diagnostics. The completed-run verifier deliberately does not certify
+those partial diagnostics.
 
 The DAG has eight waves:
 
@@ -162,7 +172,11 @@ champion, materialize a successor, or automatically run the successor generation
   sealed worktree worker replaces `PYTHONPATH` and imports `tests.*` from its controlled
   working directory; the separate provenance probe retains safe-path mode. Every
   command gets a disposable temporary root and has `TEMP`, `TMP`, and `TMPDIR` rebound
-  to it. The benchmark hidden checker replaces the parent `PYTHONPATH` with the exact isolated
+  to it. Tournament-owned temp/workspace basenames are intentionally short, and the
+  exact sealed control-plane commands preflight their known 196-character descendant
+  budget against the 259-character classic Windows boundary before launch. This is a
+  compatibility constraint inside the same validated ambient-temp authority, not an
+  authority expansion. The benchmark hidden checker replaces the parent `PYTHONPATH` with the exact isolated
   candidate workspace when candidate import is its intended check. A bounded,
   non-importing probe records resolved package provenance. Execution and captured
   streams have wall-time and byte budgets. These processes are not protected by a
