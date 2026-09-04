@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 
 from hive_mind_os.brain_kernel.architect import Architect
 from hive_mind_os.brain_kernel.builder import BuilderCoordinator
-from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.curator_runtime import CuratorRuntime
 from hive_mind_os.brain_kernel.dag_runtime import (
     SPECIALIST_ROLES,
@@ -23,11 +22,13 @@ from hive_mind_os.brain_kernel.planner import OrchestratorPlanner
 from hive_mind_os.brain_kernel.steward import Steward
 from hive_mind_os.cortex.repository.specialist_handlers import (
     RepositorySpecialistHandlers,
+    repository_candidate_digest,
     repository_specialist_plan,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-CANDIDATE = canonical_digest({"candidate": "repository-specialist-handler-tests"})
+PLAN = repository_specialist_plan()
+CANDIDATE = repository_candidate_digest(REPOSITORY_ROOT, PLAN.digest)
 
 
 def _spy_method(stack: ExitStack, owner: type, name: str) -> MagicMock:
@@ -75,7 +76,7 @@ class RepositorySpecialistExecutionTests(unittest.IsolatedAsyncioTestCase):
             }
             with tempfile.TemporaryDirectory(prefix="hsd-v2-") as temporary:
                 runtime = ExecutableDagRuntime(temporary, candidate_digest=CANDIDATE)
-                result = await runtime.run(repository_specialist_plan(), handlers)
+                result = await runtime.run(PLAN, handlers)
                 documents = {
                     receipt.role: json.loads(
                         runtime.artifact_store.get(receipt.artifact_digest).decode(
@@ -117,7 +118,7 @@ class RepositorySpecialistExecutionTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory(prefix="hsd-v2-fallback-") as temporary:
             result = await ExecutableDagRuntime(
                 temporary, candidate_digest=CANDIDATE
-            ).run(repository_specialist_plan(), handlers)
+            ).run(PLAN, handlers)
         builder = next(value for value in result.receipts if value.role == "builder")
         curator = next(value for value in result.receipts if value.role == "curator")
         architect = next(

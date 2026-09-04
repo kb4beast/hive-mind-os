@@ -8,10 +8,15 @@ native specialist node.
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import subprocess
+import sys
+import tempfile
+from hashlib import sha256
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable, Mapping, cast
 
 from ...brain_kernel.architect import (
     AcceptanceMapping,
@@ -73,6 +78,7 @@ _ZERO_DIGEST = "sha256:" + "0" * 64
 _ZERO_SHA = "0" * 40
 _NOW = "2030-01-01T00:00:00Z"
 _EXPIRES = "2099-01-01T00:00:00Z"
+_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _NATIVE_SYMBOLS = {
     "orchestrator": "OrchestratorPlanner.plan",
     "explorer": "RepositoryExplorer.discover_tests",
@@ -83,6 +89,32 @@ _NATIVE_SYMBOLS = {
     "steward": "Steward.assess",
     "optimizer": "Optimizer.recommend_independent_review",
 }
+
+_CURATOR_SMOKE_TEST = "tests.test_brain_kernel_artifacts"
+
+
+def repository_candidate_digest(repository_root: str | Path, plan_digest: str) -> str:
+    """Bind a native specialist run to committed Git HEAD/tree and its plan.
+
+    The working-tree path is deliberately excluded so that an independently
+    reconstructed checkout has the same identity.  Callers that evaluate dirty
+    or untracked files need a separate inventory binding; this native lane only
+    claims the committed Git candidate.
+    """
+
+    if not isinstance(plan_digest, str) or _DIGEST.fullmatch(plan_digest) is None:
+        raise ValueError("plan digest must be lowercase sha256:<64 hex>")
+    root = Path(repository_root).resolve()
+    identity = _repository_identity(root)
+    return canonical_digest(
+        {
+            "schema_version": 1,
+            "candidate_kind": "committed-repository-specialist-dag",
+            "head_commit": identity.commit,
+            "tree_oid": identity.tree,
+            "plan_digest": plan_digest,
+        }
+    )
 
 
 def _artifact_type(role: str) -> ArtifactType:
@@ -219,7 +251,20 @@ class RepositorySpecialistHandlers:
         return tuple(sorted(self._handlers))
 
     def handler_for(self, role: str) -> SpecialistHandler:
-        return self._handlers.get(role, self.generic_handler)
+        handler = self._handlers.get(role, self.generic_handler)
+
+        def candidate_bound(context: SpecialistContext) -> SpecialistResult:
+            observed = repository_candidate_digest(
+                self.repository_root, context.plan_digest
+            )
+            if context.candidate_digest != observed:
+                raise RuntimeError(
+                    "native specialist candidate does not match committed "
+                    "repository HEAD/tree and plan"
+                )
+            return cast(SpecialistResult, handler(context))
+
+        return candidate_bound
 
     @staticmethod
     def generic_handler(context: SpecialistContext) -> SpecialistResult:
@@ -449,6 +494,13 @@ class RepositorySpecialistHandlers:
             ),
         )
         executions = coordinator.repair((actions,), max_retries=0)
+        if any(value.outcome.status != "SUCCEEDED" for value in executions):
+            raise RuntimeError("bounded Builder action did not succeed")
+        product = context.confined_path(target)
+        try:
+            product_digest = _bytes_digest(product.read_bytes())
+        except OSError as error:
+            raise RuntimeError("bounded Builder product is unavailable") from error
         return SpecialistResult(
             {
                 "role": "builder",
@@ -462,6 +514,7 @@ class RepositorySpecialistHandlers:
                     for value in executions
                 ],
                 "workspace_product": target,
+                "workspace_product_digest": product_digest,
             },
             True,
             _NATIVE_SYMBOLS["builder"],
@@ -470,7 +523,11 @@ class RepositorySpecialistHandlers:
 
     def _curator(self, context: SpecialistContext) -> SpecialistResult:
         runtime = CuratorRuntime()
-        checks = ("artifact-dependency-integrity", "repository-test-presence")
+        checks = (
+            "builder-artifact-and-product",
+            "repository-test-presence",
+            "repository-nonrecursive-smoke",
+        )
         seal = runtime.seal_acceptance(
             mission_id="MISSION-specialist-dag-v2",
             work_id="WORK-specialist-curator",
@@ -481,7 +538,14 @@ class RepositorySpecialistHandlers:
         # Candidate materialization deliberately happens only after the blind seal.
         candidate_root = context.confined_path("candidate")
         self._clone_candidate(candidate_root)
-        identity = self._candidate_identity(candidate_root)
+        identity = _repository_identity(candidate_root)
+        if (
+            repository_candidate_digest(candidate_root, context.plan_digest)
+            != context.candidate_digest
+        ):
+            raise RuntimeError(
+                "Curator clone does not match the committed candidate binding"
+            )
         workspace = IsolatedCandidateWorkspace(
             "workspace:curator:v2",
             candidate_root,
@@ -490,22 +554,56 @@ class RepositorySpecialistHandlers:
             context.workspaces_root / "04-builder",
         )
 
+        builder_validation: dict[str, object] = {
+            "passed": False,
+            "error_type": "not-run",
+        }
+        test_presence: dict[str, object] = {
+            "passed": False,
+            "pattern": "tests/test_*.py",
+        }
+        smoke_test: dict[str, object] = _not_run_smoke_evidence()
+
         def check(name: str, root: Path) -> bool:
-            if name == "artifact-dependency-integrity":
-                return all(
-                    context.artifact_for(source).envelope.artifact_digest
-                    for source in context.artifacts
-                )
+            nonlocal builder_validation, test_presence, smoke_test
+            if name == "builder-artifact-and-product":
+                try:
+                    builder_validation = _validate_builder_handoff(context)
+                except (OSError, TypeError, ValueError) as error:
+                    builder_validation = {
+                        "passed": False,
+                        "error_type": type(error).__name__,
+                    }
+                return builder_validation.get("passed") is True
             if name == "repository-test-presence":
                 tests = root / "tests"
-                return tests.is_dir() and any(tests.rglob("test_*.py"))
+                passed = tests.is_dir() and any(tests.rglob("test_*.py"))
+                test_presence = {
+                    "passed": passed,
+                    "pattern": "tests/test_*.py",
+                }
+                return passed
+            if name == "repository-nonrecursive-smoke":
+                with tempfile.TemporaryDirectory(
+                    prefix=".curator-smoke-", dir=context.workspace
+                ) as temporary:
+                    smoke_test = _run_curator_smoke(root, Path(temporary))
+                return smoke_test.get("passed") is True
             return False
 
         report = runtime.verify(seal, workspace, candidate=identity, check_runner=check)
         if report.verdict is not CuratorVerdict.ADOPT:
+            diagnostic_digest = canonical_digest(
+                {
+                    "report_digest": report.report_digest,
+                    "builder_validation": builder_validation,
+                    "test_presence": test_presence,
+                    "smoke_test": smoke_test,
+                    "reasons": report.reasons,
+                }
+            )
             raise RuntimeError(
-                "independent Curator did not adopt candidate: "
-                + ", ".join(report.reasons)
+                "bounded Curator remanded candidate; diagnostic=" + diagnostic_digest
             )
         return SpecialistResult(
             {
@@ -516,7 +614,13 @@ class RepositorySpecialistHandlers:
                 "report_digest": report.report_digest,
                 "verdict": report.verdict.value,
                 "check_results": [list(value) for value in report.check_results],
-                "candidate_scope": "committed repository HEAD; builder artifact checked separately",
+                "builder_validation": builder_validation,
+                "test_presence": test_presence,
+                "smoke_test": smoke_test,
+                "candidate_scope": (
+                    "committed repository HEAD; Builder artifact and product "
+                    "validated as a separate bounded handoff"
+                ),
             },
             True,
             _NATIVE_SYMBOLS["curator"],
@@ -524,6 +628,8 @@ class RepositorySpecialistHandlers:
         )
 
     def _integrator(self, context: SpecialistContext) -> SpecialistResult:
+        curator = _curator_payload(context)
+        curator_complete = _curator_evidence_complete(curator)
         source = VersionedContract(
             "repository-specialist-artifact",
             1,
@@ -551,7 +657,7 @@ class RepositorySpecialistHandlers:
             source.identity,
             target.identity,
             _evidence_refs(context),
-            True,
+            curator_complete,
         )
         report = Integrator().validate(
             source, target, adapter, accepted_consumer_versions=(2,)
@@ -564,6 +670,7 @@ class RepositorySpecialistHandlers:
                 "lineage_digest": report.lineage_digest,
                 "findings": list(report.findings),
                 "builder_remands": [value.work_id for value in report.builder_remands],
+                "curator_evidence_complete": curator_complete,
             },
             True,
             _NATIVE_SYMBOLS["integrator"],
@@ -571,32 +678,65 @@ class RepositorySpecialistHandlers:
         )
 
     def _steward(self, context: SpecialistContext) -> SpecialistResult:
+        curator = _curator_payload(context)
+        complete = _curator_evidence_complete(curator)
+        observed_surfaces = {
+            HealthSurface.RECEIPTS,
+            HealthSurface.SNAPSHOTS,
+            HealthSurface.WORKSPACES,
+        }
         observations = []
         for surface in HealthSurface:
+            observed = surface in observed_surfaces
+            status = (
+                HealthStatus.HEALTHY
+                if observed and complete
+                else HealthStatus.CRITICAL
+                if observed
+                else HealthStatus.DEGRADED
+            )
             evidence = {
                 "surface": surface.value,
                 "source_artifacts": list(_input_digests(context)),
-                "bounded_offline_observation": True,
+                "bounded_offline_observation": observed,
+                "curator_verdict": curator["verdict"],
+                "derived_status": status.value,
             }
             observations.append(
                 HealthObservation(
                     surface,
-                    HealthStatus.HEALTHY,
+                    status,
                     f"offline:{surface.value}",
                     evidence,
                     canonical_digest(evidence),
+                    None
+                    if status is HealthStatus.HEALTHY
+                    else f"reobserve:{surface.value}:external-runtime",
                 )
             )
         report = Steward().assess(tuple(observations))
+        statuses = {
+            value.surface.value: value.status.value for value in report.observations
+        }
         return SpecialistResult(
             {
                 "role": "steward",
                 "readiness": report.readiness.value,
                 "report_digest": report.report_digest,
-                "observed_surfaces": [
-                    value.surface.value for value in report.observations
-                ],
-                "limitation": "offline artifact health, not live provider or deployment health",
+                "surface_statuses": statuses,
+                "observed_surfaces": sorted(
+                    surface.value for surface in observed_surfaces
+                ),
+                "unobserved_surfaces": sorted(
+                    surface.value
+                    for surface in HealthSurface
+                    if surface not in observed_surfaces
+                ),
+                "limitation": (
+                    "receipt, snapshot, and workspace status derives from the "
+                    "bounded Curator artifact; queues, leases, event chains, and "
+                    "providers are explicitly unobserved"
+                ),
             },
             True,
             _NATIVE_SYMBOLS["steward"],
@@ -604,12 +744,66 @@ class RepositorySpecialistHandlers:
         )
 
     def _optimizer(self, context: SpecialistContext) -> SpecialistResult:
+        integrator = _strict_artifact_payload(
+            context,
+            "06-integrator",
+            {
+                "role",
+                "status",
+                "compatibility_report_digest",
+                "lineage_digest",
+                "findings",
+                "builder_remands",
+                "curator_evidence_complete",
+            },
+            "Integrator",
+        )
+        steward = _strict_artifact_payload(
+            context,
+            "07-steward",
+            {
+                "role",
+                "readiness",
+                "report_digest",
+                "surface_statuses",
+                "observed_surfaces",
+                "unobserved_surfaces",
+                "limitation",
+            },
+            "Steward",
+        )
+        integrator_complete = (
+            integrator.get("role") == "integrator"
+            and integrator.get("status") == "compatible"
+            and integrator.get("curator_evidence_complete") is True
+            and integrator.get("builder_remands") == []
+        )
+        surface_statuses = steward.get("surface_statuses")
+        steward_complete = (
+            steward.get("role") == "steward"
+            and steward.get("readiness") == "ready"
+            and steward.get("unobserved_surfaces") == []
+            and isinstance(surface_statuses, dict)
+            and set(surface_statuses.values()) == {"healthy"}
+        )
+        evidence_complete = integrator_complete and steward_complete
+        completeness_reasons = []
+        if not integrator_complete:
+            completeness_reasons.append("integration-or-Curator-evidence-is-incomplete")
+        if not steward_complete:
+            completeness_reasons.append(
+                "operational-surfaces-are-unobserved-or-unhealthy"
+            )
         optimizer = Optimizer()
         attribution = OutcomeAttribution(
             evidence_refs=_evidence_refs(context),
             context_ref=f"dag-plan:{context.plan_digest}",
             outcome_ref="outcome:offline-specialist-run",
-            error_class="bounded-offline-evaluation",
+            error_class=(
+                "bounded-offline-evaluation"
+                if evidence_complete
+                else "incomplete-operational-observation"
+            ),
             applicability=("repository-specialists", "typed-dag"),
             confidence=0.75,
             expires_at=_EXPIRES,
@@ -626,13 +820,15 @@ class RepositorySpecialistHandlers:
         recommendation = optimizer.recommend_independent_review(
             proposal,
             evaluator_id="executor:curator:v2",
-            evidence_complete=True,
+            evidence_complete=evidence_complete,
         )
         return SpecialistResult(
             {
                 "role": "optimizer",
                 "lesson_digest": lesson.lesson_digest,
                 "challenger_proposal_digest": proposal.proposal_digest,
+                "evidence_complete": evidence_complete,
+                "completeness_reasons": completeness_reasons,
                 "recommendation": recommendation.recommendation.value,
                 "promotion_effect": "none; independent court review is still required",
             },
@@ -699,25 +895,307 @@ class RepositorySpecialistHandlers:
             }
         )
 
-    @staticmethod
-    def _candidate_identity(root: Path) -> CandidateIdentity:
-        git = RepositoryExplorer._trusted_git_executable()
+
+def _repository_identity(root: Path) -> CandidateIdentity:
+    repository = root.resolve()
+    if not repository.is_dir() or not (repository / ".git").exists():
+        raise RuntimeError("candidate Git repository is unavailable")
+    git = RepositoryExplorer._trusted_git_executable()
+    completed = subprocess.run(
+        (str(git), "rev-parse", "HEAD^{commit}", "HEAD^{tree}"),
+        cwd=repository,
+        env=_git_environment(git.parent, repository),
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="strict",
+        timeout=30,
+    )
+    values = completed.stdout.splitlines()
+    if completed.returncode != 0 or len(values) != 2:
+        raise RuntimeError("candidate Git identity is unavailable")
+    return CandidateIdentity(values[0], values[1])
+
+
+def _bytes_digest(content: bytes) -> str:
+    return f"sha256:{sha256(content).hexdigest()}"
+
+
+def _reject_duplicate_json_pairs(
+    pairs: list[tuple[str, object]],
+) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("specialist artifact contains duplicate JSON keys")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"non-finite JSON constant is forbidden: {value}")
+
+
+def _strict_json_object(
+    content: bytes, expected_fields: set[str], label: str
+) -> dict[str, object]:
+    try:
+        value = json.loads(
+            content.decode("utf-8", errors="strict"),
+            object_pairs_hook=_reject_duplicate_json_pairs,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeError, json.JSONDecodeError, ValueError) as error:
+        raise ValueError(f"{label} artifact is not strict JSON") from error
+    if not isinstance(value, dict) or set(value) != expected_fields:
+        raise ValueError(f"{label} artifact fields are invalid")
+    return value
+
+
+def _strict_artifact_payload(
+    context: SpecialistContext,
+    producer_node_id: str,
+    expected_fields: set[str],
+    label: str,
+) -> dict[str, object]:
+    return _strict_json_object(
+        context.artifact_for(producer_node_id).content,
+        expected_fields,
+        label,
+    )
+
+
+def _validate_builder_handoff(context: SpecialistContext) -> dict[str, object]:
+    stored = context.artifact_for("04-builder")
+    payload = _strict_json_object(
+        stored.content,
+        {
+            "role",
+            "actions",
+            "workspace_product",
+            "workspace_product_digest",
+        },
+        "Builder",
+    )
+    if payload["role"] != "builder":
+        raise ValueError("Builder artifact role is invalid")
+    actions = payload["actions"]
+    if not isinstance(actions, list) or len(actions) != 2:
+        raise ValueError("Builder artifact action evidence is incomplete")
+    expected_action_ids = {
+        "write-specialist-output",
+        "check-specialist-output",
+    }
+    observed_action_ids: set[str] = set()
+    receipt_digests: list[str] = []
+    for action in actions:
+        if not isinstance(action, Mapping) or set(action) != {
+            "action_id",
+            "status",
+            "effect_receipt_digest",
+            "output_digest",
+        }:
+            raise ValueError("Builder action evidence fields are invalid")
+        action_id = action["action_id"]
+        if not isinstance(action_id, str):
+            raise ValueError("Builder action identity is invalid")
+        observed_action_ids.add(action_id)
+        if action["status"] != "SUCCEEDED":
+            raise ValueError("Builder action did not succeed")
+        for key in ("effect_receipt_digest", "output_digest"):
+            digest = action[key]
+            if not isinstance(digest, str) or _DIGEST.fullmatch(digest) is None:
+                raise ValueError("Builder action digest is invalid")
+        receipt_digests.append(cast(str, action["effect_receipt_digest"]))
+    if observed_action_ids != expected_action_ids:
+        raise ValueError("Builder action evidence is incomplete")
+
+    product_relative = payload["workspace_product"]
+    if product_relative != "candidate/builder-output.json":
+        raise ValueError("Builder product path is not the sealed target")
+    claimed_product_digest = payload["workspace_product_digest"]
+    if (
+        not isinstance(claimed_product_digest, str)
+        or _DIGEST.fullmatch(claimed_product_digest) is None
+    ):
+        raise ValueError("Builder product digest is invalid")
+    builder_root = (context.workspaces_root / "04-builder").resolve()
+    product_path = builder_root.joinpath(*cast(str, product_relative).split("/"))
+    resolved_product = product_path.resolve(strict=True)
+    try:
+        resolved_product.relative_to(builder_root)
+    except ValueError as error:
+        raise ValueError("Builder product escapes its workspace") from error
+    if product_path.is_symlink() or not resolved_product.is_file():
+        raise ValueError("Builder product is not a regular confined file")
+    product_bytes = resolved_product.read_bytes()
+    product_digest = _bytes_digest(product_bytes)
+    if product_digest != claimed_product_digest:
+        raise ValueError("Builder product digest does not match its artifact")
+    product = _strict_json_object(
+        product_bytes,
+        {"architecture_artifact", "status"},
+        "Builder product",
+    )
+    dependencies = stored.envelope.dependency_digests
+    if len(dependencies) != 1 or product["architecture_artifact"] != dependencies[0]:
+        raise ValueError("Builder product does not bind its architecture dependency")
+    if product["status"] != "built-in-isolated-fixture":
+        raise ValueError("Builder product status is invalid")
+    return {
+        "passed": True,
+        "builder_artifact_digest": stored.envelope.artifact_digest,
+        "product_path": product_relative,
+        "product_digest": product_digest,
+        "architecture_artifact_digest": dependencies[0],
+        "action_receipt_digests": sorted(receipt_digests),
+        "error_type": None,
+    }
+
+
+def _not_run_smoke_evidence() -> dict[str, object]:
+    empty = _bytes_digest(b"")
+    return {
+        "check_id": "repository-nonrecursive-smoke",
+        "module": _CURATOR_SMOKE_TEST,
+        "argv": ["python", "-B", "-m", "unittest", _CURATOR_SMOKE_TEST],
+        "passed": False,
+        "returncode": None,
+        "tests_run": 0,
+        "stdout_digest": empty,
+        "stderr_digest": empty,
+        "error_type": "not-run",
+    }
+
+
+def _curator_test_environment(repository: Path, runtime: Path) -> dict[str, str]:
+    environment: dict[str, str] = {}
+    for key in ("COMSPEC", "PATHEXT", "SYSTEMROOT", "WINDIR"):
+        value = os.environ.get(key)
+        if value and "\n" not in value and "\r" not in value:
+            environment[key] = value
+    runtime_text = str(runtime.resolve())
+    environment.update(
+        {
+            "HOME": runtime_text,
+            "USERPROFILE": runtime_text,
+            "TEMP": runtime_text,
+            "TMP": runtime_text,
+            "TMPDIR": runtime_text,
+            "PYTHONPATH": os.pathsep.join(
+                (str((repository / "src").resolve()), str(repository.resolve()))
+            ),
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONSAFEPATH": "1",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+    )
+    return environment
+
+
+def _run_curator_smoke(repository: Path, runtime: Path) -> dict[str, object]:
+    logical_argv = ["python", "-B", "-m", "unittest", _CURATOR_SMOKE_TEST]
+    arguments = [sys.executable, *logical_argv[1:]]
+    try:
         completed = subprocess.run(
-            (str(git), "rev-parse", "HEAD^{commit}", "HEAD^{tree}"),
-            cwd=root,
-            env=_git_environment(git.parent, root),
+            arguments,
+            cwd=repository,
+            env=_curator_test_environment(repository, runtime),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             shell=False,
             check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="strict",
-            timeout=30,
+            timeout=60,
         )
-        values = completed.stdout.splitlines()
-        if completed.returncode != 0 or len(values) != 2:
-            raise RuntimeError("candidate Git identity is unavailable")
-        return CandidateIdentity(values[0], values[1])
+        output = completed.stdout + b"\n" + completed.stderr
+        match = re.search(rb"Ran\s+(\d+)\s+tests?", output)
+        tests_run = int(match.group(1)) if match is not None else 0
+        return {
+            "check_id": "repository-nonrecursive-smoke",
+            "module": _CURATOR_SMOKE_TEST,
+            "argv": logical_argv,
+            "passed": completed.returncode == 0 and tests_run > 0,
+            "returncode": completed.returncode,
+            "tests_run": tests_run,
+            "stdout_digest": _bytes_digest(completed.stdout),
+            "stderr_digest": _bytes_digest(completed.stderr),
+            "error_type": None,
+        }
+    except (OSError, subprocess.TimeoutExpired) as error:
+        evidence = _not_run_smoke_evidence()
+        evidence["returncode"] = (
+            124 if isinstance(error, subprocess.TimeoutExpired) else 126
+        )
+        evidence["error_type"] = type(error).__name__
+        return evidence
+
+
+_CURATOR_ARTIFACT_FIELDS = {
+    "role",
+    "seal_digest",
+    "candidate_commit",
+    "candidate_tree",
+    "report_digest",
+    "verdict",
+    "check_results",
+    "builder_validation",
+    "test_presence",
+    "smoke_test",
+    "candidate_scope",
+}
+
+
+def _curator_payload(context: SpecialistContext) -> dict[str, object]:
+    payload = _strict_artifact_payload(
+        context,
+        "05-curator",
+        _CURATOR_ARTIFACT_FIELDS,
+        "Curator",
+    )
+    if payload["role"] != "curator":
+        raise ValueError("Curator artifact role is invalid")
+    return payload
+
+
+def _curator_evidence_complete(payload: Mapping[str, object]) -> bool:
+    check_results = payload.get("check_results")
+    builder = payload.get("builder_validation")
+    presence = payload.get("test_presence")
+    smoke = payload.get("smoke_test")
+    expected_checks = {
+        "builder-artifact-and-product",
+        "repository-test-presence",
+        "repository-nonrecursive-smoke",
+    }
+    observed_checks: dict[str, bool] = {}
+    if isinstance(check_results, list):
+        for value in check_results:
+            if (
+                isinstance(value, list)
+                and len(value) == 2
+                and isinstance(value[0], str)
+                and type(value[1]) is bool
+            ):
+                observed_checks[value[0]] = value[1]
+    return (
+        payload.get("verdict") == CuratorVerdict.ADOPT.value
+        and set(observed_checks) == expected_checks
+        and all(observed_checks.values())
+        and isinstance(builder, Mapping)
+        and builder.get("passed") is True
+        and isinstance(presence, Mapping)
+        and presence.get("passed") is True
+        and isinstance(smoke, Mapping)
+        and smoke.get("passed") is True
+        and isinstance(smoke.get("tests_run"), int)
+        and cast(int, smoke["tests_run"]) > 0
+    )
 
 
 def _input_digests(context: SpecialistContext) -> tuple[str, ...]:
@@ -748,3 +1226,10 @@ def _git_environment(executable_root: Path, runtime_root: Path) -> dict[str, str
         }
     )
     return environment
+
+
+__all__ = (
+    "RepositorySpecialistHandlers",
+    "repository_candidate_digest",
+    "repository_specialist_plan",
+)
