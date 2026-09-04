@@ -151,27 +151,31 @@ def _case_kill_at_every_boundary_resumes_without_duplicate_effects(
         step_index,
         boundary,
     )
-    publish_effect_is_visible = (
-        step_index == 17
-        or (step_index == 16 and boundary == "after_effect")
-    )
-    assert output.exists() is publish_effect_is_visible
-    report = asyncio.run(resume_mission(store, mission_id))
-    assert report.status is WorkStatus.SUCCEEDED
-    assert output.is_dir()
-    checkpoints = store.checkpoints(mission_id)
-    assert len(checkpoints) == DURABLE_STEP_COUNT
-    assert store.idempotency_count(mission_id) == DURABLE_STEP_COUNT
-    receipt_files = list(
-        (
-            store.mission_root(mission_id) / "checkpoint-receipts"
-        ).glob("*.json")
-    )
-    assert len(receipt_files) == DURABLE_STEP_COUNT
-    assert all(checkpoint.execution_count == 1 for checkpoint in checkpoints)
-    if boundary == "after_effect":
-        assert checkpoints[step_index].execution_count == 1
-    store.close()
+    try:
+        publish_effect_is_visible = (
+            step_index == 17
+            or (step_index == 16 and boundary == "after_effect")
+        )
+        assert output.exists() is publish_effect_is_visible
+        report = asyncio.run(resume_mission(store, mission_id))
+        assert report.status is WorkStatus.SUCCEEDED, (
+            f"resume status={report.status.value}; failure={report.failure!r}"
+        )
+        assert output.is_dir()
+        checkpoints = store.checkpoints(mission_id)
+        assert len(checkpoints) == DURABLE_STEP_COUNT
+        assert store.idempotency_count(mission_id) == DURABLE_STEP_COUNT
+        receipt_files = list(
+            (
+                store.mission_root(mission_id) / "checkpoint-receipts"
+            ).glob("*.json")
+        )
+        assert len(receipt_files) == DURABLE_STEP_COUNT
+        assert all(checkpoint.execution_count == 1 for checkpoint in checkpoints)
+        if boundary == "after_effect":
+            assert checkpoints[step_index].execution_count == 1
+    finally:
+        store.close()
 
 
 def _case_workspace_drift_blocks_with_reconciliation_report(
