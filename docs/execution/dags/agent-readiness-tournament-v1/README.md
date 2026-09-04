@@ -58,7 +58,7 @@ The generated root reserves 220 characters for descendants and must stay below t
 conservative 247-character visible-directory boundary. The exact sealed control-plane
 commands additionally verify their known 196-character nested-arena budget. A nested
 harness receives a narrow parent hint that is accepted only when its ambient `TEMP` is
-an `htc-` child of that same revalidated parent; `USERPROFILE` itself remains scrubbed.
+below an `htc-` child of that same revalidated parent; `USERPROFILE` itself remains scrubbed.
 Cleanup
 uses extended-length Windows path spelling and revalidates root identity and callback
 confinement before deletion. It retries only recognized transient cleanup errors on a
@@ -149,6 +149,28 @@ Writing at a volume root, introducing junctions, sharing a fixed command directo
 relabeling run 003 were rejected. Retries are limited to Windows errors 5, 32, 33, and
 145 and POSIX `EACCES`, `EPERM`, `EBUSY`, and `ENOTEMPTY`; they never convert a failed
 test command into a pass.
+
+## Run-004 nested-environment appeal
+
+`C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-004`
+completed all 28 nodes and reverified as `quarantine`. Its full suite ran 1,250 tests
+with 11 skips, one failure, and two errors, all in the newly added tournament regression
+tests. The short-root cleanup succeeded and the run-003 long-path product failures did
+not recur. The failing tests instead depended on `USERPROFILE` after the tournament had
+correctly scrubbed it, or accidentally selected the real allowed parent for a negative
+case. The sealed report digest is
+`sha256:8da935e8556ca27e8aa0a654b613610d4fdc982d05369202df97d8dd235d7cbd`,
+the transcript digest is
+`sha256:7c02184af89e3409315174e9cd62f979fdcd6d0ccb12ffe21c0e4abd410db5b1`,
+and the event-chain tail is
+`sha256:5cb792ed3e769418a2d28b329fcde8ac2a0449ab22470cd32aeb9aac5a254ee4`.
+
+The appeal disposition is **ADAPT**. Tests resolve the harness-specific parent hint
+before supplying a temporary `USERPROFILE` fixture, and negative parent evidence uses
+a short volume-root child. Nested selection accepts the hint only when ambient temp
+descends through an `htc-` child of that parent, then re-runs the normal safety and path
+checks. A fresh create-only full run is required; run 004 remains immutable adverse
+evidence.
 
 `--skip-full-suite` is available for development only. It records an explicit
 `defer` and makes an `adopt` championship impossible.

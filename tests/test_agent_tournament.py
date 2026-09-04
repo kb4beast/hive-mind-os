@@ -906,8 +906,8 @@ class TournamentDagTests(unittest.TestCase):
 
         forged_ambient_parent = deepcopy(receipt)
         outside_ambient = (
-            Path(tempfile.gettempdir()).resolve().parent
-            / f"{_COMMAND_TEMP_PREFIX}forged-{time.time_ns()}"
+            Path(Path(tempfile.gettempdir()).resolve().anchor)
+            / f"{_COMMAND_TEMP_PREFIX}forged"
         )
         forged_ambient_parent["temporary_directory"] = str(outside_ambient)
         forged_ambient_parent["environment_policy"][
@@ -2339,14 +2339,23 @@ class TournamentExecutionTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "nt", "Windows short-root fallback")
     def test_invalid_ambient_temp_falls_back_to_user_profile(self) -> None:
         missing_ambient = ROOT.parent / ("missing-ambient-" + "x" * 80)
-        with patch(
-            "hive_mind_os.agent_tournament.tempfile.gettempdir",
-            return_value=str(missing_ambient),
+        safe_parent_value = os.environ.get(
+            _COMMAND_TEMP_PARENT_ENV_NAME
+        ) or os.environ.get("USERPROFILE")
+        if safe_parent_value is None:
+            self.fail("Windows command temp parent evidence is unavailable")
+        safe_parent = Path(safe_parent_value).resolve()
+        with (
+            patch(
+                "hive_mind_os.agent_tournament.tempfile.gettempdir",
+                return_value=str(missing_ambient),
+            ),
+            patch.dict(os.environ, {"USERPROFILE": str(safe_parent)}),
         ):
             parents = _validated_command_temp_parents(
                 _live_source_authority_roots(ROOT)
             )
-        self.assertEqual(Path(os.environ["USERPROFILE"]).resolve(), parents[0])
+        self.assertEqual(safe_parent, parents[0])
 
     def test_user_profile_is_not_inherited_by_command_children(self) -> None:
         temporary_root = Path(tempfile.gettempdir()).resolve() / (

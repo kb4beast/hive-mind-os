@@ -46,7 +46,7 @@ each tournament inventory:
 
 No unavailable external source was invented for this decision.
 
-Four adverse executions remain immutable outside the checkout:
+Five adverse executions remain immutable outside the checkout:
 
 - `C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-002`
   (`manifest sha256:325e00ce4578386722e2fc1299822d2c4b031036e27e8d1d0feeca58d458a400`,
@@ -91,6 +91,31 @@ Four adverse executions remain immutable outside the checkout:
   The official verifier correctly exits nonzero because no completed report exists.
   After independent inspection, only the disposable residual tree was removed; the
   sealed failed-run directory was not changed.
+- `C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-004`
+  completed all 28 nodes and independently reverified, with a truthful `quarantine`
+  disposition. Its canonical suite ran 1,250 tests, skipped 11, and reported one
+  failure plus two errors. All three were in newly added tournament regression tests:
+  two assumed that scrubbed `USERPROFILE` remained available inside a nested harness,
+  and one constructed its supposedly disallowed temp root beneath the actual allowed
+  parent and therefore received the stronger path-budget rejection first. The command
+  root was `C:\Users\beesp\htc-nx18o0qx`; its cleanup completed and the root is absent,
+  while the run-003 benchmark and GitHub long-path failures did not recur. The manifest
+  file is `sha256:349d69bbe0639b5222762364c134bf764d9621a0aa5d540f48e5285f89698`
+  with self-digest
+  `sha256:f7d06059565e0e2b223ba2e7446e4c5fcb34f4729eaee4a642a97f8de77c049c`;
+  the report file is
+  `sha256:e27a356f2c96c69d685b07ad99d2b5a0d8f3a7f3a1d9e17336523c2c9eb7d9db`
+  with self-digest
+  `sha256:8da935e8556ca27e8aa0a654b613610d4fdc982d05369202df97d8dd235d7cbd`.
+  The full-suite receipt file is
+  `sha256:f41c3be6c9213362f7e6972e6002b8bc7fc28ce781561fd4132c391488e39634`,
+  its outer and command digests are respectively
+  `sha256:de2c8238bd02253cc0cf1460936eb929770ae79bb5e3149e804997d9a8722283`
+  and `sha256:86d5d481fe226bd9ed9d6cd85d30c1d83e460b08163f1b423e9f2099c24f9cc9`,
+  and the transcript is
+  `sha256:7c02184af89e3409315174e9cd62f979fdcd6d0ccb12ffe21c0e4abd410db5b1`.
+  Its 28-event chain ends at
+  `sha256:5cb792ed3e769418a2d28b329fcde8ac2a0449ab22470cd32aeb9aac5a254ee4`.
 
 They are evidence inputs, not passing receipts, and are not overwritten or relabeled.
 
@@ -206,8 +231,9 @@ champion, materialize a successor, or automatically run the successor generation
   selects the shortest safe parent. The generated root must leave a 220-character
   descendant reserve and stay below the conservative 247-character visible-directory
   boundary. Nested harness calls receive only a harness-specific parent hint; the
-  selector accepts it when the ambient root is an `htc-` child of that same parent and
-  revalidates the parent, while standard `USERPROFILE` remains scrubbed from the child.
+  selector accepts it when the ambient root descends through an `htc-` child of that
+  same parent and revalidates the parent, while standard `USERPROFILE` remains scrubbed
+  from the child.
   The exact sealed control-plane commands additionally preflight their known
   196-character nested-arena budget. Cleanup uses extended-length Windows path spelling,
   revalidates the owned root before every attempt, confines the error callback to that
@@ -279,6 +305,22 @@ failures. Acceptance requires nested-temp execution, creation and cleanup beyond
 characters, bounded transient-retry coverage, no residue, and a fresh create-only
 tournament run. Run 003 remains an immutable losing benchmark and may never be
 rewritten, verified as complete, or used as promotion evidence.
+
+## Nested-environment appeal from run 004
+
+The run-004 court correctly quarantined a completed bundle because the canonical suite
+was red. A separate appeal disposition is **ADAPT**: retain that losing run, keep
+`USERPROFILE` scrubbed, and make both allocator tests and the narrow inherited-parent
+contract independent of the caller's ambient environment. The inherited hint is
+eligible only when the current temp path descends through an `htc-` child of the hinted
+parent; the parent is then subjected to the same link, authority, candidate-source,
+and path-budget checks as every other candidate. The disallowed-parent test uses the
+volume root as a deterministic non-candidate and a short basename so it reaches the
+intended authority assertion rather than failing an unrelated length check.
+
+Acceptance requires the exact three run-004 failures to pass together inside the same
+sanitized command wrapper, followed by another create-only full tournament. Run 004 is
+not relabeled, rewritten, or accepted as promotion evidence.
 
 ## Migration and rollback
 

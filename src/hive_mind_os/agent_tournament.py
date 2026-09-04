@@ -1733,12 +1733,18 @@ def _validated_command_temp_parents(
     inherited_parent = os.environ.get(_COMMAND_TEMP_PARENT_ENV_NAME)
     if inherited_parent and ambient is not None:
         inherited = Path(inherited_parent)
-        if (
-            inherited.is_absolute()
-            and ambient.name.startswith(_COMMAND_TEMP_PREFIX)
-            and ambient.parent == inherited.absolute()
-        ):
-            raw_candidates.append(inherited.absolute())
+        if inherited.is_absolute():
+            absolute_inherited = inherited.absolute()
+            try:
+                ambient_relative = ambient.relative_to(absolute_inherited)
+            except ValueError:
+                ambient_relative = None
+            if (
+                ambient_relative is not None
+                and ambient_relative.parts
+                and ambient_relative.parts[0].startswith(_COMMAND_TEMP_PREFIX)
+            ):
+                raw_candidates.append(absolute_inherited)
     user_profile = os.environ.get("USERPROFILE")
     if user_profile:
         profile = Path(user_profile)
