@@ -13,11 +13,13 @@ import argparse
 import ast
 import base64
 import binascii
+import errno
 import json
 import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -34,6 +36,7 @@ from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 from .brain_kernel.canonical import canonical_digest
 from .brain_kernel.roles import KERNEL_IMPLEMENTED_ROLES, role_capabilities
 from .models import Role
+from .receipts import filesystem_path
 from .roles import ROLE_CONTRACTS
 
 TOURNAMENT_ROLES: tuple[str, ...] = (
@@ -72,7 +75,15 @@ _COMMAND_TEMP_PREFIX = "htc-"
 _DOCTOR_WORKSPACE_PREFIX = "htd-"
 _DOCTOR_TEMP_DIRECTORY_NAME = "t"
 _SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET = 196
-_WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT = 259
+_WINDOWS_COMMAND_TEMP_DESCENDANT_RESERVE = 220
+_WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT = 247
+_COMMAND_TEMP_RANDOM_CHARACTERS = 8
+_COMMAND_TEMP_PARENT_ENV_NAME = "HIVE_MIND_OS_COMMAND_TEMP_PARENT"
+_COMMAND_CLEANUP_DELAYS_SECONDS = (0.0, 0.05, 0.1, 0.2, 0.4, 0.8)
+_WINDOWS_RETRYABLE_CLEANUP_ERRORS = frozenset({5, 32, 33, 145})
+_POSIX_RETRYABLE_CLEANUP_ERRORS = frozenset(
+    {errno.EACCES, errno.EPERM, errno.EBUSY, errno.ENOTEMPTY}
+)
 _CONTROLLER_TEST_COMMAND_IDENTITY = "exact-checkout-isolated-unittest-discover"
 _CONTROLLER_TEST_TIMEOUT_SECONDS = 600
 _CONTROLLER_TEST_TERMINATION_SECONDS = 10
@@ -134,6 +145,7 @@ _CHILD_BASE_REQUIRED_ENV_NAMES = frozenset(
         "ALL_PROXY",
         "HTTP_PROXY",
         "HTTPS_PROXY",
+        _COMMAND_TEMP_PARENT_ENV_NAME,
         "NO_PROXY",
         "PATH",
         "PYTHONDONTWRITEBYTECODE",
@@ -153,7 +165,11 @@ class TournamentError(RuntimeError):
 class _CommandTemporaryCleanupError(TournamentError):
     """A command completed, but its disposable temporary root survived cleanup."""
 
-    def __init__(self, path: Path, cause: OSError | None) -> None:
+    def __init__(
+        self,
+        path: Path,
+        cause: OSError | TournamentError | None,
+    ) -> None:
         detail = (
             f"{type(cause).__name__}: {cause}"
             if cause is not None
@@ -1013,6 +1029,9 @@ def _child_environment(
         resolved_temporary_directory = str(temporary_directory.resolve())
         environment.update(
             {
+                _COMMAND_TEMP_PARENT_ENV_NAME: str(
+                    temporary_directory.resolve().parent
+                ),
                 "TEMP": resolved_temporary_directory,
                 "TMP": resolved_temporary_directory,
                 "TMPDIR": resolved_temporary_directory,
@@ -1684,12 +1703,168 @@ def _validated_ambient_temp_root(
     return temporary_root
 
 
+def _validate_windows_command_temp_path_budget(path: Path) -> None:
+    if os.name != "nt":
+        return
+    projected_characters = (
+        len(str(path.resolve())) + _WINDOWS_COMMAND_TEMP_DESCENDANT_RESERVE
+    )
+    if projected_characters > _WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT:
+        raise TournamentError(
+            "command temporary root exceeds the Windows directory path budget: "
+            f"{path.resolve()} projects to {projected_characters} characters "
+            f"(limit {_WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT})"
+        )
+
+
+def _validated_command_temp_parents(
+    authority_roots: Sequence[tuple[str, Path]],
+) -> tuple[Path, ...]:
+    """Return deterministic parents that cannot distort nested Windows path tests."""
+
+    if os.name != "nt":
+        return (_validated_ambient_temp_root(authority_roots),)
+    raw_candidates: list[Path] = []
+    try:
+        ambient = Path(tempfile.gettempdir()).absolute()
+        raw_candidates.append(ambient)
+    except OSError:
+        ambient = None
+    inherited_parent = os.environ.get(_COMMAND_TEMP_PARENT_ENV_NAME)
+    if inherited_parent and ambient is not None:
+        inherited = Path(inherited_parent)
+        if (
+            inherited.is_absolute()
+            and ambient.name.startswith(_COMMAND_TEMP_PREFIX)
+            and ambient.parent == inherited.absolute()
+        ):
+            raw_candidates.append(inherited.absolute())
+    user_profile = os.environ.get("USERPROFILE")
+    if user_profile:
+        profile = Path(user_profile)
+        if profile.is_absolute():
+            raw_candidates.append(profile.absolute())
+    candidates: list[Path] = []
+    for raw_candidate in raw_candidates:
+        try:
+            link_like = _has_link_like_component(
+                Path(raw_candidate.anchor), raw_candidate
+            )
+            candidate = raw_candidate.resolve()
+        except OSError:
+            continue
+        if link_like:
+            continue
+        if not candidate.is_dir():
+            continue
+        if any(
+            candidate == authority_root.resolve()
+            or candidate.is_relative_to(authority_root.resolve())
+            for _kind, authority_root in authority_roots
+        ):
+            continue
+        prospective = candidate / (
+            _COMMAND_TEMP_PREFIX + "0" * _COMMAND_TEMP_RANDOM_CHARACTERS
+        )
+        try:
+            _validate_windows_command_temp_path_budget(prospective)
+        except TournamentError:
+            continue
+        if candidate not in candidates:
+            candidates.append(candidate)
+    candidates.sort(key=lambda item: (len(str(item)), os.path.normcase(str(item))))
+    if not candidates:
+        raise TournamentError(
+            "no validated Windows command temporary parent satisfies the path budget"
+        )
+    return tuple(candidates)
+
+
+def _retryable_cleanup_error(error: OSError) -> bool:
+    return (
+        getattr(error, "winerror", None) in _WINDOWS_RETRYABLE_CLEANUP_ERRORS
+        or error.errno in _POSIX_RETRYABLE_CLEANUP_ERRORS
+    )
+
+
+def _owned_cleanup_identity(path: Path) -> tuple[int, int, int]:
+    status = os.lstat(filesystem_path(path))
+    attributes = getattr(status, "st_file_attributes", 0)
+    if (
+        not stat.S_ISDIR(status.st_mode)
+        or stat.S_ISLNK(status.st_mode)
+        or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    ):
+        raise TournamentError("disposable cleanup root changed into a link or reparse point")
+    birth_marker = status.st_ctime_ns if os.name == "nt" else 0
+    return status.st_dev, status.st_ino, birth_marker
+
+
+def _remove_disposable_tree(
+    path: Path,
+    *,
+    expected_identity: tuple[int, int, int] | None = None,
+) -> None:
+    """Remove an owned tree with bounded, identity-checked long-path cleanup."""
+
+    root = Path(os.path.abspath(path))
+    system_root = filesystem_path(root)
+    if not os.path.lexists(system_root):
+        return
+    identity = expected_identity or _owned_cleanup_identity(root)
+    if _owned_cleanup_identity(root) != identity:
+        raise TournamentError("disposable cleanup root identity changed")
+    owned = os.path.normcase(os.path.normpath(os.fspath(system_root)))
+
+    def force_owned_remove(
+        function: Callable[[str], Any],
+        candidate: str,
+        error: Any,
+    ) -> None:
+        normalized = os.path.normcase(os.path.normpath(os.path.abspath(candidate)))
+        try:
+            confined = os.path.commonpath((owned, normalized)) == owned
+        except ValueError:
+            confined = False
+        if not confined:
+            raise TournamentError("cleanup callback escaped its owned temporary root")
+        _force_remove_readonly(function, candidate, error)
+
+    last_error: OSError | None = None
+    for attempt, delay in enumerate(_COMMAND_CLEANUP_DELAYS_SECONDS, start=1):
+        if not os.path.lexists(system_root):
+            return
+        if delay:
+            time.sleep(delay)
+        if not os.path.lexists(system_root):
+            return
+        if _owned_cleanup_identity(root) != identity:
+            raise TournamentError("disposable cleanup root identity changed")
+        try:
+            shutil.rmtree(system_root, onerror=force_owned_remove)
+        except OSError as error:
+            last_error = error
+            if not _retryable_cleanup_error(error):
+                raise
+        if not os.path.lexists(system_root):
+            return
+        if last_error is None:
+            last_error = OSError(
+                errno.ENOTEMPTY,
+                f"owned temporary root survived cleanup attempt {attempt}",
+            )
+        if not _retryable_cleanup_error(last_error):
+            raise last_error
+    assert last_error is not None
+    raise last_error
+
+
 def _validate_sealed_control_plane_temp_path_budget(path: Path) -> None:
     """Fail before sealed tests exceed the classic Windows path boundary.
 
     The immutable parallel-worktree arena can create a 196-character descendant
     beneath ``TEMP``.  Some Python and native-tool operations remain limited to
-    259 visible path characters even when the host supports newer path syntax.
+    247 visible directory-path characters even when the host supports newer path syntax.
     Short tournament-owned names preserve that arena's cleanup contract without
     changing its source or granting a broader filesystem authority.
     """
@@ -1743,11 +1918,38 @@ def _disposable_command_temporary_directory(
     requested: Path | None = None,
 ) -> Iterator[Path]:
     authority_roots = _live_source_authority_roots(repository)
+    temporary_identity: tuple[int, int, int]
     if requested is None:
-        temporary_parent = _validated_ambient_temp_root(authority_roots)
-        temporary_directory = Path(
-            tempfile.mkdtemp(prefix=_COMMAND_TEMP_PREFIX, dir=temporary_parent)
-        ).resolve()
+        temporary_directory: Path | None = None
+        last_allocation_error: OSError | TournamentError | None = None
+        for temporary_parent in _validated_command_temp_parents(authority_roots):
+            try:
+                candidate = Path(
+                    tempfile.mkdtemp(prefix=_COMMAND_TEMP_PREFIX, dir=temporary_parent)
+                ).resolve()
+                candidate_identity = _owned_cleanup_identity(candidate)
+            except OSError as error:
+                last_allocation_error = error
+                continue
+            try:
+                _validate_windows_command_temp_path_budget(candidate)
+                temporary_directory = _validate_path_outside_authority(
+                    candidate,
+                    authority_roots,
+                    label="command temporary directory",
+                )
+            except TournamentError as error:
+                _remove_disposable_tree(
+                    candidate, expected_identity=candidate_identity
+                )
+                last_allocation_error = error
+                continue
+            temporary_identity = candidate_identity
+            break
+        if temporary_directory is None:
+            raise TournamentError(
+                "no validated command temporary parent accepted an allocation"
+            ) from last_allocation_error
     else:
         absolute = requested.absolute()
         if os.path.lexists(absolute):
@@ -1760,6 +1962,7 @@ def _disposable_command_temporary_directory(
             label="requested command temporary directory",
         )
         temporary_directory.mkdir()
+        temporary_identity = _owned_cleanup_identity(temporary_directory)
     try:
         temporary_directory = _validate_path_outside_authority(
             temporary_directory,
@@ -1768,16 +1971,20 @@ def _disposable_command_temporary_directory(
         )
     except TournamentError:
         try:
-            shutil.rmtree(temporary_directory, onerror=_force_remove_readonly)
+            _remove_disposable_tree(
+                temporary_directory, expected_identity=temporary_identity
+            )
         finally:
             raise
     try:
         yield temporary_directory
     finally:
-        cleanup_error: OSError | None = None
+        cleanup_error: OSError | TournamentError | None = None
         try:
-            shutil.rmtree(temporary_directory, onerror=_force_remove_readonly)
-        except OSError as error:
+            _remove_disposable_tree(
+                temporary_directory, expected_identity=temporary_identity
+            )
+        except (OSError, TournamentError) as error:
             cleanup_error = error
         if cleanup_error is not None or os.path.lexists(temporary_directory):
             raise _CommandTemporaryCleanupError(
@@ -2014,18 +2221,23 @@ def _run_isolated_control_plane_doctor(
     workspace = Path(
         tempfile.mkdtemp(prefix=_DOCTOR_WORKSPACE_PREFIX, dir=temporary_root)
     ).resolve()
+    workspace_identity = _owned_cleanup_identity(workspace)
     try:
         workspace = _validate_path_outside_authority(
             workspace, authority_roots, label="isolated doctor workspace"
         )
     except TournamentError:
         try:
-            shutil.rmtree(workspace, onerror=_force_remove_readonly)
+            _remove_disposable_tree(
+                workspace, expected_identity=workspace_identity
+            )
         finally:
             raise
     if workspace.is_relative_to(repository):
         try:
-            shutil.rmtree(workspace, onerror=_force_remove_readonly)
+            _remove_disposable_tree(
+                workspace, expected_identity=workspace_identity
+            )
         finally:
             raise TournamentError("isolated doctor workspace is not safely separated")
     mirror = workspace / "origin.git"
@@ -2204,10 +2416,10 @@ def _run_isolated_control_plane_doctor(
         result = command_receipt, transcript, isolation, semantic
     except Exception as error:
         operation_error = error
-    cleanup_error: OSError | None = None
+    cleanup_error: OSError | TournamentError | None = None
     try:
-        shutil.rmtree(workspace, onerror=_force_remove_readonly)
-    except OSError as error:
+        _remove_disposable_tree(workspace, expected_identity=workspace_identity)
+    except (OSError, TournamentError) as error:
         cleanup_error = error
     protected_after = _snapshot_protected_states(protected_roots)
     protected_rows = []
@@ -3498,12 +3710,13 @@ def _validate_command_receipt(
         if not temporary_directory.name.startswith(_COMMAND_TEMP_PREFIX):
             raise TournamentError(f"{label} temporary directory identity is invalid")
         authority_roots = _live_source_authority_roots(repository_root)
-        if temporary_directory.parent != _validated_ambient_temp_root(
+        if temporary_directory.parent not in _validated_command_temp_parents(
             authority_roots
         ):
             raise TournamentError(
-                f"{label} temporary directory escaped the validated ambient root"
+                f"{label} temporary directory escaped the validated short roots"
             )
+        _validate_windows_command_temp_path_budget(temporary_directory)
         _validate_path_outside_authority(
             temporary_directory,
             authority_roots,

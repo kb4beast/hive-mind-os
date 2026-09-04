@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import json
 import os
 import random
@@ -12,6 +13,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
@@ -27,10 +29,15 @@ from .benchmark_corpus import (
 from .mission import RepositoryMission, ScriptedRepositoryBackend
 from .models import AutonomyLevel
 from .policy import PolicyEngine
-from .receipts import sha256_digest
+from .receipts import filesystem_path, sha256_digest
 
 MEASUREMENT_DISPOSITION = "measurement-recorded"
 DEFAULT_JUDGE_ID = "p13-independent-benchmark-judge"
+_CLEANUP_DELAYS_SECONDS = (0.0, 0.05, 0.1, 0.2, 0.4, 0.8)
+_WINDOWS_RETRYABLE_CLEANUP_ERRORS = frozenset({5, 32, 33, 145})
+_POSIX_RETRYABLE_CLEANUP_ERRORS = frozenset(
+    {errno.EACCES, errno.EPERM, errno.EBUSY, errno.ENOTEMPTY}
+)
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -51,17 +58,80 @@ def _write_json(path: Path, value: object) -> None:
     path.write_bytes(_canonical_bytes(value) + b"\n")
 
 
+def _retryable_cleanup_error(error: OSError) -> bool:
+    return (
+        getattr(error, "winerror", None) in _WINDOWS_RETRYABLE_CLEANUP_ERRORS
+        or error.errno in _POSIX_RETRYABLE_CLEANUP_ERRORS
+    )
+
+
+def _cleanup_tree_identity(root: Path) -> tuple[int, int] | None:
+    try:
+        observed = os.lstat(root)
+    except FileNotFoundError:
+        return None
+    reparse_attribute = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    if (
+        not stat.S_ISDIR(observed.st_mode)
+        or stat.S_ISLNK(observed.st_mode)
+        or bool(getattr(observed, "st_file_attributes", 0) & reparse_attribute)
+    ):
+        raise RuntimeError("benchmark cleanup root is not an owned ordinary directory")
+    return observed.st_dev, observed.st_ino
+
+
 def _remove_tree(root: Path) -> None:
+    absolute_root = Path(os.path.abspath(root))
+    cleanup_root = filesystem_path(absolute_root)
+    expected_identity = _cleanup_tree_identity(cleanup_root)
+    if expected_identity is None:
+        return
+
     def make_writable_and_retry(
         function: object,
         path: str,
         _error: object,
     ) -> None:
-        os.chmod(path, stat.S_IWRITE)
+        callback_path = Path(os.path.abspath(path))
+        try:
+            common = os.path.commonpath(
+                (os.fspath(cleanup_root), os.fspath(callback_path))
+            )
+        except ValueError as error:
+            raise RuntimeError("benchmark cleanup callback escaped its root") from error
+        if os.path.normcase(common) != os.path.normcase(os.fspath(cleanup_root)):
+            raise RuntimeError("benchmark cleanup callback escaped its root")
+        callback_path = filesystem_path(callback_path)
+        os.chmod(callback_path, stat.S_IREAD | stat.S_IWRITE)
         assert callable(function)
-        function(path)
+        function(callback_path)
 
-    shutil.rmtree(root, onerror=make_writable_and_retry)
+    last_error: OSError | None = None
+    for attempt, delay in enumerate(_CLEANUP_DELAYS_SECONDS):
+        if delay:
+            time.sleep(delay)
+        observed_identity = _cleanup_tree_identity(cleanup_root)
+        if observed_identity is None:
+            return
+        if observed_identity != expected_identity:
+            raise RuntimeError("benchmark cleanup root identity changed before removal")
+        try:
+            shutil.rmtree(cleanup_root, onerror=make_writable_and_retry)
+        except OSError as error:
+            last_error = error
+            if (
+                not _retryable_cleanup_error(error)
+                or attempt == len(_CLEANUP_DELAYS_SECONDS) - 1
+            ):
+                raise
+            continue
+        if not os.path.lexists(cleanup_root):
+            return
+        last_error = OSError(errno.ENOTEMPTY, "benchmark cleanup root remains")
+        if attempt == len(_CLEANUP_DELAYS_SECONDS) - 1:
+            raise last_error
+    assert last_error is not None
+    raise last_error
 
 
 def _git(root: Path, *args: str) -> str:

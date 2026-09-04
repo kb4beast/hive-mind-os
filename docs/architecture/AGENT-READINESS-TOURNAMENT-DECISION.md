@@ -46,7 +46,7 @@ each tournament inventory:
 
 No unavailable external source was invented for this decision.
 
-Three adverse predecessor executions remain immutable outside the checkout:
+Four adverse executions remain immutable outside the checkout:
 
 - `C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-002`
   (`manifest sha256:325e00ce4578386722e2fc1299822d2c4b031036e27e8d1d0feeca58d458a400`,
@@ -63,6 +63,34 @@ Three adverse predecessor executions remain immutable outside the checkout:
   paths disabled. No process, reparse point, or read-only artifact explained the
   residue. The 2,664-item temporary tree was removed only after this observation was
   preserved; the immutable failed bundle itself was not changed.
+- `C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-003`
+  reached the serial product-suite gate and then failed closed. The 1,240-test run
+  reported two failures and three errors across four path-sensitive tests, and cleanup
+  reported Windows error 145. Its 46-character command temp root plus an additional
+  test-owned random directory put GitHub-adapter directories at 259 characters and
+  six ordinary benchmark artifacts at 261 characters. No active process, reparse
+  point, read-only attribute, or lock explained the residue; the same failing test
+  targets passed when replayed without that nested temp prefix. The partial manifest
+  file is `sha256:8198a836430512abd6f0167a71fbaaf968375a8bb67f24df53a32f1c17fb0e65`
+  with canonical self-digest
+  `sha256:54420a29b0906835f99914165024165f63655c06cb7742b80936296ac166a904`;
+  `incomplete.json` is
+  `sha256:2fc043f9c743ec927269fcb95e22f1670e8834b3959f9c40e5bcafc8d68d357b`
+  with canonical self-digest
+  `sha256:9ab5dadbab8c1ea8ff91ade8ac9367b3ff51e69a95dea3eca757f1d8203b20d9`.
+  The failed full-suite node receipt file is
+  `sha256:0a15e53d163340b7eadb520e0eff54a14a3c6a4c5e52bc6d3e994921380bc8df`,
+  its outer receipt digest is
+  `sha256:914e2ed899646d04682e7e9f7092b9efa61fcca66f64cc82307995bfda17f60f`,
+  its diagnostic command digest is
+  `sha256:3eb877081d5accf17b493854606567ddb84af6447ca3f05023d7539c16345e0d`,
+  and its lossless transcript is
+  `sha256:2e63a2226d50a4a58ad9c180142738ab449fe205f6095231ace0d70f13d6f556`.
+  The event-chain tail remained
+  `sha256:b84cf9649a031a0149d8c431279b6f0a2a975b27853a8392a85abf51e767426d`.
+  The official verifier correctly exits nonzero because no completed report exists.
+  After independent inspection, only the disposable residual tree was removed; the
+  sealed failed-run directory was not changed.
 
 They are evidence inputs, not passing receipts, and are not overwritten or relabeled.
 
@@ -172,11 +200,22 @@ champion, materialize a successor, or automatically run the successor generation
   sealed worktree worker replaces `PYTHONPATH` and imports `tests.*` from its controlled
   working directory; the separate provenance probe retains safe-path mode. Every
   command gets a disposable temporary root and has `TEMP`, `TMP`, and `TMPDIR` rebound
-  to it. Tournament-owned temp/workspace basenames are intentionally short, and the
-  exact sealed control-plane commands preflight their known 196-character descendant
-  budget against the 259-character classic Windows boundary before launch. This is a
-  compatibility constraint inside the same validated ambient-temp authority, not an
-  authority expansion. The benchmark hidden checker replaces the parent `PYTHONPATH` with the exact isolated
+  to it. On Windows the allocator considers only validated user-owned parent candidates,
+  currently the ambient temp directory and absolute `USERPROFILE`, rejects candidates
+  that overlap repository authority or resolve through a link/reparse point, and
+  selects the shortest safe parent. The generated root must leave a 220-character
+  descendant reserve and stay below the conservative 247-character visible-directory
+  boundary. Nested harness calls receive only a harness-specific parent hint; the
+  selector accepts it when the ambient root is an `htc-` child of that same parent and
+  revalidates the parent, while standard `USERPROFILE` remains scrubbed from the child.
+  The exact sealed control-plane commands additionally preflight their known
+  196-character nested-arena budget. Cleanup uses extended-length Windows path spelling,
+  revalidates the owned root before every attempt, confines the error callback to that
+  root, and retries only bounded transient cleanup errors at 0, 50, 100, 200, 400, and
+  800 milliseconds (Windows 5, 32, 33, and 145; POSIX `EACCES`, `EPERM`, `EBUSY`, and
+  `ENOTEMPTY`). Exhaustion still fails closed with the residual path recorded. This is
+  a compatibility constraint within validated user authority, not an authority
+  expansion. The benchmark hidden checker replaces the parent `PYTHONPATH` with the exact isolated
   candidate workspace when candidate import is its intended check. A bounded,
   non-importing probe records resolved package provenance. Execution and captured
   streams have wall-time and byte budgets. These processes are not protected by a
@@ -211,6 +250,35 @@ champion, materialize a successor, or automatically run the successor generation
 - No method in this slice changes a prompt champion, source control-plane authority,
   production state, policy, protected branch, or remote repository. It does create
   explicitly selected evidence plus bounded disposable clone/temp artifacts.
+
+## Windows path-length appeal from run 003
+
+The run-003 failure was appealed as a harness-compatibility defect, not as proof that
+the affected product behaviors were correct. The Clerk preserved the failed bundle
+and exact test identities; the Advocate presented the passing unnested replays; the
+Cross-Examiner ruled out active handles, reparse points, read-only attributes, and
+ordinary retry timing; the Architect supplied the path-budget model; and an
+independent Curator reproduced the 259/261-character boundary. The Judge disposition
+is **ADAPT**.
+
+The adopted remedy is deliberately narrower than a volume-root allocation, junction,
+or shared fixed directory. Every command keeps a unique create-only root beneath the
+shortest validated user-owned parent, reserves 220 characters for descendants, and
+uses 247 characters as the practical Windows directory boundary. Long-path spelling
+addresses deletion of already-created paths beyond the classic limit. The bounded
+retry schedule addresses only transient cleanup failures; it cannot turn a failed
+command into a pass, and it does not retry contract, evidence, identity, or authority
+failures. Root identity, link/reparse status, and callback confinement are rechecked
+so the cleanup hardening does not broaden deletion authority. Command and doctor root
+identities are pinned when the directories are created, before repository code runs.
+
+The rejected alternatives are writing directly at a volume root, using a junction,
+sharing one deterministic temp directory between commands, or merely increasing
+cleanup retries while retaining a prefix known to create false path-sensitive test
+failures. Acceptance requires nested-temp execution, creation and cleanup beyond 260
+characters, bounded transient-retry coverage, no residue, and a fresh create-only
+tournament run. Run 003 remains an immutable losing benchmark and may never be
+rewritten, verified as complete, or used as promotion evidence.
 
 ## Migration and rollback
 

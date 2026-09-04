@@ -51,10 +51,19 @@ Git administration or ignored control-plane authority state. Test subprocesses r
 credential-scrubbed environment with inherited Git-control variables removed and a
 fixed minimal executable search path plus a best-effort proxy deny. Each command gets
 one create-only disposable temporary root; `TEMP`, `TMP`, and `TMPDIR` are rebound to
-it and its removal is verified. The tournament uses short internal temp/workspace
-basenames and, before either exact sealed control-plane command, verifies that its
-known 196-character nested arena fits under the 259-character classic Windows path
-boundary. A command that finishes but cannot clean its temp root still fails the run;
+it and its removal is verified. On Windows the allocator chooses the shortest safe
+parent from validated user-owned candidates (the ambient temp directory and absolute
+`USERPROFILE`), excluding repository-authority overlap and link/reparse-point paths.
+The generated root reserves 220 characters for descendants and must stay below the
+conservative 247-character visible-directory boundary. The exact sealed control-plane
+commands additionally verify their known 196-character nested-arena budget. A nested
+harness receives a narrow parent hint that is accepted only when its ambient `TEMP` is
+an `htc-` child of that same revalidated parent; `USERPROFILE` itself remains scrubbed.
+Cleanup
+uses extended-length Windows path spelling and revalidates root identity and callback
+confinement before deletion. It retries only recognized transient cleanup errors on a
+bounded 0, 50, 100, 200, 400, and 800 millisecond schedule; exhaustion still fails
+closed. A command that finishes but cannot clean its temp root still fails the run;
 its result and lossless transcript are retained only as non-certifying diagnostics in
 the incomplete bundle. That path can add
 a native Node runtime only from fixed operating-system locations; its resolved path,
@@ -107,6 +116,39 @@ content-hash, and execution-provenance verification against the caller-selected
 exact checkout, using the recorded verifier runtime from that same checkout; the
 bundle is not externally signed or independently portable to a
 different checkout.
+
+## Run-003 appeal evidence
+
+`C:\Users\beesp\.codex\tournament-runs\agent-readiness-20260903-run-003` is an
+immutable failed run, not a completed or passing bundle. Its product-suite command
+nested another temporary directory below the 46-character tournament command root,
+putting GitHub-adapter directories at 259 characters and six ordinary benchmark files
+at 261 characters. The run reported two failures and three errors across four
+path-sensitive tests, then failed cleanup with Windows error 145. Independent review
+found no process, lock, reparse point, or read-only artifact; unnested replays passed.
+
+The partial manifest file is
+`sha256:8198a836430512abd6f0167a71fbaaf968375a8bb67f24df53a32f1c17fb0e65`
+(canonical self-digest
+`sha256:54420a29b0906835f99914165024165f63655c06cb7742b80936296ac166a904`),
+and `incomplete.json` is
+`sha256:2fc043f9c743ec927269fcb95e22f1670e8834b3959f9c40e5bcafc8d68d357b`
+(canonical self-digest
+`sha256:9ab5dadbab8c1ea8ff91ade8ac9367b3ff51e69a95dea3eca757f1d8203b20d9`).
+The failed node receipt file is
+`sha256:0a15e53d163340b7eadb520e0eff54a14a3c6a4c5e52bc6d3e994921380bc8df`;
+its diagnostic transcript is
+`sha256:2e63a2226d50a4a58ad9c180142738ab449fe205f6095231ace0d70f13d6f556`.
+The official verifier exits nonzero because no completed report exists. The disposable
+residue was removed only after independent inspection; the sealed run directory was
+not modified.
+
+The appeal disposition is **ADAPT**: use the short-parent path budget, extended-length
+cleanup, and bounded retry policy described above, then start a fresh create-only run.
+Writing at a volume root, introducing junctions, sharing a fixed command directory, or
+relabeling run 003 were rejected. Retries are limited to Windows errors 5, 32, 33, and
+145 and POSIX `EACCES`, `EPERM`, `EBUSY`, and `ENOTEMPTY`; they never convert a failed
+test command into a pass.
 
 `--skip-full-suite` is available for development only. It records an explicit
 `defer` and makes an `adopt` championship impossible.

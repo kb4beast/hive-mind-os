@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import shutil
@@ -16,12 +17,14 @@ from typing import Any, Mapping, Sequence
 from unittest.mock import patch
 
 from hive_mind_os.agent_tournament import (
+    _COMMAND_TEMP_PARENT_ENV_NAME,
     _COMMAND_TEMP_PREFIX,
     _DOCTOR_REPAIR_KIND,
     _DOCTOR_TEMP_DIRECTORY_NAME,
     _DOCTOR_WORKSPACE_PREFIX,
     _SEALED_CONTROL_PLANE_TEMP_DESCENDANT_BUDGET,
     _WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT,
+    _WINDOWS_COMMAND_TEMP_DESCENDANT_RESERVE,
     CONTROL_PLANE_COMMANDS,
     SYSTEM_TEST_LANES,
     TOURNAMENT_ROLES,
@@ -38,10 +41,13 @@ from hive_mind_os.agent_tournament import (
     _feedback_node_id,
     _host_runtime_evidence,
     _inventory_content_digest,
+    _live_source_authority_roots,
     _manifest,
     _node_candidates,
     _node_executable,
     _observed_peak_concurrency,
+    _owned_cleanup_identity,
+    _remove_disposable_tree,
     _role_node_id,
     _run_isolated_control_plane_doctor,
     _source_authority_roots,
@@ -53,6 +59,7 @@ from hive_mind_os.agent_tournament import (
     _validate_scan_receipt,
     _validate_sealed_control_plane_temp_path_budget,
     _validate_system_receipt,
+    _validated_command_temp_parents,
     _write_json,
     build_tournament_plan,
     championship,
@@ -76,6 +83,7 @@ FAKE_CHILD_ENV_NAMES = sorted(
         "ALL_PROXY",
         "HTTP_PROXY",
         "HTTPS_PROXY",
+        _COMMAND_TEMP_PARENT_ENV_NAME,
         "NO_PROXY",
         "PATH",
         "PYTHONDONTWRITEBYTECODE",
@@ -228,8 +236,10 @@ def _fake_command_receipt(
     temporary_directory = (
         repository.parent / _DOCTOR_TEMP_DIRECTORY_NAME
         if tuple(argv) == CONTROL_PLANE_COMMANDS["control-plane-doctor"]
-        else Path(tempfile.gettempdir()).resolve()
-        / f"{_COMMAND_TEMP_PREFIX}fixture"
+        else _validated_command_temp_parents(
+            _live_source_authority_roots(repository)
+        )[0]
+        / f"{_COMMAND_TEMP_PREFIX}00000000"
     )
     environment = _child_environment(
         repository,
@@ -897,7 +907,7 @@ class TournamentDagTests(unittest.TestCase):
         forged_ambient_parent = deepcopy(receipt)
         outside_ambient = (
             Path(tempfile.gettempdir()).resolve().parent
-            / f"hive-tournament-command-forged-{time.time_ns()}"
+            / f"{_COMMAND_TEMP_PREFIX}forged-{time.time_ns()}"
         )
         forged_ambient_parent["temporary_directory"] = str(outside_ambient)
         forged_ambient_parent["environment_policy"][
@@ -907,7 +917,7 @@ class TournamentDagTests(unittest.TestCase):
         forged_ambient_parent["receipt_digest"] = canonical_digest(
             forged_ambient_parent
         )
-        with self.assertRaisesRegex(TournamentError, "ambient"):
+        with self.assertRaisesRegex(TournamentError, "short roots"):
             _validate_command_receipt(
                 forged_ambient_parent,
                 command,
@@ -2191,6 +2201,165 @@ class TournamentExecutionTests(unittest.TestCase):
         finally:
             shutil.rmtree(workspace)
         self.assertFalse(os.path.lexists(workspace))
+
+    @unittest.skipUnless(os.name == "nt", "short-root selection is Windows-specific")
+    def test_nested_ambient_temp_is_not_inherited_by_command_children(self) -> None:
+        with tempfile.TemporaryDirectory() as parent:
+            inherited_root = Path(parent).resolve() / ("nested-" + "n" * 80)
+            inherited_root.mkdir()
+            script = (
+                "import os,pathlib,shutil,tempfile;"
+                "t=pathlib.Path(os.environ['TEMP']).resolve();"
+                "r=pathlib.Path(tempfile.mkdtemp(prefix='nested-',dir=t));"
+                "p=r/('x'*180);p.mkdir();shutil.rmtree(r)"
+            )
+            with patch(
+                "hive_mind_os.agent_tournament.tempfile.gettempdir",
+                return_value=str(inherited_root),
+            ):
+                expected_parents = _validated_command_temp_parents(
+                    _live_source_authority_roots(ROOT)
+                )
+                receipt, _transcript = run_command_receipt(
+                    ROOT, (sys.executable, "-B", "-c", script)
+                )
+
+        command_root = Path(receipt["temporary_directory"])
+        self.assertEqual("passed", receipt["status"])
+        self.assertEqual(expected_parents[0], command_root.parent)
+        self.assertNotEqual(inherited_root, command_root.parent)
+        self.assertLessEqual(
+            len(str(command_root)) + _WINDOWS_COMMAND_TEMP_DESCENDANT_RESERVE,
+            _WINDOWS_CLASSIC_PATH_CHARACTER_LIMIT,
+        )
+        self.assertFalse(os.path.lexists(command_root))
+
+    @unittest.skipUnless(os.name == "nt", "extended path cleanup is Windows-specific")
+    def test_command_cleanup_removes_real_paths_beyond_max_path(self) -> None:
+        script = (
+            "import os,pathlib;"
+            "from hive_mind_os.receipts import filesystem_path;"
+            "t=pathlib.Path(os.environ['TEMP']).resolve();"
+            "d=t/('x'*240);"
+            "os.mkdir(filesystem_path(d));"
+            "open(filesystem_path(d/'artifact.bin'),'wb').write(b'x')"
+        )
+        receipt, _transcript = run_command_receipt(
+            ROOT, (sys.executable, "-B", "-c", script)
+        )
+        command_root = Path(receipt["temporary_directory"])
+        self.assertEqual("passed", receipt["status"])
+        self.assertGreater(len(str(command_root / ("x" * 240))), 260)
+        self.assertTrue(receipt["temporary_directory_cleanup_completed"])
+        self.assertFalse(os.path.lexists(command_root))
+
+    def test_command_cleanup_retries_a_transient_not_empty_error(self) -> None:
+        with tempfile.TemporaryDirectory() as parent:
+            owned_root = Path(parent).resolve() / "owned"
+            owned_root.mkdir()
+            (owned_root / "artifact.bin").write_bytes(b"x")
+            real_remove = shutil.rmtree
+            calls = 0
+
+            def transient_then_remove(path, *args, **kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    raise OSError(errno.ENOTEMPTY, "transient not empty")
+                return real_remove(path, *args, **kwargs)
+
+            with (
+                patch(
+                    "hive_mind_os.agent_tournament.shutil.rmtree",
+                    side_effect=transient_then_remove,
+                ),
+                patch("hive_mind_os.agent_tournament.time.sleep") as sleep,
+            ):
+                _remove_disposable_tree(owned_root)
+
+            self.assertEqual(2, calls)
+            sleep.assert_called_once_with(0.05)
+            self.assertFalse(os.path.lexists(owned_root))
+
+    def test_command_cleanup_rejects_a_replaced_root_without_touching_target(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as parent:
+            fixture = Path(parent).resolve()
+            owned_root = fixture / "owned"
+            target = fixture / "target"
+            owned_root.mkdir()
+            target.mkdir()
+            sentinel = target / "sentinel.txt"
+            sentinel.write_text("must survive", encoding="utf-8")
+            identity = _owned_cleanup_identity(owned_root)
+            shutil.rmtree(owned_root)
+            try:
+                owned_root.symlink_to(target, target_is_directory=True)
+            except OSError as error:
+                self.skipTest(f"directory symlinks are unavailable: {error}")
+            try:
+                with self.assertRaisesRegex(TournamentError, "link|identity"):
+                    _remove_disposable_tree(
+                        owned_root, expected_identity=identity
+                    )
+                self.assertEqual("must survive", sentinel.read_text(encoding="utf-8"))
+            finally:
+                owned_root.unlink(missing_ok=True)
+
+    @unittest.skipUnless(os.name == "nt", "NTFS junction regression")
+    def test_command_cleanup_rejects_a_replacement_junction(self) -> None:
+        with tempfile.TemporaryDirectory() as parent:
+            fixture = Path(parent).resolve()
+            owned_root = fixture / "owned"
+            target = fixture / "target"
+            owned_root.mkdir()
+            target.mkdir()
+            sentinel = target / "sentinel.txt"
+            sentinel.write_text("must survive", encoding="utf-8")
+            identity = _owned_cleanup_identity(owned_root)
+            owned_root.rmdir()
+            created = subprocess.run(
+                ("cmd", "/c", "mklink", "/J", str(owned_root), str(target)),
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            if created.returncode != 0:
+                self.skipTest(f"directory junctions are unavailable: {created.stderr}")
+            try:
+                with self.assertRaisesRegex(TournamentError, "link|identity"):
+                    _remove_disposable_tree(
+                        owned_root, expected_identity=identity
+                    )
+                self.assertEqual("must survive", sentinel.read_text(encoding="utf-8"))
+            finally:
+                os.rmdir(owned_root)
+
+    @unittest.skipUnless(os.name == "nt", "Windows short-root fallback")
+    def test_invalid_ambient_temp_falls_back_to_user_profile(self) -> None:
+        missing_ambient = ROOT.parent / ("missing-ambient-" + "x" * 80)
+        with patch(
+            "hive_mind_os.agent_tournament.tempfile.gettempdir",
+            return_value=str(missing_ambient),
+        ):
+            parents = _validated_command_temp_parents(
+                _live_source_authority_roots(ROOT)
+            )
+        self.assertEqual(Path(os.environ["USERPROFILE"]).resolve(), parents[0])
+
+    def test_user_profile_is_not_inherited_by_command_children(self) -> None:
+        temporary_root = Path(tempfile.gettempdir()).resolve() / (
+            _COMMAND_TEMP_PREFIX + "environment"
+        )
+        environment = _child_environment(
+            ROOT, temporary_directory=temporary_root
+        )
+        self.assertNotIn("USERPROFILE", environment)
+        self.assertEqual(
+            str(temporary_root.parent),
+            environment[_COMMAND_TEMP_PARENT_ENV_NAME],
+        )
 
     @unittest.skipUnless(os.name == "nt", "classic path budget is Windows-specific")
     def test_overlong_control_plane_temp_root_fails_before_execution(self) -> None:

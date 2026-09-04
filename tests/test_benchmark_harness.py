@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,10 +19,12 @@ from hive_mind_os.benchmark_harness import (
     BenchmarkHarness,
     LaneExecution,
     MeasurementVerdict,
+    _remove_tree,
     _run_hidden_check,
     bootstrap_interval,
     find_unauthorized_claims,
 )
+from hive_mind_os.receipts import filesystem_path
 
 
 def _raw_records(
@@ -206,6 +210,66 @@ class BenchmarkHarnessTests(unittest.TestCase):
         self.assertEqual(str(workspace.resolve()), observed_environment["PYTHONPATH"])
         self.assertNotIn(str(hostile), observed_environment["PYTHONPATH"].split(os.pathsep))
         self.assertEqual("1", observed_environment["PYTHONSAFEPATH"])
+
+    def test_cleanup_removes_artifacts_beyond_the_windows_path_limit(self) -> None:
+        cleanup_root = self.root / "long-cleanup-root"
+        long_directory = cleanup_root / ("a" * 80) / ("b" * 80) / ("c" * 96)
+        long_file = filesystem_path(long_directory / "artifact.json")
+        self.assertGreater(len(str(long_directory / "artifact.json")), 260)
+        long_file.parent.mkdir(parents=True)
+        long_file.write_text("retained evidence", encoding="utf-8")
+
+        _remove_tree(cleanup_root)
+
+        self.assertFalse(filesystem_path(cleanup_root).exists())
+
+    def test_cleanup_retries_only_a_bounded_transient_failure(self) -> None:
+        cleanup_root = self.root / "retry-cleanup-root"
+        cleanup_root.mkdir()
+        (cleanup_root / "artifact.json").write_text("evidence", encoding="utf-8")
+        real_remove = shutil.rmtree
+        attempts = 0
+        transient_error = OSError(errno.EINVAL, "directory temporarily not empty")
+        setattr(transient_error, "winerror", 145)
+
+        def transient_then_remove(*args: Any, **kwargs: Any) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise transient_error
+            real_remove(*args, **kwargs)
+
+        with (
+            patch(
+                "hive_mind_os.benchmark_harness.shutil.rmtree",
+                side_effect=transient_then_remove,
+            ),
+            patch("hive_mind_os.benchmark_harness.time.sleep") as sleep,
+        ):
+            _remove_tree(cleanup_root)
+
+        self.assertEqual(attempts, 2)
+        sleep.assert_called_once_with(0.05)
+        self.assertFalse(cleanup_root.exists())
+
+    def test_cleanup_does_not_retry_an_unclassified_failure(self) -> None:
+        cleanup_root = self.root / "failed-cleanup-root"
+        cleanup_root.mkdir()
+        failure = OSError(errno.EINVAL, "invalid cleanup request")
+
+        with (
+            patch(
+                "hive_mind_os.benchmark_harness.shutil.rmtree",
+                side_effect=failure,
+            ) as remove,
+            patch("hive_mind_os.benchmark_harness.time.sleep") as sleep,
+            self.assertRaises(OSError) as raised,
+        ):
+            _remove_tree(cleanup_root)
+
+        self.assertIs(raised.exception, failure)
+        remove.assert_called_once()
+        sleep.assert_not_called()
 
     def test_equal_budget_and_overspend_fails_closed(self) -> None:
         spec = BudgetSpec(max_tool_calls=2, max_tool_calls_per_episode=2)
