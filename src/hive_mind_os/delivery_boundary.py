@@ -1,10 +1,10 @@
 """Fail-closed separation between HiveMind orchestration and delivered code.
 
-HiveMind may compile and execute DAGs outside a target repository.  A delivery
-may not, however, make the target depend on HiveMind's runtime, workspace, or
-plan-directory conventions.  This module checks only dependencies introduced
-by a delivery; it deliberately does not prohibit a target's independent use
-of generic graph algorithms.
+HiveMind may use a tournament DAG to create and execute implementation work
+outside a target repository.  A delivery may not, however, make the target
+depend on HiveMind's runtime, workspace, or plan-directory conventions.  This
+module checks only dependencies introduced by a delivery; it deliberately does
+not prohibit a target's independent use of generic graph algorithms.
 """
 
 from __future__ import annotations

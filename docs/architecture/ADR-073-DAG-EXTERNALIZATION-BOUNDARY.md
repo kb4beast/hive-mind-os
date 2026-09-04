@@ -5,10 +5,10 @@
 
 ## Context
 
-HiveMind uses executable DAGs to schedule implementation work, run independent
-or parallel lanes, and retain orchestration evidence.  A target repository must
-not need that plan, HiveMind's runtime, or HiveMind workspace state in order to
-run its delivered code.
+HiveMind uses executable DAGs in tournaments to create and evaluate
+implementation candidates, schedule independent or parallel lanes, and retain
+orchestration evidence. A target repository must not need that plan, HiveMind's
+runtime, or HiveMind workspace state in order to run its delivered code.
 
 The prior architecture permitted implementation concepts to be represented in
 shared graph registries.  Direct agent classes now own their behavior, but a
@@ -17,8 +17,8 @@ an application dependency on the orchestration layer.
 
 ## Decision
 
-1. DAG construction, execution, tournament use, and receipts remain HiveMind
-   orchestration concerns.
+1. DAG construction, tournament-driven implementation creation and evaluation,
+   execution, and receipts remain HiveMind orchestration concerns.
 2. A repository delivery may not introduce HiveMind imports, HiveMind workspace
    paths, or DAG-plan-directory paths into target source/configuration files.
 3. A delivery may not contain a DAG plan artifact under `plans/dags`.
@@ -32,6 +32,8 @@ an application dependency on the orchestration layer.
 ## Consequences
 
 Target code is runnable from a clean checkout without HiveMind plan files or
-workspace state.  A delivery that embeds an orchestration dependency is
-rejected and must be redesigned around normal source inputs and neutral evidence
-artifacts.  HiveMind's own executor continues to use DAGs externally.
+workspace state. A tournament may use a DAG to create that direct code, but the
+resulting delivery is independent of the tournament. A delivery that embeds an
+orchestration dependency is rejected and must be redesigned around normal source
+inputs and neutral evidence artifacts. HiveMind's own executor continues to use
+DAGs externally.
