@@ -803,7 +803,13 @@ class FeedbackReentryTests(_RuntimeCase):
             "test_keep_is_retained_but_v2_promotion_is_typed_defer"
         )
         environment = os.environ.copy()
-        environment["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
+        repository_root = str(Path(__file__).resolve().parents[1])
+        pythonpath = str(
+            Path(repository_root) / "src"
+        )
+        environment["PYTHONPATH"] = os.pathsep.join(
+            (repository_root, pythonpath)
+        )
         for order in ((authority, keep), (keep, authority)):
             completed = subprocess.run(
                 (sys.executable, "-m", "unittest", "-q", *order),
