@@ -14,6 +14,7 @@ import json
 from dataclasses import replace
 from typing import Mapping, Sequence
 
+from ..agents import agent_type_for
 from ..ledger import EvidenceLedger
 from ..model_backend import ContextEnvelope, ModelBackend
 from ..model_provider import ModelProvider
@@ -102,7 +103,9 @@ class RoleRuntime:
                 f"role {role!r} cannot request capability {action!r}"
             )
 
-    def request_capability(self, invocation: RoleInvocation, action: str) -> dict[str, str]:
+    def request_capability(
+        self, invocation: RoleInvocation, action: str
+    ) -> dict[str, str]:
         """Return inert request metadata for an allowed capability.
 
         The returned object is deliberately not an executable callable or effect
@@ -142,7 +145,8 @@ class RoleRuntime:
             acceptance_criteria=capabilities.required_outputs,
             constraints=(
                 "Models may propose typed results only; direct effects are forbidden.",
-                "Allowed capability requests: " + ", ".join(capabilities.allowed_actions),
+                "Allowed capability requests: "
+                + ", ".join(capabilities.allowed_actions),
                 "Forbidden actions: " + ", ".join(capabilities.forbidden_actions),
                 "Role identity: " + invocation.executor_id,
                 "Authority envelope: " + invocation.authority_envelope_digest,
@@ -170,9 +174,13 @@ class RoleRuntime:
             context,
             context_envelope=envelope,
         )
-        return self._to_role_result(invocation, capabilities.required_outputs, agent_result)
+        return self._to_role_result(
+            invocation, capabilities.required_outputs, agent_result
+        )
 
-    async def run(self, invocation: RoleInvocation, *, prior_results: Sequence[RoleResult] = ()) -> RoleResult:
+    async def run(
+        self, invocation: RoleInvocation, *, prior_results: Sequence[RoleResult] = ()
+    ) -> RoleResult:
         """Alias for callers that model a role worker as a runnable handler."""
 
         return await self.execute(invocation, prior_results=prior_results)
@@ -238,7 +246,9 @@ class RoleRuntime:
         if record.role != invocation.role:
             raise ApplicabilityDenied("disposition is bound to a different role")
         if record.disposition is RoleDisposition.MODEL_EXECUTE:
-            raise ApplicabilityDenied("model_execute cannot be resolved deterministically")
+            raise ApplicabilityDenied(
+                "model_execute cannot be resolved deterministically"
+            )
         if record.disposition is RoleDisposition.BLOCKED:
             raise ApplicabilityDenied(
                 f"role {record.role!r} is blocked: {record.blocking_reason}"
@@ -290,13 +300,18 @@ class RoleRuntime:
 
     @staticmethod
     def _validate_invocation(invocation: RoleInvocation) -> None:
+        try:
+            agent_type = agent_type_for(invocation.role)
+        except ValueError as error:
+            raise RoleProtocolError("role has no executable kernel handler") from error
         if invocation.role not in KERNEL_IMPLEMENTED_ROLES:
             raise RoleProtocolError("role has no executable kernel handler")
-        if invocation.context.request.evaluator_mode != (
-            invocation.role == "curator"
+        if (
+            invocation.context.request.evaluator_mode
+            is not agent_type.requires_evaluator_mode
         ):
             raise RoleProtocolError(
-                "curator must use evaluator-isolated context and other roles must not"
+                "agent evaluator isolation does not match its direct role contract"
             )
 
     @staticmethod
@@ -335,7 +350,9 @@ class RoleRuntime:
         return (
             "Execute the bounded role contract using only this invocation binding. "
             "Return proposals and typed outputs; do not perform effects.\n"
-            + json.dumps(binding, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            + json.dumps(
+                binding, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
         )
 
     @staticmethod
@@ -437,12 +454,18 @@ class RoleRuntime:
             executor_id=invocation.executor_id,
             context_manifest_digest=invocation.context.manifest.manifest_digest,
             authority_envelope_digest=invocation.authority_envelope_digest,
-            base_artifact_refs=tuple(dict.fromkeys((*invocation.evidence_refs, *invocation.base_artifact_refs))),
+            base_artifact_refs=tuple(
+                dict.fromkeys(
+                    (*invocation.evidence_refs, *invocation.base_artifact_refs)
+                )
+            ),
             candidate_artifact_refs=invocation.candidate_artifact_refs,
             output_artifact_refs=output_refs,
             claims=tuple(required_outputs),
             effect_receipt_refs=(),
-            unresolved_risks=("model proposals are unexecuted until separately authorized",),
+            unresolved_risks=(
+                "model proposals are unexecuted until separately authorized",
+            ),
             requested_next_role=next_role(invocation.role),
             self_assessment=agent_result.summary,
             result_digest="sha256:" + "0" * 64,

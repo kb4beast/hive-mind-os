@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from ..agents import RoleCapabilities, agent_type_for, canonical_roles
 from .canonical import canonical_digest
 from .context import CompiledContext
 from .contracts import RoleResult
@@ -19,45 +20,13 @@ from .events import KernelEvent
 if TYPE_CHECKING:
     from .store import KernelStore
 
-KERNEL_IMPLEMENTED_ROLES: tuple[str, ...] = (
-    "orchestrator",
-    "explorer",
-    "architect",
-    "builder",
-    "curator",
-    "integrator",
-    "steward",
-    "optimizer",
+KERNEL_IMPLEMENTED_ROLES: tuple[str, ...] = tuple(
+    role.value for role in canonical_roles()
 )
 
 
 class RoleProtocolError(ValueError):
     """A role invocation violates the local kernel role boundary."""
-
-
-@dataclass(frozen=True, slots=True)
-class RoleCapabilities:
-    """Closed capability envelope advertised by one executable role handler."""
-
-    allowed_actions: tuple[str, ...]
-    forbidden_actions: tuple[str, ...]
-    required_outputs: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        if not self.required_outputs:
-            raise RoleProtocolError("role handlers require declared outputs")
-        if set(self.allowed_actions) & set(self.forbidden_actions):
-            raise RoleProtocolError("role action sets overlap")
-
-    def allows(self, action: str) -> bool:
-        """Return whether the role may request an action through an adapter.
-
-        This is intentionally only a request check.  It does not authorize or
-        execute an effect; authority and effect adapters remain separate kernel
-        boundaries.
-        """
-
-        return action in self.allowed_actions and action not in self.forbidden_actions
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +64,9 @@ class RoleInvocation:
             or manifest.role != self.role
             or manifest.authority_digest != self.authority_envelope_digest
         ):
-            raise RoleProtocolError("role invocation is not bound to its context manifest")
+            raise RoleProtocolError(
+                "role invocation is not bound to its context manifest"
+            )
 
     def to_kwargs(self) -> dict[str, object]:
         """Return constructor values for deterministic test and adapter rebinding."""
@@ -166,68 +137,12 @@ def append_role_result(
     )
 
 
-_CAPABILITIES: dict[str, RoleCapabilities] = {
-    "orchestrator": RoleCapabilities(
-        ("query_state", "plan", "request_human_gate"),
-        ("write", "accept", "verify", "merge", "policy_change"),
-        ("objective_dag", "risk_register", "budget_allocation", "stop_conditions"),
-    ),
-    "explorer": RoleCapabilities(
-        ("read", "analyze", "request_source_search"),
-        ("write", "accept", "candidate_mutation"),
-        ("evidence_map", "candidate", "uncertainty"),
-    ),
-    "architect": RoleCapabilities(
-        ("read", "propose_design_artifact"),
-        ("implementation_approval", "weaken_constraints"),
-        ("architecture", "interfaces", "threat_model", "rollback_plan"),
-    ),
-    "builder": RoleCapabilities(
-        ("request_isolated_write", "request_command", "request_branch_commit"),
-        ("accept", "protected_branch", "merge", "deploy", "modify_sealed_acceptance"),
-        ("candidate", "tests", "change_summary", "effect_intents"),
-    ),
-    "curator": RoleCapabilities(
-        ("read_fresh_workspace", "request_test", "inspect_diff"),
-        ("candidate_write", "accept", "reuse_builder_scratchpad"),
-        ("check_results", "defect_findings", "verdict", "evidence_bundle"),
-    ),
-    "integrator": RoleCapabilities(
-        ("read", "request_contract_test", "request_builder_work"),
-        ("write", "merge", "conceal_breaking_change"),
-        ("compatibility_report", "data_lineage", "integration_result"),
-    ),
-    "steward": RoleCapabilities(
-        ("read_runtime_state", "request_recovery_test", "propose_maintenance_work"),
-        ("trade_recoverability_for_speed",),
-        ("recovery_proof", "operational_readiness", "maintenance_findings"),
-    ),
-    "optimizer": RoleCapabilities(
-        ("query_ledger", "request_held_out_experiment", "register_candidate"),
-        ("promote", "change_champion", "change_dataset", "policy_change"),
-        ("comparison", "measurement_caveats", "promotion_recommendation"),
-    ),
-}
-
-_NEXT_ROLE = {
-    "orchestrator": "explorer",
-    "explorer": "architect",
-    "architect": "builder",
-    "builder": "curator",
-    "curator": "integrator",
-    # The integrator must request a Builder work item for a code repair; it cannot patch.
-    "integrator": "builder",
-    "steward": "optimizer",
-    "optimizer": None,
-}
-
-
 def role_capabilities(role: str) -> RoleCapabilities:
-    """Return the closed kernel contract for one registered role."""
+    """Return the closed capability envelope owned by one direct agent."""
 
     try:
-        return _CAPABILITIES[role]
-    except KeyError as error:
+        return agent_type_for(role).capabilities
+    except ValueError as error:
         raise RoleProtocolError("role has no executable kernel handler") from error
 
 
@@ -240,12 +155,13 @@ def role_allows_action(role: str, action: str) -> bool:
 
 
 def next_role(role: str) -> str | None:
-    """Return a fixed handoff recommendation without scheduling any work."""
+    """Return the direct agent's handoff recommendation without scheduling work."""
 
     try:
-        return _NEXT_ROLE[role]
-    except KeyError as error:
+        successor = agent_type_for(role).next_role
+    except ValueError as error:
         raise RoleProtocolError("role has no executable kernel handler") from error
+    return None if successor is None else successor.value
 
 
 def role_prompt(role: str) -> str:
