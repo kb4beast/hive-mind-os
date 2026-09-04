@@ -1,5 +1,5 @@
 {
-  "bundle_digest": "sha256:bc6ba5b4481e926d1bc327b7eacb56d41fd037f10eb7396b9826fa8c3f6f0dd9",
+  "bundle_digest": "sha256:13f0d3f8a7e34ca4b16d05b774fd22cfd52f255d8a01b5e3df8e97ed380961e7",
   "corpus_id": "code-qa-v2-bounded-three-shape-corpus",
   "directories": [
     "inventory-aggregation",
@@ -15,7 +15,7 @@
     "tag-parser/repository/tests"
   ],
   "evaluator_id": "code-qa-corpus-v2-deterministic-local-evaluator",
-  "evaluator_implementation_digest": "sha256:8235f41349ce251847ea4e5b4f0c457790d750bc48978c4e168ce4934e6ac79a",
+  "evaluator_implementation_digest": "sha256:7ad836f795fbe12200c3fb359a367adbea85374cf841fffbfb9f73a926ce07cc",
   "inventory": [
     {
       "bytes": 1001,

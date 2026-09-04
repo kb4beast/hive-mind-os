@@ -1,0 +1,541 @@
+{
+  "executor": {
+    "module": "hive_mind_os.agent_tournament_v2",
+    "script": "scripts/run_agent_tournament_v2.py"
+  },
+  "kind": "hive-mind-agent-readiness-tournament-v2-plan",
+  "nodes": [
+    {
+      "action": "seal-repository",
+      "critical": true,
+      "dependencies": [],
+      "lane": null,
+      "node_id": "SCAN-REPOSITORY",
+      "objective": "Seal every Git-visible file plus exact HEAD, tree, and checkout state.",
+      "parallel_safe": false,
+      "role": null
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-ORCHESTRATOR",
+      "objective": "Grade orchestrator independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "orchestrator"
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-EXPLORER",
+      "objective": "Grade explorer independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "explorer"
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-ARCHITECT",
+      "objective": "Grade architect independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "architect"
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-BUILDER",
+      "objective": "Grade builder independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "builder"
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-CURATOR",
+      "objective": "Grade curator independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "curator"
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-INTEGRATOR",
+      "objective": "Grade integrator independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "integrator"
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-STEWARD",
+      "objective": "Grade steward independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "steward"
+    },
+    {
+      "action": "grade-role",
+      "critical": true,
+      "dependencies": [
+        "SCAN-REPOSITORY"
+      ],
+      "lane": null,
+      "node_id": "ROLE-OPTIMIZER",
+      "objective": "Grade optimizer independently with source-bound focused tests.",
+      "parallel_safe": true,
+      "role": "optimizer"
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "static",
+      "node_id": "SYSTEM-STATIC",
+      "objective": "Parse and compile the exact sealed repository.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "lifecycle",
+      "node_id": "SYSTEM-LIFECYCLE",
+      "objective": "Exercise the native all-role lifecycle.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "resilience",
+      "node_id": "SYSTEM-RESILIENCE",
+      "objective": "Exercise recovery, no-cheating, and poisoning defenses.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "evolution",
+      "node_id": "SYSTEM-EVOLUTION",
+      "objective": "Exercise learning, evaluation, and promotion boundaries.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "control-plane",
+      "node_id": "SYSTEM-CONTROL-PLANE",
+      "objective": "Run strict predecessor control-plane validation.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "control-plane-tests",
+      "node_id": "SYSTEM-CONTROL-PLANE-TESTS",
+      "objective": "Run the separately governed control-plane tests.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "native-dag",
+      "node_id": "SYSTEM-NATIVE-DAG",
+      "objective": "Execute all eight concrete repository specialists through the dependency-ready typed DAG on an isolated exact source snapshot.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER"
+      ],
+      "lane": "code-qa-v2",
+      "node_id": "SYSTEM-CODE-QA-V2",
+      "objective": "Create code through authority-bound effects and separately run public and sealed checks across three fixture shapes.",
+      "parallel_safe": true,
+      "role": null
+    },
+    {
+      "action": "system-gate",
+      "critical": true,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER",
+        "SYSTEM-CONTROL-PLANE-TESTS"
+      ],
+      "lane": "control-plane-doctor",
+      "node_id": "SYSTEM-CONTROL-PLANE-DOCTOR",
+      "objective": "Run the exact bootstrap doctor in its disposable isolated checkout.",
+      "parallel_safe": false,
+      "role": null
+    },
+    {
+      "action": "challenger-boundary",
+      "critical": false,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "ROLE-EXPLORER",
+        "ROLE-ARCHITECT",
+        "ROLE-BUILDER",
+        "ROLE-CURATOR",
+        "ROLE-INTEGRATOR",
+        "ROLE-STEWARD",
+        "ROLE-OPTIMIZER",
+        "SYSTEM-STATIC",
+        "SYSTEM-LIFECYCLE",
+        "SYSTEM-RESILIENCE",
+        "SYSTEM-EVOLUTION",
+        "SYSTEM-CONTROL-PLANE",
+        "SYSTEM-CONTROL-PLANE-TESTS",
+        "SYSTEM-NATIVE-DAG",
+        "SYSTEM-CODE-QA-V2",
+        "SYSTEM-CONTROL-PLANE-DOCTOR"
+      ],
+      "lane": "challenger-g1",
+      "node_id": "CHALLENGER-G1",
+      "objective": "Authenticate external evaluation authority and retain an owned G1 proposal, or explicitly defer at the evaluator evidence boundary.",
+      "parallel_safe": false,
+      "role": null
+    },
+    {
+      "action": "full-suite",
+      "critical": true,
+      "dependencies": [
+        "SYSTEM-STATIC",
+        "SYSTEM-LIFECYCLE",
+        "SYSTEM-RESILIENCE",
+        "SYSTEM-EVOLUTION",
+        "SYSTEM-CONTROL-PLANE",
+        "SYSTEM-CONTROL-PLANE-TESTS",
+        "SYSTEM-NATIVE-DAG",
+        "SYSTEM-CODE-QA-V2",
+        "SYSTEM-CONTROL-PLANE-DOCTOR",
+        "CHALLENGER-G1"
+      ],
+      "lane": "full-suite",
+      "node_id": "SYSTEM-FULL-SUITE",
+      "objective": "Run the canonical repository CI gate; development skips cannot adopt.",
+      "parallel_safe": false,
+      "role": null
+    },
+    {
+      "action": "cross-examine",
+      "critical": true,
+      "dependencies": [
+        "SYSTEM-FULL-SUITE"
+      ],
+      "lane": null,
+      "node_id": "CROSS-EXAMINE",
+      "objective": "Attack every apparent pass and preserve fatal findings and dissent.",
+      "parallel_safe": false,
+      "role": null
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-ORCHESTRATOR",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-ORCHESTRATOR",
+      "objective": "Challenge orchestrator, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "orchestrator"
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-EXPLORER",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-EXPLORER",
+      "objective": "Challenge explorer, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "explorer"
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-ARCHITECT",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-ARCHITECT",
+      "objective": "Challenge architect, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "architect"
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-BUILDER",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-BUILDER",
+      "objective": "Challenge builder, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "builder"
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-CURATOR",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-CURATOR",
+      "objective": "Challenge curator, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "curator"
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-INTEGRATOR",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-INTEGRATOR",
+      "objective": "Challenge integrator, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "integrator"
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-STEWARD",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-STEWARD",
+      "objective": "Challenge steward, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "steward"
+    },
+    {
+      "action": "feedback",
+      "critical": false,
+      "dependencies": [
+        "ROLE-OPTIMIZER",
+        "CROSS-EXAMINE",
+        "CHALLENGER-G1"
+      ],
+      "lane": null,
+      "node_id": "FEEDBACK-OPTIMIZER",
+      "objective": "Challenge optimizer, rethink from source evidence, and emit bounded fresh-run re-entry without mutating its champion.",
+      "parallel_safe": true,
+      "role": "optimizer"
+    },
+    {
+      "action": "championship",
+      "critical": true,
+      "dependencies": [
+        "FEEDBACK-ORCHESTRATOR",
+        "FEEDBACK-EXPLORER",
+        "FEEDBACK-ARCHITECT",
+        "FEEDBACK-BUILDER",
+        "FEEDBACK-CURATOR",
+        "FEEDBACK-INTEGRATOR",
+        "FEEDBACK-STEWARD",
+        "FEEDBACK-OPTIMIZER"
+      ],
+      "lane": null,
+      "node_id": "CHAMPIONSHIP",
+      "objective": "Issue a non-compensating system verdict without a superiority claim.",
+      "parallel_safe": false,
+      "role": null
+    }
+  ],
+  "plan_digest": "sha256:651226a00eea40a606f563719c1b20109f3a721018d06e066129108767cf80fa",
+  "policies": {
+    "authority_manifest_requires_caller_expected_digest": true,
+    "authority_only_challenger_status": "retest-required",
+    "challenger_promotion_authorized": false,
+    "create_only_output": true,
+    "default_runs_canonical_full_suite": true,
+    "fatal_gates_are_non_compensating": true,
+    "feedback_cycles": 3,
+    "skip_full_suite_can_never_adopt": true
+  },
+  "schema_version": 2,
+  "waves": [
+    [
+      "SCAN-REPOSITORY"
+    ],
+    [
+      "ROLE-ORCHESTRATOR",
+      "ROLE-EXPLORER",
+      "ROLE-ARCHITECT",
+      "ROLE-BUILDER",
+      "ROLE-CURATOR",
+      "ROLE-INTEGRATOR",
+      "ROLE-STEWARD",
+      "ROLE-OPTIMIZER"
+    ],
+    [
+      "SYSTEM-STATIC",
+      "SYSTEM-LIFECYCLE",
+      "SYSTEM-RESILIENCE",
+      "SYSTEM-EVOLUTION",
+      "SYSTEM-CONTROL-PLANE",
+      "SYSTEM-CONTROL-PLANE-TESTS",
+      "SYSTEM-NATIVE-DAG",
+      "SYSTEM-CODE-QA-V2"
+    ],
+    [
+      "SYSTEM-CONTROL-PLANE-DOCTOR"
+    ],
+    [
+      "CHALLENGER-G1"
+    ],
+    [
+      "SYSTEM-FULL-SUITE"
+    ],
+    [
+      "CROSS-EXAMINE"
+    ],
+    [
+      "FEEDBACK-ORCHESTRATOR",
+      "FEEDBACK-EXPLORER",
+      "FEEDBACK-ARCHITECT",
+      "FEEDBACK-BUILDER",
+      "FEEDBACK-CURATOR",
+      "FEEDBACK-INTEGRATOR",
+      "FEEDBACK-STEWARD",
+      "FEEDBACK-OPTIMIZER"
+    ],
+    [
+      "CHAMPIONSHIP"
+    ]
+  ]
+}

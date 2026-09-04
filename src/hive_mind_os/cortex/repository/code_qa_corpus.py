@@ -42,7 +42,7 @@ QUALIFICATION = "deterministic-test-double-only-not-provider-or-production-quali
 TRUST_MODEL = "unsandboxed-same-os-authority-local-development"
 # evaluator-digest-excluded-bundle-pin-begin
 PINNED_CORPUS_BUNDLE_DIGEST = (
-    "sha256:bc6ba5b4481e926d1bc327b7eacb56d41fd037f10eb7396b9826fa8c3f6f0dd9"
+    "sha256:13f0d3f8a7e34ca4b16d05b774fd22cfd52f255d8a01b5e3df8e97ed380961e7"
 )
 # evaluator-digest-excluded-bundle-pin-end
 NOW = "2030-01-01T00:00:00Z"
@@ -868,13 +868,18 @@ def _test_outcome(
     checker_digest: str,
     candidate_digest: str,
     completed: Sequence[subprocess.CompletedProcess[bytes]],
+    location_roots: Sequence[Path],
 ) -> TestOutcome:
     passed = all(item.returncode == 0 for item in completed)
     returncode = (
         0 if passed else next(item.returncode for item in completed if item.returncode)
     )
-    stdout = b"\x00".join(item.stdout for item in completed)
-    stderr = b"\x00".join(item.stderr for item in completed)
+    stdout = _location_independent_stream(
+        b"\x00".join(item.stdout for item in completed), location_roots
+    )
+    stderr = _location_independent_stream(
+        b"\x00".join(item.stderr for item in completed), location_roots
+    )
     outcome_digest = canonical_digest(
         {
             "checker_kind": kind,
@@ -894,6 +899,29 @@ def _test_outcome(
         _sha256(stderr),
         outcome_digest,
     )
+
+
+def _location_independent_stream(stream: bytes, roots: Sequence[Path]) -> bytes:
+    """Replace disposable absolute roots before hashing retained test output."""
+
+    normalized = stream
+    markers = (b"<CODE-QA-WORKSPACE>", b"<CODE-QA-RUNTIME>")
+    for root, marker in zip(roots, markers):
+        resolved = root.resolve(strict=False)
+        representations = {
+            str(root),
+            str(resolved),
+            root.as_posix(),
+            resolved.as_posix(),
+        }
+        for representation in sorted(representations, key=len, reverse=True):
+            for encoding in ("utf-8", sys.getfilesystemencoding()):
+                try:
+                    encoded = representation.encode(encoding)
+                except UnicodeEncodeError:
+                    continue
+                normalized = normalized.replace(encoded, marker)
+    return normalized
 
 
 def _execute_test(
@@ -947,6 +975,7 @@ def _run_public(
         checker_digest=task.public_check_digest,
         candidate_digest=candidate_digest,
         completed=completed,
+        location_roots=(workspace, runtime),
     )
 
 
@@ -964,6 +993,7 @@ def _run_hidden(
         checker_digest=check.hidden_check_digest,
         candidate_digest=candidate_digest,
         completed=(completed,),
+        location_roots=(workspace, runtime),
     )
 
 
