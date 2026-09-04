@@ -138,7 +138,9 @@ class EvidenceReceipt:
             ):
                 raise ValueError("score must be a finite number from 0 through 100")
         if self.strict and self.evidence_kind not in _STRICT_GATES:
-            raise ValueError("strict is valid only for control-plane or full-suite evidence")
+            raise ValueError(
+                "strict is valid only for control-plane or full-suite evidence"
+            )
         comparison_values = (
             self.comparator_digest,
             self.budget_digest,
@@ -149,7 +151,9 @@ class EvidenceReceipt:
             _require_digest(self.budget_digest, "budget_digest")
             _require_text(self.run_id, "run_id")
         elif any(value is not None for value in comparison_values):
-            raise ValueError("comparison fields are valid only for superiority evidence")
+            raise ValueError(
+                "comparison fields are valid only for superiority evidence"
+            )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -247,9 +251,7 @@ def _superiority_requirements(
         for receipt in receipts
         if receipt.passed and receipt.evidence_kind is EvidenceKind.SUPERIORITY
     )
-    comparator_digests = {
-        receipt.comparator_digest for receipt in comparisons
-    }
+    comparator_digests = {receipt.comparator_digest for receipt in comparisons}
     budgets = {receipt.budget_digest for receipt in comparisons}
     enough_comparators = len(comparator_digests) >= policy.superiority_min_comparators
     equal_budget = bool(comparisons) and len(budgets) == 1
@@ -261,8 +263,7 @@ def _superiority_requirements(
             if receipt.comparator_digest == comparator
         )
         if (
-            len({receipt.run_id for receipt in group})
-            < policy.superiority_repetitions
+            len({receipt.run_id for receipt in group}) < policy.superiority_repetitions
             or len({receipt.artifact_digest for receipt in group})
             < policy.superiority_repetitions
         ):
@@ -340,20 +341,15 @@ def qualify_claim(
             receipt_failures.append("evidence is future-dated")
         if age_seconds > policy.max_evidence_age_seconds or expires < as_of:
             receipt_failures.append("evidence is stale")
-        if (
-            receipt.evidence_kind
-            in {
-                EvidenceKind.BOUNDED_LOCAL,
-                EvidenceKind.CONTROL_PLANE,
-                EvidenceKind.FULL_SUITE,
-            }
-            and receipt.execution_mode
-            not in {
-                ExecutionMode.LOCAL,
-                ExecutionMode.PROVIDER,
-                ExecutionMode.PRODUCTION,
-            }
-        ):
+        if receipt.evidence_kind in {
+            EvidenceKind.BOUNDED_LOCAL,
+            EvidenceKind.CONTROL_PLANE,
+            EvidenceKind.FULL_SUITE,
+        } and receipt.execution_mode not in {
+            ExecutionMode.LOCAL,
+            ExecutionMode.PROVIDER,
+            ExecutionMode.PRODUCTION,
+        }:
             receipt_failures.append(
                 "fixture and test-double evidence cannot satisfy executable local gates"
             )
@@ -370,9 +366,7 @@ def qualify_claim(
                     "independent end-to-end evidence requires a real provider execution"
                 )
             if receipt.issuer_trust_domain == request.candidate_trust_domain:
-                receipt_failures.append(
-                    "evaluator and candidate share a trust domain"
-                )
+                receipt_failures.append("evaluator and candidate share a trust domain")
         if (
             receipt.evidence_kind is EvidenceKind.PRODUCTION
             and receipt.execution_mode is not ExecutionMode.PRODUCTION
@@ -383,6 +377,15 @@ def qualify_claim(
             and receipt.comparator_digest == request.candidate_digest
         ):
             receipt_failures.append("a candidate cannot be its own comparator")
+        if receipt.evidence_kind is EvidenceKind.SUPERIORITY:
+            if receipt.execution_mode not in _PROVIDER_MODES:
+                receipt_failures.append(
+                    "superiority evidence requires provider or production execution"
+                )
+            if receipt.issuer_trust_domain == request.candidate_trust_domain:
+                receipt_failures.append(
+                    "superiority evaluator and candidate share a trust domain"
+                )
         if receipt_failures:
             rejected.add(receipt.receipt_id)
             failures.extend(
@@ -392,20 +395,17 @@ def qualify_claim(
             valid.append(receipt)
 
     for receipt in valid:
-        if (
-            receipt.strict
-            and receipt.evidence_kind in _STRICT_GATES
-            and not receipt.passed
-        ):
-            failures.append(
-                f"{receipt.receipt_id}: failed strict {receipt.evidence_kind.value.lower()} gate"
-            )
-            rejected.add(receipt.receipt_id)
+        if receipt.passed:
+            continue
+        if receipt.strict and receipt.evidence_kind in _STRICT_GATES:
+            failure = f"failed strict {receipt.evidence_kind.value.lower()} gate"
+        else:
+            failure = f"adverse {receipt.evidence_kind.value.lower()} evidence reported failure"
+        failures.append(f"{receipt.receipt_id}: {failure}")
+        rejected.add(receipt.receipt_id)
 
     valid_receipts = tuple(valid)
-    superiority, geometry_failures = _superiority_requirements(
-        valid_receipts, policy
-    )
+    superiority, geometry_failures = _superiority_requirements(valid_receipts, policy)
     failures.extend(geometry_failures)
     requirements: dict[QualificationLevel, dict[str, bool]] = {
         QualificationLevel.STRUCTURAL: {

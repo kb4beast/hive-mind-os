@@ -73,9 +73,7 @@ def receipt(
         "evidence_kind": kind,
         "passed": True,
         "issuer_id": "external-curator" if external else "local-curator",
-        "issuer_trust_domain": (
-            "independent-lab" if external else "candidate-lab"
-        ),
+        "issuer_trust_domain": ("independent-lab" if external else "candidate-lab"),
         "observed_at": FRESH,
         "expires_at": EXPIRES,
         "artifact_digest": digest(1000 + number),
@@ -126,9 +124,7 @@ class QualificationTests(unittest.TestCase):
         )
 
     def test_bounded_local_is_an_attainable_adoption_level(self) -> None:
-        decision = self.qualify(
-            QualificationLevel.BOUNDED_LOCAL, bounded_receipts()
-        )
+        decision = self.qualify(QualificationLevel.BOUNDED_LOCAL, bounded_receipts())
         self.assertTrue(decision.qualified)
         self.assertEqual(QualificationDisposition.ADOPT, decision.disposition)
         self.assertEqual(QualificationLevel.BOUNDED_LOCAL, decision.achieved_level)
@@ -157,9 +153,7 @@ class QualificationTests(unittest.TestCase):
         for change in changes:
             with self.subTest(change=change):
                 forged = replace(receipt(EvidenceKind.STRUCTURAL, 1), **change)
-                decision = self.qualify(
-                    QualificationLevel.STRUCTURAL, (forged,)
-                )
+                decision = self.qualify(QualificationLevel.STRUCTURAL, (forged,))
                 self.assertFalse(decision.qualified)
                 self.assertEqual(
                     QualificationDisposition.QUARANTINE, decision.disposition
@@ -222,9 +216,7 @@ class QualificationTests(unittest.TestCase):
         )
         for stale in cases:
             with self.subTest(receipt=stale):
-                decision = self.qualify(
-                    QualificationLevel.STRUCTURAL, (stale,)
-                )
+                decision = self.qualify(QualificationLevel.STRUCTURAL, (stale,))
                 self.assertEqual(
                     QualificationDisposition.QUARANTINE, decision.disposition
                 )
@@ -262,9 +254,7 @@ class QualificationTests(unittest.TestCase):
                     else item
                     for item in bounded_receipts()
                 )
-                decision = self.qualify(
-                    QualificationLevel.BOUNDED_LOCAL, evidence
-                )
+                decision = self.qualify(QualificationLevel.BOUNDED_LOCAL, evidence)
                 self.assertEqual(
                     QualificationDisposition.QUARANTINE, decision.disposition
                 )
@@ -303,14 +293,35 @@ class QualificationTests(unittest.TestCase):
                     else item
                     for item in bounded_receipts()
                 )
-                decision = self.qualify(
-                    QualificationLevel.BOUNDED_LOCAL, evidence
-                )
+                decision = self.qualify(QualificationLevel.BOUNDED_LOCAL, evidence)
                 self.assertEqual(
                     QualificationDisposition.QUARANTINE, decision.disposition
                 )
                 self.assertFalse(decision.qualified)
                 self.assertTrue(any("failed strict" in x for x in decision.failures))
+
+    def test_adverse_receipt_cannot_be_compensated_by_a_passing_receipt(self) -> None:
+        passing = replace(receipt(EvidenceKind.STRUCTURAL, 1), score=100.0)
+        adverse = replace(
+            receipt(EvidenceKind.STRUCTURAL, 2),
+            passed=False,
+            score=0.0,
+        )
+
+        decision = self.qualify(
+            QualificationLevel.STRUCTURAL,
+            (passing, adverse),
+        )
+
+        self.assertFalse(decision.qualified)
+        self.assertEqual(QualificationDisposition.QUARANTINE, decision.disposition)
+        self.assertEqual(QualificationLevel.STRUCTURAL, decision.achieved_level)
+        self.assertEqual((), decision.missing_requirements)
+        self.assertEqual((passing.receipt_id,), decision.accepted_receipt_ids)
+        self.assertEqual((adverse.receipt_id,), decision.rejected_receipt_ids)
+        self.assertTrue(
+            any("adverse structural evidence" in item for item in decision.failures)
+        )
 
     def test_superiority_requires_two_equal_budget_repeated_comparators(self) -> None:
         comparisons = (
@@ -325,6 +336,7 @@ class QualificationTests(unittest.TestCase):
                 EvidenceKind.SUPERIORITY,
                 23,
                 comparator_digest=digest(21),
+                execution_mode=ExecutionMode.PRODUCTION,
             ),
         )
         decision = self.qualify(
@@ -335,7 +347,65 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(QualificationLevel.SUPERIORITY, decision.achieved_level)
         self.assertEqual(QualificationDisposition.ADOPT, decision.disposition)
 
-    def test_one_comparator_or_nonrepeated_receipts_cannot_reach_superiority(self) -> None:
+    def test_superiority_requires_independent_provider_or_production_evidence(
+        self,
+    ) -> None:
+        valid = (
+            receipt(EvidenceKind.SUPERIORITY, 20),
+            receipt(EvidenceKind.SUPERIORITY, 21),
+            receipt(
+                EvidenceKind.SUPERIORITY,
+                22,
+                comparator_digest=digest(21),
+            ),
+            receipt(
+                EvidenceKind.SUPERIORITY,
+                23,
+                comparator_digest=digest(21),
+            ),
+        )
+        cases = tuple(
+            (
+                replace(valid[0], execution_mode=mode),
+                "provider or production execution",
+            )
+            for mode in (
+                ExecutionMode.FIXTURE,
+                ExecutionMode.TEST_DOUBLE,
+                ExecutionMode.LOCAL,
+            )
+        ) + (
+            (
+                replace(
+                    valid[0],
+                    issuer_id="local-curator",
+                    issuer_trust_domain="candidate-lab",
+                ),
+                "share a trust domain",
+            ),
+        )
+        for invalid, expected_failure in cases:
+            with self.subTest(
+                execution_mode=invalid.execution_mode,
+                issuer_trust_domain=invalid.issuer_trust_domain,
+            ):
+                decision = self.qualify(
+                    QualificationLevel.SUPERIORITY,
+                    production_receipts() + (invalid,) + valid[1:],
+                )
+                self.assertFalse(decision.qualified)
+                self.assertEqual(
+                    QualificationDisposition.QUARANTINE,
+                    decision.disposition,
+                )
+                self.assertIn(invalid.receipt_id, decision.rejected_receipt_ids)
+                self.assertTrue(
+                    any(expected_failure in item for item in decision.failures)
+                )
+
+    def test_one_comparator_or_nonrepeated_receipts_cannot_reach_superiority(
+        self,
+    ) -> None:
         one_comparator = (
             receipt(EvidenceKind.SUPERIORITY, 20),
             receipt(EvidenceKind.SUPERIORITY, 21),
@@ -366,9 +436,7 @@ class QualificationTests(unittest.TestCase):
                     production_receipts() + comparisons,
                 )
                 self.assertFalse(decision.qualified)
-                self.assertEqual(
-                    QualificationDisposition.DEFER, decision.disposition
-                )
+                self.assertEqual(QualificationDisposition.DEFER, decision.disposition)
                 self.assertEqual(QualificationLevel.PRODUCTION, decision.achieved_level)
 
     def test_unequal_budget_or_self_comparison_quarantines_superiority(self) -> None:
