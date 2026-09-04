@@ -1,0 +1,19 @@
+{
+  "allowed_write_paths": [
+    "src/inventory/totals.py"
+  ],
+  "baseline_public_outcome_digest": "sha256:678bcd1211fe1979e5c5bc38be0ede7cfc037a1565ade8073cf221b54a8d554f",
+  "baseline_tree_digest": "sha256:4a33a7a41631e49fa60c15f8f3d9bccb2501eb8c762f30af4ce478beb00b8d0d",
+  "hidden_check_digest": "sha256:981f6021a609562be0e6336668fba105ea99fa56747396c1eef1bf9299759923",
+  "max_attempts": 2,
+  "objective": "Aggregate quantities for each SKU across the complete input, including non-adjacent repeats, without losing other SKUs.",
+  "public_check_digest": "sha256:37958fdff08627ee092d06fe3cb2fbb89f3d31b5d36f174ea9b9a33be25d04e6",
+  "public_test_paths": [
+    "tests/test_inventory.py"
+  ],
+  "qualification": "deterministic-test-double-only-not-provider-or-production-qualified",
+  "schema_version": 2,
+  "shape": "nested-package-whole-input-aggregation",
+  "task_contract_digest": "sha256:cd09d7733a4ec91ad05714f1af9f3aa2ab12686fd1bddf7e7fde699d5e3f8d74",
+  "task_id": "inventory-aggregation"
+}

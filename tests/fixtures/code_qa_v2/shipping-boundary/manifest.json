@@ -1,0 +1,19 @@
+{
+  "allowed_write_paths": [
+    "shipping.py"
+  ],
+  "baseline_public_outcome_digest": "sha256:351867997511449e1144140e561cc659df0dd8c21d3ac21e104f2f603a8764aa",
+  "baseline_tree_digest": "sha256:f86cdf44f8ad866036bccafa4c60b370c006d6be8c39c5001e11f28e98c0b217",
+  "hidden_check_digest": "sha256:0bb6adf2e0f2beff37063be071f31b839904e97f9300daffe797a0dbb05eff23",
+  "max_attempts": 2,
+  "objective": "Classify every non-negative weight from 0 through 10 inclusive as parcel and every other integer as freight.",
+  "public_check_digest": "sha256:746f7ec985c15b8ec33dc5520b0e93fe48dfcaf30b2aa821d2306231d74e3195",
+  "public_test_paths": [
+    "tests/test_shipping.py"
+  ],
+  "qualification": "deterministic-test-double-only-not-provider-or-production-qualified",
+  "schema_version": 2,
+  "shape": "single-module-boundary-classification",
+  "task_contract_digest": "sha256:51925627f33e0c946b4234b78a8e180b724c6552a5151950813df07819b2e9e9",
+  "task_id": "shipping-boundary"
+}

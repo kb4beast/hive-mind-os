@@ -1,0 +1,103 @@
+{
+  "bundle_digest": "sha256:bc6ba5b4481e926d1bc327b7eacb56d41fd037f10eb7396b9826fa8c3f6f0dd9",
+  "corpus_id": "code-qa-v2-bounded-three-shape-corpus",
+  "directories": [
+    "inventory-aggregation",
+    "inventory-aggregation/repository",
+    "inventory-aggregation/repository/src",
+    "inventory-aggregation/repository/src/inventory",
+    "inventory-aggregation/repository/tests",
+    "shipping-boundary",
+    "shipping-boundary/repository",
+    "shipping-boundary/repository/tests",
+    "tag-parser",
+    "tag-parser/repository",
+    "tag-parser/repository/tests"
+  ],
+  "evaluator_id": "code-qa-corpus-v2-deterministic-local-evaluator",
+  "evaluator_implementation_digest": "sha256:8235f41349ce251847ea4e5b4f0c457790d750bc48978c4e168ce4934e6ac79a",
+  "inventory": [
+    {
+      "bytes": 1001,
+      "path": "inventory-aggregation/manifest.json",
+      "sha256": "sha256:445b44c92d7bb32914d6c90c2f708a7e9011fb03e07cb79f7a30376cfb169d2f"
+    },
+    {
+      "bytes": 61,
+      "path": "inventory-aggregation/repository/src/inventory/__init__.py",
+      "sha256": "sha256:1d917eefd3d823d92fb8837fa962ca8918bff7ddabbc361a5b3bd6f2a12453f7"
+    },
+    {
+      "bytes": 120,
+      "path": "inventory-aggregation/repository/src/inventory/totals.py",
+      "sha256": "sha256:bcea8dca2a869d1230bfcb7769ef7b3c0b084c3a40c7134a15280fca2144c543"
+    },
+    {
+      "bytes": 168,
+      "path": "inventory-aggregation/repository/tests/test_inventory.py",
+      "sha256": "sha256:091bd329a0f024dc6afa254895f000e77cc8611e49aee66d7f1b74d2dde0cd7d"
+    },
+    {
+      "bytes": 383,
+      "path": "inventory-aggregation/sealed-check.json",
+      "sha256": "sha256:a33f0aa852eb0844a4da3e87b35bff520f1c0986b753c243bb82e0e3a3e48137"
+    },
+    {
+      "bytes": 972,
+      "path": "shipping-boundary/manifest.json",
+      "sha256": "sha256:df6730daf866eed558976fe672df4baa0ca0645e8fee1d255bef22eed985275a"
+    },
+    {
+      "bytes": 88,
+      "path": "shipping-boundary/repository/shipping.py",
+      "sha256": "sha256:5b88b6b905d2d39ab7928548d77527aaaa82c74000daeff04702b5bfca49a36a"
+    },
+    {
+      "bytes": 139,
+      "path": "shipping-boundary/repository/tests/test_shipping.py",
+      "sha256": "sha256:d7f38ed78d46ecf6965f876de76d45fecf3c0a72e6bdeac45cf5703f806ec661"
+    },
+    {
+      "bytes": 373,
+      "path": "shipping-boundary/sealed-check.json",
+      "sha256": "sha256:3111f9260183c3106d904ec6d19817faebdf9077955b2b1c0c564ec54b3d12d4"
+    },
+    {
+      "bytes": 970,
+      "path": "tag-parser/manifest.json",
+      "sha256": "sha256:b9d543d5e77bc2d279b67449fcb20d40eb5ec9a07ce046a26e398e2ee7fd46bd"
+    },
+    {
+      "bytes": 67,
+      "path": "tag-parser/repository/tag_parser.py",
+      "sha256": "sha256:0c5965b944c93e789bfe5ef9ac3d32a62c789fb933d62291fae98d11bbd3065d"
+    },
+    {
+      "bytes": 152,
+      "path": "tag-parser/repository/tests/test_tag_parser.py",
+      "sha256": "sha256:ae3649602e9e3a5b6a6500c8aa5d29c38952e622aef26bb106f209114248ad29"
+    },
+    {
+      "bytes": 365,
+      "path": "tag-parser/sealed-check.json",
+      "sha256": "sha256:17920b6e42667ca6dd0fb7634a4d7d7e62e6da46934b3f81478a0efd213b00a0"
+    }
+  ],
+  "qualification": "deterministic-test-double-only-not-provider-or-production-qualified",
+  "schema_version": 2,
+  "tasks": [
+    {
+      "task_contract_digest": "sha256:cd09d7733a4ec91ad05714f1af9f3aa2ab12686fd1bddf7e7fde699d5e3f8d74",
+      "task_id": "inventory-aggregation"
+    },
+    {
+      "task_contract_digest": "sha256:51925627f33e0c946b4234b78a8e180b724c6552a5151950813df07819b2e9e9",
+      "task_id": "shipping-boundary"
+    },
+    {
+      "task_contract_digest": "sha256:b01ab34544f3c4211dfef9cc611a28b54937231230ace3cc31fc513f39b5a234",
+      "task_id": "tag-parser"
+    }
+  ],
+  "trust_model": "unsandboxed-same-os-authority-local-development"
+}

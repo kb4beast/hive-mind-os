@@ -1,0 +1,7 @@
+{
+  "checker_id": "inventory-non-adjacent-duplicates",
+  "hidden_check_digest": "sha256:981f6021a609562be0e6336668fba105ea99fa56747396c1eef1bf9299759923",
+  "program": "from src.inventory.totals import total_by_sku; assert total_by_sku([('A', 1), ('B', 4), ('A', 2)]) == {'A': 3, 'B': 4}; assert total_by_sku([]) == {}",
+  "schema_version": 2,
+  "task_id": "inventory-aggregation"
+}

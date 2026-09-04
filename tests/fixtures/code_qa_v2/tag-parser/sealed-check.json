@@ -1,0 +1,7 @@
+{
+  "checker_id": "tag-parser-whitespace-and-empty-fields",
+  "hidden_check_digest": "sha256:6a5e42097628572a0815e7c5b41de07d7a4c88144f1a69bff5a4a566c370712d",
+  "program": "from tag_parser import parse_tags; assert parse_tags(' red,\\tblue,, green ') == ['red', 'blue', 'green']; assert parse_tags(' , ') == []",
+  "schema_version": 2,
+  "task_id": "tag-parser"
+}

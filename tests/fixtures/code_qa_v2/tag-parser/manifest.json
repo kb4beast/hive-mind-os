@@ -1,0 +1,19 @@
+{
+  "allowed_write_paths": [
+    "tag_parser.py"
+  ],
+  "baseline_public_outcome_digest": "sha256:ad8a8995ce0d7f9b9deee99ccd0c5ac3a97935b596212468878a00ba4625fe71",
+  "baseline_tree_digest": "sha256:0d7835c5ee95dede902301cf8620f37af62f76c7aa7137f68233691b31092aba",
+  "hidden_check_digest": "sha256:6a5e42097628572a0815e7c5b41de07d7a4c88144f1a69bff5a4a566c370712d",
+  "max_attempts": 2,
+  "objective": "Parse comma-separated tags by trimming all surrounding whitespace and dropping empty fields while preserving order.",
+  "public_check_digest": "sha256:250b23fea9dcaa24351d4a71582bed4a8aa7a6609cfc89d928fde874b3a63ada",
+  "public_test_paths": [
+    "tests/test_tag_parser.py"
+  ],
+  "qualification": "deterministic-test-double-only-not-provider-or-production-qualified",
+  "schema_version": 2,
+  "shape": "flat-module-token-normalization",
+  "task_contract_digest": "sha256:b01ab34544f3c4211dfef9cc611a28b54937231230ace3cc31fc513f39b5a234",
+  "task_id": "tag-parser"
+}

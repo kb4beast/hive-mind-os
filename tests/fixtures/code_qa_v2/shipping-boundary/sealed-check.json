@@ -1,0 +1,7 @@
+{
+  "checker_id": "shipping-complete-range",
+  "hidden_check_digest": "sha256:0bb6adf2e0f2beff37063be071f31b839904e97f9300daffe797a0dbb05eff23",
+  "program": "from shipping import shipping_tier; assert [shipping_tier(value) for value in (-1, 0, 5, 10, 11)] == ['freight', 'parcel', 'parcel', 'parcel', 'freight']",
+  "schema_version": 2,
+  "task_id": "shipping-boundary"
+}
