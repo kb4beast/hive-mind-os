@@ -1,4 +1,4 @@
-"""Shared, DAG-free contracts for independently implemented agents."""
+"""Shared contracts for independently implemented agents."""
 
 from __future__ import annotations
 

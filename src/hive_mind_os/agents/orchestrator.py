@@ -19,6 +19,6 @@ class OrchestratorAgent(Agent):
     capabilities = RoleCapabilities(
         ("query_state", "plan", "request_human_gate"),
         ("write", "accept", "verify", "merge", "policy_change"),
-        ("objective_dag", "risk_register", "budget_allocation", "stop_conditions"),
+        ("objective_plan", "risk_register", "budget_allocation", "stop_conditions"),
     )
     next_role = Role.EXPLORER

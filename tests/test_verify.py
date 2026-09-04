@@ -153,6 +153,17 @@ class StandaloneVerificationTests(unittest.TestCase):
         )
         verification.verify_bundle(report.report_path.parent)
 
+    def test_rejects_a_candidate_that_introduces_hivemind_orchestration(self) -> None:
+        (self.repository / "app.py").write_text(
+            "from hive_mind_os.dag_executor import DagExecutor\n\n"
+            "def value() -> int:\n    return 2\n",
+            encoding="utf-8",
+        )
+        self._commit("introduce forbidden orchestration dependency", "app.py")
+
+        with self.assertRaisesRegex(VerificationError, "independent of HiveMind"):
+            self._verify(self._specification())
+
     def test_executes_only_the_immutable_candidate_not_dirty_or_untracked_source_bytes(self) -> None:
         (self.repository / "app.py").write_text(
             "def value() -> int:\n    return 999\n", encoding="utf-8"

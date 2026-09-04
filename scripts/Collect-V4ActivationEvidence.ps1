@@ -574,6 +574,10 @@ if not successful:
         [string]$manifest.candidate_base.commit -ceq $candidateBaseObservedCommit -and
         [string]$manifest.candidate_base.tree -ceq $candidateBaseObservedTree
     )
+    $branchIsCodex = (
+        $branch -is [string] -and
+        $branch.StartsWith('codex/', [System.StringComparison]::Ordinal)
+    )
     $planMatches = (
         [string]$manifest.plan.sha256 -ceq $planSha256 -and
         [int]$manifest.plan.node_count -eq @($plan.nodes).Count -and
@@ -611,7 +615,7 @@ if not successful:
         $candidateBaseMatches -and
         $planMatches -and
         $inertManifest -and
-        $branch.StartsWith('codex/', [System.StringComparison]::Ordinal)
+        $branchIsCodex
     )
     $capturedAt = [DateTime]::UtcNow.ToString('o')
 
