@@ -362,6 +362,84 @@ class ExecutableDagRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIs(NodeStatus.SUCCEEDED, result.receipt_for("06-integrator").status)
 
+    async def test_ordered_node_cannot_write_into_future_integrator_workspace(
+        self,
+    ) -> None:
+        valid = plan()
+        builder = next(node for node in valid.nodes if node.role == "builder")
+        integrator = next(node for node in valid.nodes if node.role == "integrator")
+        ordered_integrator = replace(
+            integrator,
+            dependencies=(builder.node_id,),
+            required_artifacts=(
+                ArtifactRequirement(
+                    builder.node_id,
+                    builder.produces.schema_id,
+                    builder.produces.schema_version,
+                ),
+            ),
+        )
+        ordered_plan = plan(
+            nodes=tuple(
+                ordered_integrator if node.role == "integrator" else node
+                for node in valid.nodes
+            )
+        )
+        registry = handlers()
+
+        def contaminate_integrator(context: SpecialistContext) -> SpecialistResult:
+            context.write_text("output.txt", "bounded output\n")
+            (context.workspaces_root / "06-integrator" / "foreign.txt").write_text(
+                "misattributed builder output\n", encoding="utf-8"
+            )
+            return SpecialistResult({"role": "builder"}, True, "native:builder")
+
+        registry["builder"] = contaminate_integrator
+        with tempfile.TemporaryDirectory() as temporary:
+            result = await ExecutableDagRuntime(
+                temporary, candidate_digest=CANDIDATE
+            ).run(ordered_plan, registry)
+
+        builder_receipt = result.receipt_for("04-builder")
+        self.assertIs(NodeStatus.FAILED, builder_receipt.status)
+        self.assertEqual("WorkspaceViolation", builder_receipt.error_type)
+        self.assertIn("06-integrator", builder_receipt.error_message or "")
+        for node_id in ("05-curator", "06-integrator", "08-optimizer"):
+            self.assertIs(NodeStatus.BLOCKED, result.receipt_for(node_id).status)
+        self.assertIs(NodeStatus.SUCCEEDED, result.receipt_for("07-steward").status)
+
+    async def test_unordered_ready_peers_may_write_their_own_workspaces(
+        self,
+    ) -> None:
+        valid = plan()
+        peer_plan = plan(
+            nodes=tuple(
+                replace(node, write_scope=("peer.txt",))
+                if node.role == "integrator"
+                else node
+                for node in valid.nodes
+            )
+        )
+        registry = handlers(delays={"builder": 0.03})
+
+        async def write_peer_workspace(
+            context: SpecialistContext,
+        ) -> SpecialistResult:
+            await asyncio.sleep(0.01)
+            context.write_text("peer.txt", "independent peer output\n")
+            await asyncio.sleep(0.03)
+            return SpecialistResult({"role": "integrator"}, True, "native:integrator")
+
+        registry["integrator"] = write_peer_workspace
+        with tempfile.TemporaryDirectory() as temporary:
+            result = await ExecutableDagRuntime(
+                temporary, candidate_digest=CANDIDATE
+            ).run(peer_plan, registry)
+
+        self.assertIs(NodeStatus.SUCCEEDED, result.receipt_for("04-builder").status)
+        self.assertIs(NodeStatus.SUCCEEDED, result.receipt_for("06-integrator").status)
+        self.assertGreaterEqual(result.max_observed_parallelism, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ every receipt.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import os
 import re
@@ -567,6 +568,15 @@ class ExecutableDagRuntime:
             raise DagValidationError("runtime requires a validated DagPlan")
         by_id = {node.node_id: node for node in plan.nodes}
         order = plan.topological_order
+        ancestors = _ancestor_sets(by_id, order)
+        ordered_workspace_ids = {
+            node_id: frozenset(
+                other_id
+                for other_id in by_id
+                if other_id in ancestors[node_id] or node_id in ancestors[other_id]
+            )
+            for node_id in by_id
+        }
         receipts: dict[str, NodeReceipt] = {}
         artifacts: dict[str, StoredArtifact] = {}
         saved = dict(self._completed.get(plan.digest, {}))
@@ -625,6 +635,7 @@ class ExecutableDagRuntime:
                     handlers,
                     artifacts,
                     allowed_workspace_ids=frozenset(by_id),
+                    ordered_workspace_ids=ordered_workspace_ids[node.node_id],
                 )
             finally:
                 active -= 1
@@ -739,6 +750,7 @@ class ExecutableDagRuntime:
         artifacts: Mapping[str, StoredArtifact],
         *,
         allowed_workspace_ids: frozenset[str],
+        ordered_workspace_ids: frozenset[str],
     ) -> _Attempt:
         workspace = (self.workspaces_root / node.node_id).resolve()
         inputs = {
@@ -757,6 +769,7 @@ class ExecutableDagRuntime:
             _unexpected_workspace_entries(self.workspaces_root, allowed_workspace_ids)
         )
         run_entries_before = frozenset(_unexpected_run_entries(self.run_root))
+        ordered_before = _workspace_states(self.workspaces_root, ordered_workspace_ids)
         try:
             handler = _resolve_handler(handlers, node.role)
             result = await asyncio.wait_for(
@@ -789,7 +802,15 @@ class ExecutableDagRuntime:
                 for value in _unexpected_run_entries(self.run_root)
                 if value not in run_entries_before
             )
-            if outside or unexpected or run_escapes:
+            ordered_after = _workspace_states(
+                self.workspaces_root, ordered_workspace_ids
+            )
+            ordered_mutations = tuple(
+                node_id
+                for node_id in sorted(ordered_workspace_ids)
+                if ordered_before[node_id] != ordered_after[node_id]
+            )
+            if outside or unexpected or run_escapes or ordered_mutations:
                 details = []
                 if outside:
                     details.append("out-of-scope paths: " + ", ".join(outside))
@@ -797,6 +818,11 @@ class ExecutableDagRuntime:
                     details.append("workspace-root escapes: " + ", ".join(unexpected))
                 if run_escapes:
                     details.append("run-root escapes: " + ", ".join(run_escapes))
+                if ordered_mutations:
+                    details.append(
+                        "dependency-ordered workspace mutations: "
+                        + ", ".join(ordered_mutations)
+                    )
                 raise WorkspaceViolation("; ".join(details))
             return _Attempt(node, result, written_paths)
         except BaseException as error:
@@ -1036,6 +1062,79 @@ def _snapshot_workspace(root: Path) -> tuple[str, ...]:
                 raise WorkspaceViolation("node workspace contains a non-regular file")
             files.append(normalize_portable_path(path.relative_to(root).as_posix()))
     return tuple(sorted(files))
+
+
+def _workspace_states(
+    workspaces_root: Path, workspace_ids: frozenset[str]
+) -> dict[str, str]:
+    """Fingerprint ordered workspaces without treating ready peers as violations.
+
+    This closes cooperative cross-node attribution gaps, including content edits
+    to an existing file.  It remains an observation boundary rather than an OS
+    sandbox: hostile code could race observation or mutate paths outside the run.
+    """
+
+    states: dict[str, str] = {}
+    for workspace_id in sorted(workspace_ids):
+        try:
+            states[workspace_id] = _workspace_state_digest(
+                workspaces_root / workspace_id
+            )
+        except WorkspaceViolation as error:
+            raise WorkspaceViolation(
+                f"dependency-ordered workspace {workspace_id}: {error}"
+            ) from error
+        except OSError as error:
+            raise WorkspaceViolation(
+                f"dependency-ordered workspace {workspace_id} could not be inspected"
+            ) from error
+    return states
+
+
+def _workspace_state_digest(root: Path) -> str:
+    if not os.path.lexists(root):
+        return canonical_digest({"state": "missing"})
+    if _is_reparse_or_link(root):
+        raise WorkspaceViolation("workspace cannot be a link or reparse point")
+    if not root.is_dir():
+        raise WorkspaceViolation("workspace must be a directory")
+
+    entries: list[dict[str, object]] = []
+    for current, directories, names in os.walk(root, topdown=True, followlinks=False):
+        current_path = Path(current)
+        directories.sort()
+        names.sort()
+        for name in directories:
+            directory = current_path / name
+            if _is_reparse_or_link(directory):
+                raise WorkspaceViolation("workspace contains a link or reparse point")
+            entries.append(
+                {
+                    "kind": "directory",
+                    "path": normalize_portable_path(
+                        directory.relative_to(root).as_posix()
+                    ),
+                }
+            )
+        for name in names:
+            path = current_path / name
+            if _is_reparse_or_link(path) or not path.is_file():
+                raise WorkspaceViolation("workspace contains a non-regular file")
+            digest = hashlib.sha256()
+            size = 0
+            with path.open("rb") as stream:
+                while chunk := stream.read(1024 * 1024):
+                    size += len(chunk)
+                    digest.update(chunk)
+            entries.append(
+                {
+                    "kind": "file",
+                    "path": normalize_portable_path(path.relative_to(root).as_posix()),
+                    "size": size,
+                    "digest": f"sha256:{digest.hexdigest()}",
+                }
+            )
+    return canonical_digest({"state": "present", "entries": entries})
 
 
 def _unexpected_workspace_entries(
