@@ -84,3 +84,25 @@ class DirectAgentArchitectureTests(unittest.TestCase):
                 context = (*context, result)
 
         asyncio.run(run())
+
+    def test_legacy_tournament_role_behaviors_are_owned_by_direct_classes(self) -> None:
+        """Retain role semantics without restoring the retired tournament runtime."""
+
+        expected_obligations = {
+            Role.ORCHESTRATOR: {"objective decomposition", "budget allocation", "stop conditions"},
+            Role.EXPLORER: {"repository inspection", "evidence map", "non-mutating discovery"},
+            Role.ARCHITECT: {"interfaces", "migration", "rollback"},
+            Role.BUILDER: {"bounded implementation", "executable tests", "typed effect intents"},
+            Role.CURATOR: {"exact candidate", "independent verification", "non-mutating review"},
+            Role.INTEGRATOR: {"versioned contracts", "compatibility", "repair routing"},
+            Role.STEWARD: {"health", "recovery", "operational readiness"},
+            Role.OPTIMIZER: {"measure outcomes", "held-out evaluation", "challenger proposal"},
+        }
+        implementations = {agent_type.role: agent_type for agent_type in AGENT_TYPES}
+
+        self.assertEqual(set(implementations), set(expected_obligations))
+        for role, obligations in expected_obligations.items():
+            self.assertTrue(
+                obligations <= set(implementations[role].contract.readiness_obligations),
+                role.value,
+            )

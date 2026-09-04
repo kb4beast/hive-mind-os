@@ -23,6 +23,7 @@ class BuilderAgent(Agent):
             "comment_pull_request",
         ),
         ("tests pass", "change is traceable to the objective"),
+        ("bounded implementation", "executable tests", "typed effect intents"),
     )
     capabilities = RoleCapabilities(
         ("request_isolated_write", "request_command", "request_branch_commit"),

@@ -15,6 +15,7 @@ class StewardAgent(Agent):
         ("health report", "maintenance change", "operational runbook"),
         ("inspect_runtime", "manage_dependencies", "write_workspace", "run_tests"),
         ("system remains recoverable", "maintenance reduces measured risk"),
+        ("health", "recovery", "operational readiness"),
     )
     capabilities = RoleCapabilities(
         ("read_runtime_state", "request_recovery_test", "propose_maintenance_work"),

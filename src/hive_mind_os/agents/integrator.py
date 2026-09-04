@@ -15,6 +15,7 @@ class IntegratorAgent(Agent):
         ("integration contract", "compatibility result", "data lineage"),
         ("inspect_interfaces", "write_adapters", "run_contract_tests"),
         ("contracts are versioned", "provenance is preserved"),
+        ("versioned contracts", "compatibility", "repair routing"),
     )
     capabilities = RoleCapabilities(
         ("read", "request_contract_test", "request_builder_work"),

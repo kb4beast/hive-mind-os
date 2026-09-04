@@ -15,6 +15,7 @@ class OrchestratorAgent(Agent):
         ("objective decomposition", "execution plan", "risk register"),
         ("read_repository", "query_agents", "create_work_items"),
         ("acceptance criteria are testable", "dependencies are explicit"),
+        ("objective decomposition", "budget allocation", "stop conditions"),
     )
     capabilities = RoleCapabilities(
         ("query_state", "plan", "request_human_gate"),

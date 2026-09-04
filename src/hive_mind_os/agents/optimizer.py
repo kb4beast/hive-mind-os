@@ -15,6 +15,7 @@ class OptimizerAgent(Agent):
         ("metrics", "experiment result", "improvement proposal"),
         ("query_ledger", "run_evaluations", "run_commands", "propose_skill_change"),
         ("improvement beats baseline", "regressions stay within budget"),
+        ("measure outcomes", "held-out evaluation", "challenger proposal"),
     )
     capabilities = RoleCapabilities(
         ("query_ledger", "request_held_out_experiment", "register_candidate"),

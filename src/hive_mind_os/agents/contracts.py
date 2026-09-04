@@ -16,6 +16,7 @@ class RoleContract:
     required_outputs: tuple[str, ...]
     default_capabilities: tuple[str, ...]
     quality_gates: tuple[str, ...]
+    readiness_obligations: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

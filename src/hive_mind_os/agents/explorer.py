@@ -21,6 +21,7 @@ class ExplorerAgent(Agent):
             "run_commands",
         ),
         ("problem is evidence-backed", "alternatives were considered"),
+        ("repository inspection", "evidence map", "non-mutating discovery"),
     )
     capabilities = RoleCapabilities(
         ("read", "analyze", "request_source_search"),

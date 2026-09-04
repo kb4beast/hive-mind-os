@@ -22,6 +22,7 @@ class CuratorAgent(Agent):
             "security_scan",
         ),
         ("claims have evidence", "critical regressions are absent"),
+        ("exact candidate", "independent verification", "non-mutating review"),
     )
     capabilities = RoleCapabilities(
         ("read_fresh_workspace", "request_test", "inspect_diff"),

@@ -30,6 +30,7 @@ from dag_standard import (  # noqa: E402
     Finding,
     PlanGraph,
     compile_rounds,
+    derived_repo_root,
     dispatch_command_prefix,
     lint_exit_code,
     lint_plan,
@@ -2021,6 +2022,99 @@ class PlanLoadingAndCliTests(unittest.TestCase):
                     ]
                 )
         self.assertEqual((relaxed, strict), (0, 1))
+
+
+class ExternalPlanRepoRootTests(unittest.TestCase):
+    """An external plan must resolve to the repository, not to its own folder.
+
+    A plan installed at ``<root>/.autopilot/plan.json`` names its root by
+    position. A plan filed by its subject, e.g. ``Brain/plans/dags/<subject>/``,
+    does not. Resolving it to its own directory hands every path-existence check
+    a root containing none of the repository, and the scaffold-collision check
+    then reports each *established* directory as a first-time creation contested
+    by whichever nodes write into it: a specific, credible, entirely false
+    finding that fails toward extra work rather than toward a crash.
+    """
+
+    COLLIDING = (
+        node(
+            "ALPHA",
+            write_scope=["tests/suite/test_alpha.py"],
+            file_locks=["tests/suite/test_alpha.py"],
+        ),
+        node(
+            "BETA",
+            write_scope=["tests/suite/test_beta.py"],
+            file_locks=["tests/suite/test_beta.py"],
+        ),
+    )
+
+    @staticmethod
+    def _file_plan(root: Path, *, git: str | None) -> Path:
+        """Write the plan where a subject files it, deep under *root*."""
+
+        if git == "dir":
+            (root / ".git").mkdir()
+        elif git == "file":
+            (root / ".git").write_text("gitdir: /elsewhere/.git/worktrees/w\n")
+        established = root / "tests" / "suite"
+        established.mkdir(parents=True)
+        (established / "__init__.py").write_text("")
+        (established / "conftest.py").write_text("")
+        plan_dir = root / "Brain" / "plans" / "dags" / "subject"
+        plan_dir.mkdir(parents=True)
+        plan_path = plan_dir / "plan.json"
+        plan_path.write_text(
+            json.dumps({"schema_version": 1, "nodes": list(ExternalPlanRepoRootTests.COLLIDING)})
+        )
+        return plan_path
+
+    def test_external_plan_resolves_to_the_enclosing_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            plan_path = self._file_plan(root, git="dir")
+            self.assertEqual(Path(derived_repo_root(plan_path) or "").resolve(), root)
+
+    def test_a_linked_worktree_git_file_counts_as_a_repository_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            plan_path = self._file_plan(root, git="file")
+            self.assertEqual(Path(derived_repo_root(plan_path) or "").resolve(), root)
+
+    def test_established_directories_are_not_contested_scaffolds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            plan_path = self._file_plan(root, git="dir")
+            graph = load_plan_graph(plan_path)
+            resolved = derived_repo_root(plan_path)
+            self.assertEqual(
+                findings_of(graph, "scaffold-collision", repo_root=resolved), ()
+            )
+
+    def test_without_a_repository_the_same_plan_still_reports_the_collision(self) -> None:
+        """The bite proof: the fix must not simply silence the check."""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            plan_path = self._file_plan(root, git=None)
+            graph = load_plan_graph(plan_path)
+            resolved = Path(derived_repo_root(plan_path) or "")
+            self.assertEqual(resolved.resolve(), plan_path.parent.resolve())
+            subjects = {
+                item.subject
+                for item in findings_of(graph, "scaffold-collision", repo_root=resolved)
+            }
+            self.assertIn("tests/suite/__init__.py", subjects)
+
+    def test_an_installed_plan_still_resolves_by_position(self) -> None:
+        """The ``.autopilot/plan.json`` case must be unchanged by the walk-up."""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / ".autopilot").mkdir()
+            plan_path = root / ".autopilot" / "plan.json"
+            plan_path.write_text(json.dumps({"schema_version": 1, "nodes": []}))
+            self.assertEqual(Path(derived_repo_root(plan_path) or "").resolve(), root)
 
 
 if __name__ == "__main__":

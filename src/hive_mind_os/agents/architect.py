@@ -15,6 +15,7 @@ class ArchitectAgent(Agent):
         ("architecture", "interfaces", "threat model", "migration plan"),
         ("read_repository", "model_system", "write_design"),
         ("constraints are satisfied", "failure modes are addressed"),
+        ("interfaces", "migration", "rollback"),
     )
     capabilities = RoleCapabilities(
         ("read", "propose_design_artifact"),

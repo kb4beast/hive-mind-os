@@ -5,7 +5,7 @@ from dataclasses import asdict
 from typing import Any, Sequence
 from uuid import uuid4
 
-from .agents import Agent, AgentBackend, create_agents
+from .agents import Agent, AgentBackend, RoleContract, create_agents
 from .ledger import EvidenceLedger
 from .models import (
     AgentResult,
@@ -18,7 +18,7 @@ from .models import (
     utc_now,
 )
 from .policy import PolicyEngine
-from .roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS, RoleContract
+from .roles import DEFAULT_LIFECYCLE, ROLE_CONTRACTS
 
 
 class DeterministicBackend:
@@ -104,20 +104,21 @@ class HiveKernel:
         )
 
         for role in self.lifecycle:
+            agent = self.agents[role]
             work_item = WorkItem(
                 objective_id=objective.id,
                 role=role,
-                instruction=ROLE_CONTRACTS[role].mission,
+                instruction=agent.contract.mission,
                 dependencies=tuple(result.work_item_id for result in results),
             )
             self.ledger.append_event(
                 run_id, "work.started", role.value, asdict(work_item)
             )
             try:
-                result = await self.agents[role].run(
+                result = await agent.run(
                     work_item, objective, tuple(results)
                 )
-                self._validate_result(role, result)
+                self._validate_result(agent, result)
             except Exception as exc:
                 work_item.status = WorkStatus.FAILED
                 self.ledger.append_event(
@@ -166,14 +167,21 @@ class HiveKernel:
         )
 
     @staticmethod
-    def _validate_result(role: Role, result: AgentResult) -> None:
+    def _validate_result(agent: Agent | Role, result: AgentResult) -> None:
+        """Validate direct runtime results and retain the legacy helper signature."""
+
+        if isinstance(agent, Agent):
+            role = agent.role
+            required = set(agent.contract.required_outputs)
+        else:
+            role = agent
+            required = set(ROLE_CONTRACTS[role].required_outputs)
         if result.role is not role:
             raise ValueError(
                 f"agent returned result for {result.role}, expected {role}"
             )
         if not result.success:
             raise RuntimeError(result.summary)
-        required = set(ROLE_CONTRACTS[role].required_outputs)
         observed = {
             item.summary for item in result.evidence if item.kind == "contract-output"
         }
