@@ -26,6 +26,16 @@ def _tree_digest(root: Path) -> str:
 
 class HiveCortexExplorerTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Explorer rejects every inherited GIT_* variable.  Make the fixture
+        # self-contained so a developer's harmless global setting (for example
+        # GIT_PAGER) does not turn the normal observation tests into accidental
+        # injection tests.  Individual tests introduce hostile variables when
+        # they need to exercise that boundary.
+        self._inherited_git_environment = {
+            key: value for key, value in os.environ.items() if key.upper().startswith("GIT_")
+        }
+        for key in self._inherited_git_environment:
+            os.environ.pop(key, None)
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         subprocess.run(("git", "init", "-q"), cwd=self.root, check=True)
@@ -41,6 +51,10 @@ class HiveCortexExplorerTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+        for key in tuple(os.environ):
+            if key.upper().startswith("GIT_"):
+                os.environ.pop(key, None)
+        os.environ.update(self._inherited_git_environment)
 
     def test_explorer_can_read_history_and_discover_tests_through_receipts(self) -> None:
         text = self.explorer.read_text("notes.txt")
