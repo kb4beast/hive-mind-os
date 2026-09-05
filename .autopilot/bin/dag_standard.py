@@ -42,9 +42,9 @@ import argparse
 import json
 import os
 import re
-from hashlib import sha256
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -874,13 +874,44 @@ def _same_file(first: Path, second: Path) -> bool:
     )
 
 
+def _enclosing_repository_root(start: Path) -> Path | None:
+    """The nearest ancestor of *start* that is a git repository root.
+
+    ``.git`` is a directory in a normal clone and a *file* in a linked worktree,
+    so both shapes count. Returns ``None`` when no ancestor carries one, which
+    is the synthetic-plan case the callers already handle.
+    """
+
+    for candidate in (start, *start.parents):
+        marker = candidate / ".git"
+        if marker.is_dir() or marker.is_file():
+            return candidate
+    return None
+
+
 def derived_repo_root(plan_path: Path | None) -> Path | None:
-    """The repository a plan governs, read off the plan's own location."""
+    """The repository a plan governs, read off the plan's own location.
+
+    A plan installed at ``<root>/.autopilot/plan.json`` names its root by
+    position. An *external* plan does not: it lives wherever its subject filed
+    it, commonly several directories deep (``Brain/plans/dags/<subject>/``).
+    Returning that directory would hand every path-existence check a root that
+    contains none of the repository, which silently inverts their verdicts
+    rather than failing. The scaffold-collision check judges only scaffolds that
+    do not yet exist, so under a wrong root every *established* directory reads
+    as a first-time creation contested by whichever nodes write into it. That is
+    a specific, credible, entirely false finding, and it fails toward extra work
+    instead of toward a crash. So walk up to the enclosing repository instead,
+    and fall back to the plan's own directory only when there is none to find.
+    """
 
     if plan_path is None:
         return None
     if plan_path.parent.name == ".autopilot":
         return plan_path.parent.parent or Path(".")
+    enclosing = _enclosing_repository_root(plan_path.parent)
+    if enclosing is not None:
+        return enclosing
     return plan_path.parent or Path(".")
 
 

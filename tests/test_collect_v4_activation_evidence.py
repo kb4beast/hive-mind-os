@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "Collect-V4ActivationEvidence.ps1"
 PROCESS_RUNNER = ROOT / "scripts" / "V4EvidenceProcess.ps1"
 TERMINAL_RESULT_MARKER = "HIVE_V4_UNITTEST_RESULT_" + ("a" * 32)
+V4_CANDIDATE_COMMIT = "1038b5a7d2eb49904c59957ad3e989af8bb2fcc5"
 EXPECTED_FOCUSED_TEST_COUNTS = {
     "tests.test_adapter_registry": 7,
     "tests.test_ci_contract": 11,
@@ -222,67 +223,97 @@ Get-V4UnittestTerminalResult `
 
     def test_collector_writes_review_evidence_without_authorizing_activation(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
-            output_directory = Path(temporary_directory) / "evidence"
-            environment = os.environ.copy()
-            environment["GIT_PAGER"] = "cat"
-            environment["PYTHONPATH"] = str(ROOT / "missing-poisoned-source")
-            completed = subprocess.run(
+            temporary_root = Path(temporary_directory)
+            candidate_root = temporary_root / "candidate"
+            materialized = subprocess.run(
                 [
-                    "powershell",
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                    str(SCRIPT),
-                    "-OutputDirectory",
-                    str(output_directory),
-                    "-AllowDirty",
+                    "git",
+                    "worktree",
+                    "add",
+                    "--detach",
+                    str(candidate_root),
+                    V4_CANDIDATE_COMMIT,
                 ],
                 cwd=ROOT,
-                env=environment,
                 text=True,
                 capture_output=True,
                 check=False,
             )
-
-            if completed.returncode != 0:
-                focused_output_path = output_directory / "focused-test-output.txt"
-                focused_output = (
-                    focused_output_path.read_text(encoding="utf-8", errors="replace")
-                    if focused_output_path.is_file()
-                    else "<focused transcript was not materialized>"
+            self.assertEqual(0, materialized.returncode, materialized.stderr)
+            candidate_script = candidate_root / "scripts" / SCRIPT.name
+            shutil.copyfile(SCRIPT, candidate_script)
+            output_directory = temporary_root / "evidence"
+            environment = os.environ.copy()
+            environment["GIT_PAGER"] = "cat"
+            environment["PYTHONPATH"] = str(
+                candidate_root / "missing-poisoned-source"
+            )
+            try:
+                completed = subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(candidate_script),
+                        "-OutputDirectory",
+                        str(output_directory),
+                        "-AllowDirty",
+                    ],
+                    cwd=candidate_root,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
                 )
-                self.fail(
-                    completed.stderr
-                    + completed.stdout
-                    + "\n=== RETAINED FOCUSED TRANSCRIPT ===\n"
-                    + focused_output
+                if completed.returncode != 0:
+                    focused_output_path = output_directory / "focused-test-output.txt"
+                    focused_output = (
+                        focused_output_path.read_text(encoding="utf-8", errors="replace")
+                        if focused_output_path.is_file()
+                        else "<focused transcript was not materialized>"
+                    )
+                    self.fail(
+                        completed.stderr
+                        + completed.stdout
+                        + "\n=== RETAINED FOCUSED TRANSCRIPT ===\n"
+                        + focused_output
+                    )
+                evidence = json.loads(
+                    (output_directory / "evidence.json").read_text(encoding="utf-8")
                 )
-            evidence = json.loads(
-                (output_directory / "evidence.json").read_text(encoding="utf-8")
-            )
 
-            self.assertEqual(2, evidence["schema_version"])
-            self.assertFalse(evidence["qualification_eligible"])
-            self.assertFalse(evidence["activation_authorized"])
-            self.assertEqual("CANDIDATE_NOT_AUTHORIZED", evidence["activation_status"])
-            self.assertTrue(evidence["artifacts"]["manifest_plan_matches"])
-            self.assertTrue(evidence["artifacts"]["manifest_inert"])
-            self.assertEqual(13, evidence["artifacts"]["source_count"])
-            self.assertEqual(
-                0, evidence["artifacts"]["unavailable_source_count"]
-            )
-            self.assertEqual(
-                "sha256:27822617648a04965c17a9f3c4161d71d76521518aa58b5c128f916cb2e89132",
-                evidence["artifacts"]["source_intake_sha256"],
-            )
-            self.assertEqual(
-                "sha256:908d82cc7bccea22e37eda43eea28d9d363528b20c6b913014b0fb080c07893c",
-                evidence["artifacts"]["source_archive_sha256"],
-            )
-            self.assertTrue(
-                evidence["artifacts"]["predecessor_receipt_matches_manifest"]
-            )
+                self.assertEqual(2, evidence["schema_version"])
+                self.assertFalse(evidence["qualification_eligible"])
+                self.assertFalse(evidence["activation_authorized"])
+                self.assertEqual("CANDIDATE_NOT_AUTHORIZED", evidence["activation_status"])
+                self.assertTrue(evidence["artifacts"]["manifest_plan_matches"])
+                self.assertTrue(evidence["artifacts"]["manifest_inert"])
+                self.assertEqual(13, evidence["artifacts"]["source_count"])
+                self.assertEqual(
+                    0, evidence["artifacts"]["unavailable_source_count"]
+                )
+                self.assertEqual(
+                    "sha256:27822617648a04965c17a9f3c4161d71d76521518aa58b5c128f916cb2e89132",
+                    evidence["artifacts"]["source_intake_sha256"],
+                )
+                self.assertEqual(
+                    "sha256:908d82cc7bccea22e37eda43eea28d9d363528b20c6b913014b0fb080c07893c",
+                    evidence["artifacts"]["source_archive_sha256"],
+                )
+                self.assertTrue(
+                    evidence["artifacts"]["predecessor_receipt_matches_manifest"]
+                )
+            finally:
+                self.addCleanup(
+                    subprocess.run,
+                    ["git", "worktree", "remove", "--force", str(candidate_root)],
+                    cwd=ROOT,
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                )
             self.assertRegex(evidence["repository"]["head_commit"], r"^[0-9a-f]{40}$")
             self.assertRegex(evidence["repository"]["head_tree"], r"^[0-9a-f]{40}$")
             self.assertTrue(evidence["repository"]["candidate_base_matches_manifest"])
@@ -305,7 +336,7 @@ Get-V4UnittestTerminalResult `
             )
             self.assertTrue(
                 Path(evidence["validation"]["expected_package_path"]).samefile(
-                    ROOT / "src" / "hive_mind_os" / "__init__.py"
+                    candidate_root / "src" / "hive_mind_os" / "__init__.py"
                 )
             )
             expected_module_count = len(EXPECTED_FOCUSED_TEST_COUNTS)
@@ -407,7 +438,7 @@ Get-V4UnittestTerminalResult `
                 evidence["toolchain"]["python_sha256_after"],
             )
             self.assertEqual(
-                os.pathsep.join((str(ROOT / "src"), str(ROOT))),
+                os.pathsep.join((str(candidate_root / "src"), str(candidate_root))),
                 evidence["toolchain"]["child_pythonpath"],
             )
             self.assertTrue(evidence["toolchain"]["child_pythonpath_consistent"])
@@ -440,7 +471,7 @@ Get-V4UnittestTerminalResult `
                 focused_output.count(evidence["validation"]["terminal_result_marker"]),
             )
             self.assertIn(
-                f"BOUND_PACKAGE={ROOT / 'src' / 'hive_mind_os' / '__init__.py'}",
+                f"BOUND_PACKAGE={candidate_root / 'src' / 'hive_mind_os' / '__init__.py'}",
                 focused_output,
             )
             template = json.loads(

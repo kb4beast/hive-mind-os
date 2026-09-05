@@ -353,6 +353,19 @@ class GitAdapterTests(unittest.TestCase):
         )
         self.assertFalse(verify_delivery(delivery.root, self.fixture.root))
 
+    def test_export_rejects_a_new_hivemind_orchestration_dependency(self) -> None:
+        workspace = self.workspace()
+        workspace.create_branch("phase/no-orchestration-leak")
+        workspace.write_file(
+            "tiny_pkg/maths.py",
+            b"from hive_mind_os.dag_executor import DagExecutor\n\n"
+            b"def increment(value: int) -> int:\n    return value + 1\n",
+        )
+        workspace.commit("test: inject orchestration dependency")
+
+        with self.assertRaisesRegex(GitOperationFailed, "independent of HiveMind"):
+            workspace.export_delivery(self.base / "orchestration-leak")
+
     def test_dirty_workspace_cannot_export_delivery(self) -> None:
         workspace = self.workspace()
         workspace.create_branch("phase/dirty")

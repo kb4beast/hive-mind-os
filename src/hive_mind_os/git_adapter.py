@@ -19,6 +19,11 @@ from uuid import uuid4
 
 from .autonomy import EpisodeAllowance
 from .contracts import tool_intent_digest
+from .delivery_boundary import (
+    DeliveryBoundaryError,
+    is_hivemind_source_tree,
+    require_external_delivery_independence,
+)
 from .models import AutonomyLevel, RiskTier, Role
 from .policy import Action, PolicyEngine
 from .receipts import (
@@ -837,6 +842,13 @@ class GitWorkspace:
         ]
         for relative in files:
             portable_path_parts(relative)
+        try:
+            require_external_delivery_independence(
+                self._delivery_source_entries(files),
+                allow_hivemind_runtime_dependencies=is_hivemind_source_tree(self.root),
+            )
+        except DeliveryBoundaryError as error:
+            raise GitOperationFailed(str(error)) from error
         _, bundle = self._run_git(
             ["bundle", "create", "-", self.branch_name],
             Action.READ_REPOSITORY,
@@ -892,6 +904,31 @@ class GitWorkspace:
             diff_digest,
             receipt_snapshot,
         )
+
+    def _delivery_source_entries(
+        self, files: Sequence[str]
+    ) -> tuple[tuple[str, bytes], ...]:
+        """Return current bytes for the changed files that still exist at HEAD."""
+
+        entries: list[tuple[str, bytes]] = []
+        resolved_root = self.root.resolve()
+        for relative in files:
+            parts = portable_path_parts(relative)
+            source = self.root / Path(*parts)
+            if not source.exists():
+                # A deleted path has no delivered source bytes to depend on
+                # orchestration.  Its deletion remains bound by the patch.
+                continue
+            if source.is_symlink() or path_traverses_link_or_reparse_point(source):
+                raise GitOperationFailed("delivery source traverses a link or reparse point")
+            try:
+                source.resolve().relative_to(resolved_root)
+                entries.append((relative, source.read_bytes()))
+            except (OSError, ValueError) as error:
+                raise GitOperationFailed(
+                    f"delivery source cannot be read safely: {relative}"
+                ) from error
+        return tuple(entries)
 
     def _copy_delivery_evidence(
         self,

@@ -23,6 +23,11 @@ from .acceptance import AcceptanceSpecification
 from .autonomy import AutonomyBudget
 from .contracts import tool_intent_digest
 from .curator import _is_test_path, _python_test_metrics
+from .delivery_boundary import (
+    DeliveryBoundaryError,
+    is_hivemind_source_tree,
+    require_external_delivery_independence,
+)
 from .ledger import EvidenceLedger
 from .models import RiskTier, Role
 from .receipts import (
@@ -148,6 +153,15 @@ def verify_repository(
         changed_paths = tuple(sorted({path for change in changes for path in change.paths}))
         if not changed_paths:
             raise VerificationError("candidate commit contains no change from its parent")
+        try:
+            require_external_delivery_independence(
+                _candidate_source_entries(candidate_workspace, changed_paths),
+                allow_hivemind_runtime_dependencies=is_hivemind_source_tree(
+                    candidate_workspace
+                ),
+            )
+        except DeliveryBoundaryError as error:
+            raise VerificationError(str(error)) from error
         undeclared_paths = tuple(
             sorted(set(changed_paths) - set(specification.declared_paths))
         )
@@ -651,6 +665,34 @@ def _changes_from_objects(root: Path, base: str, candidate: str) -> tuple[_GitCh
         index += path_count
         changes.append(_GitChange(status=status, paths=tuple(paths)))
     return tuple(changes)
+
+
+def _candidate_source_entries(
+    candidate_workspace: Path, changed_paths: Sequence[str]
+) -> tuple[tuple[str, bytes], ...]:
+    """Read changed candidate bytes without following links or ambient paths."""
+
+    resolved_root = candidate_workspace.resolve()
+    entries: list[tuple[str, bytes]] = []
+    for relative in changed_paths:
+        try:
+            parts = portable_path_parts(relative)
+        except ValueError as error:
+            raise VerificationError(f"candidate has an unsafe source path: {relative}") from error
+        source = candidate_workspace / Path(*parts)
+        if not source.exists():
+            # Deleted files cannot create a newly delivered runtime dependency.
+            continue
+        if source.is_symlink() or path_traverses_link_or_reparse_point(source):
+            raise VerificationError("candidate source traverses a link or reparse point")
+        try:
+            source.resolve().relative_to(resolved_root)
+            entries.append((relative, source.read_bytes()))
+        except (OSError, ValueError) as error:
+            raise VerificationError(
+                f"candidate source cannot be read safely: {relative}"
+            ) from error
+    return tuple(entries)
 
 
 def _analyze_tests(
