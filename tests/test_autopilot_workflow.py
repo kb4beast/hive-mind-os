@@ -370,7 +370,7 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(PortableAutopilotError, "subject must not be empty"):
             run_repository(self.root, subject="  ")
 
-    def test_run_with_installed_controller_requires_a_subject_bound_plan(self) -> None:
+    def test_run_with_installed_controller_dispatches_a_subject_bound_external_plan(self) -> None:
         controller = self.root / ".autopilot" / "bin" / "autopilot.py"
         controller.parent.mkdir(parents=True)
         controller.write_text("raise AssertionError('old controller must not run')\n", encoding="utf-8")
@@ -403,13 +403,20 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
             )
 
         contract = result["execution_contract"]
-        self.assertEqual(contract["kind"], "hive-mind-portable-plan-generation-required-v1")
-        self.assertEqual(contract["outcome"], "PLAN_GENERATION_REQUIRED")
+        self.assertEqual(contract["kind"], "hive-mind-external-plan-generation-contract-v1")
+        self.assertEqual(contract["outcome"], "PLAN_GENERATION_DISPATCHED")
         self.assertEqual(contract["intent"]["intent"], "BUILD_DAG")
         self.assertTrue(contract["intent"]["explicit"])
-        self.assertEqual(contract["tasks"], [])
-        self.assertIsNone(contract["closure_target"])
+        self.assertEqual(1, len(contract["tasks"]))
+        self.assertEqual(contract["tasks"][0]["task_key"], contract["closure_target"])
         self.assertFalse(contract["legacy_plan_reuse_allowed"])
+        self.assertTrue(contract["installed_controller_present"])
+        self.assertEqual(
+            "external_host_workspace",
+            contract["generation_scope"]["orchestration_location"],
+        )
+        self.assertIn("outside the target delivery", contract["tasks"][0]["prompt"])
+        self.assertIn("one-run activation", contract["tasks"][0]["prompt"])
         self.assertEqual(
             contract["request_id"],
             result["initialization"]["request"]["request_id"],
@@ -480,8 +487,8 @@ class PortableAutopilotWorkflowTests(unittest.TestCase):
             self.root.resolve(),
         )
         contract = result["execution_contract"]
-        self.assertEqual(contract["outcome"], "PLAN_GENERATION_REQUIRED")
-        self.assertEqual(contract["tasks"], [])
+        self.assertEqual(contract["outcome"], "PLAN_GENERATION_DISPATCHED")
+        self.assertTrue(contract["tasks"])
 
     def test_run_cli_accepts_a_single_subject_argument(self) -> None:
         args = cli.build_autopilot_parser().parse_args(

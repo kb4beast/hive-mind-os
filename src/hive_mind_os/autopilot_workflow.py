@@ -1122,70 +1122,20 @@ def run_repository(
         "Build and execute the governed Autopilot DAG for the objective: "
         f"{normalized_subject}"
     )
-    if (root / ".autopilot" / "bin" / "autopilot.py").is_file():
-        # An installed controller currently owns a plan that predates this request.
-        # Until request-to-plan generation is authenticated, asking that controller
-        # to "build and execute" can classify subject words as START/CONTINUE/FINISH
-        # and leak tasks from the old plan.  `run` is an explicit new-subject
-        # operation, so fail closed before controller review or invocation.
-        contract: Mapping[str, Any] = {
-            "schema_version": 1,
-            "kind": "hive-mind-portable-plan-generation-required-v1",
-            "repository_id": bootstrap["repository_id"],
-            "request_id": bootstrap["request_id"],
-            "objective_digest": _digest(normalized_subject),
-            "intent": {
-                "intent": "BUILD_DAG",
-                "explicit": True,
-                "confidence": "high",
-                "reasons": [
-                    "autopilot run explicitly requires a plan generated for its persisted subject"
-                ],
-            },
-            "operator_request": normalized_subject,
-            "target_branch": bootstrap["target_branch"],
-            "tasks": [],
-            "closure_target": None,
-            "outcome": "PLAN_GENERATION_REQUIRED",
-            "successful": False,
-            "quiescent": False,
-            "legacy_plan_reuse_allowed": False,
-            "successor_requirements": {
-                "authenticated_plan_generation": True,
-                "required_bindings": [
-                    "repository_id",
-                    "request_id",
-                    "objective_digest",
-                    "generated_plan_digest",
-                    "plan_generation_id",
-                ],
-                "independent_validation": True,
-                "execution_gate": (
-                    "execute only the independently validated generated plan whose "
-                    "authenticated bindings exactly match this request"
-                ),
-                "resume_rule": (
-                    "resume only by the matching plan_generation_id; never fall back to "
-                    "the installed legacy plan"
-                ),
-            },
-            "blocker": (
-                "authenticated request-to-plan generation is not implemented; the installed "
-                "controller plan is not evidence for this subject"
-            ),
-            "stop_condition": (
-                "a new independently validated plan generation is authenticated and bound "
-                "to this repository, request, and objective digest"
-            ),
-        }
-        contract = {**contract, "contract_id": _canonical_contract_id(contract)}
-    else:
-        contract = _uninstalled_contract(
+    # A checked-in controller may own a different subject's historical plan.  A
+    # new subject must never be classified by or resumed through it.  We still
+    # observe the path once for the race-safe decision boundary, but always
+    # dispatch fresh, external orchestration work for this explicit request.
+    _installed_controller_present = (root / ".autopilot" / "bin" / "autopilot.py").is_file()
+    contract = _external_plan_generation_contract(
+        _uninstalled_contract(
             root,
             operation_request,
             explicit_build=True,
             expected_bootstrap=bootstrap,
-        )
+        ),
+        installed_controller_present=_installed_controller_present,
+    )
     return {
         "schema_version": 1,
         "kind": "hive-mind-portable-autopilot-run-v1",
@@ -1264,7 +1214,7 @@ def _uninstalled_contract(
         contract["contract_id"] = "sha256:" + sha256(_canonical_bytes(contract)).hexdigest()
         return contract
     task_prompt = (
-        "Build the governed repository-resident Autopilot DAG described by "
+        "Generate the governed external HiveMind DAG described by "
         ".hive-mind/autopilot-request.json. Work only from request ID "
         f"{request_id} and objective digest {objective_digest}. Before any work, verify "
         "that the persisted request has that exact content-addressed request ID by "
@@ -1276,22 +1226,23 @@ def _uninstalled_contract(
         "not authority to copy or redistribute its wording. Create "
         "machine-readable node contracts, conflict/lock data, release/integration "
         "boundaries, receipts, tests, rollback, and the portable orchestration policy. "
-        "The DAG you build MUST satisfy the DAG authoring standard retained in this "
+        "The DAG you generate MUST satisfy the DAG authoring standard retained in this "
         f"repository at {standard_pin['installed_path']} "
         f"(sha256 {standard_pin['sha256']}, standard version {standard_pin['standard_version']}); "
         "verify those exact bytes before relying on them and fail closed if they differ. "
         "That standard binds node contracts, scaffold ownership, budgeted read scopes, "
         "durability ordering, executable rounds, per-round validation, and prompt-as-contract "
-        "rendering. The generated control plane MUST implement `dag-lint`, and "
-        "`python .autopilot/bin/autopilot.py --repo-root . dag-lint --json` MUST exit zero "
-        "with no errors or warnings against the generated DAG. Do not report success until "
-        "that receipt exists; lint findings must be corrected, never suppressed. "
+        "rendering. Keep the DAG, its receipts, and its execution workspace outside the "
+        "target delivery. Target application code and configuration must not import HiveMind, "
+        "reference HiveMind workspace state, or depend on a DAG plan path. Use the installed "
+        "`hive-mind dag build`, `validate`, and `rounds` interfaces to seal and inspect the "
+        "generated plan; lint findings must be corrected, never suppressed. "
         "Before any push or PR, verify current protected-ref rules and fail closed if they "
         "cannot be established. Target the configured release branch, never a protected "
         "branch. The active host must independently review the clean controller bundle "
-        "and execute it only inside its approved deny-by-default sandbox; checked-in "
-        "provenance alone is not execution trust. Finish the DAG "
-        "bootstrap candidate and independent validation in this durable task."
+        "and execute it only inside its approved deny-by-default sandbox after a separately "
+        "authenticated one-run activation. Checked-in provenance alone is not execution trust. "
+        "Finish external plan generation and independent validation in this durable task."
     )
     contract: dict[str, Any] = {
         "schema_version": 1,
@@ -1332,10 +1283,11 @@ def _uninstalled_contract(
                     }
                 },
                 "prompt": task_prompt,
-                "expected_artifact": "validated repository-resident Autopilot DAG bootstrap PR",
+                "expected_artifact": "validated external HiveMind DAG and activation-preparation packet",
                 "required_receipts": [
-                    "dag-lint --json exit 0 with zero errors and warnings",
-                    "independent validation of the generated control plane",
+                    "canonical plan build, validation, and parallel-round inspection",
+                    "independent validation of the generated external control plane",
+                    "proof that target delivery has no HiveMind or DAG-plan dependency",
                 ],
             }
         ],
@@ -1345,6 +1297,59 @@ def _uninstalled_contract(
     }
     contract["contract_id"] = "sha256:" + sha256(_canonical_bytes(contract)).hexdigest()
     return contract
+
+
+def _external_plan_generation_contract(
+    contract: Mapping[str, Any], *, installed_controller_present: bool
+) -> Mapping[str, Any]:
+    """Turn a fresh-subject bootstrap into an external orchestration dispatch.
+
+    This is intentionally a contract for the active host, not an attempt to run
+    an untrusted target controller.  The host may use the portable DAG runtime
+    to materialize, validate, schedule, and, after external activation, execute
+    the resulting plan.  It may not treat an existing target plan as evidence
+    for the new subject.
+    """
+
+    tasks = contract.get("tasks")
+    if not isinstance(tasks, list) or len(tasks) != 1 or not isinstance(tasks[0], Mapping):
+        raise PortableAutopilotError("fresh plan generation requires one durable task")
+    external = dict(contract)
+    external.update(
+        {
+            "kind": "hive-mind-external-plan-generation-contract-v1",
+            "outcome": "PLAN_GENERATION_DISPATCHED",
+            "successful": False,
+            "legacy_plan_reuse_allowed": False,
+            "installed_controller_present": installed_controller_present,
+            "generation_scope": {
+                "orchestration_location": "external_host_workspace",
+                "target_delivery_must_remain_independent": True,
+                "required_bindings": [
+                    "repository_id",
+                    "request_id",
+                    "objective_digest",
+                    "generated_plan_digest",
+                    "plan_generation_id",
+                ],
+                "independent_validation": True,
+                "execution_gate": (
+                    "execute only an independently validated generated plan with an "
+                    "externally authenticated one-run activation"
+                ),
+                "resume_rule": (
+                    "resume only by the matching plan_generation_id; never fall back to "
+                    "a target-resident historical plan"
+                ),
+            },
+            "stop_condition": (
+                "an externally stored, independently validated plan is bound to this "
+                "repository, request, and objective digest"
+            ),
+        }
+    )
+    external["contract_id"] = _canonical_contract_id(external)
+    return external
 
 
 def inspect_repository(
