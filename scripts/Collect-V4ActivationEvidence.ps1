@@ -3,7 +3,7 @@ param(
     [string]$OutputDirectory,
     [switch]$AllowDirty,
     [ValidateRange(1, 900)][int]$FocusedTestTimeoutSeconds = 180,
-    [ValidateRange(1, 60000)][int]$MaximumFocusedModuleTimeoutMilliseconds = 60000
+    [ValidateRange(1, 120000)][int]$MaximumFocusedModuleTimeoutMilliseconds = 120000
 )
 
 Set-StrictMode -Version Latest

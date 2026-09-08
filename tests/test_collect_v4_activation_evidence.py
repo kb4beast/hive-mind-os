@@ -241,7 +241,9 @@ Get-V4UnittestTerminalResult `
             )
             self.assertEqual(0, materialized.returncode, materialized.stderr)
             candidate_script = candidate_root / "scripts" / SCRIPT.name
+            candidate_process_runner = candidate_root / "scripts" / PROCESS_RUNNER.name
             shutil.copyfile(SCRIPT, candidate_script)
+            shutil.copyfile(PROCESS_RUNNER, candidate_process_runner)
             output_directory = temporary_root / "evidence"
             environment = os.environ.copy()
             environment["GIT_PAGER"] = "cat"
@@ -324,10 +326,10 @@ Get-V4UnittestTerminalResult `
             self.assertEqual(180, evidence["validation"]["timeout_seconds"])
             self.assertEqual(180000, evidence["validation"]["timeout_milliseconds"])
             self.assertEqual(
-                60, evidence["validation"]["maximum_module_timeout_seconds"]
+                120, evidence["validation"]["maximum_module_timeout_seconds"]
             )
             self.assertEqual(
-                60000,
+                120000,
                 evidence["validation"]["maximum_module_timeout_milliseconds"],
             )
             self.assertGreater(evidence["validation"]["duration_milliseconds"], 0)
