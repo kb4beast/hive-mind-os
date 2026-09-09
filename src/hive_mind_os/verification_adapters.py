@@ -205,18 +205,19 @@ def _executable(name: str) -> str | None:
 
 
 def _safe_test_paths(repository: Path, values: Sequence[str], suffixes: set[str]) -> tuple[str, ...]:
+    root = repository.resolve()
     selected: list[str] = []
     for raw in values:
         path = Path(raw.replace("\\", "/"))
         if path.is_absolute() or ".." in path.parts:
             raise VerificationError("verification path escapes the repository")
-        candidate = (repository / path).resolve(strict=False)
-        if not is_within(candidate, repository):
+        candidate = (root / path).resolve(strict=False)
+        if not is_within(candidate, root):
             raise VerificationError("verification path escapes through a filesystem alias")
         if candidate.is_symlink() or (candidate.exists() and candidate.suffix.casefold() in suffixes):
             if candidate.is_symlink():
                 raise VerificationError("verification rejects symlink test paths")
-            selected.append(candidate.relative_to(repository).as_posix())
+            selected.append(candidate.relative_to(root).as_posix())
     return tuple(sorted(set(selected)))
 
 
@@ -314,11 +315,12 @@ class VerificationRegistry:
             raise VerificationError("verification adapter ids must be unique")
 
     def seal(self, repository: Path, selected_paths: Sequence[str] = (), adapter_id: str | None = None) -> SealedCommand | None:
+        root = repository.resolve()
         matches = [adapter for adapter in self.adapters if adapter_id is None or adapter.adapter_id == adapter_id]
         if adapter_id is not None and not matches:
             raise VerificationError("requested verification adapter is not allowlisted")
         for adapter in matches:
-            command = adapter.seal(repository, selected_paths)
+            command = adapter.seal(root, selected_paths)
             if command is not None:
                 return command
         return None
