@@ -323,13 +323,13 @@ Get-V4UnittestTerminalResult `
             self.assertEqual(0, evidence["validation"]["exit_code"])
             self.assertEqual(0, evidence["validation"]["actual_exit_code"])
             self.assertFalse(evidence["validation"]["timed_out"])
-            self.assertEqual(180, evidence["validation"]["timeout_seconds"])
-            self.assertEqual(180000, evidence["validation"]["timeout_milliseconds"])
+            self.assertEqual(900, evidence["validation"]["timeout_seconds"])
+            self.assertEqual(900000, evidence["validation"]["timeout_milliseconds"])
             self.assertEqual(
-                120, evidence["validation"]["maximum_module_timeout_seconds"]
+                300, evidence["validation"]["maximum_module_timeout_seconds"]
             )
             self.assertEqual(
-                120000,
+                300000,
                 evidence["validation"]["maximum_module_timeout_milliseconds"],
             )
             self.assertGreater(evidence["validation"]["duration_milliseconds"], 0)
