@@ -197,7 +197,11 @@ class VerificationAdapter(Protocol):
 
 def _executable(name: str) -> str | None:
     result = shutil.which(name)
-    return str(Path(result).resolve()) if result else None
+    # Preserve the discovered invocation name. Some trusted host tools are
+    # multicall symlinks whose behavior depends on argv[0] (notably rustc ->
+    # rustup on GitHub runners); resolving that link invokes the wrong CLI.
+    # abspath keeps the sealed command explicit without dereferencing it.
+    return os.path.abspath(result) if result else None
 
 
 def _safe_test_paths(repository: Path, values: Sequence[str], suffixes: set[str]) -> tuple[str, ...]:

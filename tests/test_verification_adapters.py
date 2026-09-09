@@ -146,6 +146,10 @@ class VerificationAdapterTests(unittest.TestCase):
             "pub fn answer() -> i32 { 42 }\n#[cfg(test)] mod tests { #[test] fn answer_is_42(){ assert_eq!(super::answer(),42); } }\n",
             encoding="utf-8",
         )
+        command = VerificationRegistry().seal(self.repo, adapter_id="rustc-check")
+        self.assertIsNotNone(command)
+        assert command is not None
+        self.assertEqual("rustc", Path(command.argv[0]).stem)
         receipt = verify_repository(self.repo, evidence_directory=self.root / "rust-evidence", **self.trusted())
         self.assertEqual(
             "PASSED", receipt["status"],
