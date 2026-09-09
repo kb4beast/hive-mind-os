@@ -18,6 +18,7 @@ from hive_mind_os.identity_attestation import (
     IdentityError,
     PinnedAttestationVerifier,
     PrincipalAttestation,
+    principal_attestation_digest,
     verify_role_assignments,
 )
 from hive_mind_os.runtime_contracts import canonical_json_bytes, raw_sha256
@@ -27,11 +28,15 @@ DIGEST = "sha256:" + "a" * 64
 
 
 def attestation(principal: str, role: str, administrator: str, domain: str) -> PrincipalAttestation:
-    digest = raw_sha256(canonical_json_bytes({"principal": principal, "role": role}))
+    credential = raw_sha256((principal + "-credential").encode())
+    expires = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    digest = principal_attestation_digest(
+        principal_id=principal, administrator_id=administrator,
+        trust_domain=domain, credential_digest=credential,
+        roles=(role,), expires_at=expires,
+    )
     return PrincipalAttestation(
-        principal, administrator, domain,
-        raw_sha256((principal + "-credential").encode()), (role,),
-        (datetime.now(UTC) + timedelta(hours=1)).isoformat(), digest,
+        principal, administrator, domain, credential, (role,), expires, digest,
     )
 
 
@@ -75,6 +80,15 @@ class EvidenceCourtTests(unittest.TestCase):
             verify_role_assignments(
                 {"proposer": proposer, "judge": judge}, verifier=verifier,
                 independently_administered=(("proposer", "judge"),),
+            )
+
+    def test_pinned_attestation_fields_cannot_be_substituted(self) -> None:
+        original = attestation("p1", "proposer", "admin-a", "domain-a")
+        with self.assertRaisesRegex(IdentityError, "does not bind"):
+            PrincipalAttestation(
+                original.principal_id, "substituted-admin", original.trust_domain,
+                original.credential_digest, original.roles, original.expires_at,
+                original.attestation_digest,
             )
 
     def test_promotion_is_disabled_without_separate_authenticated_authority(self) -> None:

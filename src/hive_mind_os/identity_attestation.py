@@ -7,7 +7,13 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Mapping, Protocol, Sequence
 
-from .runtime_contracts import require_digest, require_identifier, require_time
+from .runtime_contracts import (
+    canonical_json_bytes,
+    raw_sha256,
+    require_digest,
+    require_identifier,
+    require_time,
+)
 
 
 class IdentityError(ValueError):
@@ -17,6 +23,22 @@ class IdentityError(ValueError):
 class TrustProfile(StrEnum):
     LOCAL_SINGLE_OPERATOR = "local-single-operator"
     INDEPENDENT_PRINCIPALS = "independent-principals"
+
+
+def principal_attestation_digest(
+    *, principal_id: str, administrator_id: str, trust_domain: str,
+    credential_digest: str, roles: Sequence[str], expires_at: str,
+) -> str:
+    """Bind every security-relevant field before an external verifier pins it."""
+
+    return raw_sha256(canonical_json_bytes({
+        "principal_id": principal_id,
+        "administrator_id": administrator_id,
+        "trust_domain": trust_domain,
+        "credential_digest": credential_digest,
+        "roles": list(roles),
+        "expires_at": expires_at,
+    }))
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,8 +61,22 @@ class PrincipalAttestation:
         require_digest(self.credential_digest, "credential_digest")
         require_digest(self.attestation_digest, "attestation_digest")
         require_time(self.expires_at, "attestation expiry")
-        if not self.roles or any(not isinstance(role, str) or not role for role in self.roles):
-            raise IdentityError("attestation roles are required")
+        if (
+            type(self.roles) is not tuple or not self.roles
+            or any(type(role) is not str or not role for role in self.roles)
+            or len(set(self.roles)) != len(self.roles)
+        ):
+            raise IdentityError("attestation roles must be a unique immutable tuple")
+        expected = principal_attestation_digest(
+            principal_id=self.principal_id,
+            administrator_id=self.administrator_id,
+            trust_domain=self.trust_domain,
+            credential_digest=self.credential_digest,
+            roles=self.roles,
+            expires_at=self.expires_at,
+        )
+        if self.attestation_digest != expected:
+            raise IdentityError("attestation digest does not bind its principal fields")
 
 
 class AttestationVerifier(Protocol):
@@ -113,5 +149,5 @@ def verify_role_assignments(
 __all__ = [
     "AttestationVerifier", "IdentityError", "LocalAssertionVerifier",
     "PinnedAttestationVerifier", "PrincipalAttestation", "TrustProfile",
-    "verify_role_assignments",
+    "principal_attestation_digest", "verify_role_assignments",
 ]
