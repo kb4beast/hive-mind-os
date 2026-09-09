@@ -49,8 +49,18 @@ def build_dag_parser() -> argparse.ArgumentParser:
     for name in ("execute", "resume"):
         command = commands.add_parser(name)
         _add_plan_arguments(command)
-        command.add_argument("--activation", required=True)
+        command.add_argument("--activation")
         command.add_argument("--state-directory", required=True)
+        command.add_argument("--runtime", choices=("external", "local"), default="external")
+        command.add_argument("--repository")
+        command.add_argument("--host-directory")
+        command.add_argument("--operator-request-file")
+        command.add_argument("--brain-directory")
+        command.add_argument("--workers", type=int, default=4)
+        command.add_argument("--node-timeout", type=float, default=900)
+        command.add_argument("--worker-mode", choices=("evidence-packet", "direct"), default="evidence-packet")
+        command.add_argument("--refresh-local-host", action="store_true")
+        command.add_argument("--recover-recorded-patch", action="store_true")
     status = commands.add_parser("status")
     status.add_argument("--state-directory", required=True)
     status.add_argument("--run-id")
@@ -167,6 +177,23 @@ def run_dag_command(
                 expected_execution_client_digest=args.expected_execution_client_digest,
             )
             result = {**prepared.to_document(), "text": prepared.text}
+        elif args.dag_command in {"execute", "resume"} and args.runtime == "local":
+            from .local_dag_runtime import LocalTournamentService
+            required = ("repository", "host_directory", "operator_request_file", "brain_directory")
+            if any(not getattr(args, name) for name in required):
+                raise SubjectExecutionError("local execution requires repository, host-directory, operator-request-file and brain-directory")
+            if args.mode != "repository" or args.activation:
+                raise SubjectExecutionError("local repository authority cannot be combined with an external activation")
+            result = LocalTournamentService(worker_mode=args.worker_mode).execute(
+                plan_path=Path(args.plan), standard_path=Path(args.standard),
+                expected_plan_digest=args.expected_plan_digest, repository=Path(args.repository),
+                state_directory=Path(args.state_directory), host_directory=Path(args.host_directory),
+                operator_request_file=Path(args.operator_request_file), brain_directory=Path(args.brain_directory),
+                workers=args.workers, node_timeout=args.node_timeout, resume=args.dag_command == "resume",
+                refresh_local_host=args.refresh_local_host,
+                recover_recorded_patch=args.recover_recorded_patch,
+                expected_request_id=args.expected_request_id, expected_subject_id=args.expected_subject_id,
+            )
         elif args.dag_command in {"execute", "resume", "cancel", "reconcile"}:
             # Raw files cannot become an AuthorizedOneRun merely by being named
             # on a command line. A configured host integration must parse and
@@ -190,7 +217,7 @@ def run_dag_command(
         )
         return 2
     print(json.dumps(result, indent=2, sort_keys=True))
-    return 0
+    return 2 if result.get("status") == "BLOCKED" else 0
 
 
 def main(argv: Sequence[str] | None = None) -> None:

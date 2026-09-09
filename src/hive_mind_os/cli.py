@@ -1823,6 +1823,11 @@ def _run_defer(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "tournament":
+        from .tournament_cli import build_tournament_parser, run_tournament_command
+
+        args = build_tournament_parser().parse_args(arguments[1:])
+        raise SystemExit(run_tournament_command(args))
     if arguments and arguments[0] == "dag":
         from .dag_cli import build_dag_parser, run_dag_command
 

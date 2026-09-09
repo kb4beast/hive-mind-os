@@ -293,7 +293,22 @@ class Courtroom:
 
         if not supporting:
             reasons.append("no supporting exhibit")
-        if case.claim.burden >= BurdenOfProof.DESIGN and not (opposing or opposing_testimony):
+        # A cross-examiner can search for counterexamples and find none. Retain
+        # that evidence as neutral testimony instead of requiring a fabricated
+        # objection. It must come from the assigned cross-examiner and refer to
+        # actual independent exhibits in this case; it adds no support weight.
+        independent_exhibit_ids = {
+            item.id for item in case.exhibits if item.independent
+        }
+        neutral_cross_examination = any(
+            item.actor_id == case.participants.cross_examiner_id
+            and item.stance is EvidenceStance.CONTEXT
+            and set(item.evidence_refs) <= independent_exhibit_ids
+            for item in case.testimony
+        )
+        if case.claim.burden >= BurdenOfProof.DESIGN and not (
+            opposing or opposing_testimony or neutral_cross_examination
+        ):
             reasons.append("no adversarial cross-examination evidence")
 
         if case.claim.burden >= BurdenOfProof.IMPLEMENT:

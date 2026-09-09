@@ -85,20 +85,96 @@ class TournamentPlanFactoryTests(unittest.TestCase):
             expected_subject_id=request().subject_id,
         )
 
-        self.assertEqual("external-all-aspect-tournament-v1", plan.plan_id)
-        self.assertEqual(9, receipt.metrics.node_count)
+        self.assertEqual("external-all-aspect-tournament-v2", plan.plan_id)
+        self.assertEqual(13, receipt.metrics.node_count)
         self.assertEqual(4, receipt.maximum_workers)
         self.assertEqual(
             ("AGENTS-010", "LEARNING-040", "ORCHESTRATION-020", "RUNTIME-030"),
             receipt.rounds[1].node_ids,
         )
-        self.assertEqual(("CHALLENGER-060",), receipt.rounds[3].node_ids)
-        self.assertEqual(("VERIFY-070",), receipt.rounds[4].node_ids)
-        self.assertEqual(("INTEGRATE-080",), receipt.rounds[5].node_ids)
+        self.assertEqual(
+            (
+                ("PROPOSE-042",),
+                ("CROSS-045",),
+                ("REVISE-048",),
+                ("COURT-050",),
+                ("CHALLENGER-060",),
+                ("VERIFY-070",),
+                ("JUDGE-075",),
+                ("INTEGRATE-080",),
+            ),
+            tuple(round_.node_ids for round_ in receipt.rounds[2:]),
+        )
         self.assertFalse(hasattr(plan, "execute"))
         challenger = next(node for node in plan.nodes if node.node_id == "CHALLENGER-060")
         self.assertIn("candidate-workspace", challenger.resource_ids)
         self.assertIn("no Hive Mind workspace or DAG-plan dependency", challenger.acceptance_criteria[1])
+
+    def test_experiment_selection_follows_independent_challenge_and_response(self) -> None:
+        plan = TournamentPlanFactory().build(
+            request(), standard=STANDARD, authority=authority(), evidence=evidence()
+        )
+        nodes = {node.node_id: node for node in plan.nodes}
+        self.assertEqual(("PROPOSE-042",), nodes["CROSS-045"].dependencies)
+        self.assertEqual(("CROSS-045",), nodes["REVISE-048"].dependencies)
+        self.assertEqual(("REVISE-048",), nodes["COURT-050"].dependencies)
+        self.assertEqual(("VERIFY-070",), nodes["JUDGE-075"].dependencies)
+        challenge = " ".join(nodes["CROSS-045"].acceptance_criteria)
+        selection = " ".join(nodes["COURT-050"].acceptance_criteria)
+        judgment = " ".join(nodes["JUDGE-075"].acceptance_criteria)
+        self.assertIn("distinct from its advocate", challenge)
+        self.assertIn("may find no blocking defect", challenge)
+        self.assertIn("material revisions receive independent re-examination", selection)
+        self.assertIn("only at their later applicable stages", selection)
+        self.assertIn("authority gaps still stop", selection)
+        self.assertIn("independent verification receipts", judgment)
+        self.assertIn("multiple pinned comparators", judgment)
+
+    def test_generic_repository_uses_external_workers_and_preserves_idea_history(self) -> None:
+        repository = RepositorySubject(
+            raw_sha256(b"FOO BAR"), "c" * 40, "d" * 40, "feature/customer-value"
+        )
+        subject = SubjectBinding.for_repository(repository)
+        generic = replace(
+            request(),
+            repository_id=repository.repository_id,
+            subject_id=subject.subject_id,
+            parent_commit=repository.commit,
+            parent_tree=repository.tree,
+            target=repository.target_branch,
+        )
+        plan = TournamentPlanFactory().build(
+            generic, standard=STANDARD, authority=authority(), evidence=evidence()
+        )
+        receipt = compile_plan(
+            plan.canonical_bytes(),
+            expected_plan_digest=plan.digest(),
+            standard_bytes=STANDARD.content,
+            expected_request_id=generic.request_id,
+            expected_subject_id=generic.subject_id,
+        )
+        self.assertEqual(subject, plan.subject)
+        self.assertEqual(13, receipt.metrics.node_count)
+        text = plan.canonical_bytes().decode("utf-8")
+        self.assertNotIn("one class per agent file", text)
+        self.assertNotIn("Every constitutional role is inspected as a direct source file", text)
+        nodes = {node.node_id: node for node in plan.nodes}
+        revision = " ".join(nodes["REVISE-048"].acceptance_criteria)
+        brain = " ".join(nodes["INTEGRATE-080"].acceptance_criteria)
+        self.assertIn("stable idea identity and immutable version history", revision)
+        self.assertIn("explicitly linked child idea", revision)
+        self.assertIn("one revision round", revision)
+        self.assertIn("who returned it, why, the receiving role", revision)
+        self.assertIn("even when no challenger is selected", brain)
+        self.assertIn("local Markdown without requiring Obsidian", brain)
+        self.assertEqual(
+            {"orchestrator", "explorer", "architect", "builder", "curator", "integrator", "steward", "optimizer"},
+            {role for node in plan.nodes for role in node.roles},
+        )
+        self.assertEqual(
+            {"discover", "design", "build", "validate", "grow", "maintain", "integrate"},
+            {stage for node in plan.nodes for stage in node.lifecycle_stages},
+        )
 
     def test_factory_seals_a_fresh_plan_without_activating_it(self) -> None:
         factory = TournamentPlanFactory()

@@ -61,7 +61,7 @@ _REQUIRED_DENIED_ACTIONS = frozenset(
 
 
 class TournamentPlanFactory:
-    """Create one standard all-role tournament topology for a fresh request.
+    """Create an all-role tournament with one bounded idea revision round.
 
     The caller supplies the already-pinned standard, evidence, and a
     local-reversible authority envelope.  A raw plan produced here is still only
@@ -88,7 +88,7 @@ class TournamentPlanFactory:
         evidence_inventory = self._evidence_inventory(evidence)
         return PortablePlanBundle(
             schema_version=1,
-            plan_id="external-all-aspect-tournament-v1",
+            plan_id="external-all-aspect-tournament-v2",
             request_id=request.request_id,
             objective_digest=request.objective_digest,
             subject=SubjectBinding.for_repository(repository),
@@ -318,13 +318,14 @@ class TournamentPlanFactory:
         return (
             cls._node(
                 "BASELINE-001",
-                "Seal the exact request, repository snapshot, direct-agent contracts, and constitutional boundaries.",
+                "Seal the exact request, repository snapshot, target contracts, and constitutional boundaries.",
                 (),
                 ("orchestrator", "explorer"),
                 ("discover",),
                 (
                     "The request, subject, target, commit, and tree are retained exactly.",
                     "No historical plan is reused as authority for the fresh objective.",
+                    "The repository identity and selected brain destination are recorded without assuming a Hive Mind source layout.",
                 ),
                 authority_id,
                 evidence_ids,
@@ -332,20 +333,20 @@ class TournamentPlanFactory:
             ),
             cls._node(
                 "AGENTS-010",
-                "Audit direct role ownership and identify only behavior gaps that belong in one class per agent file.",
+                "Inspect the target's behavior, user needs, and ownership to discover concrete improvement opportunities.",
                 ("BASELINE-001",),
                 ("explorer", "curator"),
                 ("discover", "validate"),
                 (
-                    "Every constitutional role is inspected as a direct source file.",
-                    "Direct agent modules contain no DAG import or DAG reference.",
+                    "Findings cite the target's actual source and tests, including repositories without agent classes.",
+                    "Hive Mind's eight worker roles remain external to the target application's architecture.",
                 ),
                 authority_id,
                 evidence_ids,
             ),
             cls._node(
                 "ORCHESTRATION-020",
-                "Audit plan generation, external DAG validation, parallel scheduling, delivery export, and activation boundaries.",
+                "Audit the target's architecture, interfaces, delivery boundaries, and compatibility with external orchestration.",
                 ("BASELINE-001",),
                 ("architect", "integrator"),
                 ("design", "integrate"),
@@ -376,21 +377,68 @@ class TournamentPlanFactory:
                 ("optimizer", "explorer"),
                 ("grow", "discover"),
                 (
-                    "Every proposal is an immutable challenger rather than an in-place mutation.",
+                    "Immutable challenger versions retain a stable idea identity or an explicit parent idea link.",
                     "A proposer cannot evaluate or promote its own challenger.",
                 ),
                 authority_id,
                 evidence_ids,
             ),
             cls._node(
-                "COURT-050",
-                "Cross-examine audit findings and select only evidence-backed direct-code challengers.",
+                "PROPOSE-042",
+                "Champion concrete improvement hypotheses and compare their expected user value with considered alternatives.",
                 ("AGENTS-010", "LEARNING-040", "ORCHESTRATION-020", "RUNTIME-030"),
+                ("explorer", "optimizer", "orchestrator"),
+                ("discover", "grow"),
+                (
+                    "Each idea has a stable idea identity, source claims, advocate identity, hypothesis, and a bounded experiment or reproduction plan.",
+                    "Experiment proposals state expected value, uncertainty, cost, and rollback; they need not already prove superiority.",
+                    "Considered alternatives and their selection rationale remain in the brain trace.",
+                ),
+                authority_id,
+                evidence_ids,
+            ),
+            cls._node(
+                "CROSS-045",
+                "Independently challenge every proposed idea with concrete counterexamples, failure modes, and proportionate evidence requests.",
+                ("PROPOSE-042",),
+                ("curator", "steward", "integrator"),
+                ("validate", "maintain", "integrate"),
+                (
+                    "Each idea has a cross-examiner distinct from its advocate and an independent expert witness appropriate to the claim.",
+                    "Challenge receipts name checks, evidence, findings, and actionable objections; a completed challenge may find no blocking defect.",
+                    "Each objection states the affected claim, severity, reason, and evidence needed at the current stage.",
+                ),
+                authority_id,
+                evidence_ids,
+                verify=True,
+            ),
+            cls._node(
+                "REVISE-048",
+                "Record an evidence-backed response to each challenge and one bounded revision when it can resolve an actionable objection.",
+                ("CROSS-045",),
+                ("explorer", "architect", "optimizer"),
+                ("discover", "design", "grow"),
+                (
+                    "A revision keeps the stable idea identity and immutable version history, or creates an explicitly linked child idea.",
+                    "Every return to an earlier agent records who returned it, why, the receiving role, and what evidence or change is needed.",
+                    "Original objections, dissent, responses, and rejected versions remain visible; a response may explain why no revision is needed.",
+                    "This run permits one revision round; further work remains a linked follow-up generation instead of a cycle or silent discard.",
+                ),
+                authority_id,
+                evidence_ids,
+            ),
+            cls._node(
+                "COURT-050",
+                "Independently review challenge responses and select proportionate, reversible experiments.",
+                ("REVISE-048",),
                 ("curator", "architect"),
                 ("validate", "design"),
                 (
-                    "Every selected candidate has a hypothesis, rollback, and distinct verifier.",
-                    "Unsafe, coupled, or unsupported candidates are rejected or deferred.",
+                    "The judge is distinct from the scout, advocate, cross-examiner, architect, builder, and affected champion; material revisions receive independent re-examination.",
+                    "Every selected experiment has a supported hypothesis, executable acceptance or reproduction, bounded scope, rollback, and a distinct verifier.",
+                    "Selection applies the current design or implementation burden; code receipts, held-out wins, and superiority benchmarks are required only at their later applicable stages.",
+                    "Every idea receives adopt, adapt, defer, reject, or quarantine with reasons; remediable gaps identify the next role and concrete return conditions.",
+                    "No selected idea is also recorded as promoted; unresolved critical risk and authority gaps still stop the affected experiment.",
                 ),
                 authority_id,
                 evidence_ids,
@@ -398,12 +446,12 @@ class TournamentPlanFactory:
             ),
             cls._node(
                 "CHALLENGER-060",
-                "Implement selected challengers as direct source files, focused tests, and neutral evidence artifacts.",
+                "Implement selected challengers in isolated target workspaces with focused tests and neutral evidence artifacts.",
                 ("COURT-050",),
                 ("builder", "architect"),
                 ("build", "design"),
                 (
-                    "Changed agent behavior remains in one class per agent file.",
+                    "Changes follow the target repository's architecture and preserve its public contracts.",
                     "Target source and configuration gain no Hive Mind workspace or DAG-plan dependency.",
                 ),
                 authority_id,
@@ -425,14 +473,32 @@ class TournamentPlanFactory:
                 verify=True,
             ),
             cls._node(
-                "INTEGRATE-080",
-                "Issue an evidence-only recommendation to retain, open a PR, retest, defer, reject, or quarantine.",
+                "JUDGE-075",
+                "Adjudicate independently reproduced results and record whether to retain, revise, defer, reject, or recommend a verified challenger.",
                 ("VERIFY-070",),
+                ("curator", "optimizer"),
+                ("validate", "grow"),
+                (
+                    "The result judge is distinct from the scout, advocate, cross-examiner, architect, builder, and affected champion and cites independent verification receipts.",
+                    "A promotion recommendation requires applicable code, test, outcome, held-out evaluation, regression, and safety evidence; superiority claims require multiple pinned comparators.",
+                    "Rejection, deferral, and return decisions name their reason, receiving role, remaining obligations, and any linked follow-up idea.",
+                ),
+                authority_id,
+                evidence_ids,
+                verify=True,
+            ),
+            cls._node(
+                "INTEGRATE-080",
+                "Prepare reversible delivery and publish a human-readable brain trace of every idea and decision.",
+                ("JUDGE-075",),
                 ("integrator", "optimizer", "orchestrator"),
                 ("integrate", "grow"),
                 (
                     "This plan never merges, promotes, or mutates a protected target.",
                     "The recommendation names rollback and the next independently authorized action.",
+                    "The selected brain contains readable links from source and idea through championing, challenge, response, revisions, verdict, tests, and delivery receipts.",
+                    "Each idea shows current status, immutable history, parent or stable identity, rejection or return reasons, next role, and unfinished obligations even when no challenger is selected.",
+                    "The brain projection is repository-scoped and usable as local Markdown without requiring Obsidian or changing target application dependencies.",
                 ),
                 authority_id,
                 evidence_ids,
