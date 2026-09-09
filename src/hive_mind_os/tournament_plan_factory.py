@@ -24,6 +24,8 @@ from .plan_generation import (
 )
 from .portable_plan import (
     BudgetAllocation,
+    NodeEffectMode,
+    NodeExecutionContract,
     PortableNode,
     PortablePlanBundle,
     RepositorySubject,
@@ -43,6 +45,22 @@ from .runtime_contracts import (
     TokenPolicy,
     canonical_digest,
 )
+
+_FIXTURE_STAGE_KINDS = {
+    "BASELINE-001": "analysis",
+    "AGENTS-010": "analysis",
+    "ORCHESTRATION-020": "analysis",
+    "RUNTIME-030": "runtime-audit",
+    "LEARNING-040": "analysis",
+    "PROPOSE-042": "proposal",
+    "CROSS-045": "cross-examination",
+    "REVISE-048": "revision",
+    "COURT-050": "court-selection",
+    "CHALLENGER-060": "build",
+    "VERIFY-070": "verification",
+    "JUDGE-075": "court-result",
+    "INTEGRATE-080": "integration",
+}
 
 _REQUIRED_LOCAL_ACTIONS = frozenset(
     {"inspect", "local-edit", "local-test", "prepare-evidence"}
@@ -548,6 +566,24 @@ class TournamentPlanFactory:
             "Retain receipts and supersede the candidate; never mutate the champion in place.",
             roles,
             lifecycle_stages,
+            NodeExecutionContract(
+                stage_kind=_FIXTURE_STAGE_KINDS[node_id],
+                execution_role=roles[0],
+                worker_capability="candidate-workspace" if build else "subject-inspector",
+                effect_mode=(
+                    NodeEffectMode.BOUNDED_WRITE if build else NodeEffectMode.READ_ONLY
+                ),
+                exclusive_writer=build,
+                required_outputs=(
+                    "summary", "findings", "acceptance_evidence", "ideas",
+                    "selected_idea_ids", "changed_paths",
+                ),
+                success_transition=(
+                    "selected-experiment-or-no-change"
+                    if _FIXTURE_STAGE_KINDS[node_id] == "court-selection"
+                    else "release-dependents"
+                ),
+            ),
         )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 import tempfile
@@ -69,6 +70,54 @@ class TournamentCliTests(unittest.TestCase):
             self.prepare()
         self.assertEqual(original, (self.output / "plan.json").read_bytes())
 
+    def test_output_equal_to_or_nested_in_target_is_rejected_before_writes(self):
+        tracked = (self.repo / "app.js").read_bytes()
+        for output in (self.repo, self.repo / "brain" / "run"):
+            with self.subTest(output=output), self.assertRaisesRegex(ValueError, "outside"):
+                prepare_tournament(repository=self.repo, request_file=self.request,
+                    standard_file=self.standard, output=output)
+            self.assertEqual(tracked, (self.repo / "app.js").read_bytes())
+            self.assertEqual("", self.git("status", "--porcelain"))
+        self.assertFalse((self.repo / "brain").exists())
+
+    def test_similarly_prefixed_sibling_output_is_allowed(self):
+        sibling = self.root / "FOO BAR-brain"
+        manifest = prepare_tournament(repository=self.repo, request_file=self.request,
+            standard_file=self.standard, output=sibling)
+        self.assertEqual("PREPARED", manifest["status"])
+        self.assertTrue((sibling / "brain.sqlite3").is_file())
+        self.assertEqual("", self.git("status", "--porcelain"))
+
+    def test_filesystem_alias_into_target_is_rejected_before_writes(self):
+        alias = self.root / "target-alias"
+        try:
+            alias.symlink_to(self.repo, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"directory aliases unavailable: {error}")
+        with self.assertRaisesRegex(ValueError, "outside"):
+            prepare_tournament(repository=self.repo, request_file=self.request,
+                standard_file=self.standard, output=alias / "brain")
+        self.assertFalse((self.repo / "brain").exists())
+        self.assertEqual("", self.git("status", "--porcelain"))
+
+    @unittest.skipUnless(os.name == "nt", "NTFS junction regression")
+    def test_windows_junction_alias_into_target_is_rejected(self):
+        alias = self.root / "target-junction"
+        result = subprocess.run(
+            [os.environ.get("ComSpec", "cmd.exe"), "/c", "mklink", "/J", str(alias), str(self.repo)],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode:
+            self.skipTest(f"junctions unavailable: {result.stderr or result.stdout}")
+        try:
+            with self.assertRaisesRegex(ValueError, "outside"):
+                prepare_tournament(repository=self.repo, request_file=self.request,
+                    standard_file=self.standard, output=alias / "brain")
+            self.assertFalse((self.repo / "brain").exists())
+            self.assertEqual("", self.git("status", "--porcelain"))
+        finally:
+            alias.rmdir()
+
     def test_different_standard_cannot_be_relabelled_as_version_two(self):
         wrong = self.root / "standard.md"
         wrong.write_text("# DAG authoring standard V1\n", encoding="utf-8")
@@ -111,6 +160,11 @@ class TournamentCliTests(unittest.TestCase):
         markdown = (export / idea_note_name("idea-1")).read_text(encoding="utf-8")
         for fragment in ("Need duplicate-run receipt", "builder", "Run twice", "Added idempotency"):
             self.assertIn(fragment, markdown)
+        self.assertIn('same_idea_revision: 2', markdown)
+        self.assertIn('latest_event: "revised"', markdown)
+        index = (export / "INDEX.md").read_text(encoding="utf-8")
+        for heading in ("Stable ID", "Relationships", "Latest event", "Rationale and next action"):
+            self.assertIn(heading, index)
         with self.assertRaises(FileExistsError):
             publish_brain(database=database, subject_id=subject, idea_ids=["idea-1"], output=export)
         self.assertEqual("Keep this note", human.read_text(encoding="utf-8"))
@@ -149,6 +203,8 @@ class TournamentCliTests(unittest.TestCase):
             markdown = (export / idea_note_name(identity)).read_text(encoding="utf-8")
             if index:
                 self.assertIn(f"({idea_note_name(identities[index-1])})", markdown)
+            if index + 1 < len(identities):
+                self.assertIn(f"({idea_note_name(identities[index+1])})", markdown)
 
 
 if __name__ == "__main__":

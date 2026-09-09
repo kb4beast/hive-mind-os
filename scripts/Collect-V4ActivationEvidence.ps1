@@ -2,8 +2,11 @@
 param(
     [string]$OutputDirectory,
     [switch]$AllowDirty,
-    [ValidateRange(1, 900)][int]$FocusedTestTimeoutSeconds = 180,
-    [ValidateRange(1, 120000)][int]$MaximumFocusedModuleTimeoutMilliseconds = 120000
+    # The collector starts 29 fresh, isolated Python processes. Antivirus and
+    # runner contention can dominate their sub-second test bodies on Windows,
+    # so keep a finite fivefold headroom over the original measured budget.
+    [ValidateRange(1, 900)][int]$FocusedTestTimeoutSeconds = 900,
+    [ValidateRange(1, 300000)][int]$MaximumFocusedModuleTimeoutMilliseconds = 300000
 )
 
 Set-StrictMode -Version Latest

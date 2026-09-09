@@ -42,6 +42,78 @@ class SubjectKind(StrEnum):
     NON_REPOSITORY = "non_repository"
 
 
+class NodeEffectMode(StrEnum):
+    """Filesystem effect promised by a portable node to its execution host."""
+
+    READ_ONLY = "read-only"
+    BOUNDED_WRITE = "bounded-write"
+
+
+@dataclass(frozen=True, slots=True)
+class NodeExecutionContract:
+    """Plan-authored execution semantics with no node-name conventions.
+
+    Dependencies, resource leases, evidence inputs, acceptance outputs, budgets,
+    and deadlines remain bound by :class:`PortableNode` and the surrounding plan.
+    This contract declares the behavior that the local executor previously
+    inferred from the fixed V2 node identifiers.
+    """
+
+    stage_kind: str
+    execution_role: str
+    worker_capability: str
+    effect_mode: NodeEffectMode
+    exclusive_writer: bool
+    required_outputs: tuple[str, ...]
+    success_transition: str = "release-dependents"
+    failure_transition: str = "halt-dependents"
+    retry_policy: str = "plan-recovery"
+    cancellation_policy: str = "terminate-process-tree"
+
+    def __post_init__(self) -> None:
+        for value, label in (
+            (self.stage_kind, "stage_kind"),
+            (self.execution_role, "execution_role"),
+            (self.worker_capability, "worker_capability"),
+            (self.success_transition, "success_transition"),
+            (self.failure_transition, "failure_transition"),
+            (self.retry_policy, "retry_policy"),
+            (self.cancellation_policy, "cancellation_policy"),
+        ):
+            require_identifier(value, label)
+        if not isinstance(self.effect_mode, NodeEffectMode):
+            raise ContractViolation("node effect_mode must be typed")
+        if type(self.exclusive_writer) is not bool:
+            raise ContractViolation("exclusive_writer must be boolean")
+        if self.effect_mode is NodeEffectMode.BOUNDED_WRITE and not self.exclusive_writer:
+            raise ContractViolation("bounded-write nodes must request an exclusive writer lease")
+        if self.effect_mode is NodeEffectMode.READ_ONLY and self.exclusive_writer:
+            raise ContractViolation("read-only nodes cannot request an exclusive writer lease")
+        if (
+            type(self.required_outputs) is not tuple
+            or not self.required_outputs
+            or any(type(value) is not str or not value for value in self.required_outputs)
+            or len(set(self.required_outputs)) != len(self.required_outputs)
+        ):
+            raise ContractViolation("required_outputs must be unique non-empty strings")
+        if self.failure_transition != "halt-dependents":
+            raise ContractViolation("local execution must halt dependents after failure")
+
+    def to_document(self) -> dict[str, Any]:
+        return {
+            "stage_kind": self.stage_kind,
+            "execution_role": self.execution_role,
+            "worker_capability": self.worker_capability,
+            "effect_mode": self.effect_mode.value,
+            "exclusive_writer": self.exclusive_writer,
+            "required_outputs": list(self.required_outputs),
+            "success_transition": self.success_transition,
+            "failure_transition": self.failure_transition,
+            "retry_policy": self.retry_policy,
+            "cancellation_policy": self.cancellation_policy,
+        }
+
+
 @dataclass(frozen=True, slots=True)
 class StandardBinding:
     version: int
@@ -213,6 +285,7 @@ class PortableNode:
     rollback: str
     roles: tuple[str, ...]
     lifecycle_stages: tuple[str, ...]
+    execution: NodeExecutionContract | None = None
 
     def __post_init__(self) -> None:
         require_identifier(self.node_id, "node_id")
@@ -247,9 +320,14 @@ class PortableNode:
             raise ContractViolation(
                 "portable node roles and lifecycle_stages are required"
             )
+        if self.execution is not None:
+            if not isinstance(self.execution, NodeExecutionContract):
+                raise ContractViolation("node execution contract must be typed")
+            if self.execution.execution_role not in self.roles:
+                raise ContractViolation("execution role must be declared by the node")
 
     def to_document(self) -> dict[str, Any]:
-        return {
+        document = {
             "node_id": self.node_id,
             "objective": self.objective,
             "dependencies": list(self.dependencies),
@@ -264,6 +342,9 @@ class PortableNode:
             "roles": list(self.roles),
             "lifecycle_stages": list(self.lifecycle_stages),
         }
+        if self.execution is not None:
+            document["execution"] = self.execution.to_document()
+        return document
 
 
 @dataclass(frozen=True, slots=True)
@@ -669,8 +750,40 @@ def _node_from_document(value: Mapping[str, Any]) -> PortableNode:
         "rollback",
         "roles",
         "lifecycle_stages",
+        "execution",
     }
-    _closed(value, fields, "portable node")
+    required = fields - {"execution"}
+    unknown = set(value) - fields
+    missing = required - set(value)
+    if unknown or missing:
+        raise ContractViolation(
+            "portable node fields differ: "
+            f"missing={sorted(missing)}, extra={sorted(unknown)}"
+        )
+    execution_value = value.get("execution")
+    execution = None
+    if execution_value is not None:
+        if not isinstance(execution_value, Mapping):
+            raise ContractViolation("node execution contract must be an object")
+        execution_fields = {
+            "stage_kind", "execution_role", "worker_capability", "effect_mode",
+            "exclusive_writer", "required_outputs", "success_transition",
+            "failure_transition", "retry_policy", "cancellation_policy",
+        }
+        _closed(execution_value, execution_fields, "node execution contract")
+        try:
+            effect_mode = NodeEffectMode(execution_value["effect_mode"])
+        except (KeyError, ValueError) as error:
+            raise ContractViolation("node execution effect_mode is unsupported") from error
+        execution = NodeExecutionContract(
+            execution_value["stage_kind"], execution_value["execution_role"],
+            execution_value["worker_capability"], effect_mode,
+            execution_value["exclusive_writer"],
+            _string_list(execution_value, "required_outputs"),
+            execution_value["success_transition"],
+            execution_value["failure_transition"], execution_value["retry_policy"],
+            execution_value["cancellation_policy"],
+        )
     return PortableNode(
         value["node_id"],
         value["objective"],
@@ -685,6 +798,7 @@ def _node_from_document(value: Mapping[str, Any]) -> PortableNode:
         value["rollback"],
         _string_list(value, "roles"),
         _string_list(value, "lifecycle_stages"),
+        execution,
     )
 
 
@@ -798,6 +912,8 @@ def validate_runtime_plan_admission(
 
 __all__ = [
     "BudgetAllocation",
+    "NodeEffectMode",
+    "NodeExecutionContract",
     "NonRepositorySubject",
     "PortableNode",
     "PortablePlanBundle",

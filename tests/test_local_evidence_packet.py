@@ -304,13 +304,18 @@ class LocalEvidencePacketTests(unittest.TestCase):
         self.assertTrue(receipt["all_passed"])
         self.assertEqual(receipt["total_tests"], 2)
         check = receipt["checks"][0]
-        self.assertEqual(check["command"][:5], [sys.executable, "-m", "unittest", "discover", "-s"])
+        self.assertTrue(Path(check["command"][0]).samefile(sys.executable))
+        self.assertEqual(check["command"][1:3], ["-m", "unittest"])
+        self.assertIn("tests/test_example.py", check["command"])
         self.assertEqual(check["exit_code"], 0)
-        self.assertEqual(check["cwd"], str(self.workspace.resolve()))
-        self.assertEqual(check["environment"], {"PYTHONPATH": str(self.workspace.resolve() / "src")})
+        self.assertEqual(
+            check["cwd"], receipt["verification_receipt"]["execution_workspace"]
+        )
+        self.assertIn("PYTHONPATH", check["environment"]["names"])
+        self.assertTrue(check["environment"]["digest"].startswith("sha256:"))
         actual_output = Path(check["stdout_path"]).read_text()
         self.assertIn("CHECK_CWD=" + check["cwd"], actual_output)
-        self.assertIn("CHECK_PYTHONPATH=" + check["environment"]["PYTHONPATH"], actual_output)
+        self.assertIn("CHECK_PYTHONPATH=src", actual_output)
         self.assertIn(b"Ran 2 tests", Path(check["stderr_path"]).read_bytes())
         self.assertEqual(check["stderr_sha256"], hashlib.sha256(Path(check["stderr_path"]).read_bytes()).hexdigest())
 

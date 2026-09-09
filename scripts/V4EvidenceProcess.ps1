@@ -5,10 +5,11 @@ function Invoke-BoundedPythonValidation {
         [Parameter(Mandatory = $true)][string[]]$Modules,
         [Parameter(Mandatory = $true)][string]$WorkingDirectory,
         [Parameter(Mandatory = $true)][string]$TaskkillExecutable,
-        # DAG executor evidence tests can exceed one minute on a loaded
-        # Windows/Python 3.14 runner. Keep the bound finite while allowing
-        # the collector's separate overall deadline to remain authoritative.
-        [Parameter(Mandatory = $true)][ValidateRange(1, 120000)][int]$TimeoutMilliseconds
+        # DAG executor evidence tests and fresh-process startup can exceed two
+        # minutes on a loaded Windows runner. Keep the per-module bound finite
+        # while allowing the collector's separate overall deadline to remain
+        # authoritative.
+        [Parameter(Mandatory = $true)][ValidateRange(1, 300000)][int]$TimeoutMilliseconds
     )
 
     if ($BootstrapPath.Contains('"')) {

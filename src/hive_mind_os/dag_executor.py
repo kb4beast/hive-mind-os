@@ -1533,7 +1533,7 @@ def validate_graph_patch(
         current = successor_nodes.get(prior.node_id)
         if current is None:
             raise DagExecutionError(f"graph patch removes node {prior.node_id}")
-        exact_fields = ("objective", "authority_id", "budget_id", "rollback")
+        exact_fields = ("objective", "authority_id", "budget_id", "rollback", "execution")
         if any(
             getattr(prior, field) != getattr(current, field) for field in exact_fields
         ):

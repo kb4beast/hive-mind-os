@@ -25,7 +25,11 @@ class WorkerTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_seeded_process_kill_sweep_reclaims_without_duplicate_effects(self) -> None:
-        queue = Scheduler(self.root, lease_seconds=0.15)
+        # This is a process-crash recovery test, not a sub-second scheduler
+        # benchmark. Leave enough lease headroom for a contended Windows runner
+        # to schedule the recovery worker and its heartbeat reliably.
+        lease_seconds = 2.0
+        queue = Scheduler(self.root, lease_seconds=lease_seconds)
         effects = self.root / "effects.sqlite3"
         try:
             for index in range(3):
@@ -41,7 +45,7 @@ class WorkerTests(unittest.TestCase):
                 script = (
                     "import pathlib,sys,time;"
                     "from hive_mind_os.scheduler import Scheduler;"
-                    "q=Scheduler(sys.argv[1],lease_seconds=.15);"
+                    f"q=Scheduler(sys.argv[1],lease_seconds={lease_seconds!r});"
                     "j=q.claim('crash-worker');"
                     "pathlib.Path(sys.argv[2]).write_text(j.id if j else 'none');"
                     "time.sleep(30)"
