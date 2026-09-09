@@ -9,7 +9,6 @@ single-operator process boundary is configured.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import platform
 import shutil

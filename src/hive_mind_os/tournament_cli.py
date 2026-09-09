@@ -18,9 +18,9 @@ from typing import Sequence
 
 from .dag_standard import compile_plan
 from .idea_lineage import IdeaLineageStore, idea_note_name
+from .path_boundary import require_external_path
 from .plan_generation import PinnedArtifact, PlanGenerationRequest
 from .portable_plan import RepositorySubject, SubjectBinding
-from .path_boundary import require_external_path
 from .runtime_contracts import (
     AuthorityEnvelope,
     EvidenceReference,

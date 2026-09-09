@@ -12,7 +12,13 @@ from .identity_attestation import (
     TrustProfile,
     verify_role_assignments,
 )
-from .runtime_contracts import canonical_json_bytes, raw_sha256, require_digest, require_identifier, require_time
+from .runtime_contracts import (
+    canonical_json_bytes,
+    raw_sha256,
+    require_digest,
+    require_identifier,
+    require_time,
+)
 
 
 class EvidenceCourtError(ValueError):

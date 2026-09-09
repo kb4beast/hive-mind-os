@@ -5,10 +5,10 @@ from dataclasses import replace
 from pathlib import Path
 
 from hive_mind_os.compiled_tournament import compile_node_execution
-from hive_mind_os.portable_plan import NodeEffectMode, NodeExecutionContract
-from tests.test_tournament_plan_factory import authority, evidence, request
 from hive_mind_os.plan_generation import PinnedArtifact
+from hive_mind_os.portable_plan import NodeEffectMode, NodeExecutionContract
 from hive_mind_os.tournament_plan_factory import TournamentPlanFactory
+from tests.test_tournament_plan_factory import authority, evidence, request
 
 
 class CompiledTournamentTests(unittest.TestCase):

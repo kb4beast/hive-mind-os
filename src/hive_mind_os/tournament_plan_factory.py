@@ -32,6 +32,19 @@ from .portable_plan import (
     StandardBinding,
     SubjectBinding,
 )
+from .runtime_contracts import (
+    AdapterRequirement,
+    AuthorityEnvelope,
+    BudgetPolicy,
+    CapabilityRequirement,
+    ContractViolation,
+    EvidenceReference,
+    IntegrationPolicy,
+    RecoveryPolicy,
+    ResourceRequirement,
+    TokenPolicy,
+    canonical_digest,
+)
 
 _FIXTURE_STAGE_KINDS = {
     "BASELINE-001": "analysis",
@@ -48,19 +61,6 @@ _FIXTURE_STAGE_KINDS = {
     "JUDGE-075": "court-result",
     "INTEGRATE-080": "integration",
 }
-from .runtime_contracts import (
-    AdapterRequirement,
-    AuthorityEnvelope,
-    BudgetPolicy,
-    CapabilityRequirement,
-    ContractViolation,
-    EvidenceReference,
-    IntegrationPolicy,
-    RecoveryPolicy,
-    ResourceRequirement,
-    TokenPolicy,
-    canonical_digest,
-)
 
 _REQUIRED_LOCAL_ACTIONS = frozenset(
     {"inspect", "local-edit", "local-test", "prepare-evidence"}

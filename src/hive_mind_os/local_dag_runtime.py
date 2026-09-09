@@ -19,8 +19,11 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from .compiled_tournament import (
+    CompiledNodeExecution,
+    compile_node_execution,
+)
 from .dag_standard import compile_plan, load_bound_plan
-from .compiled_tournament import CompiledNodeExecution, compile_node_execution, first_stage
 from .local_codex_worker import CodexLocalWorker, resolve_codex_executable
 from .local_run_authority import (
     LocalAuthorityError,
@@ -28,8 +31,8 @@ from .local_run_authority import (
     read_json,
     write_new_json,
 )
-from .runtime_contracts import canonical_json_bytes, raw_sha256
 from .path_boundary import ExternalPathRequired, is_within, require_external_path
+from .runtime_contracts import canonical_json_bytes, raw_sha256
 
 
 class LocalExecutionError(ValueError):

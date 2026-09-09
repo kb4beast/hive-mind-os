@@ -23,7 +23,6 @@ from hive_mind_os.identity_attestation import (
 )
 from hive_mind_os.runtime_contracts import canonical_json_bytes, raw_sha256
 
-
 DIGEST = "sha256:" + "a" * 64
 
 
