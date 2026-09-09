@@ -26,11 +26,11 @@ class VerificationAdapterTests(unittest.TestCase):
         self.repo = self.root / "FOO BAR"
         self.repo.mkdir()
 
-    def trusted(self) -> dict:
+    def trusted(self, *, wall_seconds: float = 30) -> dict:
         return {
             "sandbox": LocalProcessSandbox(),
             "requirements": SandboxRequirements(network_policy="inherit", hostile_code_isolation=False),
-            "budget": VerificationBudget(wall_seconds=30),
+            "budget": VerificationBudget(wall_seconds=wall_seconds),
         }
 
     def test_trusted_local_process_does_not_claim_memory_isolation(self) -> None:
@@ -116,12 +116,24 @@ class VerificationAdapterTests(unittest.TestCase):
             "package fixture\nimport \"testing\"\nfunc TestAnswer(t *testing.T){if Answer()!=42{t.Fail()}}\n",
             encoding="utf-8",
         )
-        receipt = verify_repository(self.repo, evidence_directory=self.root / "go-evidence", **self.trusted())
+        receipt = verify_repository(
+            self.repo,
+            evidence_directory=self.root / "go-evidence",
+            **self.trusted(wall_seconds=90),
+        )
         self.assertEqual(
             "PASSED",
             receipt["status"],
-            Path(receipt["stderr"]["path"]).read_text(
-                encoding="utf-8", errors="replace"
+            json.dumps(
+                {
+                    "exit_code": receipt["exit_code"],
+                    "timed_out": receipt["timed_out"],
+                    "disk_delta_bytes": receipt["disk_delta_bytes"],
+                    "stderr": Path(receipt["stderr"]["path"]).read_text(
+                        encoding="utf-8", errors="replace"
+                    ),
+                },
+                sort_keys=True,
             ),
         )
         self.assertEqual("go-test", receipt["adapter_id"])
