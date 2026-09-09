@@ -381,7 +381,18 @@ def verify_repository(
     evidence.mkdir(parents=True, exist_ok=False)
     workspace = evidence / "workspace"
     shutil.copytree(root, workspace, ignore=shutil.ignore_patterns(".git", ".hg", ".svn"))
-    environment: dict[str, str] = {}
+    scratch = evidence / "tmp"
+    scratch.mkdir()
+    # A scrubbed environment must still provide a writable temporary directory.
+    # Windows otherwise falls back as far as the system directory, while POSIX
+    # tools can escape the controlled evidence root through a shared /tmp
+    # directory. Keeping scratch beside the copied workspace also avoids a
+    # collision with any target-owned repository path.
+    environment: dict[str, str] = {
+        "TEMP": str(scratch),
+        "TMP": str(scratch),
+        "TMPDIR": str(scratch),
+    }
     if os.name == "nt" and os.environ.get("SystemRoot"):
         environment["SystemRoot"] = os.environ["SystemRoot"]
     if os.environ.get("PATH"):
@@ -395,7 +406,7 @@ def verify_repository(
     for directory_name in ("GOCACHE", "GOMODCACHE", "GOPATH", "GOTMPDIR"):
         if directory_name in environment:
             Path(environment[directory_name]).mkdir(parents=True, exist_ok=True)
-    before_size = _tree_size(workspace)
+    before_size = _tree_size(workspace) + _tree_size(scratch)
     started = time.monotonic()
     version_stdout_path, version_stderr_path = evidence / "version.stdout.bin", evidence / "version.stderr.bin"
     version_exit, version_timed_out = boundary.run(
@@ -414,7 +425,7 @@ def verify_repository(
                                         timeout=remaining, stdout_path=stdout_path,
                                         stderr_path=stderr_path, budget=limits)
     duration_ms = int((time.monotonic() - started) * 1000)
-    after_size = _tree_size(workspace)
+    after_size = _tree_size(workspace) + _tree_size(scratch)
     stdout, stderr = stdout_path.read_bytes(), stderr_path.read_bytes()
     if len(stdout) > limits.max_output_bytes or len(stderr) > limits.max_output_bytes:
         raise VerificationError("verification output exceeded its sealed budget")

@@ -70,6 +70,32 @@ class VerificationAdapterTests(unittest.TestCase):
         self.assertEqual("PASSED", receipt["status"])
         self.assertNotIn("HIVE_ACCEPTANCE_SECRET", receipt["environment"])
 
+    def test_python_adapter_provides_verification_scoped_temporary_storage(self) -> None:
+        (self.repo / "tests").mkdir()
+        (self.repo / ".hive-verification" / "tmp").mkdir(parents=True)
+        (self.repo / "tests" / "test_temporary_storage.py").write_text(
+            "import os, pathlib, tempfile, unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_temp_is_scoped(self):\n"
+            "        root = pathlib.Path.cwd().resolve()\n"
+            "        temp = pathlib.Path(tempfile.gettempdir()).resolve()\n"
+            "        self.assertEqual(root.parent / 'tmp', temp, (temp, root, dict(os.environ)))\n",
+            encoding="utf-8",
+        )
+        receipt = verify_repository(
+            self.repo,
+            evidence_directory=self.root / "temporary-storage-evidence",
+            **self.trusted(),
+        )
+        self.assertEqual(
+            "PASSED",
+            receipt["status"],
+            Path(receipt["stderr"]["path"]).read_text(
+                encoding="utf-8", errors="replace"
+            ),
+        )
+        self.assertTrue({"TEMP", "TMP", "TMPDIR"}.issubset(receipt["environment"]))
+
     def test_default_hostile_sandbox_requirement_fails_closed_before_writes(self) -> None:
         evidence = self.root / "blocked-evidence"
         receipt = verify_repository(self.repo, evidence_directory=evidence)
