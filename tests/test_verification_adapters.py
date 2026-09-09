@@ -33,6 +33,11 @@ class VerificationAdapterTests(unittest.TestCase):
             "budget": VerificationBudget(wall_seconds=30),
         }
 
+    def test_trusted_local_process_does_not_claim_memory_isolation(self) -> None:
+        capabilities = LocalProcessSandbox().capabilities
+        self.assertFalse(capabilities.hostile_code_isolation)
+        self.assertFalse(capabilities.cpu_memory_limits)
+
     def test_python_unittest_receipt_is_sealed_and_content_addressed(self) -> None:
         (self.repo / "tests").mkdir()
         (self.repo / "tests" / "test_ok.py").write_text(
@@ -112,8 +117,19 @@ class VerificationAdapterTests(unittest.TestCase):
             encoding="utf-8",
         )
         receipt = verify_repository(self.repo, evidence_directory=self.root / "go-evidence", **self.trusted())
-        self.assertEqual("PASSED", receipt["status"])
+        self.assertEqual(
+            "PASSED",
+            receipt["status"],
+            Path(receipt["stderr"]["path"]).read_text(
+                encoding="utf-8", errors="replace"
+            ),
+        )
         self.assertEqual("go-test", receipt["adapter_id"])
+        self.assertTrue(
+            {"GOCACHE", "GOMODCACHE", "GOPATH", "GOTMPDIR"}.issubset(
+                receipt["environment"]
+            )
+        )
 
     @unittest.skipUnless(shutil.which("rustc"), "Rust compiler is unavailable")
     def test_rust_adapter_runs_compiled_language_target_without_network(self) -> None:

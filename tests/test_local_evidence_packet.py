@@ -304,7 +304,8 @@ class LocalEvidencePacketTests(unittest.TestCase):
         self.assertTrue(receipt["all_passed"])
         self.assertEqual(receipt["total_tests"], 2)
         check = receipt["checks"][0]
-        self.assertEqual(check["command"][:3], [sys.executable, "-m", "unittest"])
+        self.assertTrue(Path(check["command"][0]).samefile(sys.executable))
+        self.assertEqual(check["command"][1:3], ["-m", "unittest"])
         self.assertIn("tests/test_example.py", check["command"])
         self.assertEqual(check["exit_code"], 0)
         self.assertEqual(

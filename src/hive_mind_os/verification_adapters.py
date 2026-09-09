@@ -120,7 +120,7 @@ class LocalProcessSandbox:
     @property
     def capabilities(self) -> SandboxCapabilities:
         return SandboxCapabilities(
-            "local-process", "1", True, False, False, os.name != "nt", False, True,
+            "local-process", "1", True, False, False, False, False, True,
             f"{platform.system()}-{platform.release()}|python-{platform.python_version()}",
         )
 
@@ -135,7 +135,11 @@ class LocalProcessSandbox:
             def limits() -> None:
                 import resource
                 resource.setrlimit(resource.RLIMIT_CPU, (budget.cpu_seconds, budget.cpu_seconds))
-                resource.setrlimit(resource.RLIMIT_AS, (budget.memory_bytes, budget.memory_bytes))
+                # RLIMIT_AS caps virtual address space rather than resident
+                # memory. Go and Rust reserve large sparse address ranges, so
+                # treating it as a memory boundary kills otherwise bounded
+                # compiler checks. The trusted-local adapter therefore applies
+                # a CPU limit but truthfully advertises no CPU+memory boundary.
             options = {"start_new_session": True, "preexec_fn": limits}
         with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
             process = subprocess.Popen(list(argv), cwd=workspace, env=environment,
@@ -260,8 +264,22 @@ class GoTestAdapter:
         if go is None or not (repository / "go.mod").is_file():
             return None
         selected = _safe_test_paths(repository, selected_paths, {".go"}) if selected_paths else ()
-        return SealedCommand(self.adapter_id, (go, "test", "./..."), (go, "version"), selected or ("./...",),
-                             (("GOTOOLCHAIN", "local"),))
+        return SealedCommand(
+            self.adapter_id,
+            (go, "test", "-mod=readonly", "./..."),
+            (go, "version"),
+            selected or ("./...",),
+            (
+                ("GOCACHE", "{workspace}/.hive-verification/go-build-cache"),
+                ("GOENV", "off"),
+                ("GOMODCACHE", "{workspace}/.hive-verification/go-mod-cache"),
+                ("GOPATH", "{workspace}/.hive-verification/go-path"),
+                ("GOPROXY", "off"),
+                ("GOSUMDB", "off"),
+                ("GOTOOLCHAIN", "local"),
+                ("GOTMPDIR", "{workspace}/.hive-verification/go-tmp"),
+            ),
+        )
 
 
 class RustCompileAdapter:
@@ -364,7 +382,13 @@ def verify_repository(
         # Executables remain adapter-selected and absolute. PATH is retained only
         # for compiler/linker subprocesses and is content-digested in the receipt.
         environment["PATH"] = os.environ["PATH"]
-    environment.update(dict(command.fixed_environment))
+    environment.update({
+        name: value.replace("{workspace}", str(workspace))
+        for name, value in command.fixed_environment
+    })
+    for directory_name in ("GOCACHE", "GOMODCACHE", "GOPATH", "GOTMPDIR"):
+        if directory_name in environment:
+            Path(environment[directory_name]).mkdir(parents=True, exist_ok=True)
     before_size = _tree_size(workspace)
     started = time.monotonic()
     version_stdout_path, version_stderr_path = evidence / "version.stdout.bin", evidence / "version.stderr.bin"
