@@ -54,7 +54,9 @@ def _git(directory: Path, *arguments: str) -> str:
 
 
 def _clone(source: Path, destination: Path, commit: str) -> None:
-    _git(source, "clone", "--no-local", "--no-hardlinks", "--no-checkout", str(source), str(destination))
+    # Git creates pack files while cloning, before repository-local configuration
+    # exists. Enable the Windows long-path setting on that first invocation.
+    _git(source, "-c", "core.longpaths=true", "clone", "--no-local", "--no-hardlinks", "--no-checkout", str(source), str(destination))
     _git(destination, "config", "core.autocrlf", "false")
     _git(destination, "config", "core.longpaths", "true")
     _git(destination, "checkout", "--detach", commit)

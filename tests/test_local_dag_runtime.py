@@ -506,6 +506,23 @@ class LocalDagRuntimeTests(unittest.TestCase):
             long_file.unlink(missing_ok=True)
             long_file.parent.rmdir()
 
+    def test_clone_enables_long_paths_before_git_creates_pack_files(self) -> None:
+        calls: list[tuple[Path, tuple[str, ...]]] = []
+
+        def record_call(directory: Path, *arguments: str) -> str:
+            calls.append((directory, arguments))
+            return ""
+
+        destination = self.root / "mock-clone"
+        with patch("hive_mind_os.local_dag_runtime._git", side_effect=record_call):
+            _clone(self.repository, destination, "a" * 40)
+
+        self.assertEqual(self.repository, calls[0][0])
+        self.assertEqual(
+            ("-c", "core.longpaths=true", "clone"),
+            calls[0][1][:3],
+        )
+
     def test_candidate_drift_blocks_resume_of_completed_run(self) -> None:
         self.execute()
         (self.state / "candidate" / "counter.py").write_text("unexpected change\n", encoding="utf-8")
