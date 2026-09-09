@@ -516,6 +516,11 @@ class RuntimeContractTests(unittest.TestCase):
             {"acceptance_criteria", "rollback", "roles", "lifecycle_stages"}
             <= set(portable_schema["$defs"]["node"]["required"])
         )
+        self.assertIn("execution", portable_schema["$defs"]["node"]["properties"])
+        self.assertEqual(
+            "halt-dependents",
+            portable_schema["$defs"]["nodeExecution"]["properties"]["failure_transition"]["const"],
+        )
 
 
 if __name__ == "__main__":

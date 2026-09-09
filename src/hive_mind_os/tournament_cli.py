@@ -20,6 +20,7 @@ from .dag_standard import compile_plan
 from .idea_lineage import IdeaLineageStore, idea_note_name
 from .plan_generation import PinnedArtifact, PlanGenerationRequest
 from .portable_plan import RepositorySubject, SubjectBinding
+from .path_boundary import require_external_path
 from .runtime_contracts import (
     AuthorityEnvelope,
     EvidenceReference,
@@ -52,6 +53,8 @@ def prepare_tournament(
 ) -> dict[str, object]:
     """Pin the target's HEAD, preserve the exact request, and compile a fresh DAG."""
     repository = Path(_git(repository.resolve(), "rev-parse", "--show-toplevel"))
+    # Resolve filesystem aliases before constructing any preparation artifact.
+    output = require_external_path(output, repository, label="tournament output")
     # Validate the branch spelling as data; never turn a target name into a command.
     _git(repository, "check-ref-format", "--branch", target)
     commit = _git(repository, "rev-parse", "HEAD")
@@ -132,7 +135,6 @@ def prepare_tournament(
             f'  {dependency} --> {node.node_id}' for node in plan.nodes for dependency in node.dependencies
         ) + "\n").encode("utf-8"),
     }
-    output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     for name, content in documents.items():
         _write(output / name, content)
@@ -165,15 +167,31 @@ def publish_brain(*, database: Path, subject_id: str, idea_ids: Sequence[str], o
     store = IdeaLineageStore(database, read_only=True)
     try:
         notes: dict[str, str] = {}
+        histories: dict[str, tuple] = {}
+        all_ids = store.idea_ids(subject_id)
+        children: dict[str, list[str]] = {idea_id: [] for idea_id in all_ids}
+        for known_id in all_ids:
+            history = store.history(subject_id, known_id)
+            histories[known_id] = history
+            if history and history[0].parent_idea_id is not None:
+                children.setdefault(history[0].parent_idea_id, []).append(known_id)
         pending = list(idea_ids)
         while pending:
             idea_id = pending.pop(0)
             if idea_id in notes:
                 continue
-            notes[idea_id] = store.render_markdown(subject_id, idea_id)
-            parent = store.history(subject_id, idea_id)[0].parent_idea_id
+            history = histories.get(idea_id) or store.history(subject_id, idea_id)
+            if not history:
+                raise ValueError(f"unknown idea: {idea_id}")
+            histories[idea_id] = history
+            related_children = tuple(sorted(children.get(idea_id, ())))
+            notes[idea_id] = store.render_markdown(
+                subject_id, idea_id, children=related_children
+            )
+            parent = history[0].parent_idea_id
             if parent is not None:
                 pending.append(parent)
+            pending.extend(related_children)
     finally:
         store.close()
     if not notes:
@@ -185,9 +203,34 @@ def publish_brain(*, database: Path, subject_id: str, idea_ids: Sequence[str], o
     def label(value: str) -> str:
         return escape(value).replace("[", "&#91;").replace("]", "&#93;").replace("\n", " ")
 
-    index = "# Idea history\n\n" + f"Subject: {label(subject_id)}\n\n" + "\n".join(
-        f"- [{label(idea_id)}]({idea_note_name(idea_id)})" for idea_id in notes
-    ) + "\n\nDerived local history; these notes do not authorize execution or promotion.\n"
+    rows = []
+    for idea_id in sorted(notes):
+        latest = histories[idea_id][-1]
+        parent = latest.parent_idea_id
+        relation = (
+            f"parent [{label(parent)}]({idea_note_name(parent)})"
+            if parent is not None else "root"
+        )
+        child_ids = children.get(idea_id, ())
+        if child_ids:
+            relation += "; children " + ", ".join(
+                f"[{label(child)}]({idea_note_name(child)})" for child in child_ids
+            )
+        rationale = latest.reason
+        if latest.next_action:
+            rationale += f" Next: {latest.next_action}"
+        rows.append(
+            f"| {label(latest.title)} | [{label(idea_id)}]({idea_note_name(idea_id)}) | "
+            f"{relation} | {label(latest.event_type)} | {latest.revision} | "
+            f"{label(latest.return_to_agent or latest.actor_id)} | {label(rationale)} |"
+        )
+    index = (
+        "# Idea history\n\n" + f"Subject: {label(subject_id)}\n\n"
+        "| Title | Stable ID | Relationships | Latest event | Revision | Responsible / return-to | Rationale and next action |\n"
+        "|---|---|---|---|---:|---|---|\n" + "\n".join(rows)
+        + "\n\nEach idea note links every prior attempt and source reference; runtime projections also link node, candidate, and test receipts. "
+        "Derived local history does not authorize execution or promotion.\n"
+    )
     _write(output / "INDEX.md", index.encode("utf-8"))
     return {"status": "PUBLISHED", "output": str(output), "ideas": list(notes)}
 

@@ -15,10 +15,12 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from html import escape
 from pathlib import Path
 from typing import Any
 
 from .dag_standard import compile_plan, load_bound_plan
+from .compiled_tournament import CompiledNodeExecution, compile_node_execution, first_stage
 from .local_codex_worker import CodexLocalWorker, resolve_codex_executable
 from .local_run_authority import (
     LocalAuthorityError,
@@ -27,20 +29,11 @@ from .local_run_authority import (
     write_new_json,
 )
 from .runtime_contracts import canonical_json_bytes, raw_sha256
+from .path_boundary import ExternalPathRequired, is_within, require_external_path
 
 
 class LocalExecutionError(ValueError):
     """The local run cannot advance without violating its recorded contract."""
-
-
-_ROLES = {
-    "BASELINE-001": "orchestrator", "AGENTS-010": "explorer",
-    "ORCHESTRATION-020": "architect", "RUNTIME-030": "steward",
-    "LEARNING-040": "optimizer", "PROPOSE-042": "explorer",
-    "CROSS-045": "curator", "REVISE-048": "architect",
-    "COURT-050": "curator", "CHALLENGER-060": "builder",
-    "VERIFY-070": "curator", "JUDGE-075": "curator", "INTEGRATE-080": "integrator",
-}
 
 
 def _git(directory: Path, *arguments: str) -> str:
@@ -165,8 +158,7 @@ class LocalTournamentService:
         plan = load_bound_plan(plan_bytes, expected_plan_digest=expected_plan_digest, standard_bytes=standard_bytes,
             expected_request_id=expected_request_id, expected_subject_id=expected_subject_id)
         compilation = compile_plan(plan_bytes, expected_plan_digest=expected_plan_digest, standard_bytes=standard_bytes)
-        if plan.plan_id != "external-all-aspect-tournament-v2" or set(_ROLES) != {n.node_id for n in plan.nodes}:
-            raise LocalExecutionError("local profile supports the thirteen-node V2 tournament topology")
+        policies = compile_node_execution(plan)
         pin = plan.subject.to_document()["repository"]
         if not pin or _git(repository, "rev-parse", "--show-toplevel").casefold() != str(repository).replace("\\", "/").casefold():
             raise LocalExecutionError("an explicit repository root is required")
@@ -174,12 +166,15 @@ class LocalTournamentService:
             raise LocalExecutionError("repository commit/tree differs from the plan pin")
         if not 1 <= workers <= compilation.maximum_workers or not 30 <= node_timeout <= 3600:
             raise LocalExecutionError("invalid local worker count or node deadline")
-        if state.is_relative_to(repository) or brain.is_relative_to(repository):
-            raise LocalExecutionError("run state and brain must be outside the target repository")
+        try:
+            state = require_external_path(state, repository, label="run state")
+            brain = require_external_path(brain, repository, label="brain")
+        except ExternalPathRequired as error:
+            raise LocalExecutionError(str(error)) from error
         if brain.is_relative_to(state) or state.is_relative_to(brain):
             raise LocalExecutionError("brain and private run state must be separate directories")
         custody = host_directory.resolve()
-        if custody.is_relative_to(repository) or custody.is_relative_to(state) or custody.is_relative_to(brain):
+        if is_within(custody, repository) or is_within(custody, state) or is_within(custody, brain):
             raise LocalExecutionError("host key custody must be outside the subject, run state, and brain")
         directive = operator_request_file.read_bytes()
         request_bytes = (plan_path.parent / "request.txt").read_bytes()
@@ -247,14 +242,15 @@ class LocalTournamentService:
             if any(event["kind"] in {"node_started", "host_patch_started"} for event in latest.values()):
                 raise LocalExecutionError("RECOVERY_REQUIRED: interrupted worker may have effects; inspect its process and workspace before a new run")
             failed = [event for event in latest.values() if event["kind"] == "node_failed"]
-            if failed and not (refresh_local_host or recover_recorded_patch):
-                return self._publish(state, brain, plan, events, "BLOCKED")
             current_commit = next((event["candidate_after"] for event in reversed(events) if event["kind"] == "node_completed"), pin["commit"])
             if _git(state / "candidate", "rev-parse", "HEAD") != current_commit or _git(state / "candidate", "status", "--porcelain"):
                 raise LocalExecutionError("candidate drifted from its last authenticated receipt")
+            if failed and not (refresh_local_host or recover_recorded_patch):
+                return self._publish(state, brain, plan, events, "BLOCKED")
             if recover_recorded_patch:
-                self._validate_patch_recovery(state, failed, events, completed)
-                node = next(node for node in plan.nodes if node.node_id == "CHALLENGER-060")
+                self._validate_patch_recovery(state, failed, events, completed, policies)
+                recovered_policy = policies[failed[0]["node_id"]]
+                node = next(node for node in plan.nodes if node.node_id == recovered_policy.node_id)
                 budget = next(item.policy for item in plan.budgets if item.budget_id == node.budget_id)
                 prior = [worker for event in events if event.get("node_id") == node.node_id for worker in event.get("workers", [])]
                 for key, limit in (("input_tokens", budget.input_tokens), ("output_tokens", budget.output_tokens)):
@@ -269,7 +265,7 @@ class LocalTournamentService:
                 if not failed:
                     raise LocalExecutionError("host refresh requires a terminal read-only blocker")
                 for event in failed:
-                    if event["node_id"] == "CHALLENGER-060" or event.get("reason") or not event.get("workers"):
+                    if policies[event["node_id"]].writable or event.get("reason") or not event.get("workers"):
                         raise LocalExecutionError("host refresh cannot retry uncertain or writing effects")
                     if sum(item.get("node_id") == event["node_id"] and item["kind"] == "node_started" for item in events) >= plan.recovery.maximum_attempts:
                         raise LocalExecutionError("node retry budget is exhausted")
@@ -301,12 +297,14 @@ class LocalTournamentService:
                     "reason": "Explicit operator-local host continuation; original evidence retained; expiry not extended; recorded-patch recovery never replays the model."})
             deadline = datetime.fromisoformat(document["expires_at"])
             if recover_recorded_patch:
-                node = next(node for node in plan.nodes if node.node_id == "CHALLENGER-060")
+                recovered_policy = policies[failed[0]["node_id"]]
+                node = next(node for node in plan.nodes if node.node_id == recovered_policy.node_id)
                 budget = next(item.policy for item in plan.budgets if item.budget_id == node.budget_id)
                 timeout = min(node_timeout, budget.wall_seconds) - _consumed_wall(events, node.node_id)
                 if timeout <= 0:
                     raise LocalExecutionError("cumulative node wall budget is exhausted")
                 recovery = self._recover_patch(state, authority, events, failed[0], current_commit,
+                    recovered_policy,
                     timeout=min(timeout, (deadline - datetime.now(UTC)).total_seconds()),
                     verify_host=lambda: authority.verify(grant, plan_digest=expected_plan_digest,
                         repository=repository, state_directory=state, host_digest=host_digest(), operator_request=directive))
@@ -340,13 +338,14 @@ class LocalTournamentService:
                     self._append(state, authority, events, {"kind": "node_started", "node_id": node_id, "attempt": attempts[node_id], "candidate_before": current_commit})
                 context = [{"node_id": node_id, "workers": event["workers"]} for node_id, event in completed.items()]
                 # One writer is admitted only in its compiler-serialized round.
-                if "CHALLENGER-060" in pending and len(pending) != 1:
+                if any(policies[node_id].exclusive_writer for node_id in pending) and len(pending) != 1:
                     raise LocalExecutionError("candidate writer must occupy an exclusive round")
                 self._publish(state, brain, plan, events, "RUNNING")
                 failures = False
                 with ThreadPoolExecutor(max_workers=workers) as pool:
                     tasks = {pool.submit(
                         self._node, node=nodes[node_id], state=state, commit=current_commit,
+                        policy=policies[node_id], policies=policies,
                         context=context, directive=request_bytes.decode("utf-8") + "\nFollow-up authority:\n" + directive.decode("utf-8"),
                         timeout=timeouts[node_id],
                         deadline=deadline,
@@ -373,8 +372,11 @@ class LocalTournamentService:
                                 raise LocalExecutionError("worker session was reused across independent identities")
                             sessions.update(new_sessions)
                             after = current_commit
-                            if good and node_id == "CHALLENGER-060":
-                                court = completed["COURT-050"]["workers"][0]["report"]
+                            if good and policies[node_id].writable:
+                                court_node = self._predecessor_by_stage(
+                                    node_id, nodes, completed, policies, "court-selection"
+                                )
+                                court = completed[court_node]["workers"][0]["report"]
                                 if not court["selected_idea_ids"] and _git(state / "candidate", "status", "--porcelain"):
                                     raise LocalExecutionError("builder changed files without a selected experiment")
                                 if _git(state / "candidate", "rev-parse", "HEAD") != current_commit:
@@ -402,9 +404,31 @@ class LocalTournamentService:
             return self._publish(state, brain, plan, events, "COMPLETED")
 
     @staticmethod
-    def _validate_patch_recovery(state: Path, failed: list[dict[str, Any]], events: list[dict[str, Any]], completed: dict[str, Any]) -> None:
+    def _predecessor_by_stage(
+        node_id: str, nodes: dict[str, dict[str, Any]], completed: dict[str, Any],
+        policies: dict[str, CompiledNodeExecution], stage_kind: str,
+    ) -> str:
+        pending = list(nodes[node_id]["dependencies"])
+        seen: set[str] = set()
+        while pending:
+            candidate = pending.pop(0)
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            if candidate in completed and policies[candidate].stage_kind == stage_kind:
+                return candidate
+            pending.extend(nodes[candidate]["dependencies"])
+        raise LocalExecutionError(
+            f"{node_id} requires a completed {stage_kind} predecessor"
+        )
+
+    @staticmethod
+    def _validate_patch_recovery(
+        state: Path, failed: list[dict[str, Any]], events: list[dict[str, Any]],
+        completed: dict[str, Any], policies: dict[str, CompiledNodeExecution],
+    ) -> None:
         """Admit one deterministic continuation of an unexecuted model patch."""
-        if len(failed) != 1 or failed[0]["node_id"] != "CHALLENGER-060":
+        if len(failed) != 1 or not policies[failed[0]["node_id"]].writable:
             raise LocalExecutionError("recorded-patch recovery requires a terminal Builder parse failure")
         event = failed[0]
         if (not str(event.get("reason", "")).startswith("LocalEvidenceError: git apply failed: error: corrupt patch")
@@ -419,19 +443,25 @@ class LocalTournamentService:
                 or report.get("status") != "completed" or not report.get("proposed_patch")
                 or receipt.get("host_patch") or receipt.get("host_checks")):
             raise LocalExecutionError("recorded patch lacks terminal model-only evidence before host effects")
-        court = completed["COURT-050"]["workers"][0]["report"]
+        # The writer receipt retains the court selection in its model report.
+        court_events = [item for item in completed.values()
+                        if policies[item["node_id"]].stage_kind == "court-selection"]
+        if not court_events:
+            raise LocalExecutionError("recorded patch has no completed selection court")
+        court = court_events[-1]["workers"][0]["report"]
         allowed = {idea["idea_id"] for idea in court["ideas"] if idea["disposition"] in {"adopt", "adapt"}} & set(court["selected_idea_ids"])
         selected = set(report["selected_idea_ids"])
         if not selected or not selected.issubset(allowed):
             raise LocalExecutionError("recorded patch lacks a selected local court experiment")
 
     def _recover_patch(self, state: Path, authority: LocalAuthorityStore, events: list[dict[str, Any]],
-                       failed: dict[str, Any], commit: str, *, timeout: float, verify_host: Any) -> dict[str, Any]:
+                       failed: dict[str, Any], commit: str, policy: CompiledNodeExecution,
+                       *, timeout: float, verify_host: Any) -> dict[str, Any]:
         from .local_evidence_packet import apply_proposed_patch, run_focused_checks
 
         # Copy the signed receipt; its original report and evidence bytes stay intact.
         receipt = json.loads(json.dumps(failed["workers"][0]))
-        node_id = "CHALLENGER-060"
+        node_id = policy.node_id
         verify_host()
         self._append(state, authority, events, {"kind": "host_patch_started", "node_id": node_id,
             "candidate_before": commit, "recovered_from_sequence": failed["sequence"],
@@ -442,7 +472,7 @@ class LocalTournamentService:
             report = receipt["report"]
             receipt["host_patch"] = apply_proposed_patch(state / "candidate", report["proposed_patch"], report["changed_paths"])
             receipt["host_checks"] = run_focused_checks(state / "candidate", report["changed_paths"],
-                state / "workers" / "CHALLENGER-060-RECOVERED-HOST-CHECKS", timeout - (time.monotonic() - started))
+                state / "workers" / f"{node_id}-RECOVERED-HOST-CHECKS", timeout - (time.monotonic() - started))
             verify_host()
             if time.monotonic() - started > timeout:
                 raise LocalExecutionError("recorded-patch recovery exceeded remaining node time")
@@ -490,7 +520,13 @@ class LocalTournamentService:
         authority.advance_event_head(state, sequence=document["sequence"], digest=raw_sha256(canonical_json_bytes(document)), previous_digest=document["previous_digest"])
         events.append(document)
 
-    def _node(self, *, node: dict[str, Any], state: Path, commit: str, context: list[dict[str, Any]], directive: str, timeout: float, deadline: datetime, run_binding: dict[str, Any] | None = None, attempt: int = 1) -> list[dict[str, Any]]:
+    def _node(
+        self, *, node: dict[str, Any], policy: CompiledNodeExecution,
+        policies: dict[str, CompiledNodeExecution], state: Path, commit: str,
+        context: list[dict[str, Any]], directive: str, timeout: float,
+        deadline: datetime, run_binding: dict[str, Any] | None = None,
+        attempt: int = 1,
+    ) -> list[dict[str, Any]]:
         node_deadline = time.monotonic() + timeout
 
         def remaining() -> float:
@@ -501,7 +537,7 @@ class LocalTournamentService:
 
         node_id = node["node_id"]
         execution_id = node_id if attempt == 1 else f"{node_id}-attempt-{attempt:02}"
-        writable = node_id == "CHALLENGER-060"
+        writable = policy.writable
         workspace = state / "candidate" if writable else state / "workspaces" / execution_id
         if not writable:
             _clone(state / "candidate", workspace, commit)
@@ -509,23 +545,20 @@ class LocalTournamentService:
         reports = [{"node_id": item["node_id"], "workers": [
             {key: receipt[key] for key in ("actor_id", "role", "session_id", "report", "evidence", "host_checks", "host_patch") if key in receipt}
             for receipt in item["workers"]]} for item in context]
-        if node_id == "CROSS-045":
+        if policy.stage_kind == "cross-examination":
             # The canonical proposal retains every idea and its provenance.
             # Other full transcripts remain available in authenticated run state.
-            reports = [item for item in reports if item["node_id"] == "PROPOSE-042"]
-        elif node_id == "INTEGRATE-080":
+            reports = [item for item in reports if policies[item["node_id"]].stage_kind == "proposal"]
+        elif policy.stage_kind == "integration":
             # The court and final judge retain all canonical ideas. The actual
             # brain snapshot below supplies their complete published histories.
-            reports = [item for item in reports if item["node_id"] in {"COURT-050", "JUDGE-075"}]
+            reports = [item for item in reports if policies[item["node_id"]].stage_kind in {"court-selection", "court-result"}]
         objective = directive + "\nLocal execution context: " + json.dumps({
             "base_commit": commit, "state_directory": str(state), "workspace": str(workspace),
             "execution_scope": "isolated reversible local work; no promotion or superiority assertion",
             "brain_projection": "Host automatically publishes each real report and all idea iterations as Markdown after completion.",
-        }) + (
-            "\nAct as an independent expert witness. Examine the proposals and challenges, supply domain evidence, preserve each idea ID."
-            if node_id.endswith("-WITNESS") else ""
-        )
-        objective += "\nKeep the experiment focused: champion at most three concrete ideas and select at most one small implementable improvement. Preserve ALL existing idea IDs and record a reason for every defer/reject/return. A node can complete successfully with a reasoned defer verdict. Do not demand implementation evidence at proposal stage. Do not claim a full suite passed unless you ran it; focused acceptance tests are appropriate during this bounded experiment. For this Python repository, set PYTHONPATH to this workspace's src so imports cannot use another checkout. Run tests without installing packages. Verification must actually execute the selected regression tests. At REVISE respond to the challenge without changing an idea's hypothesis unless a concrete defect requires it. At COURT include every proposed idea and cite cross-examination plus witness evidence. At CHALLENGER implement only ideas selected adopt/adapt by COURT; if none, inspect and record a no-change result. Include required ADR/evidence for kernel or policy changes."
+        })
+        objective += "\nKeep the experiment focused: champion at most three concrete ideas and select at most one small implementable improvement. Preserve ALL existing idea IDs and record a reason for every defer/reject/return. A node can complete successfully with a reasoned defer verdict. Do not demand implementation evidence at proposal stage. Do not claim a full suite passed unless you ran it; focused acceptance tests are appropriate during this bounded experiment. Verification must actually execute the selected regression tests through a sealed adapter. A revision stage responds to challenges without changing an idea's hypothesis unless a concrete defect requires it. A court-selection stage includes every proposed idea and cites cross-examination plus witness evidence. A build stage implements only ideas selected adopt/adapt by that court; if none, it records a no-change result. Include required ADR/evidence for kernel or policy changes."
         extra: dict[str, Any] = {}
         host_checks = None
         inventory_evidence = None
@@ -536,10 +569,10 @@ class LocalTournamentService:
                 run_focused_checks,
             )
             selection_context = reports
-            if node_id in {"CHALLENGER-060", "VERIFY-070"}:
-                court_report = next(item for item in reports if item["node_id"] == "COURT-050")["workers"][0]["report"]
+            if policy.stage_kind in {"build", "verification"}:
+                court_report = next(item for item in reports if policies[item["node_id"]].stage_kind == "court-selection")["workers"][0]["report"]
                 selection_context = [{"ideas": [idea for idea in court_report["ideas"] if idea["idea_id"] in court_report["selected_idea_ids"]]}]
-            packet = build_source_packet(workspace, node_id, selection_context, max_content_bytes=60_000 if node_id in {"CROSS-045", "INTEGRATE-080"} else 140_000)
+            packet = build_source_packet(workspace, node_id, selection_context, max_content_bytes=60_000 if policy.stage_kind in {"cross-examination", "integration"} else 140_000)
             if run_binding is None:
                 raise LocalAuthorityError("worker packet requires verified run bindings")
             packet["run_binding"] = {
@@ -552,11 +585,11 @@ class LocalTournamentService:
             write_new_json(inventory_path, inventory)
             inventory_evidence = {"path": str(inventory_path), "sha256": hashlib.sha256(inventory_path.read_bytes()).hexdigest()}
             packet["source_inventory_receipt"] = {**inventory_evidence, "tracked_files": len(inventory["inventory"]), "omitted_files": len(inventory["omitted_files"])}
-            if node_id == "INTEGRATE-080":
+            if policy.stage_kind == "integration":
                 packet["brain_publication"] = inspect_brain_publication(Path(run_binding["brain_directory"]))
                 base = run_binding["subject"]["repository"]["commit"]
                 diff = _git(workspace, "diff", "--no-ext-diff", "--no-textconv", base, commit, "--")
-                verifier = next(item for item in context if item["node_id"] == "VERIFY-070")["workers"][0]
+                verifier = next(item for item in context if policies[item["node_id"]].stage_kind == "verification")["workers"][0]
                 packet["delivery_manifest"] = {
                     "artifact": "isolated local candidate", "candidate_directory": str(state / "candidate"),
                     "base_commit": base, "candidate_commit": commit,
@@ -568,20 +601,20 @@ class LocalTournamentService:
                     "rollback": "Retain all receipts and the source pin; supersede or revert this isolated candidate commit. No protected reference is changed by delivery preparation.",
                 }
                 objective += "\nThe brain_publication packet records actual files already written by the host, including the index, whole idea histories, hashes, and local link checks. Evaluate that existing publication and the final court verdict. Your current report will be appended by the host after you return; do not claim that future write already occurred. Completion can attest the inspected publication and your reversible delivery recommendation without requiring your own not-yet-returned report to be present. All failed attempts remain in the snapshot."
-            if node_id == "VERIFY-070":
-                builder = next(item for item in reports if item["node_id"] == "CHALLENGER-060")
+            if policy.stage_kind == "verification":
+                builder = next(item for item in reports if policies[item["node_id"]].stage_kind == "build")
                 changed_paths = builder["workers"][0]["report"]["changed_paths"]
                 host_checks = run_focused_checks(workspace, changed_paths, state / "workers" / f"{execution_id}-HOST-CHECKS", remaining())
                 packet["independent_host_checks"] = host_checks
-            elif node_id == "RUNTIME-030":
+            elif policy.stage_kind == "runtime-audit":
                 inspected_tests = [item["path"] for item in packet["selected_files"] if Path(item["path"]).name.startswith("test_") and item["path"].endswith(".py")]
                 host_checks = run_focused_checks(workspace, inspected_tests, state / "workers" / f"{execution_id}-HOST-CHECKS", remaining())
                 packet["independent_host_checks"] = host_checks
             extra["source_packet"] = packet
             objective += "\nEVIDENCE-PACKET MODE: native child tool execution is unavailable. The host has already read immutable Git blobs and supplies their exact content/digests. Do not call tools or request policy changes. Perform your role on that supplied evidence and clearly name omitted-source obligations. Independent tests, when supplied, were actually run by the host in this separate verifier clone. You evaluate their evidence; do not claim you personally ran commands. Builder: return one plain unified diff in proposed_patch, with exact changed_paths, for the selected focused idea including its regression test. The host validates and applies it only in the isolated candidate and runs fixed tests. Other roles: proposed_patch=null and changed_paths=[]. A reasoned disposition can complete the node even when it retains limitations; unavailable implementation facts stay explicit."
         witness = None
-        if node_id == "CROSS-045":
-            witness_node = {**node, "node_id": "CROSS-045-WITNESS",
+        if policy.stage_kind == "cross-examination":
+            witness_node = {**node, "node_id": f"{node_id}-WITNESS",
                 "objective": "Provide independent expert testimony on each proposed idea before cross-examination.",
                 "acceptance_criteria": ["Independently assess each proposal using supplied source evidence, identify counterexamples and limits, and retain its idea identity. Do not claim to be its cross-examiner or judge."]}
             witness = self.worker.run(
@@ -591,16 +624,20 @@ class LocalTournamentService:
                 timeout_seconds=remaining(), writable=False, **extra)
             if witness["status"] != "completed":
                 return [witness]
-            reports = reports + [{"node_id": "CROSS-045-WITNESS", "workers": [{key: witness[key] for key in ("actor_id", "role", "session_id", "report", "evidence")}]}]
+            reports = reports + [{"node_id": witness_node["node_id"], "workers": [{key: witness[key] for key in ("actor_id", "role", "session_id", "report", "evidence")}]}]
         timeout = remaining()
         receipt = self.worker.run(
-            node=node, actor_id=f"local:{state.name}:{execution_id}", role=_ROLES[node_id],
+            node=node, actor_id=f"local:{state.name}:{execution_id}", role=policy.role,
             workspace=workspace, evidence_directory=state / "workers" / execution_id,
             predecessor_reports=reports, objective=objective, timeout_seconds=timeout, writable=writable,
             **extra,
         )
-        if receipt["status"] == "completed" and node_id in {"COURT-050", "JUDGE-075"}:
-            proposal = next(item for item in reports if item["node_id"] == "PROPOSE-042")["workers"][0]["report"]
+        if receipt.get("status") == "completed":
+            report = receipt.get("report")
+            if not isinstance(report, dict) or any(name not in report for name in policy.required_outputs):
+                raise LocalExecutionError("worker omitted a plan-required output")
+        if receipt["status"] == "completed" and policy.stage_kind in {"court-selection", "court-result"}:
+            proposal = next(item for item in reports if policies[item["node_id"]].stage_kind == "proposal")["workers"][0]["report"]
             proposed = {idea["idea_id"] for idea in proposal["ideas"]}
             decided = {idea["idea_id"] for idea in receipt["report"]["ideas"]}
             admitted = {idea["idea_id"] for idea in receipt["report"]["ideas"] if idea["disposition"] in {"adopt", "adapt"}}
@@ -608,6 +645,9 @@ class LocalTournamentService:
                 raise LocalExecutionError("court omitted a proposed idea or selected an idea without an adopt/adapt disposition")
         if host_checks is not None:
             receipt["host_checks"] = host_checks
+            if policy.stage_kind == "verification" and not host_checks.get("all_passed", False):
+                receipt["status"] = "failed"
+                receipt["reason"] = "independent sealed verification did not pass"
         if inventory_evidence is not None:
             receipt["evidence"]["source_inventory"] = inventory_evidence
         if writable and self.worker_mode == "evidence-packet" and receipt["status"] == "completed":
@@ -615,14 +655,17 @@ class LocalTournamentService:
             patch = receipt["report"]["proposed_patch"]
             changed_paths = receipt["report"]["changed_paths"]
             if patch:
-                court = next(item for item in reports if item["node_id"] == "COURT-050")["workers"][0]["report"]
+                court = next(item for item in reports if policies[item["node_id"]].stage_kind == "court-selection")["workers"][0]["report"]
                 allowed = {idea["idea_id"] for idea in court["ideas"] if idea["disposition"] in {"adopt", "adapt"}} & set(court["selected_idea_ids"])
                 selected = set(receipt["report"]["selected_idea_ids"])
                 if not selected or not selected.issubset(allowed):
                     raise LocalExecutionError("builder patch lacks a selected local court experiment")
                 remaining()
                 receipt["host_patch"] = apply_proposed_patch(workspace, patch, changed_paths)
-                receipt["host_checks"] = run_focused_checks(workspace, changed_paths, state / "workers" / "CHALLENGER-060-HOST-CHECKS", remaining())
+                receipt["host_checks"] = run_focused_checks(workspace, changed_paths, state / "workers" / f"{node_id}-HOST-CHECKS", remaining())
+                if not receipt["host_checks"].get("all_passed", False):
+                    receipt["status"] = "failed"
+                    receipt["reason"] = "post-patch sealed verification did not pass"
             elif changed_paths:
                 raise LocalExecutionError("builder reported changes without a proposed patch")
         receipts = [receipt] + ([witness] if witness is not None else [])
@@ -669,14 +712,49 @@ class LocalTournamentService:
             (brain / f"{event['node_id']}.md").write_text("\n\n".join(lines) + f"\n\n[This attempt]({name}); earlier attempts remain linked from INDEX.md.\n", encoding="utf-8")
             links.append(f"- [{event['node_id']}]({name}) — {event['kind']}")
         idea_links = []
+        child_ideas: dict[str, list[str]] = {}
+        for identity, history in ideas.items():
+            parent = history[-1][2]["parent_idea_id"]
+            if parent:
+                child_ideas.setdefault(parent, []).append(identity)
         for idea_id, history in ideas.items():
             filename = "idea-" + hashlib.sha256(idea_id.encode()).hexdigest() + ".md"
-            lines = [f"# {idea_id}", "Stable idea identity; ordered reports below preserve revisions, dissent, returns and decisions. Only COURT and JUDGE reports are local court verdicts."]
+            latest = history[-1][2]
+            children = sorted(child_ideas.get(idea_id, ()))
+            metadata = {
+                "idea_id": idea_id, "title": latest["title"],
+                "parent_idea_id": latest["parent_idea_id"], "child_idea_ids": children,
+                "same_idea_revision": len(history), "latest_event": history[-1][0]["node_id"],
+                "latest_disposition": latest["disposition"],
+                "responsible_actor": history[-1][1]["actor_id"],
+                "return_to_role": latest["return_to_agent"], "next_action": latest["next_action"],
+            }
+            def metadata_json(value: object) -> str:
+                return json.dumps(value, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e")
+
+            lines = ["---", *[f"{key}: {metadata_json(value)}" for key, value in metadata.items()], "---",
+                     f"# {escape(idea_id, quote=False)}", "Stable idea identity; ordered reports below preserve revisions, dissent, returns and decisions. Court-selection and court-result reports are local court verdicts."]
+            if latest["parent_idea_id"]:
+                parent_name = "idea-" + hashlib.sha256(latest["parent_idea_id"].encode()).hexdigest() + ".md"
+                lines.append(f"[Parent idea]({parent_name})")
+            if children:
+                lines.append("Children: " + ", ".join(
+                    f"[{escape(child, quote=False)}](idea-{hashlib.sha256(child.encode()).hexdigest()}.md)"
+                    for child in children
+                ))
             for event, worker, idea in history:
                 evidence_name = f"{event['node_id']}-{event['sequence']:04}.md"
-                lines += [f"\n## {event['node_id']} / {worker['session_id']}", f"[Node evidence and result]({evidence_name})", f"Title: {idea['title']}", f"Hypothesis: {idea['hypothesis']}", f"Source: {idea['source']}", f"Parent idea: {idea['parent_idea_id']}", f"Disposition: {idea['disposition']}", f"Reason: {idea['reason']}", f"Return to: {idea['return_to_agent']}", f"Next action: {idea['next_action']}"]
+                lines += [f"\n## {escape(event['node_id'], quote=False)} / {escape(worker['session_id'], quote=False)}", f"[Node evidence and result]({evidence_name})", f"Title: {escape(idea['title'], quote=False)}", f"Hypothesis: {escape(idea['hypothesis'], quote=False)}", f"Source: {escape(idea['source'], quote=False)}", f"Parent idea: {escape(str(idea['parent_idea_id']), quote=False)}", f"Disposition: {idea['disposition']}", f"Reason: {escape(idea['reason'], quote=False)}", f"Return to: {escape(str(idea['return_to_agent']), quote=False)}", f"Next action: {escape(idea['next_action'], quote=False)}"]
             (brain / filename).write_text("\n\n".join(lines) + "\n", encoding="utf-8")
-            idea_links.append(f"- [{idea_id}]({filename})")
+            relation = "root" if not latest["parent_idea_id"] else f"parent `{escape(latest['parent_idea_id'], quote=False)}`"
+            if children:
+                relation += "; children " + ", ".join(f"`{escape(child, quote=False)}`" for child in children)
+            idea_links.append(
+                f"| {escape(latest['title'], quote=False)} | [{escape(idea_id, quote=False)}]({filename}) | {relation} | "
+                f"{escape(history[-1][0]['node_id'], quote=False)} / {latest['disposition']} | {len(history)} | "
+                f"{escape(str(latest['return_to_agent'] or history[-1][1]['role']), quote=False)} | "
+                f"{escape(latest['reason'], quote=False)} Next: {escape(latest['next_action'], quote=False)} |"
+            )
         result = {"status": status, "authority_profile": "operator-local-v1", "plan_digest": plan.digest(),
                   "completed_nodes": len(completed), "total_nodes": len(plan.nodes),
                   "session_count": len({worker["session_id"] for event in events for worker in event.get("workers", []) if worker.get("session_id")}),
@@ -688,7 +766,8 @@ class LocalTournamentService:
             "# Live local tournament", f"Status: **{status}** — {len(completed)}/{len(plan.nodes)} nodes",
             "Actual Codex sessions under one operator's local custody. Worker separation is recorded; this is not an externally signed V4 release.",
             f"Plan: `{plan.digest()}`", f"Run evidence: {state}",
-            "## Nodes", "\n".join(links), "## Ideas and iterations", "\n".join(idea_links),
+            "## Nodes", "\n".join(links), "## Ideas and iterations",
+            "| Title | Stable ID | Relationships | Latest event / disposition | Revision | Responsible / return-to | Rationale and next action |\n|---|---|---|---|---:|---|---|\n" + "\n".join(idea_links),
             "Rollback: retain the original source checkout and discard the isolated candidate. No protected merge or promotion occurs here.",
         ]) + "\n", encoding="utf-8")
         (state / "status.json").write_text(json.dumps(result, indent=2), encoding="utf-8")

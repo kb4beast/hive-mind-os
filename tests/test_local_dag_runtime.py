@@ -137,6 +137,7 @@ class PacketRecordingWorker(RecordingWorker):
     def __init__(self):
         super().__init__()
         self.run_fixture_verifier_tests = False
+        self.broken_patch = False
 
     def run(self, **arguments):
         if "source_packet" not in arguments:
@@ -148,7 +149,8 @@ class PacketRecordingWorker(RecordingWorker):
         if arguments["node"]["node_id"] == "CHALLENGER-060":
             selected = {item["path"]: item["content"] for item in arguments["source_packet"]["selected_files"]}
             before = selected["counter.py"]
-            after = before.replace("return value\n", "return value + 1\n")
+            increment = "2" if self.broken_patch else "1"
+            after = before.replace("return value\n", f"return value + {increment}\n")
             source_patch = "".join(difflib.unified_diff(
                 before.splitlines(True), after.splitlines(True),
                 fromfile="a/counter.py", tofile="b/counter.py",
@@ -316,7 +318,7 @@ class LocalDagRuntimeTests(unittest.TestCase):
         for receipt in (builder, verifier):
             checks = receipt["host_checks"]
             self.assertTrue(checks["all_passed"])
-            self.assertEqual(1, checks["total_tests"])
+            self.assertEqual(2, checks["total_tests"])
             self.assertEqual(0, checks["checks"][0]["exit_code"])
         self.assertNotEqual(builder["workspace"], verifier["workspace"])
         self.assertEqual(self.base, git(self.repository, "rev-parse", "HEAD"))
@@ -329,6 +331,23 @@ class LocalDagRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(LocalAuthorityError, "deterministic test evidence changed"):
             self.execute(resume=True)
         self.assertEqual(before, len(self.worker.calls))
+
+    def test_failed_sealed_post_patch_check_halts_dependents_with_receipts(self) -> None:
+        self.worker = PacketRecordingWorker()
+        self.worker.broken_patch = True
+        self.service = LocalTournamentService(self.worker)
+        result = self.execute()
+        self.assertEqual("BLOCKED", result["status"])
+        events = self.events()
+        failure = next(
+            event for event in events
+            if event.get("node_id") == "CHALLENGER-060" and event["kind"] == "node_failed"
+        )
+        self.assertEqual("failed", failure["workers"][0]["status"])
+        self.assertEqual("failed", failure["workers"][0]["host_checks"]["status"])
+        called = {call["node"]["node_id"] for call in self.worker.calls}
+        self.assertNotIn("VERIFY-070", called)
+        self.assertNotIn("INTEGRATE-080", called)
 
     def test_baseline_packet_contains_exact_host_verified_run_metadata(self) -> None:
         self.worker = PacketRecordingWorker()
@@ -473,13 +492,19 @@ class LocalDagRuntimeTests(unittest.TestCase):
             self.execute(resume=True)
         self.assertEqual(1, len(self.worker.calls))
 
-    def test_rejected_in_repository_host_never_creates_a_secret_in_target(self) -> None:
-        inside_host = self.repository / "host"
-        with self.assertRaisesRegex((LocalAuthorityError, LocalExecutionError), "outside"):
-            self.execute(host_directory=inside_host)
-        self.assertFalse((inside_host / "local-host.key").exists())
-        self.assertEqual("", git(self.repository, "status", "--porcelain"))
-        self.assertEqual([], self.worker.calls)
+    def test_rejected_in_repository_runtime_paths_write_nothing_to_target(self) -> None:
+        variants = {
+            "host_directory": self.repository / "host",
+            "state_directory": self.repository / "state",
+            "brain_directory": self.repository / "brain",
+        }
+        for argument, inside in variants.items():
+            with self.subTest(argument=argument):
+                with self.assertRaisesRegex((LocalAuthorityError, LocalExecutionError), "outside"):
+                    self.execute(**{argument: inside})
+                self.assertFalse(inside.exists())
+                self.assertEqual("", git(self.repository, "status", "--porcelain"))
+                self.assertEqual([], self.worker.calls)
 
     def test_deep_clone_enables_long_paths_and_retains_every_tracked_file(self) -> None:
         relative = Path("tracked-" + "x" * 120) / "evidence.txt"
@@ -525,6 +550,15 @@ class LocalDagRuntimeTests(unittest.TestCase):
 
     def test_candidate_drift_blocks_resume_of_completed_run(self) -> None:
         self.execute()
+        (self.state / "candidate" / "counter.py").write_text("unexpected change\n", encoding="utf-8")
+        before = len(self.worker.calls)
+        with self.assertRaisesRegex(LocalExecutionError, "candidate drifted"):
+            self.execute(resume=True)
+        self.assertEqual(before, len(self.worker.calls))
+
+    def test_candidate_drift_is_checked_before_returning_a_stored_blocker(self) -> None:
+        self.worker.failed_node = "AGENTS-010"
+        self.assertEqual("BLOCKED", self.execute()["status"])
         (self.state / "candidate" / "counter.py").write_text("unexpected change\n", encoding="utf-8")
         before = len(self.worker.calls)
         with self.assertRaisesRegex(LocalExecutionError, "candidate drifted"):

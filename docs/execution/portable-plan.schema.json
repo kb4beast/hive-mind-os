@@ -177,7 +177,28 @@
         "authority_id": {"$ref": "#/$defs/identifier"}, "budget_id": {"$ref": "#/$defs/identifier"},
         "evidence_ids": {"$ref": "#/$defs/stringSet"}, "acceptance_criteria": {"$ref": "#/$defs/stringSet", "minItems": 1},
         "rollback": {"type": "string", "minLength": 1}, "roles": {"$ref": "#/$defs/stringSet", "minItems": 1},
-        "lifecycle_stages": {"$ref": "#/$defs/stringSet", "minItems": 1}
+        "lifecycle_stages": {"$ref": "#/$defs/stringSet", "minItems": 1},
+        "execution": {"$ref": "#/$defs/nodeExecution"}
+      }
+    },
+    "nodeExecution": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "stage_kind", "execution_role", "worker_capability", "effect_mode",
+        "exclusive_writer", "required_outputs", "success_transition",
+        "failure_transition", "retry_policy", "cancellation_policy"
+      ],
+      "properties": {
+        "stage_kind": {"$ref": "#/$defs/identifier"},
+        "execution_role": {"$ref": "#/$defs/identifier"},
+        "worker_capability": {"$ref": "#/$defs/identifier"},
+        "effect_mode": {"enum": ["read-only", "bounded-write"]},
+        "exclusive_writer": {"type": "boolean"},
+        "required_outputs": {"$ref": "#/$defs/stringSet", "minItems": 1},
+        "success_transition": {"$ref": "#/$defs/identifier"},
+        "failure_transition": {"const": "halt-dependents"},
+        "retry_policy": {"$ref": "#/$defs/identifier"},
+        "cancellation_policy": {"$ref": "#/$defs/identifier"}
       }
     }
   }

@@ -145,6 +145,16 @@ class IdeaLineageStore:
                 events.append(event)
             return tuple(events)
 
+    def idea_ids(self, subject_id: str) -> tuple[str, ...]:
+        """List stable idea identities without modifying their histories."""
+        subject_id = _text(subject_id, "subject_id")
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT DISTINCT idea_id FROM idea_lineage_events WHERE subject_id=? ORDER BY idea_id",
+                (subject_id,),
+            ).fetchall()
+        return tuple(row[0] for row in rows)
+
     def _insert(self, value: dict) -> IdeaEvent:
         value["recorded_at"] = datetime.now(timezone.utc).isoformat()
         body = _canonical(value)
@@ -261,7 +271,9 @@ class IdeaLineageStore:
                 self._connection.execute("ROLLBACK")
                 raise
 
-    def render_markdown(self, subject_id: str, idea_id: str) -> str:
+    def render_markdown(
+        self, subject_id: str, idea_id: str, *, children: tuple[str, ...] = (),
+    ) -> str:
         """Deterministic complete projection; caller owns destination and export policy."""
         events = self.history(subject_id, idea_id)
         if not events:
@@ -274,7 +286,27 @@ class IdeaLineageStore:
                 f"> {escape(line, quote=False)}" for line in value.splitlines()
             ) + "\n"
 
-        lines = ["# Idea history\n", block("Title", latest.title),
+        if any(not isinstance(child, str) or not child for child in children):
+            raise IdeaLineageError("child identities must be non-empty strings")
+        metadata = {
+            "idea_id": idea_id,
+            "title": latest.title,
+            "parent_idea_id": latest.parent_idea_id,
+            "child_idea_ids": list(children),
+            "same_idea_revision": latest.revision,
+            "latest_event": latest.event_type,
+            "latest_disposition": latest.event_type if latest.event_type in _DISPOSITIONS else None,
+            "responsible_actor": latest.actor_id,
+            "return_to_role": latest.return_to_agent,
+            "next_action": latest.next_action,
+        }
+        def metadata_json(value: object) -> str:
+            return json.dumps(value, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e")
+
+        frontmatter = ["---"] + [
+            f"{key}: {metadata_json(value)}" for key, value in metadata.items()
+        ] + ["---\n"]
+        lines = frontmatter + ["# Idea history\n", block("Title", latest.title),
                  block("Subject", subject_id), block("Idea ID", idea_id),
                  f"Status: **{latest.event_type}** · Revision {latest.revision}/{latest.max_revisions}\n",
                  "Actor identities are local assertions, not authentication. "
@@ -282,6 +314,11 @@ class IdeaLineageStore:
         if latest.parent_idea_id is not None:
             lines.append(block("Parent idea", latest.parent_idea_id))
             lines.append(f"[Parent history]({idea_note_name(latest.parent_idea_id)})\n")
+        if children:
+            lines.append("## Child ideas\n\n" + "\n".join(
+                f"- [{escape(child, quote=False)}]({idea_note_name(child)})"
+                for child in children
+            ) + "\n")
         for event in events:
             lines.extend([
                 f"## Event {event.sequence} · Revision {event.revision} · {event.event_type}\n",

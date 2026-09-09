@@ -11,10 +11,7 @@ import json
 import math
 import os
 import re
-import signal
 import subprocess
-import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
@@ -505,37 +502,26 @@ def apply_proposed_patch(workspace: Path, patch: str, changed_paths: list[str]) 
             "before_sha256": before, "after_sha256": digests()}
 
 
-def _kill_tree(process: subprocess.Popen) -> None:
-    if os.name == "nt":
-        executable = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "taskkill.exe"
-        try:
-            result = subprocess.run([str(executable), "/PID", str(process.pid), "/T", "/F"],
-                                    capture_output=True, timeout=15, check=False)
-            if result.returncode and process.poll() is None:
-                raise LocalEvidenceError("process-tree termination failed")
-        finally:
-            if process.poll() is None:
-                process.kill()
-    else:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    process.wait(timeout=15)
-
-
 def run_focused_checks(workspace: Path, changed_paths: list[str], evidence_directory: Path,
                        timeout_seconds: float) -> dict:
-    """Run fixed unittest discovery commands and preserve actual process receipts."""
+    """Run an allowlisted repository adapter and preserve process receipts."""
     root = _isolated_clone(workspace)
     if isinstance(timeout_seconds, bool) or not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise LocalEvidenceError("test timeout must be finite and positive")
-    candidates = []
-    tests_root = root / "tests"
-    if tests_root.is_dir():
-        candidates = [p.relative_to(root).as_posix() for p in tests_root.rglob("test_*.py")
-                      if p.is_file() and not p.is_symlink()]
-    selected = set()
+    from .verification_adapters import (
+        LocalProcessSandbox,
+        SandboxRequirements,
+        VerificationBudget,
+        VerificationRegistry,
+        verify_repository,
+    )
+
+    candidates = [
+        path.relative_to(root).as_posix()
+        for path in root.rglob("test_*.py")
+        if path.is_file() and not path.is_symlink() and ".git" not in path.parts
+    ]
+    selected: set[str] = set()
     for name in changed_paths:
         _safe_path(root, name)
         path = PurePosixPath(name)
@@ -546,54 +532,48 @@ def run_focused_checks(workspace: Path, changed_paths: list[str], evidence_direc
                 test_stem = PurePosixPath(candidate).stem
                 if test_stem in {f"test_{path.stem}", f"test_{path.parent.name}_{path.stem}"}:
                     selected.add(candidate)
-    if not selected:
+    registry = VerificationRegistry()
+    sealed = registry.seal(root, sorted(selected), "python-unittest") if selected else registry.seal(root)
+    if sealed is None or (sealed.adapter_id == "python-unittest" and not selected):
         return {"status": "no_tests_selected", "checks": [], "total_tests": 0, "all_passed": False,
                 "reason": "No corresponding focused unittest files were found; broader validation remains open."}
-    _reject_tracked_symlinks(root, sorted(selected))
-    evidence_directory = evidence_directory.resolve()
-    evidence_directory.mkdir(parents=True, exist_ok=True)
-    started, checks = time.monotonic(), []
-    environment = dict(os.environ, PYTHONPATH=str(root / "src"), PYTHONDONTWRITEBYTECODE="1")
-    options: dict[str, Any] = {"start_new_session": True} if os.name != "nt" else {
-        "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW,
-    }
-    for number, name in enumerate(sorted(selected), 1):
-        _safe_path(root, name)
-        remaining = timeout_seconds - (time.monotonic() - started)
-        if remaining <= 0:
-            return {"status": "timed_out", "checks": checks,
-                    "total_tests": sum(c["test_count"] for c in checks), "all_passed": False,
-                    "unexecuted_tests": sorted(selected)[number - 1:]}
-        test = PurePosixPath(name)
-        command = [sys.executable, "-m", "unittest", "discover", "-s", str(test.parent), "-p", test.name, "-v"]
-        stdout_path = evidence_directory / f"check-{number:03d}.stdout.txt"
-        stderr_path = evidence_directory / f"check-{number:03d}.stderr.txt"
-        timed_out = False
-        with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
-            process = subprocess.Popen(command, cwd=root, env=environment, stdin=subprocess.DEVNULL,
-                                       stdout=stdout, stderr=stderr, shell=False, **options)
-            try:
-                process.wait(timeout=remaining)
-            except subprocess.TimeoutExpired:
-                timed_out = True
-                _kill_tree(process)
-            except BaseException:
-                _kill_tree(process)
-                raise
-        output, error = stdout_path.read_bytes(), stderr_path.read_bytes()
-        counts = re.findall(r"(?m)^Ran (\d+) tests? in ", (output + b"\n" + error).decode("utf-8", "replace"))
-        count = int(counts[-1]) if counts else 0
-        checks.append({"test_file": name, "command": command, "exit_code": process.returncode,
-                       "cwd": str(root), "environment": {"PYTHONPATH": environment["PYTHONPATH"]},
-                       "test_count": count, "timed_out": timed_out,
-                       "stdout_path": str(stdout_path), "stderr_path": str(stderr_path),
-                       "stdout_sha256": hashlib.sha256(output).hexdigest(),
-                       "stderr_sha256": hashlib.sha256(error).hexdigest()})
-        if timed_out:
-            break
-    all_passed = len(checks) == len(selected) and all(
-        c["exit_code"] == 0 and c["test_count"] > 0 and not c["timed_out"] for c in checks
+    selected_paths = sorted(selected) if sealed.adapter_id == "python-unittest" else ()
+    _reject_tracked_symlinks(root, list(sealed.selected_tests))
+    receipt = verify_repository(
+        root, evidence_directory=evidence_directory, selected_paths=selected_paths,
+        adapter_id=sealed.adapter_id, sandbox=LocalProcessSandbox(),
+        requirements=SandboxRequirements(network_policy="inherit", hostile_code_isolation=False),
+        budget=VerificationBudget(wall_seconds=timeout_seconds),
     )
-    return {"status": "passed" if all_passed else "timed_out" if any(c["timed_out"] for c in checks) else "failed",
-            "checks": checks, "total_tests": sum(c["test_count"] for c in checks), "all_passed": all_passed,
-            "unexecuted_tests": sorted(selected)[len(checks):]}
+    if receipt["status"] in {"BLOCKED", "VERIFICATION_OBLIGATION"}:
+        return {"status": "no_compatible_adapter", "checks": [], "total_tests": 0,
+                "all_passed": False, "reason": receipt["reason"],
+                "verification_receipt": receipt}
+    output = Path(receipt["stdout"]["path"]).read_bytes()
+    error = Path(receipt["stderr"]["path"]).read_bytes()
+    counts = re.findall(r"(?m)^Ran (\d+) tests? in ", (output + b"\n" + error).decode("utf-8", "replace"))
+    tests_executed = bool(receipt["tests_executed"])
+    count = int(counts[-1]) if counts else int(tests_executed and receipt["status"] == "PASSED")
+    all_passed = receipt["status"] == "PASSED" and tests_executed and count > 0
+    check = {
+        "test_file": ",".join(receipt["selected_tests"]),
+        "command": receipt["argv"], "exit_code": receipt["exit_code"],
+        "cwd": receipt["execution_workspace"],
+        "environment": {
+            "names": receipt["environment"], "digest": receipt["environment_digest"],
+        },
+        "test_count": count, "timed_out": receipt["timed_out"],
+        "stdout_path": receipt["stdout"]["path"], "stderr_path": receipt["stderr"]["path"],
+        "stdout_sha256": receipt["stdout"]["digest"].removeprefix("sha256:"),
+        "stderr_sha256": receipt["stderr"]["digest"].removeprefix("sha256:"),
+        "adapter_id": receipt["adapter_id"], "sealed_command_digest": receipt["sealed_command_digest"],
+        "verification_kind": receipt["verification_kind"],
+    }
+    status = (
+        "passed" if all_passed else "timed_out" if receipt["timed_out"]
+        else "compiled" if receipt["status"] == "PASSED" and not tests_executed else "failed"
+    )
+    return {"status": status, "checks": [check], "total_tests": count,
+            "all_passed": all_passed,
+            "unexecuted_tests": list(receipt["selected_tests"]) if receipt["timed_out"] else [],
+            "verification_receipt": receipt}
