@@ -169,7 +169,10 @@ class VerificationAdapterTests(unittest.TestCase):
         receipt = verify_repository(
             self.repo,
             evidence_directory=self.root / "go-evidence",
-            **self.trusted(wall_seconds=90),
+            # The adapter intentionally starts with isolated empty Go caches.
+            # Use its production default wall budget so this test measures the
+            # sealed cold-cache execution rather than runner contention.
+            **self.trusted(wall_seconds=300),
         )
         self.assertEqual(
             "PASSED",

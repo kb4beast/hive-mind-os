@@ -111,6 +111,9 @@ class CIContractTests(unittest.TestCase):
             "python -m pip install --disable-pip-version-check --no-deps -e .",
             workflow,
         )
+        trigger = workflow.partition("on:\n")[2].partition("\npermissions:")[0]
+        self.assertIn("push:\n    branches: [main]", trigger)
+        self.assertIn("pull_request:", trigger)
 
     def test_pull_request_jobs_checkout_the_immutable_candidate_head(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
