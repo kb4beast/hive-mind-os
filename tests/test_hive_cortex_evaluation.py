@@ -416,5 +416,86 @@ class MissingArtifactQuarantineTests(_EvaluationCase):
         )
 
 
+class MultiSurfaceGuardrailTests(_EvaluationCase):
+    def test_every_guarded_surface_respects_budget_and_retains_evidence(self) -> None:
+        self.holdout.reveal(self.seal)
+        for kind in SurfaceKind:
+            for budget in (0.0, 0.25):
+                runtime = EvaluationRuntime(
+                    EvaluationContract(guardrails=(GuardrailSpec(kind, budget),))
+                )
+                if budget == 0.0 and kind in (
+                    SurfaceKind.ADVERSARIAL, SurfaceKind.COMPARATOR
+                ):
+                    runtime = self.runtime
+                for loss in (0.0, budget, budget + 0.25):
+                    for loss_name, pass_name in (("a", "z"), ("z", "a")):
+                        surfaces = [s for s in self._surfaces() if s.kind != kind]
+                        surfaces.extend((
+                            self._surface(kind, (1.0,) * 3, (1.0 - loss,) * 3,
+                                          name=loss_name),
+                            self._surface(kind, (1.0,) * 3, (1.0,) * 3,
+                                          name=pass_name),
+                        ))
+                        if kind == SurfaceKind.HELD_OUT:
+                            surfaces.append(self._surface(
+                                kind, (0.0,) * 3, (1.0,) * 3, name="zz-primary"
+                            ))
+                        for reverse in (False, True):
+                            with self.subTest(kind=kind, budget=budget, loss=loss,
+                                              loss_name=loss_name, reverse=reverse):
+                                inputs = surfaces[::-1] if reverse else surfaces
+                                record = self._evaluate(inputs, runtime=runtime)
+                                expected = (EvaluationVerdict.DISCARD if loss > budget
+                                            else EvaluationVerdict.KEEP)
+                                self.assertEqual(expected, record.verdict)
+                                if loss > budget:
+                                    self.assertEqual(
+                                        (f"hard guardrail regressed: {loss_name}",),
+                                        record.reasons,
+                                    )
+                                    self.assertIsNone(record.primary_effect)
+                                document = json.loads(record.record_path.read_text(
+                                    encoding="utf-8"
+                                ))
+                                self.assertEqual(
+                                    [s.document() for s in sorted(
+                                        surfaces, key=lambda s: (s.kind.value, s.name)
+                                    )], document["surfaces"],
+                                )
+                                self.assertEqual(canonical_digest(document),
+                                                 record.record_digest)
+                                self.assertEqual(runtime.contract.fingerprint,
+                                                 document["contract_fingerprint"])
+
+    def test_precedence_and_unconfigured_kind_remain_unchanged(self) -> None:
+        self.holdout.reveal(self.seal)
+        surfaces = self._surfaces()
+        surfaces.append(self._surface(
+            SurfaceKind.PIT, (1.0,) * 3, (0.0,) * 3, name="a-loss"
+        ))
+        self.assertEqual(EvaluationVerdict.KEEP, self._evaluate(surfaces).verdict)
+        surfaces.append(self._surface(
+            SurfaceKind.ADVERSARIAL, (1.0,) * 3, (0.0,) * 3, name="a-loss"
+        ))
+        incomplete = [s for s in surfaces if s.kind != SurfaceKind.COMPARATOR]
+        missing = self._evaluate(incomplete)
+        self.assertEqual(EvaluationVerdict.RETEST, missing.verdict)
+        self.assertIn("missing surfaces: comparator", missing.reasons)
+        thin = surfaces + [self._surface(
+            SurfaceKind.PIT, (1.0,) * 2, (1.0,) * 2, name="thin"
+        )]
+        record = self._evaluate(thin)
+        self.assertEqual(EvaluationVerdict.RETEST, record.verdict)
+        self.assertIn("insufficient repeated measurements: thin", record.reasons)
+        reference = thin[0].artifact_refs[0]
+        Path(reference.rpartition("#")[0]).unlink()
+        quarantined = self._evaluate(thin)
+        self.assertEqual(EvaluationVerdict.QUARANTINE, quarantined.verdict)
+        self.assertIsNone(quarantined.primary_effect)
+        self.assertFalse(any("hard guardrail" in r or "insufficient" in r
+                             for r in quarantined.reasons))
+
+
 if __name__ == "__main__":
     unittest.main()
