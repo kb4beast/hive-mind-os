@@ -4,10 +4,13 @@ import difflib
 import hashlib
 import json
 import os
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -599,9 +602,34 @@ class LocalDagRuntimeTests(unittest.TestCase):
             self.assertEqual(original.read_bytes(), long_file.read_bytes())
             self.assertEqual("", git(destination, "status", "--porcelain"))
         finally:
-            # Keep TemporaryDirectory's ordinary Windows cleanup below MAX_PATH.
-            long_file.unlink(missing_ok=True)
-            long_file.parent.rmdir()
+            # Remove the deep clone explicitly before TemporaryDirectory walks
+            # it with a legacy path. Git for Windows can also release the pack
+            # directory just after the clone process exits, so retry only that
+            # transient non-empty-directory condition.
+            cleanup_path = str(destination)
+            if os.name == "nt":
+                cleanup_path = "\\\\?\\" + cleanup_path
+
+            def remove_readonly(
+                function, path: str, error: OSError
+            ) -> None:
+                if isinstance(error, PermissionError):
+                    os.chmod(path, stat.S_IWRITE)
+                    function(path)
+                    return
+                raise error
+
+            for attempt in range(5):
+                try:
+                    shutil.rmtree(cleanup_path, onexc=remove_readonly)
+                    break
+                except OSError as error:
+                    if (
+                        getattr(error, "winerror", None) != 145
+                        or attempt == 4
+                    ):
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
 
     def test_clone_enables_long_paths_before_git_creates_pack_files(self) -> None:
         calls: list[tuple[Path, tuple[str, ...]]] = []
