@@ -32,6 +32,7 @@ Judge (Integrator identity), distinct from the identities above: **adapt**.
 5. A failed or changed no-change candidate remains fail-closed. A selected experiment still requires actual sealed focused tests.
 6. The court's two independent model sessions share the existing sealed budget. Court source packets are capped below the general evidence-packet maximum, and the judge receives digest-linked adjudicative fields rather than a duplicate of the examiner's full retained dossier.
 7. Operator-local Windows runs use a short external private-state root when target tests create nested Git repositories. Deep brain and plan paths remain supported; Git's internal nested-repository limit is retained as an explicit platform limitation rather than represented as hostile-code isolation.
+8. A discovery-stage runtime audit retains failed host checks as adverse evidence and can still issue a bounded report with explicit diagnostic obligations. It must not claim qualification passed. Candidate verification remains fail-closed on every unsuccessful host check.
 
 ## Acceptance and rollback
 

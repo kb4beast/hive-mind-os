@@ -357,6 +357,9 @@ class LocalDagRuntimeTests(unittest.TestCase):
         self.assertLessEqual(examiner["source_packet"]["selected_content_bytes"], 60_000)
         completed = {event["node_id"]: event for event in self.events() if event["kind"] == "node_completed"}
         runtime_call = next(call for call in self.worker.calls if call["node"]["node_id"] == "RUNTIME-030")
+        self.assertIn(
+            "failed host check is material evidence", runtime_call["objective"]
+        )
         runtime_checks = runtime_call["source_packet"]["independent_host_checks"]
         self.assertGreater(runtime_checks["total_tests"], 0)
         self.assertEqual(runtime_checks, completed["RUNTIME-030"]["workers"][0]["host_checks"])

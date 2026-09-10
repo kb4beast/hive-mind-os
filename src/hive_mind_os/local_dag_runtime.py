@@ -663,6 +663,15 @@ class LocalTournamentService:
                 inspected_tests = [item["path"] for item in packet["selected_files"] if Path(item["path"]).name.startswith("test_") and item["path"].endswith(".py")]
                 host_checks = run_focused_checks(workspace, inspected_tests, state / "workers" / f"{execution_id}-HOST-CHECKS", remaining())
                 packet["independent_host_checks"] = host_checks
+                objective += (
+                    "\nThis is a discovery-stage audit, not candidate qualification. "
+                    "A failed host check is material evidence to retain and challenge, "
+                    "but it does not by itself make the audit impossible. Complete the "
+                    "bounded audit when the supplied evidence supports a reasoned report; "
+                    "name unavailable diagnostics and omitted sources as obligations, and "
+                    "never describe the failed check as passing. Use blocked only when you "
+                    "cannot perform the audit role at all."
+                )
             extra["source_packet"] = packet
             objective += "\nEVIDENCE-PACKET MODE: native child tool execution is unavailable. The host has already read immutable Git blobs and supplies their exact content/digests. Do not call tools or request policy changes. Perform your role on that supplied evidence and clearly name omitted-source obligations. Independent tests, when supplied, were actually run by the host in this separate verifier clone. You evaluate their evidence; do not claim you personally ran commands. Builder: return one plain unified diff in proposed_patch, with exact changed_paths, for the selected focused idea including its regression test. The host validates and applies it only in the isolated candidate and runs fixed tests. Other roles: proposed_patch=null and changed_paths=[]. A reasoned disposition can complete the node even when it retains limitations; unavailable implementation facts stay explicit."
         reexaminer = None
