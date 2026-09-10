@@ -711,7 +711,17 @@ class LocalDagRuntimeTests(unittest.TestCase):
 
             for attempt in range(5):
                 try:
-                    shutil.rmtree(cleanup_path, onexc=remove_readonly)
+                    if sys.version_info >= (3, 12):
+                        shutil.rmtree(cleanup_path, onexc=remove_readonly)
+                    else:
+                        def remove_readonly_311(
+                            function, path: str, error_info
+                        ) -> None:
+                            remove_readonly(function, path, error_info[1])
+
+                        shutil.rmtree(
+                            cleanup_path, onerror=remove_readonly_311
+                        )
                     break
                 except OSError as error:
                     if (
