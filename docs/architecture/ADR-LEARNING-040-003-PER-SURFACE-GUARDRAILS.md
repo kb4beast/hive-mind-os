@@ -1,7 +1,7 @@
 # ADR: Apply configured guardrails to every matching surface
 
 Date: 2026-09-10
-Status: proposed implementation; independent verification pending
+Status: locally verified; protected delivery pending
 Idea: LEARNING-040-003; parent: LEARNING-040-002
 
 ## Source and decision
@@ -31,7 +31,9 @@ parent obligations. Local actor labels do not prove independent administration.
 ## Validation, migration, and rollback
 
 MultiSurfaceGuardrailTests covers naming/order, all kinds, budgets, retention,
-controls, and precedence. Host baseline/candidate execution remains required.
+controls, and precedence. Independent host execution retained the expected
+baseline failure and a passing 19-test candidate receipt at tournament candidate
+`a92bcf0c3558e7b1139b37cae711e52b74bfdedf`.
 No data migration: preserve historical records and bind new evaluations to the
 evaluator source version; a configuration fingerprint is not a code identity.
 Rollback supersedes the isolated candidate while retaining receipts. No champion
