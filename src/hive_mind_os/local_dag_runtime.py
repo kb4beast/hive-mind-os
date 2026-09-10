@@ -479,6 +479,8 @@ class LocalTournamentService:
             verify_host()
             if time.monotonic() - started > timeout:
                 raise LocalExecutionError("recorded-patch recovery exceeded remaining node time")
+            if not receipt["host_checks"].get("all_passed", False):
+                raise LocalExecutionError("recorded-patch sealed verification did not pass")
             after = self._commit_candidate(state / "candidate", receipt)
             result = {"kind": "node_completed", "node_id": node_id, "workers": [receipt],
                 "candidate_before": commit, "candidate_after": after,
@@ -575,7 +577,19 @@ class LocalTournamentService:
             if policy.stage_kind in {"build", "verification"}:
                 court_report = next(item for item in reports if policies[item["node_id"]].stage_kind == "court-selection")["workers"][0]["report"]
                 selection_context = [{"ideas": [idea for idea in court_report["ideas"] if idea["idea_id"] in court_report["selected_idea_ids"]]}]
-            packet = build_source_packet(workspace, node_id, selection_context, max_content_bytes=60_000 if policy.stage_kind in {"cross-examination", "integration"} else 140_000)
+            packet_content_budget = (
+                60_000
+                if policy.stage_kind in {"cross-examination", "integration"}
+                else 120_000
+                if policy.stage_kind == "court-selection"
+                else 140_000
+            )
+            packet = build_source_packet(
+                workspace,
+                node_id,
+                selection_context,
+                max_content_bytes=packet_content_budget,
+            )
             if run_binding is None:
                 raise LocalAuthorityError("worker packet requires verified run bindings")
             packet["run_binding"] = {
@@ -607,14 +621,123 @@ class LocalTournamentService:
             if policy.stage_kind == "verification":
                 builder = next(item for item in reports if policies[item["node_id"]].stage_kind == "build")
                 changed_paths = builder["workers"][0]["report"]["changed_paths"]
-                host_checks = run_focused_checks(workspace, changed_paths, state / "workers" / f"{execution_id}-HOST-CHECKS", remaining())
+                court = next(
+                    item for item in reports
+                    if policies[item["node_id"]].stage_kind == "court-selection"
+                )["workers"][0]["report"]
+                if court["selected_idea_ids"]:
+                    host_checks = run_focused_checks(
+                        workspace,
+                        changed_paths,
+                        state / "workers" / f"{execution_id}-HOST-CHECKS",
+                        remaining(),
+                    )
+                else:
+                    base = run_binding["subject"]["repository"]["commit"]
+                    observed_commit = _git(workspace, "rev-parse", "HEAD")
+                    observed_tree = _git(workspace, "rev-parse", "HEAD^{tree}")
+                    clean = not _git(workspace, "status", "--porcelain")
+                    unchanged = observed_commit == base and clean
+                    host_checks = {
+                        "status": "no_change_verified" if unchanged else "failed",
+                        "checks": [],
+                        "total_tests": 0,
+                        "all_passed": unchanged,
+                        "no_change": True,
+                        "expected_commit": base,
+                        "observed_commit": observed_commit,
+                        "observed_tree": observed_tree,
+                        "working_tree_clean": clean,
+                        "reason": (
+                            "The selection court authorized no experiment; the host "
+                            "verified the isolated candidate remained at the pinned base."
+                            if unchanged else
+                            "The selection court authorized no experiment but the candidate changed."
+                        ),
+                    }
+                    objective += (
+                        "\nThe selection court authorized no experiment. Independently "
+                        "verify the host's exact clean, unchanged-candidate receipt. Do not "
+                        "claim tests ran or that a no-change verdict proves implementation value."
+                    )
                 packet["independent_host_checks"] = host_checks
             elif policy.stage_kind == "runtime-audit":
                 inspected_tests = [item["path"] for item in packet["selected_files"] if Path(item["path"]).name.startswith("test_") and item["path"].endswith(".py")]
                 host_checks = run_focused_checks(workspace, inspected_tests, state / "workers" / f"{execution_id}-HOST-CHECKS", remaining())
                 packet["independent_host_checks"] = host_checks
+                objective += (
+                    "\nThis is a discovery-stage audit, not candidate qualification. "
+                    "A failed host check is material evidence to retain and challenge, "
+                    "but it does not by itself make the audit impossible. Complete the "
+                    "bounded audit when the supplied evidence supports a reasoned report; "
+                    "name unavailable diagnostics and omitted sources as obligations, and "
+                    "never describe the failed check as passing. Use blocked only when you "
+                    "cannot perform the audit role at all."
+                )
             extra["source_packet"] = packet
             objective += "\nEVIDENCE-PACKET MODE: native child tool execution is unavailable. The host has already read immutable Git blobs and supplies their exact content/digests. Do not call tools or request policy changes. Perform your role on that supplied evidence and clearly name omitted-source obligations. Independent tests, when supplied, were actually run by the host in this separate verifier clone. You evaluate their evidence; do not claim you personally ran commands. Builder: return one plain unified diff in proposed_patch, with exact changed_paths, for the selected focused idea including its regression test. The host validates and applies it only in the isolated candidate and runs fixed tests. Other roles: proposed_patch=null and changed_paths=[]. A reasoned disposition can complete the node even when it retains limitations; unavailable implementation facts stay explicit."
+        reexaminer = None
+        if policy.stage_kind == "court-selection":
+            reexamination_node = {
+                **node,
+                "node_id": f"{node_id}-REEXAMINER",
+                "objective": (
+                    "Independently re-examine every proposal after the recorded revision "
+                    "before the separate selection judge rules."
+                ),
+                "acceptance_criteria": [
+                    "Assess the current revision against the original challenge and evidence; "
+                    "preserve every idea identity and outstanding objection. Do not judge, "
+                    "select, implement, or promote an experiment."
+                ],
+            }
+            reexaminer = self.worker.run(
+                node=reexamination_node,
+                actor_id=f"local:{state.name}:{execution_id}-REEXAMINER",
+                role="cross-examiner",
+                workspace=workspace,
+                evidence_directory=state / "workers" / (execution_id + "-REEXAMINER"),
+                predecessor_reports=reports,
+                objective=(
+                    objective
+                    + "\nYou are the independent post-revision cross-examiner, not the "
+                    "selection judge. Test whether each current proposal answers the prior "
+                    "objections, retain dissent and missing evidence, and make a proportionate "
+                    "recommendation to the separate court."
+                ),
+                timeout_seconds=remaining(),
+                writable=False,
+                **extra,
+            )
+            if reexaminer["status"] != "completed":
+                return [reexaminer]
+            # The full post-revision report remains content-addressed in run
+            # custody.  Give the judge only the adjudicative fields and exact
+            # response receipt so the second independent session cannot make
+            # the sealed court token budget grow without bound.
+            compact_reexamination = {
+                key: reexaminer["report"][key]
+                for key in (
+                    "status", "summary", "findings", "ideas", "selected_idea_ids"
+                )
+            }
+            response_evidence = reexaminer["evidence"].get(
+                "response", reexaminer["evidence"].get("report")
+            )
+            if response_evidence is None:
+                raise LocalExecutionError(
+                    "post-revision examiner lacks a retained response receipt"
+                )
+            reports = reports + [{
+                "node_id": reexamination_node["node_id"],
+                "workers": [{
+                    "actor_id": reexaminer["actor_id"],
+                    "role": reexaminer["role"],
+                    "session_id": reexaminer["session_id"],
+                    "report": compact_reexamination,
+                    "evidence": {"response": response_evidence},
+                }],
+            }]
         witness = None
         if policy.stage_kind == "cross-examination":
             witness_node = {**node, "node_id": f"{node_id}-WITNESS",
@@ -671,7 +794,11 @@ class LocalTournamentService:
                     receipt["reason"] = "post-patch sealed verification did not pass"
             elif changed_paths:
                 raise LocalExecutionError("builder reported changes without a proposed patch")
-        receipts = [receipt] + ([witness] if witness is not None else [])
+        receipts = (
+            [receipt]
+            + ([witness] if witness is not None else [])
+            + ([reexaminer] if reexaminer is not None else [])
+        )
         if not writable and (_git(workspace, "rev-parse", "HEAD") != commit or _git(workspace, "status", "--porcelain")):
             raise LocalExecutionError("read-only worker changed its repository snapshot")
         return receipts

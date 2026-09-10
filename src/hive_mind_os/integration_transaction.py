@@ -1115,7 +1115,16 @@ class IntegrationCoordinator:
             return existing
         round_owner = self.journal.for_round(canonical_round_id)
         if round_owner is not None:
-            raise IntegrationError("round already has an integration transaction")
+            # Another preparer can append the same content-addressed transaction
+            # after ``latest`` returns but before this round lookup.  Converge on
+            # that exact intent; a genuinely competing transaction still fails
+            # closed.
+            if (
+                round_owner.transaction_id != derived_transaction_id
+                or round_owner.intent_digest != transaction.intent_digest
+            ):
+                raise IntegrationError("round already has an integration transaction")
+            return round_owner
         # The target boundary is last: all local values, signed bindings,
         # candidate evidence, and existing journal state are settled first.
         if self._read_target_binding() != target_binding:

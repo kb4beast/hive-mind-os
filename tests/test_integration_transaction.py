@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from threading import Barrier, BrokenBarrierError, Event
+from threading import Barrier, BrokenBarrierError, Event, Lock
 from typing import Callable
 
 from hive_mind_os.activation_bundle import (
@@ -309,12 +309,51 @@ class IntegrationTransactionTests(unittest.TestCase):
     def test_round_aliases_converge_on_one_transaction_and_cas_owner(self) -> None:
         synchronization_timeout = 5.0
         prepare_start = Barrier(3)
+        prepare_latest = Barrier(2)
         commit_start = Barrier(3)
+        round_lookup_lock = Lock()
+        round_owner_inserted = Event()
         cas_entered = Event()
         loser_waiting = Event()
         release_cas = Event()
 
         class WaitingJournal(IntegrationJournal):
+            def __init__(self) -> None:
+                super().__init__()
+                self.round_lookups = 0
+
+            def latest(self, transaction_id: str) -> IntegrationTransaction | None:
+                result = super().latest(transaction_id)
+                if result is None:
+                    prepare_latest.wait(timeout=synchronization_timeout)
+                return result
+
+            def for_round(self, round_id: str) -> IntegrationTransaction | None:
+                with round_lookup_lock:
+                    self.round_lookups += 1
+                    lookup_number = self.round_lookups
+                if lookup_number == 1 and not round_owner_inserted.wait(
+                    synchronization_timeout
+                ):
+                    raise AssertionError("competing preparation did not append")
+                return super().for_round(round_id)
+
+            def _append_coordinator_event(
+                self,
+                transaction: IntegrationTransaction,
+                *,
+                idempotency_key: str,
+                authority: object,
+            ) -> IntegrationTransaction:
+                result = super()._append_coordinator_event(
+                    transaction,
+                    idempotency_key=idempotency_key,
+                    authority=authority,
+                )
+                if transaction.state is IntegrationState.PREPARED:
+                    round_owner_inserted.set()
+                return result
+
             def _wait_for_change(
                 self,
                 transaction_id: str,

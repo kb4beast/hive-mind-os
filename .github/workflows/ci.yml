@@ -1,7 +1,11 @@
 name: Constitutional CI
 
 on:
+  # Feature branches are exercised by pull_request. Restricting push runs to
+  # main avoids running two identical, resource-heavy Windows matrices for
+  # every PR synchronization.
   push:
+    branches: [main]
   pull_request:
 
 permissions:

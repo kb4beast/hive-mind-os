@@ -4,10 +4,13 @@ import difflib
 import hashlib
 import json
 import os
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -146,27 +149,49 @@ class PacketRecordingWorker(RecordingWorker):
         result = super().run(**{**arguments, "writable": False})
         report = result["report"]
         report["proposed_patch"] = None
+        court = next(
+            (
+                item["workers"][0]["report"]
+                for item in arguments["predecessor_reports"]
+                if item["node_id"] == "COURT-050"
+            ),
+            None,
+        )
         if arguments["node"]["node_id"] == "CHALLENGER-060":
-            selected = {item["path"]: item["content"] for item in arguments["source_packet"]["selected_files"]}
-            before = selected["counter.py"]
-            increment = "2" if self.broken_patch else "1"
-            after = before.replace("return value\n", f"return value + {increment}\n")
-            source_patch = "".join(difflib.unified_diff(
-                before.splitlines(True), after.splitlines(True),
-                fromfile="a/counter.py", tofile="b/counter.py",
-            ))
-            regression = (
-                "import unittest\nfrom counter import increment\n\n"
-                "class PacketCounterTests(unittest.TestCase):\n"
-                "    def test_increment(self):\n"
-                "        self.assertEqual(3, increment(2))\n"
-            )
-            test_patch = "".join(difflib.unified_diff(
-                [], regression.splitlines(True), fromfile="/dev/null",
-                tofile="b/tests/test_counter_packet.py",
-            ))
-            report["proposed_patch"] = source_patch + test_patch
-            report["changed_paths"] = ["counter.py", "tests/test_counter_packet.py"]
+            if court is not None and not court["selected_idea_ids"]:
+                report["ideas"] = court["ideas"]
+                report["selected_idea_ids"] = []
+                report["changed_paths"] = []
+            else:
+                selected = {item["path"]: item["content"] for item in arguments["source_packet"]["selected_files"]}
+                before = selected["counter.py"]
+                increment = "2" if self.broken_patch else "1"
+                after = before.replace("return value\n", f"return value + {increment}\n")
+                source_patch = "".join(difflib.unified_diff(
+                    before.splitlines(True), after.splitlines(True),
+                    fromfile="a/counter.py", tofile="b/counter.py",
+                ))
+                regression = (
+                    "import unittest\nfrom counter import increment\n\n"
+                    "class PacketCounterTests(unittest.TestCase):\n"
+                    "    def test_increment(self):\n"
+                    "        self.assertEqual(3, increment(2))\n"
+                )
+                test_patch = "".join(difflib.unified_diff(
+                    [], regression.splitlines(True), fromfile="/dev/null",
+                    tofile="b/tests/test_counter_packet.py",
+                ))
+                report["proposed_patch"] = source_patch + test_patch
+                report["changed_paths"] = ["counter.py", "tests/test_counter_packet.py"]
+        if (
+            court is not None
+            and not court["selected_idea_ids"]
+            and arguments["node"]["node_id"]
+            in {"VERIFY-070", "JUDGE-075", "INTEGRATE-080"}
+        ):
+            report["ideas"] = court["ideas"]
+            report["selected_idea_ids"] = []
+            report["changed_paths"] = []
         if arguments["node"]["node_id"] == "VERIFY-070":
             checks = arguments["source_packet"]["independent_host_checks"]
             report["acceptance_evidence"] = [f"Independent host checks status: {checks['status']}"]
@@ -242,9 +267,9 @@ class LocalDagRuntimeTests(unittest.TestCase):
         result = self.execute()
         self.assertEqual("COMPLETED", result["status"])
         self.assertEqual(13, result["completed_nodes"])
-        self.assertEqual(14, result["session_count"])
+        self.assertEqual(15, result["session_count"])
         by_node = {call["node"]["node_id"]: call for call in self.worker.calls}
-        self.assertEqual(14, len(by_node))
+        self.assertEqual(15, len(by_node))
         for node_id, call in by_node.items():
             with self.subTest(node_id=node_id):
                 context_nodes = {report["node_id"] for report in call["predecessor_reports"]}
@@ -253,7 +278,7 @@ class LocalDagRuntimeTests(unittest.TestCase):
                 self.assertEqual("", git(call["workspace"], "remote"))
         self.assertEqual({
             "orchestrator", "explorer", "architect", "steward", "optimizer",
-            "curator", "builder", "integrator", "expert-witness",
+            "curator", "builder", "integrator", "expert-witness", "cross-examiner",
         }, {call["role"] for call in self.worker.calls})
         builder = by_node["CHALLENGER-060"]
         verifier = by_node["VERIFY-070"]
@@ -305,9 +330,39 @@ class LocalDagRuntimeTests(unittest.TestCase):
         self.assertLess(witness_index, examiner_index)
         examiner = self.worker.calls[examiner_index]
         self.assertIn("CROSS-045-WITNESS", {item["node_id"] for item in examiner["predecessor_reports"]})
+        reexaminer_index = next(
+            i for i, call in enumerate(self.worker.calls)
+            if call["node"]["node_id"] == "COURT-050-REEXAMINER"
+        )
+        court_index = next(
+            i for i, call in enumerate(self.worker.calls)
+            if call["node"]["node_id"] == "COURT-050"
+        )
+        self.assertLess(reexaminer_index, court_index)
+        self.assertIn(
+            "COURT-050-REEXAMINER",
+            {
+                item["node_id"]
+                for item in self.worker.calls[court_index]["predecessor_reports"]
+            },
+        )
+        court_call = self.worker.calls[court_index]
+        reexamination_context = next(
+            item
+            for item in court_call["predecessor_reports"]
+            if item["node_id"] == "COURT-050-REEXAMINER"
+        )["workers"][0]
+        self.assertEqual({"response"}, set(reexamination_context["evidence"]))
+        self.assertNotIn(
+            "acceptance_evidence", reexamination_context["report"]
+        )
+        self.assertEqual(120_000, court_call["source_packet"]["max_content_bytes"])
         self.assertLessEqual(examiner["source_packet"]["selected_content_bytes"], 60_000)
         completed = {event["node_id"]: event for event in self.events() if event["kind"] == "node_completed"}
         runtime_call = next(call for call in self.worker.calls if call["node"]["node_id"] == "RUNTIME-030")
+        self.assertIn(
+            "failed host check is material evidence", runtime_call["objective"]
+        )
         runtime_checks = runtime_call["source_packet"]["independent_host_checks"]
         self.assertGreater(runtime_checks["total_tests"], 0)
         self.assertEqual(runtime_checks, completed["RUNTIME-030"]["workers"][0]["host_checks"])
@@ -332,6 +387,26 @@ class LocalDagRuntimeTests(unittest.TestCase):
             self.execute(resume=True)
         self.assertEqual(before, len(self.worker.calls))
 
+    def test_packet_mode_can_complete_a_verified_no_change_court_outcome(self) -> None:
+        self.worker = PacketRecordingWorker()
+        self.worker.empty_selection_node = "COURT-050"
+        self.service = LocalTournamentService(self.worker)
+        result = self.execute()
+        self.assertEqual("COMPLETED", result["status"])
+        self.assertEqual(self.base, result["candidate_commit"])
+        completed = {
+            event["node_id"]: event
+            for event in self.events()
+            if event["kind"] == "node_completed"
+        }
+        verifier = completed["VERIFY-070"]["workers"][0]
+        self.assertEqual("no_change_verified", verifier["host_checks"]["status"])
+        self.assertTrue(verifier["host_checks"]["all_passed"])
+        self.assertTrue(verifier["host_checks"]["no_change"])
+        self.assertEqual(0, verifier["host_checks"]["total_tests"])
+        self.assertEqual([], verifier["report"]["selected_idea_ids"])
+        self.assertEqual("", git(self.state / "candidate", "status", "--porcelain"))
+
     def test_failed_sealed_post_patch_check_halts_dependents_with_receipts(self) -> None:
         self.worker = PacketRecordingWorker()
         self.worker.broken_patch = True
@@ -348,6 +423,96 @@ class LocalDagRuntimeTests(unittest.TestCase):
         called = {call["node"]["node_id"] for call in self.worker.calls}
         self.assertNotIn("VERIFY-070", called)
         self.assertNotIn("INTEGRATE-080", called)
+
+    def test_recorded_patch_recovery_requires_successful_checks(self) -> None:
+        from hive_mind_os.local_evidence_packet import run_focused_checks
+
+        # Inject only the pre-application parse failure; recovery applies the
+        # recorded fixture patch through the real host implementation.
+        class LocalEvidenceError(ValueError):
+            pass
+
+        for outcome in ("false", "missing", "exception", "success"):
+            with self.subTest(outcome=outcome):
+                self.state = self.root / ("state-" + outcome)
+                self.host = self.root / ("host-" + outcome)
+                self.brain = self.root / ("brain-" + outcome)
+                self.worker = PacketRecordingWorker()
+                self.worker.broken_patch = outcome == "false"
+                self.service = LocalTournamentService(self.worker)
+                run_worker = self.worker.run
+
+                def retain_terminal_receipt(**arguments):
+                    receipt = run_worker(**arguments)
+                    if arguments["node"]["node_id"] == "CHALLENGER-060":
+                        receipt["execution_mode"] = "source-packet"
+                        receipt["sandbox"] = "read-only"
+                        path = arguments["evidence_directory"] / "receipt.json"
+                        path.write_text(json.dumps(receipt), encoding="utf-8")
+                    return receipt
+
+                with patch.object(self.worker, "run", side_effect=retain_terminal_receipt), patch(
+                    "hive_mind_os.local_evidence_packet.apply_proposed_patch",
+                    side_effect=LocalEvidenceError("git apply failed: error: corrupt patch fixture"),
+                ):
+                    self.assertEqual("BLOCKED", self.execute()["status"])
+                original_events = self.events()
+                failed = original_events[-1]
+                self.assertEqual("node_failed", failed["kind"])
+                self.assertEqual("CHALLENGER-060", failed["node_id"])
+                report = failed["workers"][0]["report"]
+                saved_events = {path: path.read_bytes() for path in (self.state / "events").glob("*.json")}
+                saved_report = (self.state / "workers" / "CHALLENGER-060" / "report.json").read_bytes()
+                calls_before = len(self.worker.calls)
+
+                def recovery_checks(*arguments, **keywords):
+                    if outcome == "missing":
+                        return {"checks": [], "status": "incomplete"}
+                    if outcome == "exception":
+                        raise RuntimeError("injected recovery adapter exception")
+                    return run_focused_checks(*arguments, **keywords)
+
+                with patch(
+                    "hive_mind_os.local_evidence_packet.run_focused_checks",
+                    side_effect=recovery_checks,
+                ), patch.object(
+                    self.service, "_commit_candidate", wraps=self.service._commit_candidate,
+                ) as commit_candidate:
+                    result = self.execute(resume=True, recover_recorded_patch=True)
+                events = self.events()
+                recovery = next(event for event in events if event["kind"] in {"node_failed", "node_completed"}
+                                and event.get("recovered_from_sequence") == failed["sequence"])
+                self.assertFalse(recovery["model_replayed"])
+                self.assertEqual(report, recovery["workers"][0]["report"])
+                self.assertIn("host_patch", recovery["workers"][0])
+                self.assertEqual(original_events, events[:len(original_events)])
+                for path, content in saved_events.items():
+                    self.assertEqual(content, path.read_bytes())
+                self.assertEqual(saved_report, (self.state / "workers" / "CHALLENGER-060" / "report.json").read_bytes())
+                new_calls = [call["node"]["node_id"] for call in self.worker.calls[calls_before:]]
+                self.assertNotIn("CHALLENGER-060", new_calls)
+                if outcome == "success":
+                    self.assertEqual("COMPLETED", result["status"])
+                    self.assertEqual("node_completed", recovery["kind"])
+                    self.assertTrue(recovery["workers"][0]["host_checks"]["all_passed"])
+                    commit_candidate.assert_called_once()
+                    self.assertNotEqual(self.base, git(self.state / "candidate", "rev-parse", "HEAD"))
+                    self.assertIn("VERIFY-070", new_calls)
+                else:
+                    self.assertEqual("BLOCKED", result["status"])
+                    self.assertEqual("node_failed", recovery["kind"])
+                    commit_candidate.assert_not_called()
+                    self.assertEqual(self.base, git(self.state / "candidate", "rev-parse", "HEAD"))
+                    self.assertEqual([], new_calls)
+                    if outcome == "exception":
+                        self.assertNotIn("host_checks", recovery["workers"][0])
+                        self.assertIn("injected recovery adapter exception", recovery["reason"])
+                    else:
+                        self.assertFalse(recovery["workers"][0]["host_checks"].get("all_passed", False))
+                        self.assertIn("sealed verification did not pass", recovery["reason"])
+                    self.assertTrue(git(self.state / "candidate", "status", "--porcelain"))
+                self.assertEqual(self.base, git(self.repository, "rev-parse", "HEAD"))
+                self.assertEqual("", git(self.repository, "status", "--porcelain"))
 
     def test_baseline_packet_contains_exact_host_verified_run_metadata(self) -> None:
         self.worker = PacketRecordingWorker()
@@ -527,9 +692,44 @@ class LocalDagRuntimeTests(unittest.TestCase):
             self.assertEqual(original.read_bytes(), long_file.read_bytes())
             self.assertEqual("", git(destination, "status", "--porcelain"))
         finally:
-            # Keep TemporaryDirectory's ordinary Windows cleanup below MAX_PATH.
-            long_file.unlink(missing_ok=True)
-            long_file.parent.rmdir()
+            # Remove the deep clone explicitly before TemporaryDirectory walks
+            # it with a legacy path. Git for Windows can also release the pack
+            # directory just after the clone process exits, so retry only that
+            # transient non-empty-directory condition.
+            cleanup_path = str(destination)
+            if os.name == "nt":
+                cleanup_path = "\\\\?\\" + cleanup_path
+
+            def remove_readonly(
+                function, path: str, error: OSError
+            ) -> None:
+                if isinstance(error, PermissionError):
+                    os.chmod(path, stat.S_IWRITE)
+                    function(path)
+                    return
+                raise error
+
+            for attempt in range(5):
+                try:
+                    if sys.version_info >= (3, 12):
+                        shutil.rmtree(cleanup_path, onexc=remove_readonly)
+                    else:
+                        def remove_readonly_311(
+                            function, path: str, error_info
+                        ) -> None:
+                            remove_readonly(function, path, error_info[1])
+
+                        shutil.rmtree(
+                            cleanup_path, onerror=remove_readonly_311
+                        )
+                    break
+                except OSError as error:
+                    if (
+                        getattr(error, "winerror", None) != 145
+                        or attempt == 4
+                    ):
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
 
     def test_clone_enables_long_paths_before_git_creates_pack_files(self) -> None:
         calls: list[tuple[Path, tuple[str, ...]]] = []
