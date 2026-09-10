@@ -28,6 +28,17 @@ class VerificationError(ValueError):
     pass
 
 
+def _copytree_path(path: Path) -> str:
+    """Return an extended Windows path for deep verification copies."""
+
+    value = os.path.abspath(os.fspath(path))
+    if os.name != "nt" or value.startswith("\\\\?\\"):
+        return value
+    if value.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + value.lstrip("\\")
+    return "\\\\?\\" + value
+
+
 @dataclass(frozen=True, slots=True)
 class VerificationBudget:
     wall_seconds: float = 300.0
@@ -380,7 +391,15 @@ def verify_repository(
         raise VerificationError("verification rejects repository symlinks before execution")
     evidence.mkdir(parents=True, exist_ok=False)
     workspace = evidence / "workspace"
-    shutil.copytree(root, workspace, ignore=shutil.ignore_patterns(".git", ".hg", ".svn"))
+    # Git may materialize a valid deep checkout whose files exceed legacy
+    # MAX_PATH once the verifier adds its own workspace prefix.  Use Win32's
+    # extended path form for the copy without changing the ordinary paths
+    # recorded in receipts or supplied to the child process.
+    shutil.copytree(
+        _copytree_path(root),
+        _copytree_path(workspace),
+        ignore=shutil.ignore_patterns(".git", ".hg", ".svn"),
+    )
     scratch = evidence / "tmp"
     scratch.mkdir()
     # A scrubbed environment must still provide a writable temporary directory.
@@ -395,6 +414,12 @@ def verify_repository(
     }
     if os.name == "nt" and os.environ.get("SystemRoot"):
         environment["SystemRoot"] = os.environ["SystemRoot"]
+    if os.name == "nt" and os.environ.get("USERNAME"):
+        # getpass.getuser() requires one of its documented identity variables
+        # on Windows.  USERNAME is non-secret host identity needed by tests
+        # that exercise operator-local receipts; all other ambient variables
+        # remain scrubbed and this name/value is included in the receipt hash.
+        environment["USERNAME"] = os.environ["USERNAME"]
     if os.environ.get("PATH"):
         # Executables remain adapter-selected and absolute. PATH is retained only
         # for compiler/linker subprocesses and is content-digested in the receipt.

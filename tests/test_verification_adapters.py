@@ -70,6 +70,30 @@ class VerificationAdapterTests(unittest.TestCase):
         self.assertEqual("PASSED", receipt["status"])
         self.assertNotIn("HIVE_ACCEPTANCE_SECRET", receipt["environment"])
 
+    @unittest.skipUnless(os.name == "nt", "Windows operator identity behavior")
+    def test_python_adapter_retains_receipted_windows_username(self) -> None:
+        (self.repo / "tests").mkdir()
+        (self.repo / "tests" / "test_operator.py").write_text(
+            "import getpass, unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_operator(self): self.assertEqual('hive-verifier', getpass.getuser())\n",
+            encoding="utf-8",
+        )
+        with mock.patch.dict(os.environ, {"USERNAME": "hive-verifier"}):
+            receipt = verify_repository(
+                self.repo,
+                evidence_directory=self.root / "operator-evidence",
+                **self.trusted(),
+            )
+        self.assertEqual(
+            "PASSED",
+            receipt["status"],
+            Path(receipt["stderr"]["path"]).read_text(
+                encoding="utf-8", errors="replace"
+            ),
+        )
+        self.assertIn("USERNAME", receipt["environment"])
+
     def test_python_adapter_provides_verification_scoped_temporary_storage(self) -> None:
         (self.repo / "tests").mkdir()
         (self.repo / ".hive-verification" / "tmp").mkdir(parents=True)

@@ -146,27 +146,49 @@ class PacketRecordingWorker(RecordingWorker):
         result = super().run(**{**arguments, "writable": False})
         report = result["report"]
         report["proposed_patch"] = None
+        court = next(
+            (
+                item["workers"][0]["report"]
+                for item in arguments["predecessor_reports"]
+                if item["node_id"] == "COURT-050"
+            ),
+            None,
+        )
         if arguments["node"]["node_id"] == "CHALLENGER-060":
-            selected = {item["path"]: item["content"] for item in arguments["source_packet"]["selected_files"]}
-            before = selected["counter.py"]
-            increment = "2" if self.broken_patch else "1"
-            after = before.replace("return value\n", f"return value + {increment}\n")
-            source_patch = "".join(difflib.unified_diff(
-                before.splitlines(True), after.splitlines(True),
-                fromfile="a/counter.py", tofile="b/counter.py",
-            ))
-            regression = (
-                "import unittest\nfrom counter import increment\n\n"
-                "class PacketCounterTests(unittest.TestCase):\n"
-                "    def test_increment(self):\n"
-                "        self.assertEqual(3, increment(2))\n"
-            )
-            test_patch = "".join(difflib.unified_diff(
-                [], regression.splitlines(True), fromfile="/dev/null",
-                tofile="b/tests/test_counter_packet.py",
-            ))
-            report["proposed_patch"] = source_patch + test_patch
-            report["changed_paths"] = ["counter.py", "tests/test_counter_packet.py"]
+            if court is not None and not court["selected_idea_ids"]:
+                report["ideas"] = court["ideas"]
+                report["selected_idea_ids"] = []
+                report["changed_paths"] = []
+            else:
+                selected = {item["path"]: item["content"] for item in arguments["source_packet"]["selected_files"]}
+                before = selected["counter.py"]
+                increment = "2" if self.broken_patch else "1"
+                after = before.replace("return value\n", f"return value + {increment}\n")
+                source_patch = "".join(difflib.unified_diff(
+                    before.splitlines(True), after.splitlines(True),
+                    fromfile="a/counter.py", tofile="b/counter.py",
+                ))
+                regression = (
+                    "import unittest\nfrom counter import increment\n\n"
+                    "class PacketCounterTests(unittest.TestCase):\n"
+                    "    def test_increment(self):\n"
+                    "        self.assertEqual(3, increment(2))\n"
+                )
+                test_patch = "".join(difflib.unified_diff(
+                    [], regression.splitlines(True), fromfile="/dev/null",
+                    tofile="b/tests/test_counter_packet.py",
+                ))
+                report["proposed_patch"] = source_patch + test_patch
+                report["changed_paths"] = ["counter.py", "tests/test_counter_packet.py"]
+        if (
+            court is not None
+            and not court["selected_idea_ids"]
+            and arguments["node"]["node_id"]
+            in {"VERIFY-070", "JUDGE-075", "INTEGRATE-080"}
+        ):
+            report["ideas"] = court["ideas"]
+            report["selected_idea_ids"] = []
+            report["changed_paths"] = []
         if arguments["node"]["node_id"] == "VERIFY-070":
             checks = arguments["source_packet"]["independent_host_checks"]
             report["acceptance_evidence"] = [f"Independent host checks status: {checks['status']}"]
@@ -242,9 +264,9 @@ class LocalDagRuntimeTests(unittest.TestCase):
         result = self.execute()
         self.assertEqual("COMPLETED", result["status"])
         self.assertEqual(13, result["completed_nodes"])
-        self.assertEqual(14, result["session_count"])
+        self.assertEqual(15, result["session_count"])
         by_node = {call["node"]["node_id"]: call for call in self.worker.calls}
-        self.assertEqual(14, len(by_node))
+        self.assertEqual(15, len(by_node))
         for node_id, call in by_node.items():
             with self.subTest(node_id=node_id):
                 context_nodes = {report["node_id"] for report in call["predecessor_reports"]}
@@ -253,7 +275,7 @@ class LocalDagRuntimeTests(unittest.TestCase):
                 self.assertEqual("", git(call["workspace"], "remote"))
         self.assertEqual({
             "orchestrator", "explorer", "architect", "steward", "optimizer",
-            "curator", "builder", "integrator", "expert-witness",
+            "curator", "builder", "integrator", "expert-witness", "cross-examiner",
         }, {call["role"] for call in self.worker.calls})
         builder = by_node["CHALLENGER-060"]
         verifier = by_node["VERIFY-070"]
@@ -305,6 +327,22 @@ class LocalDagRuntimeTests(unittest.TestCase):
         self.assertLess(witness_index, examiner_index)
         examiner = self.worker.calls[examiner_index]
         self.assertIn("CROSS-045-WITNESS", {item["node_id"] for item in examiner["predecessor_reports"]})
+        reexaminer_index = next(
+            i for i, call in enumerate(self.worker.calls)
+            if call["node"]["node_id"] == "COURT-050-REEXAMINER"
+        )
+        court_index = next(
+            i for i, call in enumerate(self.worker.calls)
+            if call["node"]["node_id"] == "COURT-050"
+        )
+        self.assertLess(reexaminer_index, court_index)
+        self.assertIn(
+            "COURT-050-REEXAMINER",
+            {
+                item["node_id"]
+                for item in self.worker.calls[court_index]["predecessor_reports"]
+            },
+        )
         self.assertLessEqual(examiner["source_packet"]["selected_content_bytes"], 60_000)
         completed = {event["node_id"]: event for event in self.events() if event["kind"] == "node_completed"}
         runtime_call = next(call for call in self.worker.calls if call["node"]["node_id"] == "RUNTIME-030")
@@ -331,6 +369,26 @@ class LocalDagRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(LocalAuthorityError, "deterministic test evidence changed"):
             self.execute(resume=True)
         self.assertEqual(before, len(self.worker.calls))
+
+    def test_packet_mode_can_complete_a_verified_no_change_court_outcome(self) -> None:
+        self.worker = PacketRecordingWorker()
+        self.worker.empty_selection_node = "COURT-050"
+        self.service = LocalTournamentService(self.worker)
+        result = self.execute()
+        self.assertEqual("COMPLETED", result["status"])
+        self.assertEqual(self.base, result["candidate_commit"])
+        completed = {
+            event["node_id"]: event
+            for event in self.events()
+            if event["kind"] == "node_completed"
+        }
+        verifier = completed["VERIFY-070"]["workers"][0]
+        self.assertEqual("no_change_verified", verifier["host_checks"]["status"])
+        self.assertTrue(verifier["host_checks"]["all_passed"])
+        self.assertTrue(verifier["host_checks"]["no_change"])
+        self.assertEqual(0, verifier["host_checks"]["total_tests"])
+        self.assertEqual([], verifier["report"]["selected_idea_ids"])
+        self.assertEqual("", git(self.state / "candidate", "status", "--porcelain"))
 
     def test_failed_sealed_post_patch_check_halts_dependents_with_receipts(self) -> None:
         self.worker = PacketRecordingWorker()
