@@ -479,6 +479,8 @@ class LocalTournamentService:
             verify_host()
             if time.monotonic() - started > timeout:
                 raise LocalExecutionError("recorded-patch recovery exceeded remaining node time")
+            if not receipt["host_checks"].get("all_passed", False):
+                raise LocalExecutionError("recorded-patch sealed verification did not pass")
             after = self._commit_candidate(state / "candidate", receipt)
             result = {"kind": "node_completed", "node_id": node_id, "workers": [receipt],
                 "candidate_before": commit, "candidate_after": after,

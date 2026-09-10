@@ -424,6 +424,96 @@ class LocalDagRuntimeTests(unittest.TestCase):
         self.assertNotIn("VERIFY-070", called)
         self.assertNotIn("INTEGRATE-080", called)
 
+    def test_recorded_patch_recovery_requires_successful_checks(self) -> None:
+        from hive_mind_os.local_evidence_packet import run_focused_checks
+
+        # Inject only the pre-application parse failure; recovery applies the
+        # recorded fixture patch through the real host implementation.
+        class LocalEvidenceError(ValueError):
+            pass
+
+        for outcome in ("false", "missing", "exception", "success"):
+            with self.subTest(outcome=outcome):
+                self.state = self.root / ("state-" + outcome)
+                self.host = self.root / ("host-" + outcome)
+                self.brain = self.root / ("brain-" + outcome)
+                self.worker = PacketRecordingWorker()
+                self.worker.broken_patch = outcome == "false"
+                self.service = LocalTournamentService(self.worker)
+                run_worker = self.worker.run
+
+                def retain_terminal_receipt(**arguments):
+                    receipt = run_worker(**arguments)
+                    if arguments["node"]["node_id"] == "CHALLENGER-060":
+                        receipt["execution_mode"] = "source-packet"
+                        receipt["sandbox"] = "read-only"
+                        path = arguments["evidence_directory"] / "receipt.json"
+                        path.write_text(json.dumps(receipt), encoding="utf-8")
+                    return receipt
+
+                with patch.object(self.worker, "run", side_effect=retain_terminal_receipt), patch(
+                    "hive_mind_os.local_evidence_packet.apply_proposed_patch",
+                    side_effect=LocalEvidenceError("git apply failed: error: corrupt patch fixture"),
+                ):
+                    self.assertEqual("BLOCKED", self.execute()["status"])
+                original_events = self.events()
+                failed = original_events[-1]
+                self.assertEqual("node_failed", failed["kind"])
+                self.assertEqual("CHALLENGER-060", failed["node_id"])
+                report = failed["workers"][0]["report"]
+                saved_events = {path: path.read_bytes() for path in (self.state / "events").glob("*.json")}
+                saved_report = (self.state / "workers" / "CHALLENGER-060" / "report.json").read_bytes()
+                calls_before = len(self.worker.calls)
+
+                def recovery_checks(*arguments, **keywords):
+                    if outcome == "missing":
+                        return {"checks": [], "status": "incomplete"}
+                    if outcome == "exception":
+                        raise RuntimeError("injected recovery adapter exception")
+                    return run_focused_checks(*arguments, **keywords)
+
+                with patch(
+                    "hive_mind_os.local_evidence_packet.run_focused_checks",
+                    side_effect=recovery_checks,
+                ), patch.object(
+                    self.service, "_commit_candidate", wraps=self.service._commit_candidate,
+                ) as commit_candidate:
+                    result = self.execute(resume=True, recover_recorded_patch=True)
+                events = self.events()
+                recovery = next(event for event in events if event["kind"] in {"node_failed", "node_completed"}
+                                and event.get("recovered_from_sequence") == failed["sequence"])
+                self.assertFalse(recovery["model_replayed"])
+                self.assertEqual(report, recovery["workers"][0]["report"])
+                self.assertIn("host_patch", recovery["workers"][0])
+                self.assertEqual(original_events, events[:len(original_events)])
+                for path, content in saved_events.items():
+                    self.assertEqual(content, path.read_bytes())
+                self.assertEqual(saved_report, (self.state / "workers" / "CHALLENGER-060" / "report.json").read_bytes())
+                new_calls = [call["node"]["node_id"] for call in self.worker.calls[calls_before:]]
+                self.assertNotIn("CHALLENGER-060", new_calls)
+                if outcome == "success":
+                    self.assertEqual("COMPLETED", result["status"])
+                    self.assertEqual("node_completed", recovery["kind"])
+                    self.assertTrue(recovery["workers"][0]["host_checks"]["all_passed"])
+                    commit_candidate.assert_called_once()
+                    self.assertNotEqual(self.base, git(self.state / "candidate", "rev-parse", "HEAD"))
+                    self.assertIn("VERIFY-070", new_calls)
+                else:
+                    self.assertEqual("BLOCKED", result["status"])
+                    self.assertEqual("node_failed", recovery["kind"])
+                    commit_candidate.assert_not_called()
+                    self.assertEqual(self.base, git(self.state / "candidate", "rev-parse", "HEAD"))
+                    self.assertEqual([], new_calls)
+                    if outcome == "exception":
+                        self.assertNotIn("host_checks", recovery["workers"][0])
+                        self.assertIn("injected recovery adapter exception", recovery["reason"])
+                    else:
+                        self.assertFalse(recovery["workers"][0]["host_checks"].get("all_passed", False))
+                        self.assertIn("sealed verification did not pass", recovery["reason"])
+                    self.assertTrue(git(self.state / "candidate", "status", "--porcelain"))
+                self.assertEqual(self.base, git(self.repository, "rev-parse", "HEAD"))
+                self.assertEqual("", git(self.repository, "status", "--porcelain"))
+
     def test_baseline_packet_contains_exact_host_verified_run_metadata(self) -> None:
         self.worker = PacketRecordingWorker()
         self.worker.failed_node = "BASELINE-001"
