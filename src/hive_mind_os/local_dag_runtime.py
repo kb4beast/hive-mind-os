@@ -575,7 +575,19 @@ class LocalTournamentService:
             if policy.stage_kind in {"build", "verification"}:
                 court_report = next(item for item in reports if policies[item["node_id"]].stage_kind == "court-selection")["workers"][0]["report"]
                 selection_context = [{"ideas": [idea for idea in court_report["ideas"] if idea["idea_id"] in court_report["selected_idea_ids"]]}]
-            packet = build_source_packet(workspace, node_id, selection_context, max_content_bytes=60_000 if policy.stage_kind in {"cross-examination", "integration"} else 140_000)
+            packet_content_budget = (
+                60_000
+                if policy.stage_kind in {"cross-examination", "integration"}
+                else 120_000
+                if policy.stage_kind == "court-selection"
+                else 140_000
+            )
+            packet = build_source_packet(
+                workspace,
+                node_id,
+                selection_context,
+                max_content_bytes=packet_content_budget,
+            )
             if run_binding is None:
                 raise LocalAuthorityError("worker packet requires verified run bindings")
             packet["run_binding"] = {
@@ -688,13 +700,31 @@ class LocalTournamentService:
             )
             if reexaminer["status"] != "completed":
                 return [reexaminer]
+            # The full post-revision report remains content-addressed in run
+            # custody.  Give the judge only the adjudicative fields and exact
+            # response receipt so the second independent session cannot make
+            # the sealed court token budget grow without bound.
+            compact_reexamination = {
+                key: reexaminer["report"][key]
+                for key in (
+                    "status", "summary", "findings", "ideas", "selected_idea_ids"
+                )
+            }
+            response_evidence = reexaminer["evidence"].get(
+                "response", reexaminer["evidence"].get("report")
+            )
+            if response_evidence is None:
+                raise LocalExecutionError(
+                    "post-revision examiner lacks a retained response receipt"
+                )
             reports = reports + [{
                 "node_id": reexamination_node["node_id"],
                 "workers": [{
-                    key: reexaminer[key]
-                    for key in (
-                        "actor_id", "role", "session_id", "report", "evidence"
-                    )
+                    "actor_id": reexaminer["actor_id"],
+                    "role": reexaminer["role"],
+                    "session_id": reexaminer["session_id"],
+                    "report": compact_reexamination,
+                    "evidence": {"response": response_evidence},
                 }],
             }]
         witness = None
