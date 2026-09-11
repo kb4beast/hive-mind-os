@@ -423,7 +423,12 @@ class MultiSurfaceGuardrailTests(_EvaluationCase):
         for kind in SurfaceKind:
             for budget in (0.0, 0.25):
                 runtime = EvaluationRuntime(
-                    EvaluationContract(guardrails=(GuardrailSpec(kind, budget),))
+                    EvaluationContract(
+                        guardrails=(GuardrailSpec(kind, budget),),
+                        primary_held_out_name=(
+                            "zz-primary" if kind == SurfaceKind.HELD_OUT else None
+                        ),
+                    )
                 )
                 if budget == 0.0 and kind in (
                     SurfaceKind.ADVERSARIAL, SurfaceKind.COMPARATOR
@@ -584,6 +589,198 @@ class SealEvaluatorBindingTests(_EvaluationCase):
                    side_effect=OSError("receipt persistence failed")):
             with self.assertRaisesRegex(OSError, "receipt persistence failed"):
                 self._evaluate(surfaces, holdout=self._sealed_as("seal:A"))
+
+
+class ExactPrimarySelectionTests(_EvaluationCase):
+    def _check_receipt(self, record, runtime, surfaces, schema, resolved, scored):
+        document = json.loads(record.record_path.read_text(encoding="utf-8"))
+        self.assertEqual(schema, document["schema_version"])
+        self.assertEqual(resolved, record.resolved_primary_held_out_name)
+        self.assertEqual(scored, record.primary_scored)
+        self.assertEqual(runtime.contract.primary_held_out_name,
+                         record.requested_primary_held_out_name)
+        self.assertEqual(canonical_digest(document), record.record_digest)
+        self.assertEqual([s.document() for s in sorted(
+            surfaces, key=lambda s: (s.kind.value, s.name))], document["surfaces"])
+        path = self.evidence_root / "contracts" / (runtime.contract.fingerprint[7:] + ".json")
+        preimage = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(runtime.contract.document(), preimage)
+        self.assertEqual(document["contract_fingerprint"], canonical_digest(preimage))
+        if schema == 3:
+            self.assertEqual(resolved, document["resolved_primary_held_out_name"])
+            self.assertEqual(scored, document["primary_scored"])
+            self.assertEqual(runtime.contract.primary_held_out_name,
+                             document["requested_primary_held_out_name"])
+        if not scored:
+            for field in ("primary_effect", "required_effect", "noise_floor"):
+                self.assertIsNone(document[field])
+
+    def test_designation_routing_and_retained_contract(self):
+        for count in (0, 1, 2):
+            for name in (None, "held-out-surface", "unknown"):
+                with self.subTest(count=count, name=name):
+                    runtime = EvaluationRuntime(EvaluationContract(primary_held_out_name=name))
+                    surfaces = [s for s in self._surfaces() if s.kind != SurfaceKind.HELD_OUT]
+                    if count:
+                        surfaces.append(self._surface(SurfaceKind.HELD_OUT,
+                            (0.5,) * 3, (0.75,) * 3))
+                    if count == 2:
+                        surfaces.append(self._surface(SurfaceKind.HELD_OUT,
+                            (0.5,) * 3, (0.25,) * 3, name="z"))
+                    ambiguous = name == "unknown" or (name is not None and not count) or (name is None and count == 2)
+                    expected = EvaluationVerdict.QUARANTINE if ambiguous else (
+                        EvaluationVerdict.KEEP if count else EvaluationVerdict.RETEST)
+                    record = self._evaluate(surfaces, runtime=runtime)
+                    self.assertEqual(expected, record.verdict)
+                    resolved = "held-out-surface" if count and not ambiguous else None
+                    self._check_receipt(record, runtime, surfaces,
+                        3 if name is not None or count == 2 else 2,
+                        resolved, expected == EvaluationVerdict.KEEP)
+
+    def test_primary_renaming_and_permutations(self):
+        for primary_name, other_name in (("a", "z"), ("z", "a"), ("renamed", "zz")):
+            runtime = EvaluationRuntime(EvaluationContract(primary_held_out_name=primary_name))
+            surfaces = [s for s in self._surfaces() if s.kind != SurfaceKind.HELD_OUT]
+            surfaces += [self._surface(SurfaceKind.HELD_OUT, (0.5,) * 3,
+                (0.75,) * 3, name=primary_name), self._surface(SurfaceKind.HELD_OUT,
+                (0.5,) * 3, (0.25,) * 3, name=other_name)]
+            first = self._evaluate(surfaces, runtime=runtime)
+            self.assertEqual(first, self._evaluate(surfaces[::-1], runtime=runtime))
+            self.assertEqual(EvaluationVerdict.KEEP, first.verdict)
+            self.assertEqual(0.25, first.primary_effect)
+            self._check_receipt(first, runtime, surfaces, 3, primary_name, True)
+
+    def test_ambiguity_precedes_scoring_and_retains_other_failures(self):
+        for case in ("duplicate", "cross-kind", "renamed", "missing-designation"):
+            surfaces = self._surfaces(pit=None)
+            name = "held-out-surface"
+            if case == "duplicate":
+                surfaces.append(surfaces[0])
+            elif case == "cross-kind":
+                name = "comparator-surface"
+            elif case == "renamed":
+                name = "previous-name"
+            else:
+                name = None
+                surfaces.append(self._surface(SurfaceKind.HELD_OUT,
+                    (0.5,), (0.75,), name="extra"))
+            surfaces.append(self._surface(SurfaceKind.ADVERSARIAL,
+                (1.0,) * 3, (0.0,) * 3, name="bad", refs=()))
+            runtime = EvaluationRuntime(EvaluationContract(primary_held_out_name=name))
+            with patch("hive_mind_os.brain_kernel.evaluation_runtime.fmean",
+                       side_effect=AssertionError("unexpected scoring")):
+                record = self._evaluate(surfaces, runtime=runtime)
+            self.assertEqual(EvaluationVerdict.QUARANTINE, record.verdict)
+            self.assertIn("surface has no retained artifacts: bad", record.reasons)
+            self._check_receipt(record, runtime, surfaces, 3, None, False)
+
+    def test_selection_rejections_are_isolated_from_other_diagnostics(self):
+        cases = {
+            "duplicate-designation": (
+                "held-out-surface",
+                lambda surfaces: surfaces + [surfaces[0]],
+                (
+                    "duplicate surface: held-out-surface",
+                    "primary held-out designation requires exactly one match: "
+                    "held-out-surface",
+                ),
+            ),
+            "cross-kind-designation": (
+                "comparator-surface",
+                lambda surfaces: surfaces,
+                (
+                    "primary held-out designation requires exactly one match: "
+                    "comparator-surface",
+                ),
+            ),
+            "unmatched-renaming": (
+                "previous-name",
+                lambda surfaces: surfaces,
+                (
+                    "primary held-out designation requires exactly one match: "
+                    "previous-name",
+                ),
+            ),
+        }
+        for label, (name, mutate, expected_reasons) in cases.items():
+            with self.subTest(case=label):
+                runtime = EvaluationRuntime(
+                    EvaluationContract(primary_held_out_name=name)
+                )
+                surfaces = mutate(self._surfaces())
+                with (
+                    patch(
+                        "hive_mind_os.brain_kernel.evaluation_runtime.fmean",
+                        side_effect=AssertionError("unexpected scoring"),
+                    ) as mean,
+                    patch(
+                        "hive_mind_os.brain_kernel.evaluation_runtime.pstdev",
+                        side_effect=AssertionError("unexpected scoring"),
+                    ) as deviation,
+                ):
+                    record = self._evaluate(surfaces, runtime=runtime)
+                self.assertEqual(EvaluationVerdict.QUARANTINE, record.verdict)
+                for reason in expected_reasons:
+                    self.assertIn(reason, record.reasons)
+                self.assertFalse(
+                    any("retained artifacts" in reason for reason in record.reasons)
+                )
+                self.assertIsNone(record.primary_effect)
+                self.assertIsNone(record.required_effect)
+                self.assertIsNone(record.noise_floor)
+                self.assertFalse(record.primary_scored)
+                mean.assert_not_called()
+                deviation.assert_not_called()
+                self._check_receipt(record, runtime, surfaces, 3, None, False)
+
+    def test_resolved_primary_can_remain_unscored_and_thresholds_are_strict(self):
+        runtime = EvaluationRuntime(EvaluationContract(
+            minimum_effect=0.25, primary_held_out_name="held-out-surface"))
+        for value in (0.25, 0.5, 0.75):
+            surfaces = self._surfaces(held_out=((0.5,) * 3, (value,) * 3))
+            record = self._evaluate(surfaces, runtime=runtime)
+            self.assertEqual(EvaluationVerdict.RETEST, record.verdict)
+            self._check_receipt(record, runtime, surfaces, 3, "held-out-surface", True)
+        surfaces = self._surfaces(pit=None)
+        record = self._evaluate(surfaces, runtime=runtime)
+        self.assertEqual(EvaluationVerdict.RETEST, record.verdict)
+        self._check_receipt(record, runtime, surfaces, 3, "held-out-surface", False)
+
+    def test_identifier_validation_and_fingerprint_migration(self):
+        for name in ("", " x", "x ", 1, True, []):
+            with self.assertRaises(EvaluationError):
+                EvaluationContract(primary_held_out_name=name)
+        contract = EvaluationContract()
+        legacy = contract.document()
+        legacy.pop("selection_policy")
+        legacy.pop("primary_held_out_name")
+        self.assertNotEqual(canonical_digest(legacy), contract.fingerprint)
+        self.assertNotEqual(contract.fingerprint,
+            EvaluationContract(primary_held_out_name="held-out-surface").fingerprint)
+        with self.assertRaises(EvaluationError):
+            self._evaluate([])
+
+    def test_contract_mutation_is_not_overwritten(self):
+        surfaces = self._surfaces()
+        first = self._evaluate(surfaces)
+        original = first.record_path.read_bytes()
+        path = self.evidence_root / "contracts" / (self.runtime.contract.fingerprint[7:] + ".json")
+        path.write_bytes(b"truncated")
+        with self.assertRaisesRegex(EvaluationError, "contract was mutated"):
+            self._evaluate(surfaces)
+        self.assertEqual(b"truncated", path.read_bytes())
+        self.assertEqual(original, first.record_path.read_bytes())
+
+    def test_receipt_failure_after_successful_contract_persistence(self):
+        surfaces = self._surfaces()
+        with patch("hive_mind_os.brain_kernel.evaluation_runtime.os.fsync",
+                   side_effect=[None, OSError("second write failed")]) as sync:
+            with self.assertRaisesRegex(OSError, "second write failed"):
+                self._evaluate(surfaces)
+        self.assertEqual(2, sync.call_count)
+        path = self.evidence_root / "contracts" / (self.runtime.contract.fingerprint[7:] + ".json")
+        self.assertEqual(canonical_bytes(self.runtime.contract.document()) + b"\n",
+                         path.read_bytes())
 
 
 if __name__ == "__main__":
