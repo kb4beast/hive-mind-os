@@ -1,6 +1,6 @@
 # ADR: Exact held-out primary selection
 
-Status: proposed implementation; execution and independent verification pending.
+Status: accepted for reversible delivery; merge and promotion prohibited.
 
 ## Context and decision
 
@@ -39,3 +39,27 @@ Contract persistence adds availability cost and may leave orphan or partial file
 No transactional crash recovery, promotion admission, or superiority is claimed.
 Run focused evaluation tests, baseline reproduction, and independent verification.
 Rollback supersedes the isolated candidate and retains receipts and policy provenance.
+
+## Delivery evidence and scope ruling
+
+The independent appeals identity returned `adapt`: the bounded functional change is
+eligible for a delivery pull request, but neither merge nor challenger promotion is
+authorized. Authenticated premeasurement chronology remains a separate
+LEARNING-040-002 obligation; it is not evidence for or against the narrower claim
+that an explicit contract designation prevents held-out selection from changing
+when surface names are exchanged.
+
+The legacy name-swap reproduction source is bound as
+`sha256:e91ebe0a5bc7e6f2bf966ac21dbda0e24cc30858b548bb58f78e3aa5307622f8`.
+Its independently executed receipt is bound as
+`sha256:4d7b5f1112278efcbc2a26f63032e777762f063654165e7333b04ebbe502ce22`;
+the external delivery evidence retains the exact source bytes, raw output, host
+receipt, and authenticated tournament-event digest. Isolated executable cases
+cover duplicate designation, a name found only in another surface kind, and a
+renamed/unmatched designation. Each asserts the selection-specific quarantine
+reason, absence of scoring, and absence of unrelated evidence diagnostics.
+
+Outstanding obligations remain explicit: contract chronology is not authenticated;
+builder, verifier, judge, and promoter principals are not yet cryptographically
+authenticated; replay resistance and promotion admission are not implemented; and
+no superiority or promotion claim is made.

@@ -674,6 +674,65 @@ class ExactPrimarySelectionTests(_EvaluationCase):
             self.assertIn("surface has no retained artifacts: bad", record.reasons)
             self._check_receipt(record, runtime, surfaces, 3, None, False)
 
+    def test_selection_rejections_are_isolated_from_other_diagnostics(self):
+        cases = {
+            "duplicate-designation": (
+                "held-out-surface",
+                lambda surfaces: surfaces + [surfaces[0]],
+                (
+                    "duplicate surface: held-out-surface",
+                    "primary held-out designation requires exactly one match: "
+                    "held-out-surface",
+                ),
+            ),
+            "cross-kind-designation": (
+                "comparator-surface",
+                lambda surfaces: surfaces,
+                (
+                    "primary held-out designation requires exactly one match: "
+                    "comparator-surface",
+                ),
+            ),
+            "unmatched-renaming": (
+                "previous-name",
+                lambda surfaces: surfaces,
+                (
+                    "primary held-out designation requires exactly one match: "
+                    "previous-name",
+                ),
+            ),
+        }
+        for label, (name, mutate, expected_reasons) in cases.items():
+            with self.subTest(case=label):
+                runtime = EvaluationRuntime(
+                    EvaluationContract(primary_held_out_name=name)
+                )
+                surfaces = mutate(self._surfaces())
+                with (
+                    patch(
+                        "hive_mind_os.brain_kernel.evaluation_runtime.fmean",
+                        side_effect=AssertionError("unexpected scoring"),
+                    ) as mean,
+                    patch(
+                        "hive_mind_os.brain_kernel.evaluation_runtime.pstdev",
+                        side_effect=AssertionError("unexpected scoring"),
+                    ) as deviation,
+                ):
+                    record = self._evaluate(surfaces, runtime=runtime)
+                self.assertEqual(EvaluationVerdict.QUARANTINE, record.verdict)
+                for reason in expected_reasons:
+                    self.assertIn(reason, record.reasons)
+                self.assertFalse(
+                    any("retained artifacts" in reason for reason in record.reasons)
+                )
+                self.assertIsNone(record.primary_effect)
+                self.assertIsNone(record.required_effect)
+                self.assertIsNone(record.noise_floor)
+                self.assertFalse(record.primary_scored)
+                mean.assert_not_called()
+                deviation.assert_not_called()
+                self._check_receipt(record, runtime, surfaces, 3, None, False)
+
     def test_resolved_primary_can_remain_unscored_and_thresholds_are_strict(self):
         runtime = EvaluationRuntime(EvaluationContract(
             minimum_effect=0.25, primary_held_out_name="held-out-surface"))
