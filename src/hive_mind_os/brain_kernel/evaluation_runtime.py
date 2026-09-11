@@ -471,15 +471,17 @@ class EvaluationRuntime:
                 # 4. Hard guardrails, retained as losing evidence.
                 guardrail_reasons: list[str] = []
                 for spec in contract.guardrails:
-                    surface = by_kind[spec.surface]
-                    effect = fmean(surface.candidate_samples) - fmean(
-                        surface.baseline_samples
-                    )
-                    regression = max(0.0, -effect)
-                    if regression > spec.maximum_regression:
-                        guardrail_reasons.append(
-                            f"hard guardrail regressed: {surface.name}"
+                    for surface in ordered:
+                        if surface.kind != spec.surface:
+                            continue
+                        effect = fmean(surface.candidate_samples) - fmean(
+                            surface.baseline_samples
                         )
+                        regression = max(0.0, -effect)
+                        if regression > spec.maximum_regression:
+                            guardrail_reasons.append(
+                                f"hard guardrail regressed: {surface.name}"
+                            )
                 if guardrail_reasons:
                     verdict = EvaluationVerdict.DISCARD
                     reasons = guardrail_reasons
