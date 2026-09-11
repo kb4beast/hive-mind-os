@@ -498,10 +498,6 @@ class MultiSurfaceGuardrailTests(_EvaluationCase):
                              for r in quarantined.reasons))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class SealEvaluatorBindingTests(_EvaluationCase):
     def _sealed_as(self, evaluator):
         holdout = SealedHoldout(self.seal.holdout_id, HOLDOUT_CASES)
@@ -588,3 +584,7 @@ class SealEvaluatorBindingTests(_EvaluationCase):
                    side_effect=OSError("receipt persistence failed")):
             with self.assertRaisesRegex(OSError, "receipt persistence failed"):
                 self._evaluate(surfaces, holdout=self._sealed_as("seal:A"))
+
+
+if __name__ == "__main__":
+    unittest.main()
