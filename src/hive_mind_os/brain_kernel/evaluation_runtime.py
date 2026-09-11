@@ -324,6 +324,7 @@ class EvaluationContract:
         GuardrailSpec(SurfaceKind.ADVERSARIAL),
         GuardrailSpec(SurfaceKind.COMPARATOR),
     )
+    primary_held_out_name: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -336,6 +337,8 @@ class EvaluationContract:
         _require_non_negative(self.minimum_effect, "minimum_effect")
         if type(self.guardrails) is not tuple:
             raise EvaluationError("guardrails must be a tuple of GuardrailSpec")
+        if self.primary_held_out_name is not None:
+            _require_identifier(self.primary_held_out_name, "primary_held_out_name")
         surfaces: set[SurfaceKind] = set()
         for spec in self.guardrails:
             if not isinstance(spec, GuardrailSpec):
@@ -346,8 +349,13 @@ class EvaluationContract:
 
     @property
     def fingerprint(self) -> str:
-        return canonical_digest(
-            {
+        return canonical_digest(self.document())
+
+    def document(self) -> dict[str, Any]:
+        """The exact fingerprint preimage, also retained beside evaluations."""
+        return {
+                "selection_policy": "exact-held-out-v1",
+                "primary_held_out_name": self.primary_held_out_name,
                 "minimum_repetitions": self.minimum_repetitions,
                 "noise_multiplier": float(self.noise_multiplier),
                 "minimum_effect": float(self.minimum_effect),
@@ -359,7 +367,6 @@ class EvaluationContract:
                     for spec in self.guardrails
                 ],
             }
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,6 +379,10 @@ class EvaluationRecord:
     noise_floor: float | None
     record_path: Path
     record_digest: str
+    selection_policy: str | None = None
+    requested_primary_held_out_name: str | None = None
+    resolved_primary_held_out_name: str | None = None
+    primary_scored: bool = False
 
 
 class EvaluationRuntime:
@@ -445,6 +456,24 @@ class EvaluationRuntime:
                 if issue is not None:
                     quarantine_reasons.append(f"missing or mutated artifact: {issue}")
 
+        held_out_surfaces = [s for s in ordered if s.kind == SurfaceKind.HELD_OUT]
+        requested_primary = contract.primary_held_out_name
+        matches = [s for s in held_out_surfaces
+                   if requested_primary is None or s.name == requested_primary]
+        primary = matches[0] if len(matches) == 1 else None
+        if requested_primary is not None and primary is None:
+            quarantine_reasons.append(
+                "primary held-out designation requires exactly one match: "
+                + requested_primary
+            )
+        elif requested_primary is None and len(held_out_surfaces) > 1:
+            quarantine_reasons.append(
+                "multiple held-out surfaces require a primary designation"
+            )
+        resolved_primary = primary.name if primary is not None else None
+        extended_receipt = requested_primary is not None or len(held_out_surfaces) > 1
+        selection_policy = contract.document()["selection_policy"]
+
         verdict: EvaluationVerdict
         reasons: list[str]
         primary_effect: float | None = None
@@ -495,7 +524,9 @@ class EvaluationRuntime:
                     reasons = guardrail_reasons
                 else:
                     # 5. Primary decision on the held-out surface.
-                    held_out = by_kind[SurfaceKind.HELD_OUT]
+                    if primary is None:
+                        raise EvaluationError("primary held-out selection is unresolved")
+                    held_out = primary
                     primary_effect = fmean(held_out.candidate_samples) - fmean(
                         held_out.baseline_samples
                     )
@@ -525,7 +556,7 @@ class EvaluationRuntime:
 
         # 6. Retention for every verdict, losing evidence included (AC3).
         document: dict[str, Any] = {
-            "schema_version": 2,
+            "schema_version": 3 if extended_receipt else 2,
             "descriptor": descriptor.document(),
             "identities": identities.document(),
             "contract_fingerprint": contract.fingerprint,
@@ -547,11 +578,33 @@ class EvaluationRuntime:
             },
             "surfaces": [surface.document() for surface in ordered],
         }
+        primary_scored = primary_effect is not None
+        if extended_receipt:
+            document.update({
+                "selection_policy": selection_policy,
+                "requested_primary_held_out_name": requested_primary,
+                "resolved_primary_held_out_name": resolved_primary,
+                "primary_scored": primary_scored,
+            })
         evaluation_id = "EVAL-" + canonical_digest(document)[7:23]
         document["evaluation_id"] = evaluation_id
 
         root = Path(evidence_root)
         root.mkdir(parents=True, exist_ok=True)
+        contracts_root = root / "contracts"
+        contracts_root.mkdir(exist_ok=True)
+        contract_path = contracts_root / f"{contract.fingerprint[7:]}.json"
+        contract_payload = canonical_bytes(contract.document()) + b"\n"
+        try:
+            with contract_path.open("xb") as handle:
+                handle.write(contract_payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except FileExistsError:
+            if contract_path.read_bytes() != contract_payload:
+                raise EvaluationError(
+                    "retained evaluation contract was mutated"
+                ) from None
         record_path = root / f"{evaluation_id}.json"
         payload = canonical_bytes(document) + b"\n"
         try:
@@ -573,4 +626,8 @@ class EvaluationRuntime:
             noise_floor,
             record_path,
             canonical_digest(document),
+            selection_policy,
+            requested_primary,
+            resolved_primary,
+            primary_scored,
         )
