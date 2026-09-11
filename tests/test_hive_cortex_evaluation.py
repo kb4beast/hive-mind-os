@@ -6,8 +6,9 @@ import unittest
 from hashlib import sha256
 from pathlib import Path
 from statistics import pstdev
+from unittest.mock import patch
 
-from hive_mind_os.brain_kernel.canonical import canonical_digest
+from hive_mind_os.brain_kernel.canonical import canonical_bytes, canonical_digest
 from hive_mind_os.brain_kernel.evaluation_runtime import (
     ChallengerDescriptor,
     EvaluationContract,
@@ -499,3 +500,91 @@ class MultiSurfaceGuardrailTests(_EvaluationCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SealEvaluatorBindingTests(_EvaluationCase):
+    def _sealed_as(self, evaluator):
+        holdout = SealedHoldout(self.seal.holdout_id, HOLDOUT_CASES)
+        holdout.seal_prediction(evaluator, {"expected_keep": False})
+        return holdout
+
+    def _assert_quarantine(self, record, evaluator):
+        self.assertEqual(EvaluationVerdict.QUARANTINE, record.verdict)
+        document = json.loads(record.record_path.read_text(encoding="utf-8"))
+        self.assertEqual(2, document["schema_version"])
+        self.assertEqual(evaluator, document["holdout"]["evaluator_id"])
+        self.assertEqual(self.identities.evaluator_id,
+                         document["identities"]["evaluator_id"])
+        for field in ("primary_effect", "required_effect", "noise_floor"):
+            self.assertIsNone(getattr(record, field))
+            self.assertIsNone(document[field])
+        self.assertEqual(canonical_digest(document), record.record_digest)
+        return document
+
+    def test_mismatch_quarantines_before_scoring_and_retains_evidence(self):
+        for case in ("eligible", "missing-kind", "thin", "artifact", "regression"):
+            with self.subTest(case=case):
+                surfaces = self._surfaces()
+                if case == "missing-kind":
+                    surfaces = [s for s in surfaces if s.kind != SurfaceKind.PIT]
+                elif case == "thin":
+                    surfaces = self._surfaces(held_out=((0.5,), (0.8,)))
+                elif case == "artifact":
+                    Path(surfaces[0].artifact_refs[0].rpartition("#")[0]).unlink()
+                elif case == "regression":
+                    surfaces = self._surfaces(adversarial=((0.9,) * 3, (0.1,) * 3))
+                with patch("hive_mind_os.brain_kernel.evaluation_runtime.fmean",
+                           side_effect=AssertionError("unexpected scoring")):
+                    record = self._evaluate(surfaces, holdout=self._sealed_as("seal:A"))
+                document = self._assert_quarantine(record, "seal:A")
+                self.assertIn("holdout seal evaluator does not match evaluation evaluator",
+                              record.reasons)
+                self.assertEqual([s.document() for s in sorted(
+                    surfaces, key=lambda s: (s.kind.value, s.name))], document["surfaces"])
+                if case == "artifact":
+                    self.assertTrue(any("artifact does not resolve" in r
+                                        for r in record.reasons))
+
+    def test_seal_attribution_changes_identity_and_repetition_is_immutable(self):
+        surfaces = self._surfaces()
+        first = self._evaluate(surfaces, holdout=self._sealed_as("seal:A"))
+        original = first.record_path.read_bytes()
+        repeated = self._evaluate(surfaces, holdout=self._sealed_as("seal:A"))
+        other = self._evaluate(surfaces, holdout=self._sealed_as("seal:C"))
+        self.assertEqual(first, repeated)
+        self.assertEqual(original, first.record_path.read_bytes())
+        self.assertNotEqual(first.evaluation_id, other.evaluation_id)
+        self.assertNotEqual(first.record_digest, other.record_digest)
+        self._assert_quarantine(other, "seal:C")
+
+    def test_matching_receipt_preserves_legacy_bytes_and_configuration(self):
+        surfaces = self._surfaces()
+        record = self._evaluate(surfaces)
+        self.assertEqual(EvaluationVerdict.KEEP, record.verdict)
+        document = json.loads(record.record_path.read_text(encoding="utf-8"))
+        self.assertEqual(2, document["schema_version"])
+        self.assertEqual(self.identities.evaluator_id, document["holdout"]["evaluator_id"])
+        self.assertEqual(self.runtime.contract.fingerprint, document["contract_fingerprint"])
+        document.pop("evaluation_id")
+        document["schema_version"] = 1
+        document["holdout"].pop("evaluator_id")
+        legacy_id = "EVAL-" + canonical_digest(document)[7:23]
+        document["evaluation_id"] = legacy_id
+        legacy_bytes = canonical_bytes(document) + b"\n"
+        legacy_path = self.evidence_root / f"{legacy_id}.json"
+        legacy_path.write_bytes(legacy_bytes)
+        self.assertNotEqual(record.record_path, legacy_path)
+        self.assertEqual(record, self._evaluate(surfaces))
+        self.assertEqual(legacy_bytes, legacy_path.read_bytes())
+
+    def test_unsealed_input_retains_null_seal_evaluator(self):
+        record = self._evaluate(self._surfaces(), holdout=SealedHoldout(
+            "holdout:unsealed", HOLDOUT_CASES))
+        self._assert_quarantine(record, None)
+
+    def test_persistence_failure_does_not_return_success(self):
+        surfaces = self._surfaces()
+        with patch("hive_mind_os.brain_kernel.evaluation_runtime.os.fsync",
+                   side_effect=OSError("receipt persistence failed")):
+            with self.assertRaisesRegex(OSError, "receipt persistence failed"):
+                self._evaluate(surfaces, holdout=self._sealed_as("seal:A"))

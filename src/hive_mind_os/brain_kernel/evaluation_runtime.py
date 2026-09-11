@@ -416,12 +416,20 @@ class EvaluationRuntime:
 
         ordering = holdout.ordering
         violations = holdout.violations
+        recorded_seal = holdout._seal
 
         # 1. Quarantine set (AC2 + AC4). Nothing below is measured if it is non-empty.
         quarantine_reasons: list[str] = []
         if not ordering["valid"] or violations:
             kinds = ", ".join(violations) if violations else "no intact prediction seal"
             quarantine_reasons.append(f"holdout boundary violated: {kinds}")
+        if (
+            recorded_seal is not None
+            and recorded_seal.evaluator_id != identities.evaluator_id
+        ):
+            quarantine_reasons.append(
+                "holdout seal evaluator does not match evaluation evaluator"
+            )
         seen: set[tuple[SurfaceKind, str]] = set()
         for surface in ordered:
             key = (surface.kind, surface.name)
@@ -516,9 +524,8 @@ class EvaluationRuntime:
                         ]
 
         # 6. Retention for every verdict, losing evidence included (AC3).
-        recorded_seal = holdout._seal
         document: dict[str, Any] = {
-            "schema_version": 1,
+            "schema_version": 2,
             "descriptor": descriptor.document(),
             "identities": identities.document(),
             "contract_fingerprint": contract.fingerprint,
@@ -529,6 +536,9 @@ class EvaluationRuntime:
             "noise_floor": noise_floor,
             "holdout": {
                 "holdout_id": holdout._holdout_id,
+                "evaluator_id": (
+                    recorded_seal.evaluator_id if recorded_seal is not None else None
+                ),
                 "ordering": dict(ordering),
                 "violations": list(violations),
                 "prediction_digest": (
