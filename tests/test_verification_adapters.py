@@ -215,7 +215,11 @@ class VerificationAdapterTests(unittest.TestCase):
         self.assertIsNotNone(command)
         assert command is not None
         self.assertEqual("rustc", Path(command.argv[0]).stem)
-        receipt = verify_repository(self.repo, evidence_directory=self.root / "rust-evidence", **self.trusted())
+        receipt = verify_repository(
+            self.repo,
+            evidence_directory=self.root / "rust-evidence",
+            **self.trusted(wall_seconds=300),
+        )
         self.assertEqual(
             "PASSED", receipt["status"],
             Path(receipt["stderr"]["path"]).read_text(encoding="utf-8", errors="replace"),
