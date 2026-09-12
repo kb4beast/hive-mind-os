@@ -11,6 +11,8 @@ from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import PromptRegistry, generation_zero_prompt
 from hive_mind_os.roles import ROLE_CONTRACTS
+from promotion_fixtures import decision_payload
+from promotion_auth_fixtures import verifier_for
 
 
 class PromptRegistryTests(unittest.TestCase):
@@ -18,7 +20,7 @@ class PromptRegistryTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.ledger = EvidenceLedger()
-        self.registry = PromptRegistry(self.root, ledger=self.ledger)
+        self.registry = PromptRegistry(self.root, ledger=self.ledger, principal_verifier=verifier_for())
 
     def tearDown(self) -> None:
         self.registry.close()
@@ -49,22 +51,9 @@ class PromptRegistryTests(unittest.TestCase):
         actor: str = "judge:test",
         **overrides: object,
     ) -> int:
-        payload: dict[str, object] = {
-            "verdict": "keep",
-            "role": Role.BUILDER.value,
-            "candidate_digest": candidate,
-            "current_digest": current,
-            "registration_experiment_id": experiment_id,
-            "registration_role": Role.BUILDER.value,
-            "registration_author": "author:test",
-            "registration_parent_digest": current,
-            "proposer_id": "author:test",
-            "builder_id": "builder:test",
-            "evaluator_id": "evaluator:test",
-            "judge_id": actor,
-            "retained_artifact_refs": ["artifact:test#sha256:" + "a" * 64],
-            "contract_fingerprint": "sha256:" + "b" * 64,
-        }
+        payload = decision_payload(self.root, candidate_digest=candidate, parent=current,
+                                   experiment_id=experiment_id)
+        payload["judge_id"] = actor
         payload.update(overrides)
         return self.ledger.append_event(
             experiment_id,
@@ -127,7 +116,7 @@ class PromptRegistryTests(unittest.TestCase):
                 self.registry.promote(
                     Role.BUILDER,
                     challenger,
-                    promoted_by="judge:test",
+                    promoted_by="promoter:test",
                     experiment_id="EXP-crash",
                     expected_current=champion,
                     decision_event_sequence=decision_sequence,
@@ -154,7 +143,7 @@ class PromptRegistryTests(unittest.TestCase):
         self.registry.promote(
             Role.BUILDER,
             challenger,
-            promoted_by="judge:test",
+            promoted_by="promoter:test",
             experiment_id="EXP-keep",
             expected_current=champion,
             decision_event_sequence=decision_sequence,
@@ -198,7 +187,7 @@ class PromptRegistryTests(unittest.TestCase):
             self.registry.promote(
                 Role.BUILDER,
                 challenger,
-                promoted_by="judge:test",
+                promoted_by="promoter:test",
                 experiment_id="EXP-no-decision",
                 expected_current=champion,
             )
@@ -302,7 +291,7 @@ class PromptRegistryTests(unittest.TestCase):
             self.registry.promote(
                 Role.BUILDER,
                 challenger,
-                promoted_by="judge:test",
+                promoted_by="promoter:test",
                 experiment_id="EXP-forged",
                 expected_current=champion,
                 decision_event_sequence=forged_sequence,
@@ -365,7 +354,7 @@ class PromptRegistryTests(unittest.TestCase):
             self.registry.promote(
                 Role.BUILDER,
                 candidate,
-                promoted_by="judge:test",
+                promoted_by="promoter:test",
                 experiment_id="EXP-quarantined-promotion",
                 expected_current=champion,
                 decision_event_sequence=decision_sequence,

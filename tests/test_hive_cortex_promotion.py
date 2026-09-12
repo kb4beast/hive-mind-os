@@ -25,6 +25,8 @@ from hive_mind_os.brain_kernel.promotion import (
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import PromptRegistry
 from hive_mind_os.recursive_improvement import ExperimentVerdict
+from promotion_fixtures import bound_decision, evidence_refs
+from promotion_auth_fixtures import verifier_for
 
 PROPOSER = "proposer-1"
 BUILDER = "builder-1"
@@ -35,7 +37,8 @@ AFFECTED = (PROPOSER, BUILDER, EVALUATOR)
 
 def _registry(testcase: unittest.TestCase) -> PromptRegistry:
     directory = tempfile.TemporaryDirectory()
-    registry = PromptRegistry(directory.name)
+    registry = PromptRegistry(directory.name, principal_verifier=verifier_for(
+        builder_id=BUILDER, evaluator_id=EVALUATOR, judge_id=JUDGE, promoter_id="promoter-1"))
     # Cleanups run last-in-first-out: the sqlite ledger must be closed before
     # the temporary directory is removed or Windows raises WinError 32.
     testcase.addCleanup(directory.cleanup)
@@ -116,7 +119,7 @@ def _registered_candidate(
         parent,
         PROPOSER,
         BUILDER,
-        (f"evidence:{candidate_id}",),
+        evidence_refs(registry.root, candidate_id),
     )
 
 
@@ -129,16 +132,8 @@ def _decision(
     judge: str = JUDGE,
     evaluator: str = EVALUATOR,
 ) -> PromotionDecision:
-    return PromotionDecision(
-        decision_id,
-        case_id,
-        candidate,
-        verdict,
-        judge,
-        evaluator,
-        ("court-authorized",),
-        "fp-1",
-    )
+    return bound_decision(candidate, verdict, case_id, decision_id, judge=judge,
+                          evaluator=evaluator, promoter="promoter-1")
 
 
 def _keep(
@@ -494,8 +489,9 @@ class HiveCortexPromotionTests(unittest.TestCase):
         with self.assertRaisesRegex(PromotionAuthorityError, "discard or quarantine"):
             authority.rollback("DEC-D")
         self.assertEqual(registry.champion_digest(Role.BUILDER), digest_b)
-        # The authority refused on its own, without reaching the registry.
-        self.assertEqual(len(authority.receipts), retained)
+        # Early authority refusals now retain an authenticated decision-bound receipt.
+        self.assertEqual(len(authority.receipts), retained + 1)
+        self.assertEqual(authority.receipts[-1]["status"], "rejected")
 
         # An adverse quarantine verdict against the live champion restores A.
         adverse = PromotionCandidate(
@@ -555,8 +551,9 @@ class HiveCortexPromotionTests(unittest.TestCase):
         ):
             authority.rollback("DEC-Z")
         self.assertEqual(registry.champion_digest(Role.BUILDER), digest_a)
-        # Refused by this module's own binding check, not by a registry error.
-        self.assertEqual(len(authority.receipts), retained)
+        # The local binding refusal is retained without moving the registry pointer.
+        self.assertEqual(len(authority.receipts), retained + 1)
+        self.assertEqual(authority.receipts[-1]["status"], "rejected")
 
 
 if __name__ == "__main__":

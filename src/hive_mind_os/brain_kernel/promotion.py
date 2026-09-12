@@ -8,14 +8,18 @@ every outcome -- including the outcomes that deliberately move nothing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Iterable, Mapping
+
+if TYPE_CHECKING:
+    from .evaluation_runtime import ChallengerDescriptor, EvaluationRecordReference, PromptEvaluationSubject
 
 from ..models import Role, utc_now
-from ..prompt_registry import PromptRegistry
+from ..prompt_registry import PromptRegistry, PromotionCommittedEvidencePending
 from ..recursive_improvement import ExperimentVerdict
 from .canonical import canonical_digest
 from .court_runtime import CourtClaimKind, CourtDisposition, CourtHistory
+from .promotion_auth import PromotionAuthorization
 
 __all__ = [
     "PromotionAuthority",
@@ -140,6 +144,19 @@ class PromotionCandidate:
         )
 
 
+    def evaluation_subject(self, descriptor: ChallengerDescriptor, *, contract_fingerprint: str) -> PromptEvaluationSubject:
+        """Bind prompt bytes explicitly, without redefining the proposal digest."""
+        from .evaluation_runtime import PromptEvaluationSubject
+
+        return PromptEvaluationSubject(
+            descriptor=descriptor, candidate_id=self.candidate_id, role=self.role,
+            experiment_id=self.experiment_id, artifact_digest=self.artifact_digest,
+            parent_champion_digest=self.parent_champion_digest, proposer_id=self.proposer_id,
+            builder_id=self.builder_id, evidence_refs=self.evidence_refs,
+            contract_fingerprint=contract_fingerprint,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class PromotionDecision:
     """A judge's verdict on one candidate, bound to one independent court case."""
@@ -153,8 +170,14 @@ class PromotionDecision:
     reasons: tuple[str, ...]
     contract_fingerprint: str
     decided_at: str = ""
+    evaluation_subject: PromptEvaluationSubject | None = field(default=None, kw_only=True)
+    evaluation_record: EvaluationRecordReference | None = field(default=None, kw_only=True)
+    promoter_id: str | None = field(default=None, kw_only=True)
+    authorization: PromotionAuthorization | Mapping[str, Any] | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
+        if self.authorization is not None and not isinstance(self.authorization, PromotionAuthorization):
+            object.__setattr__(self, "authorization", PromotionAuthorization.from_document(self.authorization))
         _text(self.decision_id, "decision id")
         _text(self.court_case_id, "court case id")
         if not isinstance(self.candidate, PromotionCandidate):
@@ -179,6 +202,10 @@ class PromotionDecision:
             self.evaluator_id,
             self.judge_id,
         )
+        if self.promoter_id is not None:
+            _text(self.promoter_id, "promoter id")
+            if self.promoter_id in identities:
+                raise PromotionAuthorityError("promoter must be independent of proposer, builder, evaluator, and judge")
         if len(set(identities)) != 4:
             raise PromotionAuthorityError(
                 "promotion requires four distinct proposer, builder, evaluator, "
@@ -329,7 +356,12 @@ class PromotionAuthority:
     ) -> PromotionDecision:
         """Record a court-backed decision.  This never moves a pointer."""
 
-        self._log = self._log.append(decision, court_history=court_history)
+        try:
+            self._log = self._log.append(decision, court_history=court_history)
+        except PromotionAuthorityError as error:
+            self._record_receipt(decision, action="submit", status="rejected", prior_digest=None,
+                                 reasons=(str(error),), pointer_after=None)
+            raise
         return decision
 
     def _actionable(self, decision_id: str) -> PromotionDecision:
@@ -345,6 +377,31 @@ class PromotionAuthority:
         return decision
 
     def apply(self, decision_id: str) -> dict[str, Any]:
+        return self._run_with_refusal_receipt(decision_id, "apply")
+
+    def _run_with_refusal_receipt(self, decision_id: str, operation: str) -> dict[str, Any]:
+        prior_count = len(self._receipts)
+        try:
+            return self._apply(decision_id) if operation == "apply" else self._rollback(decision_id)
+        except PromotionAuthorityError as error:
+            if len(self._receipts) == prior_count:
+                decision = next((item for item in self._log.decisions if item.decision_id == decision_id), None)
+                if decision is not None:
+                    self._record_receipt(decision, action=operation, status="rejected", prior_digest=None,
+                                         reasons=(str(error),), pointer_after=None)
+                else:
+                    receipt: dict[str, Any] = {
+                        "schema_version": 1, "kind": "promotion.receipt", "decision_id": decision_id,
+                        "status": "rejected", "action": operation, "candidate_binding": None,
+                        "code": "decision-unavailable", "reasons": [str(error)], "recorded_at": utc_now(),
+                    }
+                    if self.registry.principal_verifier is not None:
+                        receipt["authentication"] = self.registry.principal_verifier.sign_rejection(receipt)
+                    self.registry.ledger.append_event("promotion:unbound", "promotion.receipt", "promotion-authority", receipt)
+                    self._receipts = (*self._receipts, receipt)
+            raise
+
+    def _apply(self, decision_id: str) -> dict[str, Any]:
         """Carry out a logged decision.  Only KEEP may move the pointer."""
 
         decision = self._actionable(decision_id)
@@ -377,8 +434,45 @@ class PromotionAuthority:
                 pointer_after=self.registry.champion_digest(candidate.role),
             )
 
-        payload = {
-            "verdict": "keep",
+        payload = self.decision_payload(decision)
+        sequence = self.registry.ledger.append_event(
+            candidate.experiment_id, "experiment.decision", decision.judge_id, payload,
+        )
+        try:
+            prior = self.registry.promote(
+                candidate.role, candidate.artifact_digest,
+                promoted_by=decision.promoter_id or decision.judge_id,
+                experiment_id=candidate.experiment_id,
+                expected_current=candidate.parent_champion_digest,
+                decision_event_sequence=sequence,
+            )
+        except PromotionCommittedEvidencePending as error:
+            self._applied |= {decision_id}
+            return self._record_receipt(
+                decision, action="promote", status="committed-evidence-pending",
+                prior_digest=error.prior_digest, reasons=(str(error),),
+                pointer_after=error.pointer_after,
+            )
+        except (RuntimeError, OSError, ValueError) as error:
+            self._record_receipt(
+                decision, action="promote",
+                status="commit-state-unknown" if getattr(error, "code", "") == "commit-state-unknown" else "failed",
+                prior_digest=current, reasons=(str(error),),
+                pointer_after=None if getattr(error, "code", "") == "commit-state-unknown" else current,
+            )
+            raise PromotionAuthorityError("atomic promotion was refused: " + str(error)) from error
+        self._applied |= {decision_id}
+        return self._record_receipt(
+            decision, action="promote", status="applied", prior_digest=prior,
+            reasons=decision.reasons, pointer_after=candidate.artifact_digest,
+        )
+
+    @staticmethod
+    def decision_payload(decision: PromotionDecision, *, include_authorization: bool = True) -> dict[str, Any]:
+        """The exact signed judgment/promotion preimage; authorization is excluded when signing."""
+        candidate = decision.candidate
+        payload: dict[str, Any] = {
+            "verdict": decision.verdict.value,
             "role": candidate.role,
             "candidate_digest": candidate.artifact_digest,
             "current_digest": candidate.parent_champion_digest,
@@ -394,47 +488,31 @@ class PromotionAuthority:
             "contract_fingerprint": decision.contract_fingerprint,
             "decision_id": decision.decision_id,
             "court_case_id": decision.court_case_id,
+            "reasons": list(decision.reasons),
+            "decided_at": decision.decided_at,
             "decision_binding_digest": decision.binding_digest,
         }
-        sequence = self.registry.ledger.append_event(
-            candidate.experiment_id,
-            "experiment.decision",
-            decision.judge_id,
-            payload,
-        )
-        try:
-            prior = self.registry.promote(
-                candidate.role,
-                candidate.artifact_digest,
-                promoted_by=decision.judge_id,
-                experiment_id=candidate.experiment_id,
-                expected_current=candidate.parent_champion_digest,
-                decision_event_sequence=sequence,
+        payload.update({
+            "candidate_id": candidate.candidate_id,
+            "promoter_id": decision.promoter_id,
+            "evaluation_subject": decision.evaluation_subject.document() if decision.evaluation_subject else None,
+            "evaluation_subject_digest": decision.evaluation_subject.subject_digest if decision.evaluation_subject else None,
+            "evaluation_record": decision.evaluation_record.document() if decision.evaluation_record else None,
+        })
+        if include_authorization:
+            payload["authorization"] = (
+                decision.authorization.document() if isinstance(decision.authorization, PromotionAuthorization) else None
             )
-        except RuntimeError as error:
-            self._record_receipt(
-                decision,
-                action="promote",
-                status="failed",
-                prior_digest=current,
-                reasons=(str(error),),
-                pointer_after=self.registry.champion_digest(candidate.role),
-            )
-            raise PromotionAuthorityError(
-                "atomic promotion was refused: " + str(error)
-            ) from error
+        return payload
 
-        self._applied |= {decision_id}
-        return self._record_receipt(
-            decision,
-            action="promote",
-            status="applied",
-            prior_digest=prior,
-            reasons=decision.reasons,
-            pointer_after=self.registry.champion_digest(candidate.role),
-        )
+    @staticmethod
+    def authorization_digest(decision: PromotionDecision) -> str:
+        return canonical_digest(PromotionAuthority.decision_payload(decision, include_authorization=False))
 
     def rollback(self, decision_id: str) -> dict[str, Any]:
+        return self._run_with_refusal_receipt(decision_id, "rollback")
+
+    def _rollback(self, decision_id: str) -> dict[str, Any]:
         """Restore the retained prior champion under an adverse verdict."""
 
         decision = self._actionable(decision_id)
@@ -515,6 +593,8 @@ class PromotionAuthority:
             "verdict": decision.verdict.value,
             "role": candidate.role,
             "candidate_digest": candidate.artifact_digest,
+            "candidate_id": candidate.candidate_id,
+            "parent_champion_digest": candidate.parent_champion_digest,
             "binding_digest": decision.binding_digest,
             "action": action,
             "status": status,
@@ -524,7 +604,17 @@ class PromotionAuthority:
             "reasons": list(reasons),
             "recorded_at": utc_now(),
         }
+        if decision.evaluation_subject is not None or decision.evaluation_record is not None:
+            receipt.update({
+                "evaluation_subject": decision.evaluation_subject.document() if decision.evaluation_subject else None,
+                "evaluation_subject_digest": decision.evaluation_subject.subject_digest if decision.evaluation_subject else None,
+                "evaluation_record": decision.evaluation_record.document() if decision.evaluation_record else None,
+                "promoter_id": decision.promoter_id,
+                "decision_payload": self.decision_payload(decision),
+            })
         receipt["receipt_digest"] = canonical_digest(receipt)
+        if self.registry.principal_verifier is not None and status in {"failed", "rejected", "commit-state-unknown"}:
+            receipt["authentication"] = self.registry.principal_verifier.sign_rejection(receipt)
         self.registry.ledger.append_event(
             candidate.experiment_id,
             "promotion.receipt",
