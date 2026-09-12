@@ -6,18 +6,21 @@ import copy
 import json
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
 from hive_mind_os.brain_kernel.canonical import canonical_bytes
+from hive_mind_os.brain_kernel.promotion import PromotionAuthority, PromotionCandidate
+from hive_mind_os.recursive_improvement import ExperimentVerdict
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import (
     PromptRegistry, PromotionAdmissionError, PromotionCommittedEvidencePending,
     RejectionPersistenceError, generation_zero_prompt,
 )
 from hive_mind_os.roles import ROLE_CONTRACTS
-from promotion_auth_fixtures import verifier_for
-from promotion_fixtures import decision_payload
+from promotion_auth_fixtures import authorize, verifier_for
+from promotion_fixtures import bound_decision, decision_payload, authenticated_rollback, rollback_payload
 
 
 class PromptPromotionAdmissionTests(unittest.TestCase):
@@ -57,6 +60,29 @@ class PromptPromotionAdmissionTests(unittest.TestCase):
     def rejection(self):
         return [event["payload"] for event in self.registry.ledger.events()
                 if event["event_type"] == "prompt.promotion_rejected"][-1]
+
+    def adverse(self, verdict, experiment="EXP-adverse"):
+        digest, original = self.candidate(experiment)
+        subject = original["evaluation_subject"]
+        candidate = PromotionCandidate(subject["candidate_id"], subject["role"], subject["experiment_id"],
+                                       digest, subject["parent_champion_digest"], subject["proposer_id"],
+                                       subject["builder_id"], tuple(subject["evidence_refs"]))
+        decision = bound_decision(candidate, verdict, "case:" + experiment, "decision:" + experiment,
+                                  judge="judge:test", evaluator="evaluator:test", promoter="promoter:test")
+        return digest, PromotionAuthority.decision_payload(decision)
+
+    def apply_adverse(self, payload):
+        return self.registry.apply_adverse_decision("builder", actor=payload["promoter_id"],
+                                                    experiment_id=payload["registration_experiment_id"],
+                                                    decision_event_sequence=self.publish(payload))
+
+    def rollback(self, payload, **overrides):
+        arguments = {"actor": payload["promoter_id"], "reason": "; ".join(payload["reasons"]),
+                     "expected_current": payload["candidate_digest"],
+                     "experiment_id": payload["registration_experiment_id"],
+                     "decision_event_sequence": self.publish(payload)}
+        arguments.update(overrides)
+        return self.registry.rollback_champion("builder", payload["current_digest"], **arguments)
 
     def test_keep_co_commits_binding_record_and_principal_nonces(self):
         digest, payload = self.candidate()
@@ -107,7 +133,7 @@ class PromptPromotionAdmissionTests(unittest.TestCase):
     def test_record_replay_after_rollback_and_restart_is_refused(self):
         digest, payload = self.candidate()
         self.promote(digest, payload)
-        self.registry.rollback_champion(Role.BUILDER, self.parent, actor="steward:test", reason="regression")
+        authenticated_rollback(self.registry, self.parent)
         before = self.registry.pointer_path.read_bytes()
         self.registry.close()
         self.registry = PromptRegistry(self.root, principal_verifier=self.verifier)
@@ -120,7 +146,7 @@ class PromptPromotionAdmissionTests(unittest.TestCase):
     def test_nonce_reuse_with_another_record_is_refused(self):
         first, original = self.candidate("EXP-first")
         self.promote(first, original)
-        self.registry.rollback_champion(Role.BUILDER, self.parent, actor="steward:test", reason="regression")
+        authenticated_rollback(self.registry, self.parent)
         digest, payload = self.candidate("EXP-second")
         attestation = payload["authorization"]["attestations"][0]
         attestation["nonce"] = original["authorization"]["attestations"][0]["nonce"]
@@ -182,7 +208,8 @@ class PromptPromotionAdmissionTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 self.promote(digest, payload)
         self.assertEqual(self.registry.champion_digest(Role.BUILDER), self.parent)
-        admission = next(self.registry.admission_root.glob("*.json")).stem
+        admission = next(path.stem for path in self.registry.admission_root.glob("*.json")
+                         if json.loads(path.read_bytes())["kind"] == "prompt-promotion-admission")
         with self.assertRaisesRegex(PromotionAdmissionError, "no committed consumption"):
             self.registry.recover_promotion_observation("sha256:" + admission, actor="steward:test")
 
@@ -215,3 +242,271 @@ class PromptPromotionAdmissionTests(unittest.TestCase):
                 self.promote(digest, payload)
         self.assertEqual(raised.exception.code, "rejection-persistence-failed")
         self.assertEqual(self.registry.pointer_path.read_bytes(), before)
+        unavailable = [item for item in self.registry.events() if item["kind"] == "promotion-rejection-unavailable"]
+        self.assertEqual(unavailable[-1]["authentication_status"], "unavailable")
+        self.assertNotIn("authentication", unavailable[-1])
+
+    def test_all_non_keep_actions_authenticate_and_consume_durably(self):
+        for verdict in (ExperimentVerdict.RETEST, ExperimentVerdict.DISCARD, ExperimentVerdict.QUARANTINE):
+            with self.subTest(verdict=verdict):
+                digest, payload = self.adverse(verdict, "EXP-" + verdict.value)
+                self.assertEqual(self.apply_adverse(payload), self.parent)
+                self.assertEqual(self.registry.champion_digest("builder"), self.parent)
+                self.assertEqual(self.registry.is_quarantined(digest), verdict is ExperimentVerdict.QUARANTINE)
+                pointers = self.registry._read_pointers()
+                self.assertIn(payload["evaluation_record"]["record_digest"], pointers["consumed_evaluations"])
+                before = self.registry.pointer_path.read_bytes()
+                with self.assertRaisesRegex(PromotionAdmissionError, "already consumed"):
+                    self.apply_adverse(payload)
+                self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_unsigned_non_keep_cannot_quarantine_and_rejection_is_signed(self):
+        digest, payload = self.adverse(ExperimentVerdict.QUARANTINE)
+        payload["authorization"] = None
+        before = self.registry.pointer_path.read_bytes()
+        with self.assertRaises(RuntimeError):
+            self.apply_adverse(payload)
+        self.assertFalse(self.registry.is_quarantined(digest))
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+        receipt = self.rejection()
+        signed = self.verifier.verify_rejection_receipt(receipt["authentication"])
+        self.assertEqual(signed["actor"], "promoter:test")
+        self.assertEqual(signed["experiment_id"], payload["registration_experiment_id"])
+
+    def test_unsigned_rollback_and_keep_authorization_cannot_restore_parent(self):
+        digest, keep = self.candidate()
+        self.promote(digest, keep)
+        before = self.registry.pointer_path.read_bytes()
+        with self.assertRaisesRegex(PromotionAdmissionError, "experiment.decision"):
+            self.registry.rollback_champion("builder", self.parent, actor="steward:test", reason="regression")
+        with self.assertRaises(PromotionAdmissionError):
+            self.rollback(keep)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+        self.verifier.verify_rejection_receipt(self.rejection()["authentication"])
+
+    def test_rollback_binds_actor_reason_live_candidate_and_action(self):
+        digest, payload = self.candidate()
+        self.promote(digest, payload)
+        adverse = rollback_payload(self.registry, self.parent)
+        before = self.registry.pointer_path.read_bytes()
+        for overrides in ({"actor": "judge:test"}, {"reason": "substituted"}, {"expected_current": self.parent}):
+            with self.subTest(overrides=overrides), self.assertRaises(RuntimeError):
+                self.rollback(adverse, **overrides)
+            self.assertEqual(before, self.registry.pointer_path.read_bytes())
+        changed = copy.deepcopy(adverse)
+        changed["action"] = "apply"
+        with self.assertRaises(PromotionAdmissionError):
+            self.rollback(changed)
+        changed = copy.deepcopy(adverse)
+        changed["reasons"] = ["forged reason"]
+        with self.assertRaisesRegex(RuntimeError, "another decision"):
+            self.rollback(changed)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_adverse_verdict_cannot_be_relabelled_even_with_new_signatures(self):
+        _, payload = self.adverse(ExperimentVerdict.DISCARD)
+        payload["verdict"] = "quarantine"
+        payload["authorization"] = authorize(payload, self.verifier)
+        before = self.registry.pointer_path.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "verdict is not QUARANTINE"):
+            self.apply_adverse(payload)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_rollback_quarantine_commit_survives_failed_observation_and_restart(self):
+        digest, payload = self.candidate()
+        self.promote(digest, payload)
+        adverse = rollback_payload(self.registry, self.parent, verdict=ExperimentVerdict.QUARANTINE)
+        with patch.object(self.registry, "_observe_adverse", side_effect=OSError("observation unavailable")):
+            with self.assertRaises(PromotionCommittedEvidencePending) as caught:
+                self.rollback(adverse)
+        admission = caught.exception.admission_digest
+        self.assertEqual(self.registry.champion_digest("builder"), self.parent)
+        self.assertTrue(self.registry.is_quarantined(digest))
+        before = self.registry.pointer_path.read_bytes()
+        self.registry.close()
+        self.registry = PromptRegistry(self.root, principal_verifier=self.verifier)
+        self.addCleanup(self.registry.close)
+        self.assertTrue(self.registry.is_quarantined(digest))
+        self.registry.recover_promotion_observation(admission, actor="steward:test")
+        self.registry.recover_promotion_observation(admission, actor="steward:test")
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+        observations = [item for item in self.registry.ledger.events()
+                        if item["event_type"] == "prompt.rollback" and item["payload"].get("admission_digest") == admission]
+        self.assertEqual(len(observations), 1)
+
+    def test_rollback_precommit_failure_does_not_consume_or_quarantine(self):
+        digest, payload = self.candidate()
+        self.promote(digest, payload)
+        adverse = rollback_payload(self.registry, self.parent, verdict=ExperimentVerdict.QUARANTINE)
+        before = self.registry.pointer_path.read_bytes()
+        with patch.object(self.registry, "_atomic_json", side_effect=OSError("replace refused")):
+            with self.assertRaises(OSError):
+                self.rollback(adverse)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+        self.assertFalse(self.registry.is_quarantined(digest))
+        self.assertTrue(self.rejection()["pointer_unchanged"])
+
+    def test_rollback_replace_then_error_reports_committed_without_rejection(self):
+        digest, payload = self.candidate()
+        self.promote(digest, payload)
+        adverse = rollback_payload(self.registry, self.parent)
+        original = self.registry._atomic_json
+        def replace_then_error(path, document):
+            original(path, document)
+            raise OSError("after replace")
+        with patch.object(self.registry, "_atomic_json", side_effect=replace_then_error):
+            with self.assertRaises(PromotionCommittedEvidencePending) as caught:
+                self.rollback(adverse)
+        self.assertEqual(self.registry.champion_digest("builder"), self.parent)
+        self.registry.recover_promotion_observation(caught.exception.admission_digest, actor="steward:test")
+        self.assertFalse(any(item["event_type"] == "prompt.promotion_rejected" for item in self.registry.ledger.events()))
+
+    def test_bootstrap_commit_observation_can_recover_after_restart(self):
+        role = Role.CURATOR
+        digest = self.registry.register(role, generation_zero_prompt(ROLE_CONTRACTS[role]),
+                                        parent_digest=None, created_by="repository:generation-0")
+        with patch.object(self.registry, "_observe_promotion", side_effect=OSError("bootstrap observation")):
+            with self.assertRaises(PromotionCommittedEvidencePending) as caught:
+                self.registry.promote(role, digest, promoted_by="repository:generation-0",
+                                      experiment_id="generation-0", expected_current=None)
+        before = self.registry.pointer_path.read_bytes()
+        self.registry.close()
+        self.registry = PromptRegistry(self.root, principal_verifier=self.verifier)
+        self.addCleanup(self.registry.close)
+        self.assertEqual(self.registry.champion_digest(role), digest)
+        self.registry.recover_promotion_observation(caught.exception.admission_digest, actor="steward:test")
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_legacy_active_pointer_is_explicit_migration_obligation_without_rewrite(self):
+        digest, _ = self.candidate("EXP-legacy")
+        legacy = {"schema_version": 1, "champions": {"builder": digest}}
+        self.registry._atomic_json(self.registry.pointer_path, legacy)
+        before = self.registry.pointer_path.read_bytes()
+        self.assertEqual(self.registry.migration_status()["roles"]["builder"], "migration-required")
+        with self.assertRaisesRegex(PromotionAdmissionError, "explicit migration required"):
+            self.registry.champion_digest("builder")
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_schema_downgrade_cannot_relabel_admission_state_as_legacy(self):
+        pointers = self.registry._read_pointers()
+        self.assertEqual(self.registry.migration_status()["downgrade"], "unsupported-preserve-admission-and-replay-state")
+        pointers["schema_version"] = 1
+        self.registry._atomic_json(self.registry.pointer_path, pointers)
+        with self.assertRaisesRegex(PromotionAdmissionError, "legacy schema"):
+            self.registry.champion_digest("builder")
+
+    def test_prompt_noncanonical_bytes_fail_even_when_normalized_digest_matches(self):
+        digest, payload = self.candidate()
+        path = self.registry.artifact_path(digest)
+        path.write_bytes(path.read_bytes() + b"\n")
+        before = self.registry.pointer_path.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "artifact digest"):
+            self.promote(digest, payload)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_relocated_record_with_fresh_nonces_remains_consumed(self):
+        digest, payload = self.candidate()
+        self.promote(digest, payload)
+        authenticated_rollback(self.registry, self.parent)
+        original = Path(payload["evaluation_record"]["record_path"])
+        moved = original.with_name("relocated.json")
+        moved.write_bytes(original.read_bytes())
+        payload["evaluation_record"]["record_path"] = str(moved)
+        payload["authorization"] = authorize(payload, self.verifier)
+        before = self.registry.pointer_path.read_bytes()
+        with self.assertRaisesRegex(PromotionAdmissionError, "already consumed"):
+            self.promote(digest, payload)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_candidate_mutation_during_preparation_fails_commit_recheck(self):
+        digest, payload = self.candidate()
+        before = self.registry.pointer_path.read_bytes()
+        original = self.registry._persist_manifest
+        def mutate_after_preparation(admission, manifest):
+            original(admission, manifest)
+            self.registry.artifact_path(digest).write_bytes(b"substituted prompt")
+        with patch.object(self.registry, "_persist_manifest", side_effect=mutate_after_preparation):
+            with self.assertRaisesRegex(PromotionAdmissionError, "registered prompt bytes"):
+                self.promote(digest, payload)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_competing_writers_commit_only_one_evaluation(self):
+        first, first_payload = self.candidate("EXP-race-first")
+        second, second_payload = self.candidate("EXP-race-second")
+        other = PromptRegistry(self.root, principal_verifier=self.verifier)
+        self.addCleanup(other.close)
+        first_sequence = self.publish(first_payload)
+        second_sequence = self.publish(second_payload)
+        def attempt(registry, digest, payload, sequence):
+            try:
+                registry.promote("builder", digest, promoted_by="promoter:test",
+                                 experiment_id=payload["registration_experiment_id"],
+                                 expected_current=self.parent, decision_event_sequence=sequence)
+                return "committed"
+            except PromotionAdmissionError as error:
+                return error.code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(attempt, self.registry, first, first_payload, first_sequence),
+                       pool.submit(attempt, other, second, second_payload, second_sequence)]
+            outcomes = [future.result() for future in futures]
+        self.assertCountEqual(outcomes, ["committed", "parent-stale"])
+        pointers = self.registry._read_pointers()
+        self.assertEqual(len(pointers["consumed_evaluations"]), 1)
+        self.assertEqual(len(pointers["consumed_nonces"]), 4)
+
+    def test_non_keep_replay_is_refused_after_new_registry_instance(self):
+        _, payload = self.adverse(ExperimentVerdict.RETEST)
+        self.apply_adverse(payload)
+        before = self.registry.pointer_path.read_bytes()
+        other = PromptRegistry(self.root, principal_verifier=self.verifier)
+        self.addCleanup(other.close)
+        with self.assertRaisesRegex(PromotionAdmissionError, "already consumed"):
+            other.apply_adverse_decision("builder", actor="promoter:test",
+                                         experiment_id=payload["registration_experiment_id"],
+                                         decision_event_sequence=self.publish(payload))
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_old_rollback_observation_recovers_after_later_keep(self):
+        first, payload = self.candidate("EXP-first")
+        self.promote(first, payload)
+        adverse = rollback_payload(self.registry, self.parent)
+        with patch.object(self.registry, "_observe_adverse", side_effect=OSError("pending")):
+            with self.assertRaises(PromotionCommittedEvidencePending) as caught:
+                self.rollback(adverse)
+        second, later = self.candidate("EXP-later")
+        self.promote(second, later)
+        before = self.registry.pointer_path.read_bytes()
+        self.registry.recover_promotion_observation(caught.exception.admission_digest, actor="steward:test")
+        self.assertEqual(self.registry.champion_digest("builder"), second)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_ambiguous_rollback_commit_blocks_service_after_restart(self):
+        digest, payload = self.candidate()
+        self.promote(digest, payload)
+        adverse = rollback_payload(self.registry, self.parent)
+        original = self.registry._atomic_json
+        def ambiguous(path, document):
+            changed = copy.deepcopy(document)
+            changed["champions"]["builder"] = digest
+            original(path, changed)
+            raise OSError("ambiguous rollback replace")
+        with patch.object(self.registry, "_atomic_json", side_effect=ambiguous):
+            with self.assertRaisesRegex(PromotionAdmissionError, "unknown"):
+                self.rollback(adverse)
+        self.assertTrue(self.registry.unknown_commit_path.exists())
+        self.registry.close()
+        self.registry = PromptRegistry(self.root, principal_verifier=self.verifier)
+        self.addCleanup(self.registry.close)
+        with self.assertRaisesRegex(PromotionAdmissionError, "unresolved"):
+            self.registry.champion_digest("builder")
+
+    def test_adverse_admission_cannot_be_repurposed_as_champion_binding(self):
+        digest, payload = self.adverse(ExperimentVerdict.RETEST)
+        self.apply_adverse(payload)
+        pointers = self.registry._read_pointers()
+        adverse = pointers["consumed_evaluations"][payload["evaluation_record"]["record_digest"]]
+        pointers["champions"]["builder"] = digest
+        pointers["promotion_bindings"]["builder"] = adverse
+        self.registry._atomic_json(self.registry.pointer_path, pointers)
+        with self.assertRaisesRegex(PromotionAdmissionError, "resolving promotion"):
+            self.registry.champion_digest("builder")

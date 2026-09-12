@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from hive_mind_os.brain_kernel.court_runtime import (
     CourtBrief,
@@ -23,7 +24,7 @@ from hive_mind_os.brain_kernel.promotion import (
     PromotionDecisionLog,
 )
 from hive_mind_os.models import Role
-from hive_mind_os.prompt_registry import PromptRegistry
+from hive_mind_os.prompt_registry import PromptRegistry, PromotionCommittedEvidencePending
 from hive_mind_os.recursive_improvement import ExperimentVerdict
 from promotion_fixtures import bound_decision, evidence_refs
 from promotion_auth_fixtures import verifier_for
@@ -131,9 +132,10 @@ def _decision(
     *,
     judge: str = JUDGE,
     evaluator: str = EVALUATOR,
+    action: str = "apply",
 ) -> PromotionDecision:
     return bound_decision(candidate, verdict, case_id, decision_id, judge=judge,
-                          evaluator=evaluator, promoter="promoter-1")
+                          evaluator=evaluator, promoter="promoter-1", action=action)
 
 
 def _keep(
@@ -168,6 +170,31 @@ def _keep(
 
 
 class HiveCortexPromotionTests(unittest.TestCase):
+    def test_committed_authority_receipt_recovers_after_restart_without_replay(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        append = registry.ledger.append_event
+        def fail_receipt(run_id, event_type, actor, payload):
+            if event_type == "promotion.receipt":
+                raise OSError("receipt unavailable")
+            return append(run_id, event_type, actor, payload)
+        with patch.object(registry.ledger, "append_event", side_effect=fail_receipt):
+            with self.assertRaises(PromotionCommittedEvidencePending):
+                _keep(authority, registry, content="prompt receipt recovery", parent=None,
+                      candidate_id="CAND-receipt", experiment_id="EXP-receipt",
+                      case_id="CASE-receipt", decision_id="DEC-receipt")
+        decision = authority.log.decisions[-1]
+        before = registry.pointer_path.read_bytes()
+        restarted = PromotionAuthority(registry)
+        restarted.submit(decision, court_history=_court_history(
+            decision.candidate.artifact_digest, disposition=CourtDisposition.ADOPT, case_id="CASE-receipt"))
+        first = restarted.recover_receipt("DEC-receipt")
+        second = restarted.recover_receipt("DEC-receipt")
+        self.assertEqual(first, second)
+        self.assertEqual(first["status"], "applied")
+        self.assertEqual(before, registry.pointer_path.read_bytes())
+        self.assertEqual(registry.champion_digest("builder"), decision.candidate.artifact_digest)
+
     def test_promotion_authority_tests(self) -> None:
         registry = _registry(self)
         authority = PromotionAuthority(registry)
@@ -502,10 +529,10 @@ class HiveCortexPromotionTests(unittest.TestCase):
             digest_a,
             PROPOSER,
             BUILDER,
-            ("evidence:quarantine",),
+            evidence_refs(registry.root, "CAND-Q"),
         )
         authority.submit(
-            _decision(adverse, ExperimentVerdict.QUARANTINE, "CASE-Q", "DEC-Q"),
+            _decision(adverse, ExperimentVerdict.QUARANTINE, "CASE-Q", "DEC-Q", action="rollback"),
             court_history=_court_history(
                 digest_b,
                 disposition=CourtDisposition.QUARANTINE,
@@ -533,7 +560,7 @@ class HiveCortexPromotionTests(unittest.TestCase):
             digest_a,
             PROPOSER,
             BUILDER,
-            ("evidence:orphan",),
+            evidence_refs(registry.root, "CAND-Z"),
         )
         authority.submit(
             _decision(orphan, ExperimentVerdict.DISCARD, "CASE-Z", "DEC-Z"),

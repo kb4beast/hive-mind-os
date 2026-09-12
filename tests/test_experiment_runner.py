@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from promotion_fixtures import decision_payload
+from promotion_fixtures import decision_payload, authenticated_rollback
 from promotion_auth_fixtures import verifier_for
 
 import asyncio
@@ -420,12 +420,7 @@ class ExperimentRunnerTests(unittest.TestCase):
             event for event in self.ledger.events() if event["event_type"] == "model.call"
         ][-1]
         self.assertEqual(first_call["payload"]["prompt_artifact_digest"], variant)
-        self.registry.rollback_champion(
-            role,
-            original,
-            actor="steward:test",
-            reason="verification",
-        )
+        authenticated_rollback(self.registry, original, reason="verification")
         self._execute_model(role)
         second_call = [
             event for event in self.ledger.events() if event["event_type"] == "model.call"

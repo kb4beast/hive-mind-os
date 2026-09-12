@@ -174,8 +174,11 @@ class PromotionDecision:
     evaluation_record: EvaluationRecordReference | None = field(default=None, kw_only=True)
     promoter_id: str | None = field(default=None, kw_only=True)
     authorization: PromotionAuthorization | Mapping[str, Any] | None = field(default=None, kw_only=True)
+    action: str = field(default="apply", kw_only=True)
 
     def __post_init__(self) -> None:
+        if self.action not in {"apply", "rollback"}:
+            raise PromotionAuthorityError("unknown promotion action")
         if self.authorization is not None and not isinstance(self.authorization, PromotionAuthorization):
             object.__setattr__(self, "authorization", PromotionAuthorization.from_document(self.authorization))
         _text(self.decision_id, "decision id")
@@ -397,6 +400,8 @@ class PromotionAuthority:
                     }
                     if self.registry.principal_verifier is not None:
                         receipt["authentication"] = self.registry.principal_verifier.sign_rejection(receipt)
+                    else:
+                        receipt["authentication_status"] = "unconfigured"
                     self.registry.ledger.append_event("promotion:unbound", "promotion.receipt", "promotion-authority", receipt)
                     self._receipts = (*self._receipts, receipt)
             raise
@@ -413,17 +418,24 @@ class PromotionAuthority:
             )
 
         if decision.verdict is not ExperimentVerdict.KEEP:
-            if decision.verdict is ExperimentVerdict.QUARANTINE:
-                self.registry.quarantine(
-                    candidate.role,
-                    candidate.artifact_digest,
-                    actor=decision.judge_id,
-                    experiment_id=candidate.experiment_id,
-                    reasons=decision.reasons,
-                )
-                action = "quarantine-candidate"
-            else:
-                action = "retain-champion"
+            action = "quarantine-candidate" if decision.verdict is ExperimentVerdict.QUARANTINE else "retain-champion"
+            sequence = self.registry.ledger.append_event(candidate.experiment_id, "experiment.decision",
+                                                         decision.judge_id, self.decision_payload(decision))
+            try:
+                current = self.registry.apply_adverse_decision(
+                    candidate.role, actor=decision.promoter_id or decision.judge_id,
+                    experiment_id=candidate.experiment_id, decision_event_sequence=sequence)
+            except PromotionCommittedEvidencePending as error:
+                self._applied |= {decision_id}
+                return self._record_receipt(decision, action=action, status="committed-evidence-pending",
+                                            prior_digest=error.prior_digest, pointer_after=error.pointer_after,
+                                            reasons=(str(error),))
+            except (RuntimeError, OSError, ValueError) as error:
+                unknown = getattr(error, "code", "") == "commit-state-unknown"
+                self._record_receipt(decision, action=action, status="commit-state-unknown" if unknown else "failed",
+                                     prior_digest=current, pointer_after=None if unknown else getattr(error, "observed_current", None),
+                                     reasons=(str(error),))
+                raise PromotionAuthorityError("atomic adverse decision was refused: " + str(error)) from error
             self._applied |= {decision_id}
             return self._record_receipt(
                 decision,
@@ -431,7 +443,7 @@ class PromotionAuthority:
                 status="applied",
                 prior_digest=current,
                 reasons=decision.reasons,
-                pointer_after=self.registry.champion_digest(candidate.role),
+                pointer_after=current,
             )
 
         payload = self.decision_payload(decision)
@@ -458,7 +470,7 @@ class PromotionAuthority:
                 decision, action="promote",
                 status="commit-state-unknown" if getattr(error, "code", "") == "commit-state-unknown" else "failed",
                 prior_digest=current, reasons=(str(error),),
-                pointer_after=None if getattr(error, "code", "") == "commit-state-unknown" else current,
+                pointer_after=None if getattr(error, "code", "") == "commit-state-unknown" else getattr(error, "observed_current", None),
             )
             raise PromotionAuthorityError("atomic promotion was refused: " + str(error)) from error
         self._applied |= {decision_id}
@@ -472,6 +484,7 @@ class PromotionAuthority:
         """The exact signed judgment/promotion preimage; authorization is excluded when signing."""
         candidate = decision.candidate
         payload: dict[str, Any] = {
+            "action": decision.action,
             "verdict": decision.verdict.value,
             "role": candidate.role,
             "candidate_digest": candidate.artifact_digest,
@@ -532,36 +545,37 @@ class PromotionAuthority:
                 "rollback requires the candidate to be the active champion"
             )
         try:
+            sequence = self.registry.ledger.append_event(candidate.experiment_id, "experiment.decision",
+                                                         decision.judge_id, self.decision_payload(decision))
             prior = self.registry.rollback_champion(
                 candidate.role,
                 restored,
-                actor=decision.judge_id,
+                actor=decision.promoter_id or decision.judge_id,
                 reason="; ".join(decision.reasons),
+                experiment_id=candidate.experiment_id, decision_event_sequence=sequence,
+                expected_current=candidate.artifact_digest,
             )
-        except RuntimeError as error:
+        except PromotionCommittedEvidencePending as error:
+            self._applied |= {decision_id}
+            return self._record_receipt(decision, action="rollback", status="committed-evidence-pending",
+                                        prior_digest=error.prior_digest, restored_digest=restored,
+                                        pointer_after=error.pointer_after, reasons=(str(error),))
+        except (RuntimeError, OSError, ValueError) as error:
+            unknown = getattr(error, "code", "") == "commit-state-unknown"
             self._record_receipt(
                 decision,
                 action="rollback",
-                status="failed",
+                status="commit-state-unknown" if unknown else "failed",
                 prior_digest=current,
                 restored_digest=restored,
                 reasons=(str(error),),
-                pointer_after=self.registry.champion_digest(candidate.role),
+                pointer_after=None if unknown else getattr(error, "observed_current", None),
             )
             raise PromotionAuthorityError(
                 "atomic rollback was refused: " + str(error)
             ) from error
 
-        # Quarantine strictly AFTER the pointer is restored: the champion must
-        # never be simultaneously active and quarantined.
-        if decision.verdict is ExperimentVerdict.QUARANTINE:
-            self.registry.quarantine(
-                candidate.role,
-                candidate.artifact_digest,
-                actor=decision.judge_id,
-                experiment_id=candidate.experiment_id,
-                reasons=decision.reasons,
-            )
+        # Rollback and quarantine were co-committed by the registry transaction.
         self._applied |= {decision_id}
         return self._record_receipt(
             decision,
@@ -570,7 +584,7 @@ class PromotionAuthority:
             prior_digest=prior,
             restored_digest=restored,
             reasons=decision.reasons,
-            pointer_after=self.registry.champion_digest(candidate.role),
+            pointer_after=restored,
         )
 
     def _record_receipt(
@@ -615,11 +629,51 @@ class PromotionAuthority:
         receipt["receipt_digest"] = canonical_digest(receipt)
         if self.registry.principal_verifier is not None and status in {"failed", "rejected", "commit-state-unknown"}:
             receipt["authentication"] = self.registry.principal_verifier.sign_rejection(receipt)
-        self.registry.ledger.append_event(
-            candidate.experiment_id,
-            "promotion.receipt",
-            decision.judge_id,
-            receipt,
-        )
+        elif status in {"failed", "rejected", "commit-state-unknown"}:
+            receipt["authentication_status"] = "unconfigured"
+        try:
+            self.registry.ledger.append_event(
+                candidate.experiment_id, "promotion.receipt", decision.judge_id, receipt,
+            )
+        except Exception as error:
+            if status in {"applied", "committed-evidence-pending"}:
+                raise PromotionCommittedEvidencePending("", prior_digest, pointer_after,
+                                                         "authority-receipt:" + decision.decision_id) from error
+            raise
         self._receipts = (*self._receipts, receipt)
         return receipt
+
+    def recover_receipt(self, decision_id: str) -> dict[str, Any]:
+        """Reproduce committed observations after restart without replaying the action."""
+        decision = next((item for item in self._log.decisions if item.decision_id == decision_id), None)
+        if decision is None:
+            raise PromotionAuthorityError("receipt recovery requires the retained submitted decision")
+        with self.registry._pointer_transaction():
+            self.registry._ensure_known_commit()
+            pointers = self.registry._read_pointers()
+            expected_payload = self.decision_payload(decision)
+            events = self.registry.ledger.events(decision.candidate.experiment_id)
+            for admission in set(pointers.get("consumed_evaluations", {}).values()):
+                manifest = self.registry._committed_manifest(admission, pointers)
+                if manifest["experiment_id"] != decision.candidate.experiment_id:
+                    continue
+                event = next((item for item in events if item["sequence"] == manifest["decision_event_sequence"]), None)
+                if event is None or event["payload"] != expected_payload:
+                    continue
+                self.registry._observe_promotion(admission, manifest)
+                self._applied |= {decision_id}
+                for item in events:
+                    receipt = item["payload"]
+                    if (item["event_type"] == "promotion.receipt" and receipt.get("status") == "applied"
+                            and receipt.get("decision_payload") == expected_payload):
+                        return receipt
+                rollback = manifest.get("action") == "rollback"
+                keep = decision.verdict is ExperimentVerdict.KEEP
+                return self._record_receipt(
+                    decision, action="rollback" if rollback else "promote" if keep else
+                    "quarantine-candidate" if decision.verdict is ExperimentVerdict.QUARANTINE else "retain-champion",
+                    status="applied", prior_digest=manifest["parent_digest"] if keep else manifest["prior_digest"],
+                    restored_digest=manifest["pointer_after"] if rollback else None,
+                    pointer_after=manifest["candidate_digest"] if keep else manifest["pointer_after"],
+                    reasons=decision.reasons)
+        raise PromotionAuthorityError("decision has no committed admission to recover")

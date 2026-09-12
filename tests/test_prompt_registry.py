@@ -11,7 +11,7 @@ from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import PromptRegistry, generation_zero_prompt
 from hive_mind_os.roles import ROLE_CONTRACTS
-from promotion_fixtures import decision_payload
+from promotion_fixtures import decision_payload, authenticated_rollback
 from promotion_auth_fixtures import verifier_for
 
 
@@ -154,12 +154,7 @@ class PromptRegistryTests(unittest.TestCase):
             if item["kind"] == "promotion"
         ][0]
         self.assertEqual(promotion["parent_digest"], champion)
-        prior = self.registry.rollback_champion(
-            Role.BUILDER,
-            champion,
-            actor="steward:test",
-            reason="regression",
-        )
+        prior = authenticated_rollback(self.registry, champion)
         self.assertEqual(prior, challenger)
         self.assertEqual(self.registry.champion_digest(Role.BUILDER), champion)
         self.registry.quarantine(

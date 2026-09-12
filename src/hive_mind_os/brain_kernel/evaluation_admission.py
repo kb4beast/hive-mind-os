@@ -36,7 +36,7 @@ from .evaluation_runtime import (
 
 __all__ = [
     "EvaluationAdmissionError", "ParsedEvaluationRecord", "ResolvedKeepEvidence",
-    "load_evaluation_record", "resolve_keep_evidence", "recheck_resolved_evidence",
+    "load_evaluation_record", "resolve_keep_evidence", "resolve_decision_evidence", "recheck_resolved_evidence",
 ]
 
 
@@ -341,13 +341,28 @@ def resolve_keep_evidence(
     subject: PromptEvaluationSubject, reference: EvaluationRecordReference, *, evaluator_id: str,
 ) -> ResolvedKeepEvidence:
     """Recompute sufficient recorded KEEP evidence; this grants no activation right."""
+    return resolve_decision_evidence(subject, reference, evaluator_id=evaluator_id,
+                                     verdict=EvaluationVerdict.KEEP)
+
+
+def resolve_decision_evidence(
+    subject: PromptEvaluationSubject, reference: EvaluationRecordReference, *,
+    evaluator_id: str, verdict: EvaluationVerdict,
+) -> ResolvedKeepEvidence:
+    """Authenticate no actors; reproduce the exact retained verdict, including losses.
+
+    Quarantine with an absent seal remains admissible adverse evidence when its
+    record, contract and referenced artifacts are intact. Missing artifacts stay
+    inspectable through load_evaluation_record, but grant no action authority.
+    """
     if not isinstance(subject, PromptEvaluationSubject):
         _fail("subject-mismatch", "subject must be a PromptEvaluationSubject")
     record = load_evaluation_record(reference)
     if record.schema_version != 4:
         _fail("evaluation-schema-not-admissible", "legacy receipts remain readable but cannot authorize KEEP")
-    if record.verdict is not EvaluationVerdict.KEEP:
-        _fail("evaluation-not-keep", "retained evaluation verdict is not KEEP")
+    if record.verdict is not verdict:
+        _fail("evaluation-not-keep" if verdict is EvaluationVerdict.KEEP else "evaluation-verdict-mismatch",
+              "retained evaluation verdict is not " + verdict.value.upper())
     if (record.promotion_subject != subject
             or record.promotion_subject_digest != subject.subject_digest
             or record.descriptor != subject.descriptor):
@@ -356,7 +371,7 @@ def resolve_keep_evidence(
             or record.identities.evaluator_id != evaluator_id
             or record.identities.proposer_id != subject.proposer_id
             or record.identities.builder_id != subject.builder_id
-            or record.holdout.evaluator_id != evaluator_id):
+            or (verdict is EvaluationVerdict.KEEP and record.holdout.evaluator_id != evaluator_id)):
         _fail("identity-mismatch", "evaluation identity and seal bindings do not match")
     if record.contract_fingerprint != subject.contract_fingerprint:
         _fail("contract-mismatch", "subject and evaluation contract fingerprints differ")
@@ -379,12 +394,14 @@ def resolve_keep_evidence(
             _fail("artifact-mismatch", "retained surface artifact bytes do not match their digest")
         snapshots.append(snapshot)
     holdout = record.holdout
-    try:
-        _require_digest(holdout.prediction_digest, "holdout prediction digest")
-    except EvaluationError as error:
-        raise EvaluationAdmissionError("evaluation-not-keep", str(error)) from error
+    if holdout.prediction_digest is not None or verdict is EvaluationVerdict.KEEP:
+        try:
+            _require_digest(holdout.prediction_digest, "holdout prediction digest")
+        except EvaluationError as error:
+            raise EvaluationAdmissionError("evaluation-not-keep", str(error)) from error
     valid = (holdout.valid is True and not holdout.violations
              and holdout.seal_sequence is not None
+             and holdout.prediction_digest is not None and holdout.evaluator_id is not None
              and (holdout.reveal_sequence is None or holdout.reveal_sequence > holdout.seal_sequence))
     ordered = tuple(sorted(record.surfaces, key=lambda item: (item.kind.value, item.name)))
     if ordered != record.surfaces:
@@ -399,12 +416,12 @@ def resolve_keep_evidence(
         )
     except (ValueError, TypeError, OverflowError) as error:
         raise EvaluationAdmissionError("evaluation-malformed", str(error)) from error
-    if result["verdict"] is not EvaluationVerdict.KEEP:
+    if result["verdict"] is not verdict:
         code = ("evaluation-insufficient" if any(
             reason.startswith(("missing surfaces:", "insufficient repeated measurements:"))
             for reason in result["reasons"]
-        ) else "evaluation-not-keep")
-        _fail(code, "recorded metrics do not recompute to a sufficient KEEP")
+        ) else "evaluation-not-keep") if verdict is EvaluationVerdict.KEEP else "evaluation-verdict-mismatch"
+        _fail(code, "recorded metrics do not recompute to " + verdict.value.upper())
     expected = {
         "reasons": tuple(dict.fromkeys(result["reasons"])),
         "primary_effect": result["primary_effect"], "required_effect": result["required_effect"],
