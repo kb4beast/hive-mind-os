@@ -26,8 +26,13 @@ are MIT licensed; no external implementation was copied.
   directory through PATH. `python312-binding.log` and version log retain identity.
 - `collector-314-bound.log`: all 14 tests pass, no skips, 60.360 seconds, with
   Python 3.14 parent and child resolution likewise bound; binding/version retained.
-- `ruff.log`: repository check passes. `pyright.log`: zero errors, six existing
-  warnings. No warning suppression or policy change was added.
+- `ruff.log`: the initial unscoped `python -m ruff check` failed with 79 errors
+  in its broader repository traversal. The earlier builder statement that this
+  log passed was incorrect and was caught by the independent Curator. The failed
+  attempt remains unchanged. `ruff-configured.log` records a fresh passing
+  `python -m ruff check src tests`, matching the existing CI workflow's configured
+  source scope. `pyright.log`: zero errors, six existing warnings. No warning
+  suppression, lint scope change or policy change was added.
 - Initial `collector-312.log` fails the unrelated diagnostic test because the
   parent loader cannot import `hive_mind_os.activation_bundle` without candidate
   source on PYTHONPATH. Its failed import placeholder counted as one test while
@@ -42,6 +47,11 @@ set PYTHONPATH to the candidate `src` and repository root, and run
 `python -m unittest tests.test_collect_v4_activation_evidence -v`. Production
 scripts did not change. Full current-main coverage and complete platform CI
 remain separate delivery obligations; these focused results do not replace them.
+
+The lint attribution correction is evidence-only and was prepared in a separate
+detached worktree at `058fda462f3f6de10240e540ef8ad32af0691324` while its exact-source
+full test gate ran elsewhere. It changes no test or production input; the original
+failure log is retained, and the updated manifest includes the configured check.
 
 ## Atomic claims and scoped dispositions
 
