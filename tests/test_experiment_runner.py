@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from promotion_auth_fixtures import verifier_for
+from promotion_fixtures import authenticated_rollback, decision_payload
+
 from hive_mind_os.experiment_runner import (
     EVALUATION_SURFACE_UNAVAILABLE,
     EvaluationSurfaceUnavailable,
@@ -128,7 +131,7 @@ class ExperimentRunnerTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.ledger = EvidenceLedger()
-        self.registry = PromptRegistry(self.root / "registry", ledger=self.ledger)
+        self.registry = PromptRegistry(self.root / "registry", ledger=self.ledger, principal_verifier=verifier_for())
         self.champion = self.registry.register(
             Role.BUILDER,
             generation_zero_prompt(ROLE_CONTRACTS[Role.BUILDER]),
@@ -173,29 +176,9 @@ class ExperimentRunnerTests(unittest.TestCase):
         author: str = "author:test",
         judge: str = "judge:test",
     ) -> int:
-        return self.ledger.append_event(
-            experiment_id,
-            "experiment.decision",
-            judge,
-            {
-                "verdict": "keep",
-                "role": Role.BUILDER.value,
-                "candidate_digest": candidate,
-                "current_digest": current,
-                "registration_experiment_id": experiment_id,
-                "registration_role": Role.BUILDER.value,
-                "registration_author": author,
-                "registration_parent_digest": current,
-                "proposer_id": author,
-                "builder_id": "builder:test",
-                "evaluator_id": "evaluator:test",
-                "judge_id": judge,
-                "retained_artifact_refs": [
-                    "artifact:test#sha256:" + "a" * 64
-                ],
-                "contract_fingerprint": "sha256:" + "b" * 64,
-            },
-        )
+        payload = decision_payload(self.root, candidate_digest=candidate, parent=current,
+                                   experiment_id=experiment_id, proposer=author, judge=judge)
+        return self.ledger.append_event(experiment_id, "experiment.decision", judge, payload)
 
     def test_keep_records_pending_appeal_without_self_promotion(self) -> None:
         result = self.runner.run(
@@ -410,26 +393,7 @@ class ExperimentRunnerTests(unittest.TestCase):
     def test_model_receipt_follows_promotion_and_rollback(self) -> None:
         role = Role.BUILDER
         champion_prompt = generation_zero_prompt(ROLE_CONTRACTS[role])
-        original = self.registry.register(
-            role,
-            champion_prompt,
-            parent_digest=self.champion,
-            created_by="author:test",
-            experiment_id="EXP-original",
-        )
-        original_decision = self._manual_decision(
-            experiment_id="EXP-original",
-            candidate=original,
-            current=self.champion,
-        )
-        self.registry.promote(
-            role,
-            original,
-            promoted_by="judge:test",
-            experiment_id="EXP-original",
-            expected_current=self.champion,
-            decision_event_sequence=original_decision,
-        )
+        original = self.champion
         variant_prompt = champion_prompt + "\nVerify every required output and receipt."
         variant = self.registry.register(
             role,
@@ -446,7 +410,7 @@ class ExperimentRunnerTests(unittest.TestCase):
         self.registry.promote(
             role,
             variant,
-            promoted_by="judge:test",
+            promoted_by="promoter:test",
             experiment_id="EXP-variant",
             expected_current=original,
             decision_event_sequence=variant_decision,
@@ -456,12 +420,7 @@ class ExperimentRunnerTests(unittest.TestCase):
             event for event in self.ledger.events() if event["event_type"] == "model.call"
         ][-1]
         self.assertEqual(first_call["payload"]["prompt_artifact_digest"], variant)
-        self.registry.rollback_champion(
-            role,
-            original,
-            actor="steward:test",
-            reason="verification",
-        )
+        authenticated_rollback(self.registry, original, reason="verification")
         self._execute_model(role)
         second_call = [
             event for event in self.ledger.events() if event["event_type"] == "model.call"

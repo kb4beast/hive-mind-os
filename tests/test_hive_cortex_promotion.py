@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
+from contextlib import ExitStack
+from pathlib import Path
+from unittest.mock import patch
+
+from promotion_auth_fixtures import verifier_for
+from promotion_fixtures import bound_decision, evidence_refs
 
 from hive_mind_os.brain_kernel.court_runtime import (
     CourtBrief,
@@ -15,6 +22,7 @@ from hive_mind_os.brain_kernel.court_runtime import (
     CourtVerdict,
     record_case,
 )
+from hive_mind_os.brain_kernel.evaluation_admission import EvaluationAdmissionError
 from hive_mind_os.brain_kernel.promotion import (
     PromotionAuthority,
     PromotionAuthorityError,
@@ -23,7 +31,12 @@ from hive_mind_os.brain_kernel.promotion import (
     PromotionDecisionLog,
 )
 from hive_mind_os.models import Role
-from hive_mind_os.prompt_registry import PromptRegistry
+from hive_mind_os.prompt_registry import (
+    PromotionAdmissionError,
+    PromotionCommittedEvidencePending,
+    PromptRegistry,
+    RejectionPersistenceError,
+)
 from hive_mind_os.recursive_improvement import ExperimentVerdict
 
 PROPOSER = "proposer-1"
@@ -35,7 +48,8 @@ AFFECTED = (PROPOSER, BUILDER, EVALUATOR)
 
 def _registry(testcase: unittest.TestCase) -> PromptRegistry:
     directory = tempfile.TemporaryDirectory()
-    registry = PromptRegistry(directory.name)
+    registry = PromptRegistry(directory.name, principal_verifier=verifier_for(
+        builder_id=BUILDER, evaluator_id=EVALUATOR, judge_id=JUDGE, promoter_id="promoter-1"))
     # Cleanups run last-in-first-out: the sqlite ledger must be closed before
     # the temporary directory is removed or Windows raises WinError 32.
     testcase.addCleanup(directory.cleanup)
@@ -116,7 +130,7 @@ def _registered_candidate(
         parent,
         PROPOSER,
         BUILDER,
-        (f"evidence:{candidate_id}",),
+        evidence_refs(registry.root, candidate_id),
     )
 
 
@@ -128,17 +142,10 @@ def _decision(
     *,
     judge: str = JUDGE,
     evaluator: str = EVALUATOR,
+    action: str = "apply",
 ) -> PromotionDecision:
-    return PromotionDecision(
-        decision_id,
-        case_id,
-        candidate,
-        verdict,
-        judge,
-        evaluator,
-        ("court-authorized",),
-        "fp-1",
-    )
+    return bound_decision(candidate, verdict, case_id, decision_id, judge=judge,
+                          evaluator=evaluator, promoter="promoter-1", action=action)
 
 
 def _keep(
@@ -173,6 +180,431 @@ def _keep(
 
 
 class HiveCortexPromotionTests(unittest.TestCase):
+    def _pending_champion_action(self, operation, verdict):
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        parent = _keep(authority, registry, content="read failure parent", parent=None,
+                       candidate_id="CAND-parent", experiment_id="EXP-parent",
+                       case_id="CASE-parent", decision_id="DEC-parent")
+        active = _keep(authority, registry, content="read failure active",
+                       parent=parent.candidate.artifact_digest,
+                       candidate_id="CAND-active", experiment_id="EXP-active",
+                       case_id="CASE-active", decision_id="DEC-active")
+        rollback = operation == "rollback"
+        candidate = _registered_candidate(
+            registry, content="read failure active" if rollback else "read failure pending",
+            parent=parent.candidate.artifact_digest if rollback else active.candidate.artifact_digest,
+            candidate_id="CAND-pending", experiment_id="EXP-pending")
+        decision = _decision(candidate, verdict, "CASE-pending", "DEC-pending", action=operation)
+        disposition = {ExperimentVerdict.KEEP: CourtDisposition.ADOPT,
+                       ExperimentVerdict.RETEST: CourtDisposition.DEFER,
+                       ExperimentVerdict.DISCARD: CourtDisposition.REJECT}[verdict]
+        authority.submit(decision, court_history=_court_history(
+            candidate.artifact_digest, disposition=disposition, case_id="CASE-pending"))
+        return registry, authority, active, decision
+
+    def test_champion_read_failures_retain_exact_signed_evidence_before_actions(self) -> None:
+        for operation, verdict in (("apply", ExperimentVerdict.KEEP),
+                                   ("apply", ExperimentVerdict.RETEST),
+                                   ("rollback", ExperimentVerdict.DISCARD)):
+            for fault in ("evaluation", "admission", "missing-manifest", "unknown"):
+                with self.subTest(operation=operation, verdict=verdict, fault=fault):
+                    registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                    pointers = registry._read_pointers()
+                    manifest = registry.admission_root / (pointers["promotion_bindings"]["builder"][7:] + ".json")
+                    if fault == "evaluation":
+                        assert active.evaluation_record is not None
+                        Path(active.evaluation_record.record_path).unlink()
+                        expected_error = EvaluationAdmissionError
+                    elif fault == "admission":
+                        manifest.write_bytes(manifest.read_bytes() + b"\n")
+                        expected_error = PromotionAdmissionError
+                    elif fault == "missing-manifest":
+                        manifest.unlink()
+                        expected_error = OSError
+                    else:
+                        registry._mark_unknown_commit({"reason": "retained ambiguous commit fixture"})
+                        expected_error = PromotionAdmissionError
+                    before = registry.pointer_path.read_bytes()
+                    events_before = registry.ledger.events()
+                    receipts_before = authority.receipts
+                    with self.assertRaises(expected_error) as caught:
+                        getattr(authority, operation)(decision.decision_id)
+                    self.assertEqual(registry.pointer_path.read_bytes(), before)
+                    self.assertEqual(len(authority.receipts), len(receipts_before) + 1)
+                    receipt = authority.receipts[-1]
+                    self.assertEqual(receipt["status"], "commit-state-unknown" if fault == "unknown" else "rejected")
+                    self.assertEqual(receipt["action"], operation)
+                    self.assertEqual(receipt["reasons"], [str(caught.exception)])
+                    self.assertEqual(receipt["decision_payload"], authority.decision_payload(decision))
+                    self.assertIsNone(receipt["prior_digest"])
+                    self.assertIsNone(receipt["pointer_after"])
+                    signed = registry.principal_verifier.verify_rejection_receipt(receipt["authentication"])
+                    self.assertEqual(signed, {key: value for key, value in receipt.items() if key != "authentication"})
+                    self.assertIn(receipt, [item["receipt"] for item in registry.events()
+                                            if item["kind"] == "promotion-authority-rejection"])
+                    events_after = registry.ledger.events()
+                    self.assertEqual(events_after[:-1], events_before)
+                    self.assertEqual(events_after[-1]["event_type"], "promotion.receipt")
+                    self.assertEqual(events_after[-1]["payload"], receipt)
+                    self.assertEqual(authority._actionable(decision.decision_id), decision)
+
+    def test_champion_sqlite_read_failures_retain_evidence_or_report_sink_outages(self) -> None:
+        for operation, verdict, admission_method in (
+            ("apply", ExperimentVerdict.KEEP, "promote"),
+            ("apply", ExperimentVerdict.RETEST, "apply_adverse_decision"),
+            ("rollback", ExperimentVerdict.DISCARD, "rollback_champion"),
+        ):
+            for error_type in (sqlite3.OperationalError, sqlite3.DatabaseError):
+                for outage in ("none", "ledger", "file", "both", "custody"):
+                    with self.subTest(operation=operation, verdict=verdict, error=error_type, outage=outage):
+                        registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                        before = registry.pointer_path.read_bytes()
+                        events_before = registry.ledger.events()
+                        receipts_before = authority.receipts
+                        manifests_before = {path.name: path.read_bytes() for path in registry.admission_root.iterdir()}
+                        lineage_before = registry._read_records(registry.lineage_root)
+                        failure = error_type("active champion ledger read unavailable")
+                        expected_error = error_type if outage == "none" else RejectionPersistenceError
+                        with ExitStack() as stack:
+                            read = stack.enter_context(patch.object(registry.ledger, "events", side_effect=failure))
+                            admit = stack.enter_context(patch.object(
+                                registry, admission_method, side_effect=AssertionError("admission started after read failure")))
+                            append = stack.enter_context(patch.object(
+                                registry.ledger, "append_event", wraps=registry.ledger.append_event,
+                                side_effect=error_type("ledger sink offline") if outage in {"ledger", "both"} else None))
+                            write = stack.enter_context(patch.object(
+                                registry, "_write_immutable_record", wraps=registry._write_immutable_record,
+                                side_effect=OSError("file sink offline") if outage in {"file", "both"} else None))
+                            sign = stack.enter_context(patch.object(
+                                registry.principal_verifier, "sign_rejection", wraps=registry.principal_verifier.sign_rejection,
+                                side_effect=OSError("custody offline") if outage == "custody" else None))
+                            with self.assertRaises(expected_error) as caught:
+                                getattr(authority, operation)(decision.decision_id)
+                        read.assert_called_once_with(active.candidate.experiment_id)
+                        admit.assert_not_called()
+                        sign.assert_called_once()
+                        self.assertEqual(write.call_count, 1 if outage in {"none", "custody"} else 2)
+                        self.assertEqual([call.args[1] for call in append.call_args_list],
+                                         ["promotion.receipt"] if outage == "none" else
+                                         ["promotion.receipt", "promotion.receipt_unavailable"] if outage == "ledger" else
+                                         ["promotion.receipt_unavailable"])
+                        self.assertEqual(registry.pointer_path.read_bytes(), before)
+                        self.assertEqual({path.name: path.read_bytes() for path in registry.admission_root.iterdir()},
+                                         manifests_before)
+                        self.assertEqual(registry._read_records(registry.lineage_root), lineage_before)
+                        self.assertFalse(registry.unknown_commit_path.exists())
+                        self.assertEqual(authority._actionable(decision.decision_id), decision)
+                        # Inspect the attempted payload even if no sink could retain it.
+                        # Only the separate durable-file/ledger assertions below prove persistence.
+                        receipt = write.call_args_list[0].args[1]["receipt"]
+                        self.assertEqual(receipt["status"], "rejected")
+                        self.assertEqual(receipt["action"], operation)
+                        self.assertEqual(receipt["decision_payload"], authority.decision_payload(decision))
+                        self.assertEqual(receipt["reasons"], [str(failure)])
+                        self.assertIsNone(receipt["prior_digest"])
+                        self.assertIsNone(receipt["pointer_after"])
+                        unsigned = {key: value for key, value in receipt.items() if key != "authentication"}
+                        if outage != "custody":
+                            self.assertEqual(registry.principal_verifier.verify_rejection_receipt(receipt["authentication"]),
+                                             unsigned)
+                        files = registry.events()
+                        signed_files = [item["receipt"] for item in files if item["kind"] == "promotion-authority-rejection"]
+                        self.assertEqual(signed_files, [receipt] if outage in {"none", "ledger"} else [])
+                        events_after = registry.ledger.events()
+                        self.assertEqual(events_after[:len(events_before)], events_before)
+                        new_events = events_after[len(events_before):]
+                        if outage == "none":
+                            self.assertIs(caught.exception, failure)
+                            self.assertEqual(authority.receipts, (*receipts_before, receipt))
+                            self.assertEqual([item["event_type"] for item in new_events], ["promotion.receipt"])
+                            self.assertEqual(new_events[0]["payload"], receipt)
+                            self.assertEqual(len(files), 1)
+                        else:
+                            assert isinstance(caught.exception, RejectionPersistenceError)
+                            self.assertEqual(caught.exception.code, "rejection-persistence-failed")
+                            self.assertEqual(authority.receipts, receipts_before)
+                            diagnostic = append.call_args_list[-1].args[3]
+                            self.assertEqual(diagnostic["kind"], "promotion-receipt-unavailable")
+                            self.assertEqual(diagnostic["receipt"], unsigned)
+                            self.assertEqual(diagnostic["authentication_status"], "unavailable")
+                            self.assertEqual(diagnostic["actor"], decision.judge_id)
+                            self.assertEqual(diagnostic["experiment_id"], decision.candidate.experiment_id)
+                            self.assertNotIn("authentication", diagnostic["receipt"])
+                            self.assertEqual([item for item in files if item["kind"] == "promotion-receipt-unavailable"],
+                                             [diagnostic] if outage in {"ledger", "custody"} else [])
+                            self.assertEqual([item["event_type"] for item in new_events],
+                                             ["promotion.receipt_unavailable"] if outage in {"file", "custody"} else [])
+                            if new_events:
+                                self.assertEqual(new_events[0]["payload"], diagnostic)
+                            if outage == "both":
+                                self.assertIn("file: file sink offline; ledger: ledger sink offline", str(caught.exception))
+                        restarted = PromptRegistry(registry.root, principal_verifier=registry.principal_verifier)
+                        self.addCleanup(restarted.close)
+                        self.assertEqual(restarted.pointer_path.read_bytes(), before)
+                        self.assertEqual(restarted.champion_digest("builder"), active.candidate.artifact_digest)
+                        self.assertEqual(restarted.events(), files)
+                        self.assertEqual(restarted.ledger.events(), events_after)
+
+    def test_champion_read_preserves_existing_commit_and_persistence_exceptions(self) -> None:
+        for operation, verdict in (("apply", ExperimentVerdict.KEEP),
+                                   ("apply", ExperimentVerdict.RETEST),
+                                   ("rollback", ExperimentVerdict.DISCARD)):
+            for pending in (True, False):
+                with self.subTest(operation=operation, verdict=verdict, pending=pending):
+                    registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                    binding = registry._read_pointers()["promotion_bindings"]["builder"]
+                    failure = (PromotionCommittedEvidencePending(binding, active.candidate.parent_champion_digest,
+                                                                  active.candidate.artifact_digest, "retained-observation")
+                               if pending else RejectionPersistenceError("rejection-persistence-failed", "retained sink failure"))
+                    before = registry.pointer_path.read_bytes()
+                    events_before = registry.ledger.events()
+                    receipts_before = authority.receipts
+                    with patch.object(registry.ledger, "events", side_effect=failure):
+                        with patch.object(authority, "_record_receipt", wraps=authority._record_receipt) as record:
+                            with self.assertRaises(type(failure)) as caught:
+                                getattr(authority, operation)(decision.decision_id)
+                    self.assertIs(caught.exception, failure)
+                    record.assert_not_called()
+                    self.assertEqual(registry.pointer_path.read_bytes(), before)
+                    self.assertEqual(registry.ledger.events(), events_before)
+                    self.assertEqual(registry.events(), ())
+                    self.assertEqual(authority.receipts, receipts_before)
+                    self.assertEqual(authority._actionable(decision.decision_id), decision)
+
+    def test_action_observation_failures_keep_committed_status_without_rejection(self) -> None:
+        for operation, verdict in (("apply", ExperimentVerdict.KEEP),
+                                   ("apply", ExperimentVerdict.RETEST),
+                                   ("rollback", ExperimentVerdict.DISCARD)):
+            with self.subTest(operation=operation, verdict=verdict):
+                registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                observer = "_observe_promotion" if verdict is ExperimentVerdict.KEEP else "_observe_adverse"
+                with patch.object(registry, observer, side_effect=OSError("observation unavailable")):
+                    receipt = getattr(authority, operation)(decision.decision_id)
+                self.assertEqual(receipt["status"], "committed-evidence-pending")
+                expected = (decision.candidate.parent_champion_digest if operation == "rollback" else
+                            decision.candidate.artifact_digest if verdict is ExperimentVerdict.KEEP else
+                            active.candidate.artifact_digest)
+                self.assertEqual(receipt["pointer_after"], expected)
+                self.assertEqual(registry.champion_digest("builder"), expected)
+                assert decision.evaluation_record is not None
+                self.assertIn(decision.evaluation_record.record_digest, registry._read_pointers()["consumed_evaluations"])
+                self.assertFalse(any(item["kind"] == "promotion-authority-rejection" for item in registry.events()))
+
+    def test_decision_publication_failures_retain_signed_evidence_without_admission(self) -> None:
+        for operation, verdict, admission_method in (
+            ("apply", ExperimentVerdict.KEEP, "promote"),
+            ("apply", ExperimentVerdict.RETEST, "apply_adverse_decision"),
+            ("rollback", ExperimentVerdict.DISCARD, "rollback_champion"),
+        ):
+            for error_type in (OSError, sqlite3.OperationalError):
+                for fault in ("decision-only", "after-publication", "ledger-outage"):
+                    with self.subTest(operation=operation, verdict=verdict, error=error_type, fault=fault):
+                        registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                        before = registry.pointer_path.read_bytes()
+                        events_before = registry.ledger.events()
+                        receipts_before = authority.receipts
+                        manifests_before = {path.name: path.read_bytes() for path in registry.admission_root.iterdir()}
+                        lineage_before = registry._read_records(registry.lineage_root)
+                        append = registry.ledger.append_event
+                        failure = error_type("decision ledger unavailable")
+
+                        def fail_publication(run_id, event_type, actor, payload):
+                            if event_type == "experiment.decision":
+                                if fault == "after-publication":
+                                    append(run_id, event_type, actor, payload)
+                                raise failure
+                            if fault == "ledger-outage":
+                                raise failure
+                            return append(run_id, event_type, actor, payload)
+
+                        expected_error = RejectionPersistenceError if fault == "ledger-outage" else error_type
+                        with patch.object(registry.ledger, "append_event", side_effect=fail_publication) as publisher:
+                            with patch.object(registry, admission_method,
+                                              side_effect=AssertionError("admission started after publication failure")) as admit:
+                                with self.assertRaises(expected_error) as caught:
+                                    getattr(authority, operation)(decision.decision_id)
+                        admit.assert_not_called()
+                        self.assertEqual([call.args[1] for call in publisher.call_args_list],
+                                         ["experiment.decision", "promotion.receipt"] +
+                                         (["promotion.receipt_unavailable"] if fault == "ledger-outage" else []))
+                        self.assertEqual(registry.pointer_path.read_bytes(), before)
+                        self.assertEqual(registry.champion_digest("builder"), active.candidate.artifact_digest)
+                        self.assertEqual({path.name: path.read_bytes() for path in registry.admission_root.iterdir()},
+                                         manifests_before)
+                        self.assertEqual(registry._read_records(registry.lineage_root), lineage_before)
+                        self.assertFalse(registry.unknown_commit_path.exists())
+                        self.assertEqual(authority._actionable(decision.decision_id), decision)
+                        signed_records = [item["receipt"] for item in registry.events()
+                                          if item["kind"] == "promotion-authority-rejection"]
+                        self.assertEqual(len(signed_records), 1)
+                        receipt = signed_records[0]
+                        verified = registry.principal_verifier.verify_rejection_receipt(receipt["authentication"])
+                        self.assertEqual(verified, {key: value for key, value in receipt.items() if key != "authentication"})
+                        self.assertEqual(receipt["status"], "rejected")
+                        self.assertEqual(receipt["action"], operation)
+                        self.assertEqual(receipt["decision_payload"], authority.decision_payload(decision))
+                        self.assertEqual(receipt["reasons"], [str(failure)])
+                        self.assertEqual(receipt["prior_digest"], active.candidate.artifact_digest)
+                        self.assertEqual(receipt["restored_digest"],
+                                         decision.candidate.parent_champion_digest if operation == "rollback" else None)
+                        self.assertIsNone(receipt["pointer_after"])  # No under-lock post-action observation.
+                        events_after = registry.ledger.events()
+                        self.assertEqual(events_after[:len(events_before)], events_before)
+                        new_events = events_after[len(events_before):]
+                        if fault == "ledger-outage":
+                            assert isinstance(caught.exception, RejectionPersistenceError)
+                            self.assertEqual(caught.exception.code, "rejection-persistence-failed")
+                            self.assertEqual(authority.receipts, receipts_before)
+                            self.assertEqual(new_events, [])
+                            diagnostic = next(item for item in registry.events()
+                                              if item["kind"] == "promotion-receipt-unavailable")
+                            self.assertEqual(diagnostic["receipt"], verified)
+                            self.assertEqual(diagnostic["authentication_status"], "unavailable")
+                            self.assertEqual(diagnostic["persistence_error"], str(failure))
+                            self.assertNotIn("authentication", diagnostic["receipt"])
+                        else:
+                            self.assertIs(caught.exception, failure)
+                            self.assertEqual(authority.receipts, (*receipts_before, receipt))
+                            self.assertEqual([item["event_type"] for item in new_events],
+                                             (["experiment.decision"] if fault == "after-publication" else []) +
+                                             ["promotion.receipt"])
+                            self.assertEqual(new_events[-1]["payload"], receipt)
+                            if fault == "after-publication":
+                                self.assertEqual(new_events[0]["payload"], authority.decision_payload(decision))
+                        restarted = PromptRegistry(registry.root, principal_verifier=registry.principal_verifier)
+                        self.addCleanup(restarted.close)
+                        self.assertEqual(restarted.pointer_path.read_bytes(), before)
+                        self.assertEqual(restarted.champion_digest("builder"), active.candidate.artifact_digest)
+                        self.assertIn(receipt, [item["receipt"] for item in restarted.events()
+                                                if item["kind"] == "promotion-authority-rejection"])
+
+    def test_authenticated_stop_retains_champion_and_closes_candidate(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        champion = _keep(authority, registry, content="stop parent", parent=None,
+                         candidate_id="CAND-parent", experiment_id="EXP-parent",
+                         case_id="CASE-parent", decision_id="DEC-parent").candidate.artifact_digest
+        candidate = _registered_candidate(registry, content="stopped candidate", parent=champion,
+                                          candidate_id="CAND-stop", experiment_id="EXP-stop")
+        decision = _decision(candidate, ExperimentVerdict.STOP, "CASE-stop", "DEC-stop")
+        authority.submit(decision, court_history=_court_history(
+            candidate.artifact_digest, disposition=CourtDisposition.DEFER, case_id="CASE-stop",
+            claim_kind=CourtClaimKind.ORDINARY))
+        receipt = authority.apply("DEC-stop")
+        self.assertEqual(receipt["status"], "applied")
+        self.assertEqual(receipt["action"], "retain-champion")
+        self.assertEqual(receipt["verdict"], "stop")
+        self.assertEqual(receipt["pointer_after"], champion)
+        before = registry.pointer_path.read_bytes()
+        self.assertEqual(authority.recover_receipt("DEC-stop"), receipt)
+        with self.assertRaisesRegex(PromotionAuthorityError, "terminal verdict"):
+            authority.submit(_decision(candidate, ExperimentVerdict.RETEST, "CASE-later", "DEC-later"),
+                             court_history=_court_history(candidate.artifact_digest,
+                                                          disposition=CourtDisposition.DEFER, case_id="CASE-later",
+                                                          claim_kind=CourtClaimKind.ORDINARY))
+        with self.assertRaisesRegex(PromotionAuthorityError, "logged, unapplied"):
+            authority.apply("DEC-stop")
+        self.assertEqual(registry.champion_digest("builder"), champion)
+        self.assertEqual(registry.pointer_path.read_bytes(), before)
+
+    def test_early_refusal_custody_outage_retains_unsigned_diagnostics(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        decision = _keep(authority, registry, content="custody parent", parent=None,
+                         candidate_id="CAND-custody", experiment_id="EXP-custody",
+                         case_id="CASE-custody", decision_id="DEC-custody")
+        before = registry.pointer_path.read_bytes()
+        receipts = authority.receipts
+        for decision_id in ("DEC-unknown", "DEC-custody"):
+            for operation in ("apply", "rollback"):
+                with self.subTest(decision_id=decision_id, operation=operation):
+                    with patch.object(registry.principal_verifier.test_only_receipt_signer, "sign",
+                                      side_effect=OSError("custody offline")) as signer:
+                        with self.assertRaises(RejectionPersistenceError) as caught:
+                            getattr(authority, operation)(decision_id)
+                    self.assertEqual(signer.call_count, 1)
+                    self.assertEqual(caught.exception.code, "rejection-persistence-failed")
+                    diagnostic = next(item for item in registry.events()
+                                      if item["kind"] == "promotion-receipt-unavailable"
+                                      and item["receipt"]["decision_id"] == decision_id
+                                      and item["receipt"]["action"] == operation)
+                    self.assertEqual(diagnostic["kind"], "promotion-receipt-unavailable")
+                    self.assertEqual(diagnostic["authentication_status"], "unavailable")
+                    self.assertNotIn("authentication", diagnostic)
+                    refused = diagnostic["receipt"]
+                    self.assertNotIn("authentication", refused)
+                    self.assertEqual(refused["status"], "rejected")
+                    self.assertEqual(refused["decision_id"], decision_id)
+                    self.assertEqual(refused["action"], operation)
+                    self.assertIn("logged, unapplied", refused["reasons"][0])
+                    if decision_id == "DEC-custody":
+                        self.assertEqual(refused["decision_payload"], authority.decision_payload(decision))
+                    else:
+                        self.assertIsNone(refused["candidate_binding"])
+                    retained = [item["payload"] for item in registry.ledger.events()
+                                if item["event_type"] == "promotion.receipt_unavailable"]
+                    self.assertIn(diagnostic, retained)
+        self.assertEqual(len([item for item in registry.events()
+                              if item["kind"] == "promotion-receipt-unavailable"]), 4)
+        self.assertEqual(authority.receipts, receipts)
+        self.assertEqual(registry.pointer_path.read_bytes(), before)
+
+    def test_refusal_ledger_outage_retains_file_and_reports_sink_failure(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        with patch.object(registry.ledger, "append_event", side_effect=OSError("ledger offline")) as append:
+            with self.assertRaisesRegex(RejectionPersistenceError, "ledger: ledger offline"):
+                authority.apply("DEC-unknown")
+        self.assertEqual(append.call_count, 2)  # Receipt then distinct fallback diagnostic.
+        diagnostic = next(item for item in registry.events() if item["kind"] == "promotion-receipt-unavailable")
+        self.assertEqual(diagnostic["authentication_status"], "unavailable")
+        self.assertEqual(diagnostic["receipt"]["decision_id"], "DEC-unknown")
+        self.assertNotIn("authentication", diagnostic["receipt"])
+        signed = next(item["receipt"] for item in registry.events()
+                      if item["kind"] == "promotion-authority-rejection")
+        verified = registry.principal_verifier.verify_rejection_receipt(signed["authentication"])
+        self.assertEqual(verified["decision_id"], "DEC-unknown")
+        self.assertEqual(authority.receipts, ())
+
+    def test_refusal_all_sinks_unavailable_reports_failure_without_retry(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        with patch.object(registry.principal_verifier.test_only_receipt_signer, "sign",
+                          side_effect=OSError("custody offline")) as signer:
+            with patch.object(registry, "_write_immutable_record", side_effect=OSError("disk offline")) as write:
+                with patch.object(registry.ledger, "append_event", side_effect=OSError("ledger offline")) as append:
+                    with self.assertRaisesRegex(RejectionPersistenceError, "file: disk offline; ledger: ledger offline"):
+                        authority.apply("DEC-unknown")
+        self.assertEqual((signer.call_count, write.call_count, append.call_count), (1, 1, 1))
+        self.assertEqual(authority.receipts, ())
+        self.assertEqual(registry.events(), ())
+
+    def test_committed_authority_receipt_recovers_after_restart_without_replay(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        append = registry.ledger.append_event
+        def fail_receipt(run_id, event_type, actor, payload):
+            if event_type == "promotion.receipt":
+                raise OSError("receipt unavailable")
+            return append(run_id, event_type, actor, payload)
+        with patch.object(registry.ledger, "append_event", side_effect=fail_receipt):
+            with self.assertRaises(PromotionCommittedEvidencePending):
+                _keep(authority, registry, content="prompt receipt recovery", parent=None,
+                      candidate_id="CAND-receipt", experiment_id="EXP-receipt",
+                      case_id="CASE-receipt", decision_id="DEC-receipt")
+        decision = authority.log.decisions[-1]
+        before = registry.pointer_path.read_bytes()
+        restarted = PromotionAuthority(registry)
+        restarted.submit(decision, court_history=_court_history(
+            decision.candidate.artifact_digest, disposition=CourtDisposition.ADOPT, case_id="CASE-receipt"))
+        first = restarted.recover_receipt("DEC-receipt")
+        second = restarted.recover_receipt("DEC-receipt")
+        self.assertEqual(first, second)
+        self.assertEqual(first["status"], "applied")
+        self.assertEqual(before, registry.pointer_path.read_bytes())
+        self.assertEqual(registry.champion_digest("builder"), decision.candidate.artifact_digest)
+
     def test_promotion_authority_tests(self) -> None:
         registry = _registry(self)
         authority = PromotionAuthority(registry)
@@ -494,8 +926,9 @@ class HiveCortexPromotionTests(unittest.TestCase):
         with self.assertRaisesRegex(PromotionAuthorityError, "discard or quarantine"):
             authority.rollback("DEC-D")
         self.assertEqual(registry.champion_digest(Role.BUILDER), digest_b)
-        # The authority refused on its own, without reaching the registry.
-        self.assertEqual(len(authority.receipts), retained)
+        # Early authority refusals now retain an authenticated decision-bound receipt.
+        self.assertEqual(len(authority.receipts), retained + 1)
+        self.assertEqual(authority.receipts[-1]["status"], "rejected")
 
         # An adverse quarantine verdict against the live champion restores A.
         adverse = PromotionCandidate(
@@ -506,10 +939,10 @@ class HiveCortexPromotionTests(unittest.TestCase):
             digest_a,
             PROPOSER,
             BUILDER,
-            ("evidence:quarantine",),
+            evidence_refs(registry.root, "CAND-Q"),
         )
         authority.submit(
-            _decision(adverse, ExperimentVerdict.QUARANTINE, "CASE-Q", "DEC-Q"),
+            _decision(adverse, ExperimentVerdict.QUARANTINE, "CASE-Q", "DEC-Q", action="rollback"),
             court_history=_court_history(
                 digest_b,
                 disposition=CourtDisposition.QUARANTINE,
@@ -537,7 +970,7 @@ class HiveCortexPromotionTests(unittest.TestCase):
             digest_a,
             PROPOSER,
             BUILDER,
-            ("evidence:orphan",),
+            evidence_refs(registry.root, "CAND-Z"),
         )
         authority.submit(
             _decision(orphan, ExperimentVerdict.DISCARD, "CASE-Z", "DEC-Z"),
@@ -555,8 +988,9 @@ class HiveCortexPromotionTests(unittest.TestCase):
         ):
             authority.rollback("DEC-Z")
         self.assertEqual(registry.champion_digest(Role.BUILDER), digest_a)
-        # Refused by this module's own binding check, not by a registry error.
-        self.assertEqual(len(authority.receipts), retained)
+        # The local binding refusal is retained without moving the registry pointer.
+        self.assertEqual(len(authority.receipts), retained + 1)
+        self.assertEqual(authority.receipts[-1]["status"], "rejected")
 
 
 if __name__ == "__main__":

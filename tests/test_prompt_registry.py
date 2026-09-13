@@ -4,12 +4,22 @@ import json
 import os
 import tempfile
 import unittest
+from hashlib import sha256
 from pathlib import Path
 from unittest.mock import patch
 
+from promotion_auth_fixtures import verifier_for
+from promotion_fixtures import authenticated_rollback, decision_payload
+
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.models import Role
-from hive_mind_os.prompt_registry import PromptRegistry, generation_zero_prompt
+from hive_mind_os.prompt_registry import (
+    PromotionAdmissionError,
+    PromptRegistry,
+    canonical_prompt_bytes,
+    generation_zero_prompt,
+    prompt_digest,
+)
 from hive_mind_os.roles import ROLE_CONTRACTS
 
 
@@ -18,7 +28,7 @@ class PromptRegistryTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.ledger = EvidenceLedger()
-        self.registry = PromptRegistry(self.root, ledger=self.ledger)
+        self.registry = PromptRegistry(self.root, ledger=self.ledger, principal_verifier=verifier_for())
 
     def tearDown(self) -> None:
         self.registry.close()
@@ -49,22 +59,9 @@ class PromptRegistryTests(unittest.TestCase):
         actor: str = "judge:test",
         **overrides: object,
     ) -> int:
-        payload: dict[str, object] = {
-            "verdict": "keep",
-            "role": Role.BUILDER.value,
-            "candidate_digest": candidate,
-            "current_digest": current,
-            "registration_experiment_id": experiment_id,
-            "registration_role": Role.BUILDER.value,
-            "registration_author": "author:test",
-            "registration_parent_digest": current,
-            "proposer_id": "author:test",
-            "builder_id": "builder:test",
-            "evaluator_id": "evaluator:test",
-            "judge_id": actor,
-            "retained_artifact_refs": ["artifact:test#sha256:" + "a" * 64],
-            "contract_fingerprint": "sha256:" + "b" * 64,
-        }
+        payload = decision_payload(self.root, candidate_digest=candidate, parent=current,
+                                   experiment_id=experiment_id)
+        payload["judge_id"] = actor
         payload.update(overrides)
         return self.ledger.append_event(
             experiment_id,
@@ -107,6 +104,46 @@ class PromptRegistryTests(unittest.TestCase):
                 generation_zero_prompt(ROLE_CONTRACTS[role]),
             )
 
+    def test_repeated_trailing_newlines_register_hash_and_read_identically(self) -> None:
+        for content in ("x", "x\n", "x\n\n", "x\n\n\n", "x\r\n\r\n", "x\r\r\n",
+                        b"x\r\n\r\n\r\n", "x\n\ninside \t\r\n\r\n", "\r\n\r\n"):
+            with self.subTest(content=content):
+                canonical = canonical_prompt_bytes(content)
+                self.assertEqual(canonical_prompt_bytes(canonical), canonical)
+                digest = self.registry.register("builder", content, parent_digest=None, created_by="author:test")
+                self.assertEqual(digest, prompt_digest(content))
+                self.assertEqual(digest, "sha256:" + sha256(canonical).hexdigest())
+                self.assertEqual(self.registry.artifact_path(digest).read_bytes(), canonical)
+                self.assertEqual(self.registry.read(digest).encode("utf-8"), canonical)
+        self.assertEqual(canonical_prompt_bytes("x\n\ninside \t\r\n\r\n"), b"x\n\ninside \t")
+
+    def test_legacy_newline_artifacts_are_preserved_for_explicit_migration(self) -> None:
+        for trailing in (2, 3):
+            with self.subTest(trailing=trailing):
+                # Pinned legacy registration removed one LF before hashing,
+                # then its digest helper removed another LF from stored bytes.
+                content = "legacy-" + str(trailing) + "\r\n" * trailing
+                stored = content.replace("\r\n", "\n").removesuffix("\n").encode()
+                legacy_digest = "sha256:" + sha256(stored.removesuffix(b"\n")).hexdigest()
+                path = self.registry.artifact_path(legacy_digest)
+                path.write_bytes(stored)
+                self.registry._atomic_json(self.registry.pointer_path,
+                                           {"schema_version": 1, "champions": {"builder": legacy_digest}})
+                before = self.registry.pointer_path.read_bytes()
+                with self.assertRaises(PromotionAdmissionError) as caught:
+                    self.registry.read(legacy_digest)
+                self.assertEqual(caught.exception.code, "artifact-noncanonical")
+                self.assertEqual(self.registry.migration_status()["roles"]["builder"], "blocked:artifact-noncanonical")
+                if trailing == 2:  # New canonical digest collides with the legacy path.
+                    with self.assertRaisesRegex(PromotionAdmissionError, "explicit migration review"):
+                        self._register(content)
+                else:
+                    fresh = self._register(content)
+                    self.assertNotEqual(fresh, legacy_digest)
+                    self.assertEqual(self.registry.read(fresh), "legacy-3")
+                self.assertEqual(path.read_bytes(), stored)
+                self.assertEqual(self.registry.pointer_path.read_bytes(), before)
+
     def test_atomic_promotion_failure_preserves_valid_pointer(self) -> None:
         champion = self._bootstrap_builder()
         challenger = self._register(
@@ -127,7 +164,7 @@ class PromptRegistryTests(unittest.TestCase):
                 self.registry.promote(
                     Role.BUILDER,
                     challenger,
-                    promoted_by="judge:test",
+                    promoted_by="promoter:test",
                     experiment_id="EXP-crash",
                     expected_current=champion,
                     decision_event_sequence=decision_sequence,
@@ -154,7 +191,7 @@ class PromptRegistryTests(unittest.TestCase):
         self.registry.promote(
             Role.BUILDER,
             challenger,
-            promoted_by="judge:test",
+            promoted_by="promoter:test",
             experiment_id="EXP-keep",
             expected_current=champion,
             decision_event_sequence=decision_sequence,
@@ -165,12 +202,7 @@ class PromptRegistryTests(unittest.TestCase):
             if item["kind"] == "promotion"
         ][0]
         self.assertEqual(promotion["parent_digest"], champion)
-        prior = self.registry.rollback_champion(
-            Role.BUILDER,
-            champion,
-            actor="steward:test",
-            reason="regression",
-        )
+        prior = authenticated_rollback(self.registry, champion)
         self.assertEqual(prior, challenger)
         self.assertEqual(self.registry.champion_digest(Role.BUILDER), champion)
         self.registry.quarantine(
@@ -198,7 +230,7 @@ class PromptRegistryTests(unittest.TestCase):
             self.registry.promote(
                 Role.BUILDER,
                 challenger,
-                promoted_by="judge:test",
+                promoted_by="promoter:test",
                 experiment_id="EXP-no-decision",
                 expected_current=champion,
             )
@@ -302,7 +334,7 @@ class PromptRegistryTests(unittest.TestCase):
             self.registry.promote(
                 Role.BUILDER,
                 challenger,
-                promoted_by="judge:test",
+                promoted_by="promoter:test",
                 experiment_id="EXP-forged",
                 expected_current=champion,
                 decision_event_sequence=forged_sequence,
@@ -365,7 +397,7 @@ class PromptRegistryTests(unittest.TestCase):
             self.registry.promote(
                 Role.BUILDER,
                 candidate,
-                promoted_by="judge:test",
+                promoted_by="promoter:test",
                 experiment_id="EXP-quarantined-promotion",
                 expected_current=champion,
                 decision_event_sequence=decision_sequence,

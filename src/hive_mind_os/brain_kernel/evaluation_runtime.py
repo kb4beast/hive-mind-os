@@ -21,6 +21,8 @@ __all__ = [
     "EvaluationError",
     "EvaluationIdentities",
     "EvaluationRecord",
+    "EvaluationRecordReference",
+    "PromptEvaluationSubject",
     "EvaluationRuntime",
     "EvaluationVerdict",
     "GuardrailSpec",
@@ -130,6 +132,137 @@ class ChallengerDescriptor:
             "change_ref": self.change_ref,
             "proposal_digest": self.proposal_digest,
         }
+
+
+def _require_digest(value: object, label: str) -> str:
+    text = _require_identifier(value, label)
+    if (len(text) != 71 or not text.startswith("sha256:")
+            or any(character not in "0123456789abcdef" for character in text[7:])):
+        raise EvaluationError(f"{label} must be sha256:<64 lowercase hex>")
+    return text
+
+
+def _exact_document(document: object, fields: set[str], label: str) -> Mapping[str, Any]:
+    if not isinstance(document, Mapping) or set(document) != fields:
+        raise EvaluationError(f"{label} has unexpected or missing fields")
+    return document
+
+
+@dataclass(frozen=True, slots=True)
+class PromptEvaluationSubject:
+    """Explicit prompt binding; proposal identifiers retain their original meaning."""
+
+    descriptor: ChallengerDescriptor
+    candidate_id: str
+    role: str
+    experiment_id: str
+    artifact_digest: str
+    parent_champion_digest: str | None
+    proposer_id: str
+    builder_id: str
+    evidence_refs: tuple[str, ...]
+    contract_fingerprint: str
+
+    def __post_init__(self) -> None:
+        from ..models import Role
+
+        if not isinstance(self.descriptor, ChallengerDescriptor):
+            raise EvaluationError("descriptor must be a ChallengerDescriptor")
+        for field in ("candidate_id", "role", "experiment_id", "proposer_id", "builder_id"):
+            _require_identifier(getattr(self, field), field)
+        try:
+            Role(self.role)
+        except ValueError as error:
+            raise EvaluationError("role must be a kernel role") from error
+        _require_digest(self.artifact_digest, "artifact_digest")
+        _require_digest(self.contract_fingerprint, "contract_fingerprint")
+        if self.parent_champion_digest is not None:
+            _require_digest(self.parent_champion_digest, "parent_champion_digest")
+        if self.artifact_digest == self.parent_champion_digest:
+            raise EvaluationError("subject artifact must differ from its parent")
+        if self.descriptor.challenger_id != self.candidate_id:
+            raise EvaluationError("descriptor challenger_id must equal candidate_id")
+        if self.proposer_id == self.builder_id:
+            raise EvaluationError("subject proposer and builder must differ")
+        if type(self.evidence_refs) is not tuple or not self.evidence_refs:
+            raise EvaluationError("subject evidence_refs must be a nonempty tuple")
+        for reference in self.evidence_refs:
+            _require_identifier(reference, "evidence reference")
+        if len(set(self.evidence_refs)) != len(self.evidence_refs):
+            raise EvaluationError("subject evidence_refs must be unique")
+
+    def document(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "kind": "prompt-evaluation-subject",
+            "descriptor": self.descriptor.document(),
+            "candidate_id": self.candidate_id,
+            "role": self.role,
+            "experiment_id": self.experiment_id,
+            "artifact_digest": self.artifact_digest,
+            "parent_champion_digest": self.parent_champion_digest,
+            "proposer_id": self.proposer_id,
+            "builder_id": self.builder_id,
+            "evidence_refs": list(self.evidence_refs),
+            "contract_fingerprint": self.contract_fingerprint,
+        }
+
+    @property
+    def subject_digest(self) -> str:
+        return canonical_digest(self.document())
+
+    @classmethod
+    def from_document(cls, document: Mapping[str, Any]) -> "PromptEvaluationSubject":
+        data = _exact_document(document, {
+            "schema_version", "kind", "descriptor", "candidate_id", "role",
+            "experiment_id", "artifact_digest", "parent_champion_digest",
+            "proposer_id", "builder_id", "evidence_refs", "contract_fingerprint",
+        }, "prompt evaluation subject")
+        if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+            raise EvaluationError("subject schema_version must be 1")
+        if data["kind"] != "prompt-evaluation-subject":
+            raise EvaluationError("invalid subject kind")
+        descriptor = _exact_document(data["descriptor"], {
+            "challenger_id", "parent_champion_id", "change_ref", "proposal_digest",
+        }, "descriptor")
+        if type(data["evidence_refs"]) is not list:
+            raise EvaluationError("subject evidence_refs must be an array")
+        return cls(
+            ChallengerDescriptor(**descriptor), data["candidate_id"], data["role"],
+            data["experiment_id"], data["artifact_digest"], data["parent_champion_digest"],
+            data["proposer_id"], data["builder_id"], tuple(data["evidence_refs"]),
+            data["contract_fingerprint"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationRecordReference:
+    evaluation_id: str
+    record_path: str
+    record_digest: str
+
+    def __post_init__(self) -> None:
+        identity = _require_identifier(self.evaluation_id, "evaluation_id")
+        if (len(identity) != 21 or not identity.startswith("EVAL-")
+                or any(character not in "0123456789abcdef" for character in identity[5:])):
+            raise EvaluationError("evaluation_id must be EVAL-<16 lowercase hex>")
+        _require_identifier(self.record_path, "record_path")
+        if not Path(self.record_path).is_absolute():
+            raise EvaluationError("record_path must be absolute")
+        _require_digest(self.record_digest, "record_digest")
+
+    def document(self) -> dict[str, Any]:
+        return {"schema_version": 1, "evaluation_id": self.evaluation_id,
+                "record_path": self.record_path, "record_digest": self.record_digest}
+
+    @classmethod
+    def from_document(cls, document: Mapping[str, Any]) -> "EvaluationRecordReference":
+        data = _exact_document(document, {
+            "schema_version", "evaluation_id", "record_path", "record_digest",
+        }, "evaluation record reference")
+        if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+            raise EvaluationError("reference schema_version must be 1")
+        return cls(data["evaluation_id"], data["record_path"], data["record_digest"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,6 +517,156 @@ class EvaluationRecord:
     resolved_primary_held_out_name: str | None = None
     primary_scored: bool = False
 
+    def reference(self) -> EvaluationRecordReference:
+        return EvaluationRecordReference(
+            self.evaluation_id, str(self.record_path.absolute()), self.record_digest
+        )
+
+
+def _score_evaluation(
+    ordered: tuple[SurfaceResult, ...], contract: EvaluationContract, *,
+    ordering: Mapping[str, Any], violations: tuple[str, ...],
+    seal_evaluator_id: str | None, evaluator_id: str,
+    artifact_issues: Mapping[str, str | None],
+) -> dict[str, Any]:
+    """Pure shared calculation; callers provide observed artifact issues."""
+    # 1. Quarantine set (AC2 + AC4). Nothing below is measured if it is non-empty.
+    quarantine_reasons: list[str] = []
+    if not ordering["valid"] or violations:
+        kinds = ", ".join(violations) if violations else "no intact prediction seal"
+        quarantine_reasons.append(f"holdout boundary violated: {kinds}")
+    if (
+        seal_evaluator_id is not None
+        and seal_evaluator_id != evaluator_id
+    ):
+        quarantine_reasons.append(
+            "holdout seal evaluator does not match evaluation evaluator"
+        )
+    seen: set[tuple[SurfaceKind, str]] = set()
+    for surface in ordered:
+        key = (surface.kind, surface.name)
+        if key in seen:
+            quarantine_reasons.append(f"duplicate surface: {surface.name}")
+        seen.add(key)
+        if not surface.artifact_refs:
+            quarantine_reasons.append(
+                f"surface has no retained artifacts: {surface.name}"
+            )
+        for reference in surface.artifact_refs:
+            issue = artifact_issues.get(reference)
+            if issue is not None:
+                quarantine_reasons.append(f"missing or mutated artifact: {issue}")
+
+    held_out_surfaces = [s for s in ordered if s.kind == SurfaceKind.HELD_OUT]
+    requested_primary = contract.primary_held_out_name
+    matches = [s for s in held_out_surfaces
+               if requested_primary is None or s.name == requested_primary]
+    primary = matches[0] if len(matches) == 1 else None
+    if requested_primary is not None and primary is None:
+        quarantine_reasons.append(
+            "primary held-out designation requires exactly one match: "
+            + requested_primary
+        )
+    elif requested_primary is None and len(held_out_surfaces) > 1:
+        quarantine_reasons.append(
+            "multiple held-out surfaces require a primary designation"
+        )
+    resolved_primary = primary.name if primary is not None else None
+    extended_receipt = requested_primary is not None or len(held_out_surfaces) > 1
+    selection_policy = contract.document()["selection_policy"]
+
+    verdict: EvaluationVerdict
+    reasons: list[str]
+    primary_effect: float | None = None
+    required_effect: float | None = None
+    noise_floor: float | None = None
+
+    if quarantine_reasons:
+        # 2. Absent or mutated evidence never falls through to a retest.
+        verdict = EvaluationVerdict.QUARANTINE
+        reasons = quarantine_reasons
+    else:
+        by_kind = {surface.kind: surface for surface in ordered}
+        retest_reasons: list[str] = []
+        missing = [kind.value for kind in SurfaceKind if kind not in by_kind]
+        if missing:
+            retest_reasons.append("missing surfaces: " + ", ".join(sorted(missing)))
+        thin = sorted(
+            surface.name
+            for surface in ordered
+            if min(len(surface.baseline_samples), len(surface.candidate_samples))
+            < contract.minimum_repetitions
+        )
+        if thin:
+            retest_reasons.append(
+                "insufficient repeated measurements: " + ", ".join(thin)
+            )
+        if retest_reasons:
+            # 3. Incomplete measurement surface: retest, do not judge.
+            verdict = EvaluationVerdict.RETEST
+            reasons = retest_reasons
+        else:
+            # 4. Hard guardrails, retained as losing evidence.
+            guardrail_reasons: list[str] = []
+            for spec in contract.guardrails:
+                for surface in ordered:
+                    if surface.kind != spec.surface:
+                        continue
+                    effect = fmean(surface.candidate_samples) - fmean(
+                        surface.baseline_samples
+                    )
+                    regression = max(0.0, -effect)
+                    if regression > spec.maximum_regression:
+                        guardrail_reasons.append(
+                            f"hard guardrail regressed: {surface.name}"
+                        )
+            if guardrail_reasons:
+                verdict = EvaluationVerdict.DISCARD
+                reasons = guardrail_reasons
+            else:
+                # 5. Primary decision on the held-out surface.
+                if primary is None:
+                    raise EvaluationError("primary held-out selection is unresolved")
+                held_out = primary
+                primary_effect = fmean(held_out.candidate_samples) - fmean(
+                    held_out.baseline_samples
+                )
+                noise_floor = max(
+                    pstdev(held_out.baseline_samples),
+                    pstdev(held_out.candidate_samples),
+                )
+                required_effect = max(
+                    float(contract.minimum_effect),
+                    float(contract.noise_multiplier) * noise_floor,
+                )
+                if primary_effect > required_effect:
+                    verdict = EvaluationVerdict.KEEP
+                    reasons = [
+                        "held-out effect exceeded the required effect over the noise floor"
+                    ]
+                elif primary_effect < -required_effect:
+                    verdict = EvaluationVerdict.DISCARD
+                    reasons = [
+                        "challenger materially underperformed the champion on held-out evidence"
+                    ]
+                else:
+                    verdict = EvaluationVerdict.RETEST
+                    reasons = [
+                        "held-out effect did not exceed the measured noise floor"
+                    ]
+
+    return {
+        "verdict": verdict,
+        "reasons": reasons,
+        "primary_effect": primary_effect,
+        "required_effect": required_effect,
+        "noise_floor": noise_floor,
+        "selection_policy": selection_policy,
+        "requested_primary": requested_primary,
+        "resolved_primary": resolved_primary,
+        "extended_receipt": extended_receipt,
+    }
+
 
 class EvaluationRuntime:
     """Independent evaluator: quarantines first, never retests optimistically."""
@@ -407,6 +690,7 @@ class EvaluationRuntime:
         holdout: SealedHoldout,
         *,
         evidence_root: str | Path,
+        promotion_subject: PromptEvaluationSubject | None = None,
     ) -> EvaluationRecord:
         if not isinstance(descriptor, ChallengerDescriptor):
             raise EvaluationError("descriptor must be a ChallengerDescriptor")
@@ -425,134 +709,35 @@ class EvaluationRuntime:
         ordered = tuple(sorted(given, key=lambda item: (item.kind.value, item.name)))
         contract = self._contract
 
+        if promotion_subject is not None:
+            if not isinstance(promotion_subject, PromptEvaluationSubject):
+                raise EvaluationError("promotion_subject must be a PromptEvaluationSubject")
+            if (promotion_subject.descriptor != descriptor
+                    or promotion_subject.proposer_id != identities.proposer_id
+                    or promotion_subject.builder_id != identities.builder_id
+                    or promotion_subject.contract_fingerprint != contract.fingerprint):
+                raise EvaluationError("promotion subject does not match evaluation inputs")
+
         ordering = holdout.ordering
         violations = holdout.violations
         recorded_seal = holdout._seal
 
-        # 1. Quarantine set (AC2 + AC4). Nothing below is measured if it is non-empty.
-        quarantine_reasons: list[str] = []
-        if not ordering["valid"] or violations:
-            kinds = ", ".join(violations) if violations else "no intact prediction seal"
-            quarantine_reasons.append(f"holdout boundary violated: {kinds}")
-        if (
-            recorded_seal is not None
-            and recorded_seal.evaluator_id != identities.evaluator_id
-        ):
-            quarantine_reasons.append(
-                "holdout seal evaluator does not match evaluation evaluator"
-            )
-        seen: set[tuple[SurfaceKind, str]] = set()
-        for surface in ordered:
-            key = (surface.kind, surface.name)
-            if key in seen:
-                quarantine_reasons.append(f"duplicate surface: {surface.name}")
-            seen.add(key)
-            if not surface.artifact_refs:
-                quarantine_reasons.append(
-                    f"surface has no retained artifacts: {surface.name}"
-                )
-            for reference in surface.artifact_refs:
-                issue = _artifact_issue(reference)
-                if issue is not None:
-                    quarantine_reasons.append(f"missing or mutated artifact: {issue}")
-
-        held_out_surfaces = [s for s in ordered if s.kind == SurfaceKind.HELD_OUT]
-        requested_primary = contract.primary_held_out_name
-        matches = [s for s in held_out_surfaces
-                   if requested_primary is None or s.name == requested_primary]
-        primary = matches[0] if len(matches) == 1 else None
-        if requested_primary is not None and primary is None:
-            quarantine_reasons.append(
-                "primary held-out designation requires exactly one match: "
-                + requested_primary
-            )
-        elif requested_primary is None and len(held_out_surfaces) > 1:
-            quarantine_reasons.append(
-                "multiple held-out surfaces require a primary designation"
-            )
-        resolved_primary = primary.name if primary is not None else None
-        extended_receipt = requested_primary is not None or len(held_out_surfaces) > 1
-        selection_policy = contract.document()["selection_policy"]
-
-        verdict: EvaluationVerdict
-        reasons: list[str]
-        primary_effect: float | None = None
-        required_effect: float | None = None
-        noise_floor: float | None = None
-
-        if quarantine_reasons:
-            # 2. Absent or mutated evidence never falls through to a retest.
-            verdict = EvaluationVerdict.QUARANTINE
-            reasons = quarantine_reasons
-        else:
-            by_kind = {surface.kind: surface for surface in ordered}
-            retest_reasons: list[str] = []
-            missing = [kind.value for kind in SurfaceKind if kind not in by_kind]
-            if missing:
-                retest_reasons.append("missing surfaces: " + ", ".join(sorted(missing)))
-            thin = sorted(
-                surface.name
-                for surface in ordered
-                if min(len(surface.baseline_samples), len(surface.candidate_samples))
-                < contract.minimum_repetitions
-            )
-            if thin:
-                retest_reasons.append(
-                    "insufficient repeated measurements: " + ", ".join(thin)
-                )
-            if retest_reasons:
-                # 3. Incomplete measurement surface: retest, do not judge.
-                verdict = EvaluationVerdict.RETEST
-                reasons = retest_reasons
-            else:
-                # 4. Hard guardrails, retained as losing evidence.
-                guardrail_reasons: list[str] = []
-                for spec in contract.guardrails:
-                    for surface in ordered:
-                        if surface.kind != spec.surface:
-                            continue
-                        effect = fmean(surface.candidate_samples) - fmean(
-                            surface.baseline_samples
-                        )
-                        regression = max(0.0, -effect)
-                        if regression > spec.maximum_regression:
-                            guardrail_reasons.append(
-                                f"hard guardrail regressed: {surface.name}"
-                            )
-                if guardrail_reasons:
-                    verdict = EvaluationVerdict.DISCARD
-                    reasons = guardrail_reasons
-                else:
-                    # 5. Primary decision on the held-out surface.
-                    if primary is None:
-                        raise EvaluationError("primary held-out selection is unresolved")
-                    held_out = primary
-                    primary_effect = fmean(held_out.candidate_samples) - fmean(
-                        held_out.baseline_samples
-                    )
-                    noise_floor = max(
-                        pstdev(held_out.baseline_samples),
-                        pstdev(held_out.candidate_samples),
-                    )
-                    required_effect = max(
-                        float(contract.minimum_effect),
-                        float(contract.noise_multiplier) * noise_floor,
-                    )
-                    if primary_effect > required_effect:
-                        verdict = EvaluationVerdict.KEEP
-                        reasons = [
-                            "held-out effect exceeded the required effect over the noise floor"
-                        ]
-                    elif primary_effect < -required_effect:
-                        verdict = EvaluationVerdict.DISCARD
-                        reasons = [
-                            "challenger materially underperformed the champion on held-out evidence"
-                        ]
-                    else:
-                        verdict = EvaluationVerdict.RETEST
-                        reasons = [
-                            "held-out effect did not exceed the measured noise floor"
-                        ]
+        scored = _score_evaluation(
+            ordered, contract, ordering=ordering, violations=violations,
+            seal_evaluator_id=(recorded_seal.evaluator_id if recorded_seal else None),
+            evaluator_id=identities.evaluator_id,
+            artifact_issues={ref: _artifact_issue(ref)
+                             for surface in ordered for ref in surface.artifact_refs},
+        )
+        verdict = scored["verdict"]
+        reasons = scored["reasons"]
+        primary_effect = scored["primary_effect"]
+        required_effect = scored["required_effect"]
+        noise_floor = scored["noise_floor"]
+        selection_policy = scored["selection_policy"]
+        requested_primary = scored["requested_primary"]
+        resolved_primary = scored["resolved_primary"]
+        extended_receipt = scored["extended_receipt"]
 
         # 6. Retention for every verdict, losing evidence included (AC3).
         document: dict[str, Any] = {
@@ -579,12 +764,18 @@ class EvaluationRuntime:
             "surfaces": [surface.document() for surface in ordered],
         }
         primary_scored = primary_effect is not None
-        if extended_receipt:
+        if extended_receipt or promotion_subject is not None:
             document.update({
                 "selection_policy": selection_policy,
                 "requested_primary_held_out_name": requested_primary,
                 "resolved_primary_held_out_name": resolved_primary,
                 "primary_scored": primary_scored,
+            })
+        if promotion_subject is not None:
+            document.update({
+                "schema_version": 4,
+                "promotion_subject": promotion_subject.document(),
+                "promotion_subject_digest": promotion_subject.subject_digest,
             })
         evaluation_id = "EVAL-" + canonical_digest(document)[7:23]
         document["evaluation_id"] = evaluation_id
