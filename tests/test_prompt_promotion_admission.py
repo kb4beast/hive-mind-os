@@ -18,7 +18,7 @@ from promotion_fixtures import (
     rollback_payload,
 )
 
-from hive_mind_os.brain_kernel.canonical import canonical_bytes
+from hive_mind_os.brain_kernel.canonical import canonical_bytes, canonical_digest
 from hive_mind_os.brain_kernel.promotion import PromotionAuthority, PromotionCandidate
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import (
@@ -256,7 +256,8 @@ class PromptPromotionAdmissionTests(unittest.TestCase):
         self.assertNotIn("authentication", unavailable[-1])
 
     def test_all_non_keep_actions_authenticate_and_consume_durably(self):
-        for verdict in (ExperimentVerdict.RETEST, ExperimentVerdict.DISCARD, ExperimentVerdict.QUARANTINE):
+        for verdict in (ExperimentVerdict.RETEST, ExperimentVerdict.DISCARD, ExperimentVerdict.QUARANTINE,
+                        ExperimentVerdict.STOP):
             with self.subTest(verdict=verdict):
                 digest, payload = self.adverse(verdict, "EXP-" + verdict.value)
                 self.assertEqual(self.apply_adverse(payload), self.parent)
@@ -268,6 +269,77 @@ class PromptPromotionAdmissionTests(unittest.TestCase):
                 with self.assertRaisesRegex(PromotionAdmissionError, "already consumed"):
                     self.apply_adverse(payload)
                 self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_stop_validates_retained_outcome_and_requires_its_own_signatures(self):
+        for verdict in (ExperimentVerdict.KEEP, ExperimentVerdict.RETEST, ExperimentVerdict.DISCARD,
+                        ExperimentVerdict.QUARANTINE):
+            with self.subTest(verdict=verdict):
+                digest, payload = self.adverse(verdict, "EXP-stop-" + verdict.value)
+                record_path = Path(payload["evaluation_record"]["record_path"])
+                record_bytes = record_path.read_bytes()
+                payload["verdict"] = "stop"
+                before = self.registry.pointer_path.read_bytes()
+                with self.assertRaisesRegex(RuntimeError, "another decision"):
+                    self.apply_adverse(payload)
+                self.assertEqual(before, self.registry.pointer_path.read_bytes())
+                payload["authorization"] = None
+                with self.assertRaises(RuntimeError):
+                    self.apply_adverse(payload)
+                self.assertEqual(before, self.registry.pointer_path.read_bytes())
+                payload["authorization"] = authorize(payload, self.verifier)
+                self.assertEqual(self.apply_adverse(payload), self.parent)
+                self.assertFalse(self.registry.is_quarantined(digest))
+                self.assertEqual(record_path.read_bytes(), record_bytes)
+                self.assertEqual(json.loads(record_bytes)["verdict"], verdict.value)
+                self.assertEqual(self.registry.champion_digest("builder"), self.parent)
+
+    def test_stop_recovery_and_replay_after_restart(self):
+        _, payload = self.adverse(ExperimentVerdict.STOP)
+        with patch.object(self.registry, "_observe_adverse", side_effect=OSError("stop observation unavailable")):
+            with self.assertRaises(PromotionCommittedEvidencePending) as caught:
+                self.apply_adverse(payload)
+        before = self.registry.pointer_path.read_bytes()
+        self.registry.close()
+        self.registry = PromptRegistry(self.root, principal_verifier=self.verifier)
+        self.addCleanup(self.registry.close)
+        admission = caught.exception.admission_digest
+        self.registry.recover_promotion_observation(admission, actor="steward:test")
+        self.registry.recover_promotion_observation(admission, actor="steward:test")
+        with self.assertRaisesRegex(PromotionAdmissionError, "already consumed"):
+            self.apply_adverse(payload)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+        observations = [item for item in self.registry.ledger.events()
+                        if item["event_type"] == "prompt.adverse_decision"
+                        and item["payload"].get("admission_digest") == admission]
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0]["payload"]["verdict"], "stop")
+
+    def test_stop_still_recomputes_rehashed_evaluation_metrics(self):
+        _, payload = self.adverse(ExperimentVerdict.STOP)
+        reference = payload["evaluation_record"]
+        path = Path(reference["record_path"])
+        document = json.loads(path.read_bytes())
+        document["primary_effect"] = 0.99
+        document.pop("evaluation_id")
+        document["evaluation_id"] = "EVAL-" + canonical_digest(document)[7:23]
+        path.write_bytes(canonical_bytes(document) + b"\n")
+        reference.update(evaluation_id=document["evaluation_id"], record_digest=canonical_digest(document))
+        payload["authorization"] = authorize(payload, self.verifier)
+        before = self.registry.pointer_path.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "retained scores or selection differ"):
+            self.apply_adverse(payload)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
+
+    def test_stop_cannot_replace_rollback_authorization(self):
+        digest, payload = self.candidate()
+        self.promote(digest, payload)
+        adverse = rollback_payload(self.registry, self.parent)
+        adverse["verdict"] = "stop"
+        adverse["authorization"] = authorize(adverse, self.verifier)
+        before = self.registry.pointer_path.read_bytes()
+        with self.assertRaises(PromotionAdmissionError):
+            self.rollback(adverse)
+        self.assertEqual(before, self.registry.pointer_path.read_bytes())
 
     def test_unsigned_non_keep_cannot_quarantine_and_rejection_is_signed(self):
         digest, payload = self.adverse(ExperimentVerdict.QUARANTINE)

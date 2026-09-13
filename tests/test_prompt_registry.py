@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import unittest
+from hashlib import sha256
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,7 +13,13 @@ from promotion_fixtures import authenticated_rollback, decision_payload
 
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.models import Role
-from hive_mind_os.prompt_registry import PromptRegistry, generation_zero_prompt
+from hive_mind_os.prompt_registry import (
+    PromotionAdmissionError,
+    PromptRegistry,
+    canonical_prompt_bytes,
+    generation_zero_prompt,
+    prompt_digest,
+)
 from hive_mind_os.roles import ROLE_CONTRACTS
 
 
@@ -96,6 +103,46 @@ class PromptRegistryTests(unittest.TestCase):
                 self.registry.read(digests[role.value]),
                 generation_zero_prompt(ROLE_CONTRACTS[role]),
             )
+
+    def test_repeated_trailing_newlines_register_hash_and_read_identically(self) -> None:
+        for content in ("x", "x\n", "x\n\n", "x\n\n\n", "x\r\n\r\n", "x\r\r\n",
+                        b"x\r\n\r\n\r\n", "x\n\ninside \t\r\n\r\n", "\r\n\r\n"):
+            with self.subTest(content=content):
+                canonical = canonical_prompt_bytes(content)
+                self.assertEqual(canonical_prompt_bytes(canonical), canonical)
+                digest = self.registry.register("builder", content, parent_digest=None, created_by="author:test")
+                self.assertEqual(digest, prompt_digest(content))
+                self.assertEqual(digest, "sha256:" + sha256(canonical).hexdigest())
+                self.assertEqual(self.registry.artifact_path(digest).read_bytes(), canonical)
+                self.assertEqual(self.registry.read(digest).encode("utf-8"), canonical)
+        self.assertEqual(canonical_prompt_bytes("x\n\ninside \t\r\n\r\n"), b"x\n\ninside \t")
+
+    def test_legacy_newline_artifacts_are_preserved_for_explicit_migration(self) -> None:
+        for trailing in (2, 3):
+            with self.subTest(trailing=trailing):
+                # Pinned legacy registration removed one LF before hashing,
+                # then its digest helper removed another LF from stored bytes.
+                content = "legacy-" + str(trailing) + "\r\n" * trailing
+                stored = content.replace("\r\n", "\n").removesuffix("\n").encode()
+                legacy_digest = "sha256:" + sha256(stored.removesuffix(b"\n")).hexdigest()
+                path = self.registry.artifact_path(legacy_digest)
+                path.write_bytes(stored)
+                self.registry._atomic_json(self.registry.pointer_path,
+                                           {"schema_version": 1, "champions": {"builder": legacy_digest}})
+                before = self.registry.pointer_path.read_bytes()
+                with self.assertRaises(PromotionAdmissionError) as caught:
+                    self.registry.read(legacy_digest)
+                self.assertEqual(caught.exception.code, "artifact-noncanonical")
+                self.assertEqual(self.registry.migration_status()["roles"]["builder"], "blocked:artifact-noncanonical")
+                if trailing == 2:  # New canonical digest collides with the legacy path.
+                    with self.assertRaisesRegex(PromotionAdmissionError, "explicit migration review"):
+                        self._register(content)
+                else:
+                    fresh = self._register(content)
+                    self.assertNotEqual(fresh, legacy_digest)
+                    self.assertEqual(self.registry.read(fresh), "legacy-3")
+                self.assertEqual(path.read_bytes(), stored)
+                self.assertEqual(self.registry.pointer_path.read_bytes(), before)
 
     def test_atomic_promotion_failure_preserves_valid_pointer(self) -> None:
         champion = self._bootstrap_builder()

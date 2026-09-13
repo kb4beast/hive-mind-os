@@ -19,7 +19,11 @@ if TYPE_CHECKING:
     )
 
 from ..models import Role, utc_now
-from ..prompt_registry import PromotionCommittedEvidencePending, PromptRegistry
+from ..prompt_registry import (
+    PromotionCommittedEvidencePending,
+    PromptRegistry,
+    RejectionPersistenceError,
+)
 from ..recursive_improvement import ExperimentVerdict
 from .canonical import canonical_digest
 from .court_runtime import CourtClaimKind, CourtDisposition, CourtHistory
@@ -402,12 +406,7 @@ class PromotionAuthority:
                         "status": "rejected", "action": operation, "candidate_binding": None,
                         "code": "decision-unavailable", "reasons": [str(error)], "recorded_at": utc_now(),
                     }
-                    if self.registry.principal_verifier is not None:
-                        receipt["authentication"] = self.registry.principal_verifier.sign_rejection(receipt)
-                    else:
-                        receipt["authentication_status"] = "unconfigured"
-                    self.registry.ledger.append_event("promotion:unbound", "promotion.receipt", "promotion-authority", receipt)
-                    self._receipts = (*self._receipts, receipt)
+                    self._persist_receipt(receipt, experiment_id="promotion:unbound", actor="promotion-authority")
             raise
 
     def _apply(self, decision_id: str) -> dict[str, Any]:
@@ -631,19 +630,45 @@ class PromotionAuthority:
                 "decision_payload": self.decision_payload(decision),
             })
         receipt["receipt_digest"] = canonical_digest(receipt)
-        if self.registry.principal_verifier is not None and status in {"failed", "rejected", "commit-state-unknown"}:
-            receipt["authentication"] = self.registry.principal_verifier.sign_rejection(receipt)
-        elif status in {"failed", "rejected", "commit-state-unknown"}:
-            receipt["authentication_status"] = "unconfigured"
+        return self._persist_receipt(receipt, experiment_id=candidate.experiment_id, actor=decision.judge_id)
+
+    def _persist_receipt(self, receipt: dict[str, Any], *, experiment_id: str, actor: str) -> dict[str, Any]:
+        """Retain custody outages as unsigned diagnostics, never as signed proof."""
+        status = receipt["status"]
         try:
-            self.registry.ledger.append_event(
-                candidate.experiment_id, "promotion.receipt", decision.judge_id, receipt,
-            )
+            if status in {"failed", "rejected", "commit-state-unknown"}:
+                if self.registry.principal_verifier is not None:
+                    receipt["authentication"] = self.registry.principal_verifier.sign_rejection(receipt)
+                else:
+                    receipt["authentication_status"] = "unconfigured"
+                self.registry._write_immutable_record(
+                    self.registry.event_root, {"kind": "promotion-authority-rejection", "receipt": receipt})
+            self.registry.ledger.append_event(experiment_id, "promotion.receipt", actor, receipt)
         except Exception as error:
             if status in {"applied", "committed-evidence-pending"}:
-                raise PromotionCommittedEvidencePending("", prior_digest, pointer_after,
-                                                         "authority-receipt:" + decision.decision_id) from error
-            raise
+                raise PromotionCommittedEvidencePending("", receipt["prior_digest"], receipt["pointer_after"],
+                                                         "authority-receipt:" + receipt["decision_id"]) from error
+            diagnostic = {
+                "schema_version": 1, "kind": "promotion-receipt-unavailable",
+                "authentication_status": "unavailable", "experiment_id": experiment_id,
+                "actor": actor, "persistence_error": str(error),
+                "receipt": {key: value for key, value in receipt.items()
+                            if key not in {"authentication", "authentication_status"}},
+            }
+            # Attempt each independent sink once. Custody failure must not erase
+            # an early refusal, and a ledger outage must not hide file evidence.
+            failures = []
+            try:
+                self.registry._write_immutable_record(self.registry.event_root, diagnostic)
+            except Exception as failure:
+                failures.append("file: " + str(failure))
+            try:
+                self.registry.ledger.append_event(experiment_id, "promotion.receipt_unavailable", actor, diagnostic)
+            except Exception as failure:
+                failures.append("ledger: " + str(failure))
+            detail = "; ".join(failures) if failures else "unsigned diagnostic retained in file and ledger"
+            raise RejectionPersistenceError(
+                "rejection-persistence-failed", f"authority rejection receipt unavailable: {error}; {detail}") from error
         self._receipts = (*self._receipts, receipt)
         return receipt
 

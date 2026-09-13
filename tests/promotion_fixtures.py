@@ -48,6 +48,8 @@ def bound_decision(candidate: PromotionCandidate, verdict: ExperimentVerdict,
     holdout = SealedHoldout("holdout:" + decision_id, {"case": {"expected": True}})
     if verdict is not ExperimentVerdict.QUARANTINE:
         holdout.seal_prediction(evaluator, {"prediction": "candidate improves"})
+    # STOP is a signed terminal court decision; its default fixture deliberately
+    # retains a measured KEEP record to exercise the distinct verdict domains.
     samples = (0.5,) * 3 if verdict is ExperimentVerdict.RETEST else (0.0,) * 3 if verdict is ExperimentVerdict.DISCARD else (0.9,) * 3
     surfaces = tuple(
         SurfaceResult(kind, kind.value, (0.5, 0.5, 0.5), samples, candidate.evidence_refs)

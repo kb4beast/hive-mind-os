@@ -30,6 +30,7 @@ from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import (
     PromotionCommittedEvidencePending,
     PromptRegistry,
+    RejectionPersistenceError,
 )
 from hive_mind_os.recursive_improvement import ExperimentVerdict
 
@@ -174,6 +175,107 @@ def _keep(
 
 
 class HiveCortexPromotionTests(unittest.TestCase):
+    def test_authenticated_stop_retains_champion_and_closes_candidate(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        champion = _keep(authority, registry, content="stop parent", parent=None,
+                         candidate_id="CAND-parent", experiment_id="EXP-parent",
+                         case_id="CASE-parent", decision_id="DEC-parent").candidate.artifact_digest
+        candidate = _registered_candidate(registry, content="stopped candidate", parent=champion,
+                                          candidate_id="CAND-stop", experiment_id="EXP-stop")
+        decision = _decision(candidate, ExperimentVerdict.STOP, "CASE-stop", "DEC-stop")
+        authority.submit(decision, court_history=_court_history(
+            candidate.artifact_digest, disposition=CourtDisposition.DEFER, case_id="CASE-stop",
+            claim_kind=CourtClaimKind.ORDINARY))
+        receipt = authority.apply("DEC-stop")
+        self.assertEqual(receipt["status"], "applied")
+        self.assertEqual(receipt["action"], "retain-champion")
+        self.assertEqual(receipt["verdict"], "stop")
+        self.assertEqual(receipt["pointer_after"], champion)
+        before = registry.pointer_path.read_bytes()
+        self.assertEqual(authority.recover_receipt("DEC-stop"), receipt)
+        with self.assertRaisesRegex(PromotionAuthorityError, "terminal verdict"):
+            authority.submit(_decision(candidate, ExperimentVerdict.RETEST, "CASE-later", "DEC-later"),
+                             court_history=_court_history(candidate.artifact_digest,
+                                                          disposition=CourtDisposition.DEFER, case_id="CASE-later",
+                                                          claim_kind=CourtClaimKind.ORDINARY))
+        with self.assertRaisesRegex(PromotionAuthorityError, "logged, unapplied"):
+            authority.apply("DEC-stop")
+        self.assertEqual(registry.champion_digest("builder"), champion)
+        self.assertEqual(registry.pointer_path.read_bytes(), before)
+
+    def test_early_refusal_custody_outage_retains_unsigned_diagnostics(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        decision = _keep(authority, registry, content="custody parent", parent=None,
+                         candidate_id="CAND-custody", experiment_id="EXP-custody",
+                         case_id="CASE-custody", decision_id="DEC-custody")
+        before = registry.pointer_path.read_bytes()
+        receipts = authority.receipts
+        for decision_id in ("DEC-unknown", "DEC-custody"):
+            for operation in ("apply", "rollback"):
+                with self.subTest(decision_id=decision_id, operation=operation):
+                    with patch.object(registry.principal_verifier.test_only_receipt_signer, "sign",
+                                      side_effect=OSError("custody offline")) as signer:
+                        with self.assertRaises(RejectionPersistenceError) as caught:
+                            getattr(authority, operation)(decision_id)
+                    self.assertEqual(signer.call_count, 1)
+                    self.assertEqual(caught.exception.code, "rejection-persistence-failed")
+                    diagnostic = next(item for item in registry.events()
+                                      if item["kind"] == "promotion-receipt-unavailable"
+                                      and item["receipt"]["decision_id"] == decision_id
+                                      and item["receipt"]["action"] == operation)
+                    self.assertEqual(diagnostic["kind"], "promotion-receipt-unavailable")
+                    self.assertEqual(diagnostic["authentication_status"], "unavailable")
+                    self.assertNotIn("authentication", diagnostic)
+                    refused = diagnostic["receipt"]
+                    self.assertNotIn("authentication", refused)
+                    self.assertEqual(refused["status"], "rejected")
+                    self.assertEqual(refused["decision_id"], decision_id)
+                    self.assertEqual(refused["action"], operation)
+                    self.assertIn("logged, unapplied", refused["reasons"][0])
+                    if decision_id == "DEC-custody":
+                        self.assertEqual(refused["decision_payload"], authority.decision_payload(decision))
+                    else:
+                        self.assertIsNone(refused["candidate_binding"])
+                    retained = [item["payload"] for item in registry.ledger.events()
+                                if item["event_type"] == "promotion.receipt_unavailable"]
+                    self.assertIn(diagnostic, retained)
+        self.assertEqual(len([item for item in registry.events()
+                              if item["kind"] == "promotion-receipt-unavailable"]), 4)
+        self.assertEqual(authority.receipts, receipts)
+        self.assertEqual(registry.pointer_path.read_bytes(), before)
+
+    def test_refusal_ledger_outage_retains_file_and_reports_sink_failure(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        with patch.object(registry.ledger, "append_event", side_effect=OSError("ledger offline")) as append:
+            with self.assertRaisesRegex(RejectionPersistenceError, "ledger: ledger offline"):
+                authority.apply("DEC-unknown")
+        self.assertEqual(append.call_count, 2)  # Receipt then distinct fallback diagnostic.
+        diagnostic = next(item for item in registry.events() if item["kind"] == "promotion-receipt-unavailable")
+        self.assertEqual(diagnostic["authentication_status"], "unavailable")
+        self.assertEqual(diagnostic["receipt"]["decision_id"], "DEC-unknown")
+        self.assertNotIn("authentication", diagnostic["receipt"])
+        signed = next(item["receipt"] for item in registry.events()
+                      if item["kind"] == "promotion-authority-rejection")
+        verified = registry.principal_verifier.verify_rejection_receipt(signed["authentication"])
+        self.assertEqual(verified["decision_id"], "DEC-unknown")
+        self.assertEqual(authority.receipts, ())
+
+    def test_refusal_all_sinks_unavailable_reports_failure_without_retry(self) -> None:
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        with patch.object(registry.principal_verifier.test_only_receipt_signer, "sign",
+                          side_effect=OSError("custody offline")) as signer:
+            with patch.object(registry, "_write_immutable_record", side_effect=OSError("disk offline")) as write:
+                with patch.object(registry.ledger, "append_event", side_effect=OSError("ledger offline")) as append:
+                    with self.assertRaisesRegex(RejectionPersistenceError, "file: disk offline; ledger: ledger offline"):
+                        authority.apply("DEC-unknown")
+        self.assertEqual((signer.call_count, write.call_count, append.call_count), (1, 1, 1))
+        self.assertEqual(authority.receipts, ())
+        self.assertEqual(registry.events(), ())
+
     def test_committed_authority_receipt_recovers_after_restart_without_replay(self) -> None:
         registry = _registry(self)
         authority = PromotionAuthority(registry)

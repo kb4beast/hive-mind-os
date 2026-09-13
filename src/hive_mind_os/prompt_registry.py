@@ -63,13 +63,17 @@ def _interprocess_lock(path: Path) -> Iterator[None]:
 
 
 def canonical_prompt_bytes(content: str | bytes) -> bytes:
-    """Return the canonical UTF-8 bytes used for prompt identity."""
+    """Normalize line endings and remove all trailing LF, idempotently.
+
+    Legacy artifacts produced by removing only one LF are never rewritten by
+    this function's callers; conflicting retained bytes require explicit review.
+    """
 
     if isinstance(content, bytes):
         text = content.decode("utf-8")
     else:
         text = content
-    return text.replace("\r\n", "\n").replace("\r", "\n").removesuffix("\n").encode(
+    return text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n").encode(
         "utf-8"
     )
 
@@ -194,7 +198,9 @@ class PromptRegistry:
                     os.fsync(handle.fileno())
             except FileExistsError:
                 if path.read_bytes() != canonical:
-                    raise RuntimeError("content-addressed prompt artifact was mutated")
+                    raise PromotionAdmissionError(
+                        "artifact-conflict", "content-addressed prompt artifact was mutated or uses legacy "
+                        "canonicalization; preserve retained bytes for explicit migration review")
             record = {
                 "schema_version": 1,
                 "artifact_digest": digest,
@@ -249,7 +255,11 @@ class PromptRegistry:
             content = path.read_bytes()
         except FileNotFoundError:
             raise KeyError(digest) from None
-        if content != canonical_prompt_bytes(content) or prompt_digest(content) != digest:
+        if content != canonical_prompt_bytes(content):
+            raise PromotionAdmissionError(
+                "artifact-noncanonical", "prompt artifact digest cannot authorize noncanonical bytes; "
+                "preserve retained bytes for explicit migration review")
+        if prompt_digest(content) != digest:
             raise RuntimeError("prompt artifact digest does not match its path")
         return content.decode("utf-8")
 
@@ -445,6 +455,7 @@ class PromptRegistry:
                                 admitted_at: str | None = None) -> tuple[Any, Any, Any]:
         from .brain_kernel.canonical import canonical_digest
         from .brain_kernel.evaluation_admission import (
+            load_evaluation_record,
             recheck_resolved_evidence,
             resolve_decision_evidence,
         )
@@ -481,8 +492,12 @@ class PromptRegistry:
         }
         if payload.get("decision_binding_digest") != canonical_digest(candidate_binding):
             raise PromotionAdmissionError("decision-binding-mismatch", "candidate decision binding was substituted")
+        # STOP is a court decision to close work, not a measured evaluation
+        # outcome. Reproduce its exact referenced outcome without relabelling it.
+        verdict = (load_evaluation_record(reference).verdict if payload["verdict"] == "stop"
+                   else EvaluationVerdict(payload["verdict"]))
         resolved = resolve_decision_evidence(subject, reference, evaluator_id=payload["evaluator_id"],
-                                             verdict=EvaluationVerdict(payload["verdict"]))
+                                             verdict=verdict)
         if self.principal_verifier is None:
             raise PromotionAdmissionError("authority-unconfigured", "promotion requires a trusted principal verifier")
         authorization = self._verify_principals(payload, subject, reference, promoted_by, admitted_at=admitted_at)
@@ -887,7 +902,7 @@ class PromptRegistry:
         if event is None or event["event_type"] != "experiment.decision" or event["run_id"] != experiment:
             raise PromotionAdmissionError("decision-binding-mismatch", "adverse decision event does not resolve")
         payload = event["payload"]
-        allowed = {"discard", "quarantine"} if action == "rollback" else {"discard", "quarantine", "retest"}
+        allowed = {"discard", "quarantine"} if action == "rollback" else {"discard", "quarantine", "retest", "stop"}
         if (payload.get("verdict") not in allowed or payload.get("action") != action
                 or payload.get("role") != role_value or payload.get("registration_role") != role_value
                 or payload.get("registration_experiment_id") != experiment

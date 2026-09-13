@@ -279,3 +279,66 @@ Pyright log also contains six `reportUnsupportedDunderAll` warnings in
 `brain_kernel/__init__.py`, which is unchanged from the pinned base; they remain
 visible for launcher review. Independent review, deterministic verification and
 non-draft PR delivery remain launcher-owned outstanding work.
+
+## Independent-review repair handoff, 2026-09-12
+
+The builder read the full branch diff from `aff97517b5d2c416bbfc2dd148e34910f0ae9d29`,
+the ADR and changed tests, and the independent review of pinned HEAD `88e4c6c`:
+`C:/h/one-touch/state/run-20260912-183953-1214c3cd/independent-review-70e0ec1a4410423c8bc3ea1cc252c654.json`,
+SHA-256 `41bfafcd06d7738e2b034e858163c51b9448694efc3271444e5b87e20056841e`.
+That review's `revise` verdict and three P2 findings remain retained unchanged.
+Its reported earlier verification results do not establish this repair's results.
+
+The STOP finding is addressed by treating STOP as the existing terminal court
+decision to close candidate work and retain the champion. It is not a new
+measurement verdict. Any exact schema-4 evaluation outcome can support that
+decision only after its own verdict, scores, contract, identities and artifacts
+are reproduced. The signed decision still says STOP and binds the precise record,
+reason and action. Four independent authenticated stages, the live-parent check,
+and atomic evaluation/nonce consumption remain required. STOP grants neither
+rollback nor quarantine nor promotion; existing restrictions remain in force.
+The court's existing DEFER/REJECT compatibility and terminal log rule are retained.
+Tests specify refusal of unsigned/relabelled STOP, forged but rehashed metrics,
+rollback substitution, replay, and recovery after observation failure and restart.
+
+The newline finding is addressed by idempotent normalization: normalize CRLF/CR
+to LF, then remove all trailing LF. Internal blank lines, spaces and tabs remain
+significant. Registration, hashing and reading now agree on the exact stored
+bytes. This intentionally changes the formerly inconsistent identities for some
+inputs with repeated trailing line endings; no old digest or artifact is rewritten.
+Legacy stored bytes with trailing LF fail with `artifact-noncanonical`, which
+`migration_status()` reports as a blocked role. A new registration colliding with
+different legacy bytes fails with `artifact-conflict` and requires explicit
+migration review. A noncolliding canonical registration cannot move an old pointer
+or supply promotion authority. Tests retain original legacy bytes and pointers
+for both collision and distinct-digest cases, and cover repeated LF/CRLF/CR input.
+Old callers hashing repeated-newline source text may calculate a different digest
+from corrected registration; they must resolve the recorded canonical artifact.
+Already canonical stored bytes keep their digest. The schema-2 complete-registry
+preservation and reviewed operational downgrade obligations above still apply.
+
+The rejection-custody finding is addressed with a shared authority receipt sink
+for known and unknown decisions. Signed refusals are saved as immutable file
+evidence before ledger publication, preserving a valid signature during a ledger
+outage. Signing or persistence failure attempts one explicitly unsigned
+`promotion-receipt-unavailable` diagnostic in each independent sink. It retains
+the original refusal payload, actor, experiment and custody/persistence error,
+and raises `rejection-persistence-failed`, including any fallback sink failures.
+It never adds a failed receipt to the successful in-memory receipt collection.
+Postcommit receipt failure continues to report committed evidence pending.
+Regression specifications cover unknown and already-applied decisions through
+both apply and rollback, custody loss, ledger loss with retained signed file proof,
+and failure of both diagnostic sinks without repeated attempts.
+
+The pointer-writer inspection again found the shared registry commit primitive
+behind promotion/bootstrap and adverse/rollback actions. Model-backend missing-role
+initialization enters the same generation-zero gate. No new champion-changing
+path, execution authority or controller was introduced. The separate controller
+campaign remains in `PROMOTION-BINDING-CONTROLLER-FOLLOW-UP.md`.
+
+Builder disposition: implementation ready for launcher verification. No tests,
+Ruff, Pyright, launcher, Git mutation, dependency installation or live promotion
+were executed by this builder. Original assertions remain; the non-KEEP coverage
+loop additionally includes STOP. Independent reproduction, deterministic checks
+and non-draft PR delivery remain outstanding and owned by the launcher. This
+addendum records implementation reasoning, not an independent approval or green CI.
