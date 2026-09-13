@@ -1,0 +1,14 @@
+{
+  "command": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "seconds": 0.0564628,
+  "stderr": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-508540c2.stderr.log",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "exitCode": 0,
+  "stdoutSha256": "339837ffb8047f97e7d79cf2147c11b7c5766fd3729821a72ad2cd49899280e1",
+  "stdout": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-508540c2.stdout.log",
+  "timedOut": false,
+  "arguments": [
+    "rev-parse",
+    "HEAD"
+  ]
+}

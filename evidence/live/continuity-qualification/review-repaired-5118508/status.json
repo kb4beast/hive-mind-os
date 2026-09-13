@@ -1,0 +1,8 @@
+{
+  "status": "revise",
+  "summary": "Independent bounded review of 511850802afe2b58c0609f12d469f3751be4a3cb completed. Original six repairs hold within documented limits; two remaining repair items block scoped clean qualification. No full suite or real external workflow ran.",
+  "findings": [
+    "R1 P2: canonical, correctly chained replay accepts an impossible blocked-to-reconciling transition and then launches; the same event/checkpoint consistency gap accepts LAUNCHED with an empty receipt payload. Add bounded local transition and receipt-delta validation, without claiming authenticated custody.",
+    "R2 P2: five qualification hashes bind CRLF working-tree files instead of immutable Git blobs; three committed original JSON evidence copies contradict the byte-for-byte claim. Preserve historical receipts, explicitly bind byte representations and immutable blobs, and retain exact originals under narrowly byte-preserving attributes."
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "process_exit_codes": [
+    0,
+    0
+  ],
+  "results": [
+    {
+      "second_constructor": "writer-busy"
+    },
+    {
+      "first_phase": "launched",
+      "launches": 1
+    }
+  ],
+  "final_phase": "launched"
+}

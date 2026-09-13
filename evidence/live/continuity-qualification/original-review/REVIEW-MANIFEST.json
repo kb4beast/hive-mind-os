@@ -1,0 +1,54 @@
+{
+  "reviewer": "/root/delivery_curator",
+  "python": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]",
+  "head": "1a28b0c0587cc9a576c8f0aa2c287df3e3d2f366",
+  "tree": "aa62d99c767c5d54e8db797a8c354bf59b1098ca",
+  "status": "",
+  "artifacts": [
+    {
+      "path": "C:\\h\\continuity-qualification\\review\\concurrency.json",
+      "sha256": "b9230f010bb08343921adf2bf2c4182dd45778d643aec8bcedfa81a89fd45645",
+      "bytes": 232
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review\\concurrency.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review\\concurrency_probe.py",
+      "sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "bytes": 3356
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review\\reproduce_draft.py",
+      "sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "bytes": 6148
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review\\reproductions.json",
+      "sha256": "19547fbf88f566f6c62794eec100b59225e2b1b3d3704bf77e8289760bbbde75",
+      "bytes": 1290
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review\\reproductions.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review\\REVIEW.md",
+      "sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "bytes": 11076
+    },
+    {
+      "path": "C:\\h\\continuity-draft1\\src\\hive_mind_os\\campaign_continuity.py",
+      "sha256": "d6f68c02152b6e581374f7138c86ad0448849da22ec944a1c020f6120cc5351d",
+      "bytes": 23002
+    },
+    {
+      "path": "C:\\h\\continuity-draft1\\tests\\test_campaign_continuity.py",
+      "sha256": "5a42daa3e5cd32618e371e3f38622aea108a3f7768e444ca764d876db0acdff2",
+      "bytes": 16912
+    }
+  ]
+}

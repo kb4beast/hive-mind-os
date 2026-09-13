@@ -1,0 +1,20 @@
+{
+  "stdout": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014401-unittest-ce463543.stdout.log",
+  "stderr": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014401-unittest-ce463543.stderr.log",
+  "timedOut": false,
+  "stderrSha256": "cf6248adaee90137ede4122b95073d5c0fb87c528af97b00c121a9d14583a161",
+  "seconds": 3.4173867,
+  "exitCode": 0,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "command": "C:\\Python314\\python.exe",
+  "arguments": [
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-v",
+    "-p",
+    "test_campaign_continuity.py"
+  ]
+}

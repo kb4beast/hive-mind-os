@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "reviewer": "/root/delivery_curator",
+  "created_utc": "2026-09-13T15:56:58.035519+00:00",
+  "status": "revise",
+  "subject": {
+    "repository": "C:\\h\\continuity-draft1",
+    "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+    "tree": "48824828bb2c571c0ae4f25ad85361bda5bedffd",
+    "base": "b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac",
+    "worktree_status_porcelain": ""
+  },
+  "scope": "Read-only independent repaired-source review and bounded external in-memory-adapter probes; no full suite, production authority, repository edits or publication.",
+  "immutable_source_artifacts": [
+    {
+      "repository_path": "src/hive_mind_os/campaign_continuity.py",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "c68ec5f5cd8a9828274f1027613fb227a722c490",
+      "git_blob_sha256": "0a2f44dd5bb894c2aba083e2cff546c5213351153741751f8ba0d71905882c17",
+      "git_blob_bytes": 38426,
+      "working_tree_sha256": "3250666dfe788b9a2492e58494b5fb8b04a94a10197ee20e029b890b1248f91c",
+      "working_tree_bytes": 38780,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\src\\hive_mind_os\\campaign_continuity.py"
+    },
+    {
+      "repository_path": "tests/test_campaign_continuity.py",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "a649227271da17f3736e8bdf0d03bb696d62a448",
+      "git_blob_sha256": "6e5cdf8d0f136fdc95c589968787850058212dd26ccdfb125397524b4b2e7746",
+      "git_blob_bytes": 37992,
+      "working_tree_sha256": "5b2c4702d99e3e39dbf991b961174bd357adc232e732bb8ece7185f753223c4a",
+      "working_tree_bytes": 38312,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\tests\\test_campaign_continuity.py"
+    },
+    {
+      "repository_path": "docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "cccd2e1bb119f8f38ff4daa92d53e3f8f5245738",
+      "git_blob_sha256": "c734da87bf6d623d1ac0a990cfdcecc9f493f4ef09e2f32a4f914d89e69186d3",
+      "git_blob_bytes": 11336,
+      "working_tree_sha256": "c734da87bf6d623d1ac0a990cfdcecc9f493f4ef09e2f32a4f914d89e69186d3",
+      "working_tree_bytes": 11336,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md"
+    },
+    {
+      "repository_path": "docs/architecture/CONTINUITY-QUALIFICATION-MANIFEST.json",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "61144a6ae6311ae6b315b37c435949bbd67d0e44",
+      "git_blob_sha256": "715d4b4dc73e4f9e241e41c930e075e20f9ba78b2e26b00bb94ee03cac7a8942",
+      "git_blob_bytes": 3884,
+      "working_tree_sha256": "3ad253c21395176f030d6564ba824ca12e4d42316819aef45c3ce6c79f297413",
+      "working_tree_bytes": 3973,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\CONTINUITY-QUALIFICATION-MANIFEST.json"
+    },
+    {
+      "repository_path": ".gitattributes",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "098fa94e22597fbb5ec1a405f7c5160a12bd5b61",
+      "git_blob_sha256": "1e3493a76b188c2ef59136acec4f062c8424698772d15e6ad45d3bf5cd3afdeb",
+      "git_blob_bytes": 1543,
+      "working_tree_sha256": "1e3493a76b188c2ef59136acec4f062c8424698772d15e6ad45d3bf5cd3afdeb",
+      "working_tree_bytes": 1543,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\.gitattributes"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/concurrency_probe.py.txt",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "947dcde8094bbaf54c95f0564f80cb381dec54c8",
+      "git_blob_sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "git_blob_bytes": 3356,
+      "working_tree_sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "working_tree_bytes": 3356,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\concurrency_probe.py.txt"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/concurrency.json",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "40dd8e72c4fa1d57237c028c895137d2d03b4084",
+      "git_blob_sha256": "bef9b1ec1124b4cb4483f9c4ab128d3ec81e56f4451d7201d6d0a3fff241d97e",
+      "git_blob_bytes": 216,
+      "working_tree_sha256": "b9230f010bb08343921adf2bf2c4182dd45778d643aec8bcedfa81a89fd45645",
+      "working_tree_bytes": 232,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\concurrency.json"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/concurrency.stderr.txt",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_blob_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_bytes": 0,
+      "working_tree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "working_tree_bytes": 0,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\concurrency.stderr.txt"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/reproduce_draft.py.txt",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "3e4989e9411308bd46a1284b4615487919f4e4b4",
+      "git_blob_sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "git_blob_bytes": 6148,
+      "working_tree_sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "working_tree_bytes": 6148,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\reproduce_draft.py.txt"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/reproductions.json",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "5bc0bd7b7d4115beeff6531beed9363788806eec",
+      "git_blob_sha256": "dbe2f26291132b99f95f9303adfc584120e96cef1201e682b3747cf642b7e511",
+      "git_blob_bytes": 1237,
+      "working_tree_sha256": "19547fbf88f566f6c62794eec100b59225e2b1b3d3704bf77e8289760bbbde75",
+      "working_tree_bytes": 1290,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\reproductions.json"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/reproductions.stderr.txt",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_blob_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_bytes": 0,
+      "working_tree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "working_tree_bytes": 0,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\reproductions.stderr.txt"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/REVIEW-MANIFEST.json",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "45ffe776b1d87955d5f6ab25ee3f05faec1b4049",
+      "git_blob_sha256": "1b04a9c2feae96bd9a1b6eea83f456c755523927526b802018be673f0400d1a4",
+      "git_blob_bytes": 2036,
+      "working_tree_sha256": "5030f65bc0970b1ed9a0f795049bc2f4f850ef556b0b3c1763c6e6c2e1932732",
+      "working_tree_bytes": 2090,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\REVIEW-MANIFEST.json"
+    },
+    {
+      "repository_path": "docs/architecture/continuity-qualification-review/REVIEW.md",
+      "commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "git_blob_oid": "8680db39805aaee95e9201e3af16705becc1d561",
+      "git_blob_sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "git_blob_bytes": 11076,
+      "working_tree_sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "working_tree_bytes": 11076,
+      "normalized_working_tree_matches_blob": true,
+      "retained_exact_blob": "C:\\h\\continuity-qualification\\review-repaired-5118508\\immutable-git-blobs\\docs\\architecture\\continuity-qualification-review\\REVIEW.md"
+    }
+  ],
+  "independent_artifacts": [
+    {
+      "path": "C:\\h\\continuity-qualification\\review-repaired-5118508\\REVIEW.md",
+      "bytes": 12433,
+      "sha256": "0bdb9acce1c1f111013aa86f0c1f4ebab2671de230e52e266937a4a32a503dad"
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review-repaired-5118508\\status.json",
+      "bytes": 956,
+      "sha256": "bec0f197d2b880336f00cacd0870004d057d1eaad4b24103a3907a51d77325ce"
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review-repaired-5118508\\probe.py",
+      "bytes": 5863,
+      "sha256": "b1f5a43a7ae908b6e0c0361def82f8e7ae14d55d526d0ce13b1f81d86894fc89"
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review-repaired-5118508\\probe-results.json",
+      "bytes": 10475,
+      "sha256": "b87d30d8c618bef9200cea82d51d6c79ec71455d43f33bb0110719cfb2d39a7b"
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review-repaired-5118508\\probe.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\h\\continuity-qualification\\review-repaired-5118508\\seal_manifest.py",
+      "bytes": 4094,
+      "sha256": "e3093693f2af511d9c76c0353b6923a24f573c28010a1ff4a4efd7b032536999"
+    }
+  ],
+  "attributed_runner_receipts_with_verified_log_hashes": [
+    {
+      "receipt": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014401-unittest-ce463543.receipt.json",
+        "bytes": 700,
+        "sha256": "c7194e736a55a68be45b03a1ce61ee3e375a94c3c7c671a7872a5080a9a3e55f"
+      },
+      "exit_code": 0,
+      "timed_out": false,
+      "stdout": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014401-unittest-ce463543.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "matches_receipt_hash": true
+      },
+      "stderr": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014401-unittest-ce463543.stderr.log",
+        "bytes": 7279,
+        "sha256": "cf6248adaee90137ede4122b95073d5c0fb87c528af97b00c121a9d14583a161",
+        "matches_receipt_hash": true
+      }
+    },
+    {
+      "receipt": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014404-ruff-b49cc393.receipt.json",
+        "bytes": 628,
+        "sha256": "f1bc3cacd842d054232991943fd64e1b0c3b75b652d69aa4d4ea850638cb0791"
+      },
+      "exit_code": 0,
+      "timed_out": false,
+      "stdout": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014404-ruff-b49cc393.stdout.log",
+        "bytes": 19,
+        "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+        "matches_receipt_hash": true
+      },
+      "stderr": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014404-ruff-b49cc393.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "matches_receipt_hash": true
+      }
+    },
+    {
+      "receipt": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014405-pyright-1e225c35.receipt.json",
+        "bytes": 661,
+        "sha256": "a096b20bcaf982f022ac40c082325bfa27572c3a66d5af07b96101ce5f827133"
+      },
+      "exit_code": 0,
+      "timed_out": false,
+      "stdout": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014405-pyright-1e225c35.stdout.log",
+        "bytes": 1263,
+        "sha256": "891badf113c9012fa58f980e1aae7ef2b17902bef2043fd0ad0dd2dfa0dc6764",
+        "matches_receipt_hash": true
+      },
+      "stderr": {
+        "path": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014405-pyright-1e225c35.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "matches_receipt_hash": true
+      }
+    }
+  ],
+  "blocked_cli_review": {
+    "path": "C:\\h\\continuity-qualification\\state\\run-20260913-104731-71436f55\\independent-review-d07aebaf3cf242ccbf4a5bab666e3e9e.json",
+    "bytes": 836,
+    "sha256": "85a49e21e646fc6ccc5068983d462beeba85259f0619c587e36b9183ee76b467"
+  },
+  "limitations": [
+    "Unsigned local evidence is not externally authenticated.",
+    "No full-suite execution by this reviewer.",
+    "Historical Windows process result was inspected, not rerun against the repair.",
+    "Preexisting-warning status is parent attribution."
+  ]
+}

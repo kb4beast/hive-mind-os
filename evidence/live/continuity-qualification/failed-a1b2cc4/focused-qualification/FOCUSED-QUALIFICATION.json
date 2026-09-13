@@ -1,0 +1,19 @@
+{
+  "independentReviewClaimed": false,
+  "failures": [
+    {
+      "stdout": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-unittest-9109126b.stdout.log",
+      "timedOut": false,
+      "exitCode": 1,
+      "stderr": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-unittest-9109126b.stderr.log"
+    }
+  ],
+  "passed": false,
+  "repository": "C:\\h\\continuity-draft1",
+  "fullSuiteExecuted": false,
+  "observedAt": "2026-09-13T16:15:49.7043797Z",
+  "tree": "79f0e89a1c3ac247cd91637fe101197abe0fd7e5",
+  "sourceStable": true,
+  "logs": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3",
+  "head": "a1b2cc410e9f54b01eee97003c3323083ac93c0d"
+}

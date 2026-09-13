@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "status": "IMPLEMENTED_AWAITING_LAUNCHER_VERIFICATION",
+  "builder": "/root",
+  "recorded_at_utc": "2026-09-13T06:42:41.5644388Z",
+  "repository": "https://github.com/kb4beast/hive-mind-os",
+  "worktree": "C:\\h\\continuity-draft1",
+  "branch": "codex/unverified-campaign-continuity",
+  "base_commit": "b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac",
+  "historical_draft_commit": "1a28b0c0587cc9a576c8f0aa2c287df3e3d2f366",
+  "historical_manifest": "docs/architecture/UNVERIFIED-CONTINUITY-MANIFEST.json",
+  "historical_manifest_sha256": "63315c458ab8735a4dc11c356eb5aa68613f035278e363795b9dbb40698296a7",
+  "source_review_manifest_sha256": "5030f65bc0970b1ed9a0f795049bc2f4f850ef556b0b3c1763c6e6c2e1932732",
+  "authority": "Owner-authorized bounded builder repair; preimplementation gates waived; launcher owns verification and Git delivery",
+  "tests_executed_by_builder": false,
+  "static_checks_executed_by_builder": false,
+  "independent_verification_of_repairs": false,
+  "historical_review_verdict": "repair required",
+  "journal_schema": 2,
+  "original_test_assertions_preserved": true,
+  "production_wiring": false,
+  "git_delivery_performed_by_builder": false,
+  "artifacts": [
+    {
+      "path": "src/hive_mind_os/campaign_continuity.py",
+      "sha256": "3250666dfe788b9a2492e58494b5fb8b04a94a10197ee20e029b890b1248f91c",
+      "bytes": 38780
+    },
+    {
+      "path": "tests/test_campaign_continuity.py",
+      "sha256": "5b2c4702d99e3e39dbf991b961174bd357adc232e732bb8ece7185f753223c4a",
+      "bytes": 38312
+    },
+    {
+      "path": "docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "sha256": "c734da87bf6d623d1ac0a990cfdcecc9f493f4ef09e2f32a4f914d89e69186d3",
+      "bytes": 11336
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency_probe.py.txt",
+      "sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "bytes": 3356
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency.json",
+      "sha256": "b9230f010bb08343921adf2bf2c4182dd45778d643aec8bcedfa81a89fd45645",
+      "bytes": 232
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproduce_draft.py.txt",
+      "sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "bytes": 6148
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproductions.json",
+      "sha256": "19547fbf88f566f6c62794eec100b59225e2b1b3d3704bf77e8289760bbbde75",
+      "bytes": 1290
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproductions.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/REVIEW-MANIFEST.json",
+      "sha256": "5030f65bc0970b1ed9a0f795049bc2f4f850ef556b0b3c1763c6e6c2e1932732",
+      "bytes": 2090
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/REVIEW.md",
+      "sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "bytes": 11076
+    }
+  ],
+  "outstanding": [
+    "Launcher focused checks and comprehensive independent review",
+    "Launcher full gate after clean independent review",
+    "Applicable Windows/Linux Python platform matrix with skips recorded",
+    "Real adapter authority, evidence, idempotence and deadline qualification before activation",
+    "Trusted storage custody and external truncation anchor before production guarantees",
+    "Process-kill and long-path fault matrix",
+    "Launcher-only non-draft PR delivery"
+  ]
+}

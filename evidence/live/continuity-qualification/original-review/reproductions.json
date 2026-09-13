@@ -1,0 +1,53 @@
+{
+  "lost_effect_then_expiry": {
+    "phase": "blocked",
+    "blocker": "authority-expired",
+    "real_operations": 1,
+    "inspections": 1,
+    "launches": 1
+  },
+  "lost_effect_on_final_reconciliation": {
+    "phase": "exhausted",
+    "blocker": "reconciliation-budget-exhausted",
+    "real_operations": 1,
+    "inspections": 1,
+    "launches": 1
+  },
+  "typed_observer_denial": {
+    "raised": [
+      "authority-denied",
+      "authority-denied"
+    ],
+    "observe_calls": 2,
+    "added_events": 0,
+    "phase": "waiting"
+  },
+  "malformed_observer_accepted": {
+    "phase": "launched",
+    "launches": 1
+  },
+  "wrong_scope_journal_after_construction": {
+    "phase": "launched",
+    "launch_binding": [
+      "foreign-worktree",
+      "worktree:fixture",
+      "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "launches": 1
+  },
+  "malformed_journal_root": {
+    "type": "AttributeError",
+    "code": null
+  },
+  "linked_lock_writes_outside_state": {
+    "outside_bytes": "00"
+  },
+  "returned_state_is_detached_control": {
+    "phase": "waiting",
+    "candidates": [
+      "alpha"
+    ],
+    "launches": 0
+  }
+}

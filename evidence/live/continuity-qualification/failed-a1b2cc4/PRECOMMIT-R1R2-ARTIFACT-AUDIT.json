@@ -1,0 +1,300 @@
+{
+  "observed_at": "2026-09-13T16:15:25.059993+00:00",
+  "stage": "precommit-index",
+  "prior_test_ast_comparison": [
+    {
+      "base": "1a28b0c0587cc9a576c8f0aa2c287df3e3d2f366",
+      "preserved_methods": 19,
+      "current_methods": 46
+    },
+    {
+      "base": "511850802afe2b58c0609f12d469f3751be4a3cb",
+      "preserved_methods": 38,
+      "current_methods": 46
+    }
+  ],
+  "artifact_checks": [
+    {
+      "path": ".gitattributes",
+      "git_blob_oid": "098fa94e22597fbb5ec1a405f7c5160a12bd5b61",
+      "sha256": "1e3493a76b188c2ef59136acec4f062c8424698772d15e6ad45d3bf5cd3afdeb"
+    },
+    {
+      "path": "UNVERIFIED-CONTINUITY-DRAFT.md",
+      "git_blob_oid": "898b8b966f52278593996855ee55acec1892399b",
+      "sha256": "230c765119f9c2a6ada631720b74fb431bcbbef068ed7b1f7be83147b7a40e57"
+    },
+    {
+      "path": "docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "git_blob_oid": "983a4a2f9aaf234e60f79179f030cb06a7822271",
+      "sha256": "b9a8885083adec5494fb8df1696a0f4d18954e49a27682f22c556cc0960e11bc"
+    },
+    {
+      "path": "docs/architecture/ADR-UNVERIFIED-CAMPAIGN-CONTINUITY.md",
+      "git_blob_oid": "9a9c68b1bd8465f7e20234d5eac3af3cfc0b2bfa",
+      "sha256": "1f11936396a8e5c9457b9c6e8a39ed20bb18fc55f428f8498ddde8d81b2737ad"
+    },
+    {
+      "path": "docs/architecture/CONTINUITY-QUALIFICATION-MANIFEST.json",
+      "git_blob_oid": "61144a6ae6311ae6b315b37c435949bbd67d0e44",
+      "sha256": "715d4b4dc73e4f9e241e41c930e075e20f9ba78b2e26b00bb94ee03cac7a8942"
+    },
+    {
+      "path": "docs/architecture/UNVERIFIED-CONTINUITY-MANIFEST.json",
+      "git_blob_oid": "c5b48057d7fee60146712d6d7f6011159a081bad",
+      "sha256": "f6bb810300e6cb57699c6c1bc7e682133bdadca5e69209956ca0e91660560c80"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/REVIEW-MANIFEST.json",
+      "git_blob_oid": "45ffe776b1d87955d5f6ab25ee3f05faec1b4049",
+      "sha256": "1b04a9c2feae96bd9a1b6eea83f456c755523927526b802018be673f0400d1a4"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/REVIEW.md",
+      "git_blob_oid": "8680db39805aaee95e9201e3af16705becc1d561",
+      "sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency.json",
+      "git_blob_oid": "40dd8e72c4fa1d57237c028c895137d2d03b4084",
+      "sha256": "bef9b1ec1124b4cb4483f9c4ab128d3ec81e56f4451d7201d6d0a3fff241d97e"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency.stderr.txt",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency_probe.py.txt",
+      "git_blob_oid": "947dcde8094bbaf54c95f0564f80cb381dec54c8",
+      "sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproduce_draft.py.txt",
+      "git_blob_oid": "3e4989e9411308bd46a1284b4615487919f4e4b4",
+      "sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproductions.json",
+      "git_blob_oid": "5bc0bd7b7d4115beeff6531beed9363788806eec",
+      "sha256": "dbe2f26291132b99f95f9303adfc584120e96cef1201e682b3747cf642b7e511"
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproductions.stderr.txt",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/ROOT-RECEIPT-AUDIT-5118508.json",
+      "git_blob_oid": "7a6e1700b8528ba4dfb5960ffe340c8a0eae299a",
+      "sha256": "a1a9e435253a9ea6e9405764dcdc07a16d98c04965f90b8c07f8d1b7a879c16a"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014401-unittest-ce463543.receipt.json",
+      "git_blob_oid": "8ceb129109e9d15a861cadbd523b4b6c0d7f7042",
+      "sha256": "c7194e736a55a68be45b03a1ce61ee3e375a94c3c7c671a7872a5080a9a3e55f"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014401-unittest-ce463543.stderr.log",
+      "git_blob_oid": "a5ff7fd31168241fc3efa59c405cc0086af70fc4",
+      "sha256": "cf6248adaee90137ede4122b95073d5c0fb87c528af97b00c121a9d14583a161"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014401-unittest-ce463543.stdout.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014404-ruff-b49cc393.receipt.json",
+      "git_blob_oid": "b4a293399ce556bd226606ee158d9848e7d8749a",
+      "sha256": "f1bc3cacd842d054232991943fd64e1b0c3b75b652d69aa4d4ea850638cb0791"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014404-ruff-b49cc393.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014404-ruff-b49cc393.stdout.log",
+      "git_blob_oid": "1f5f344d054fae10f39140fb7199c99321d9190a",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014405-pyright-1e225c35.receipt.json",
+      "git_blob_oid": "02814c20b01ba23e0abb85e32393bf8208a7ac39",
+      "sha256": "a096b20bcaf982f022ac40c082325bfa27572c3a66d5af07b96101ce5f827133"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014405-pyright-1e225c35.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014405-pyright-1e225c35.stdout.log",
+      "git_blob_oid": "01a38e572443ba7693df1b7ab79b2b37552820e6",
+      "sha256": "891badf113c9012fa58f980e1aae7ef2b17902bef2043fd0ad0dd2dfa0dc6764"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-runner-receipts/independent-review-d07aebaf3cf242ccbf4a5bab666e3e9e.json",
+      "git_blob_oid": "0c592d61c011a5c8ee071373c1595d47dc1a4627",
+      "sha256": "85a49e21e646fc6ccc5068983d462beeba85259f0619c587e36b9183ee76b467"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/historical-working-tree/CONTINUITY-QUALIFICATION-MANIFEST.json",
+      "git_blob_oid": "f903d354f058edc9f407b704a037354a2605b1c4",
+      "sha256": "3ad253c21395176f030d6564ba824ca12e4d42316819aef45c3ce6c79f297413"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/REVIEW-MANIFEST.json",
+      "git_blob_oid": "1343e6c6c4c1c0e7f95383d2412711d87fb8225b",
+      "sha256": "5030f65bc0970b1ed9a0f795049bc2f4f850ef556b0b3c1763c6e6c2e1932732"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/REVIEW.md",
+      "git_blob_oid": "8680db39805aaee95e9201e3af16705becc1d561",
+      "sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/concurrency.json",
+      "git_blob_oid": "3e8d1795e4b4c4c1b25999019163ff3bf91703bb",
+      "sha256": "b9230f010bb08343921adf2bf2c4182dd45778d643aec8bcedfa81a89fd45645"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/concurrency.stderr.txt",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/concurrency_probe.py",
+      "git_blob_oid": "947dcde8094bbaf54c95f0564f80cb381dec54c8",
+      "sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/reproduce_draft.py",
+      "git_blob_oid": "3e4989e9411308bd46a1284b4615487919f4e4b4",
+      "sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/reproductions.json",
+      "git_blob_oid": "5a1adcd5868861115d21c46b83edb80c4bbad9f1",
+      "sha256": "19547fbf88f566f6c62794eec100b59225e2b1b3d3704bf77e8289760bbbde75"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/original-review/reproductions.stderr.txt",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/REVIEW-MANIFEST.json",
+      "git_blob_oid": "952571f39faabcf55771bddceffe0a7b8f1bf53c",
+      "sha256": "36b2458b1f83d7918c1558325a773c137012475cd0d3c41e8a5c66edb5e7181b"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/REVIEW.md",
+      "git_blob_oid": "b8848aec5c7f9b6dd5ce4d2731713e4a15759a55",
+      "sha256": "0bdb9acce1c1f111013aa86f0c1f4ebab2671de230e52e266937a4a32a503dad"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/.gitattributes",
+      "git_blob_oid": "098fa94e22597fbb5ec1a405f7c5160a12bd5b61",
+      "sha256": "1e3493a76b188c2ef59136acec4f062c8424698772d15e6ad45d3bf5cd3afdeb"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "git_blob_oid": "cccd2e1bb119f8f38ff4daa92d53e3f8f5245738",
+      "sha256": "c734da87bf6d623d1ac0a990cfdcecc9f493f4ef09e2f32a4f914d89e69186d3"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/CONTINUITY-QUALIFICATION-MANIFEST.json",
+      "git_blob_oid": "61144a6ae6311ae6b315b37c435949bbd67d0e44",
+      "sha256": "715d4b4dc73e4f9e241e41c930e075e20f9ba78b2e26b00bb94ee03cac7a8942"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/REVIEW-MANIFEST.json",
+      "git_blob_oid": "45ffe776b1d87955d5f6ab25ee3f05faec1b4049",
+      "sha256": "1b04a9c2feae96bd9a1b6eea83f456c755523927526b802018be673f0400d1a4"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/REVIEW.md",
+      "git_blob_oid": "8680db39805aaee95e9201e3af16705becc1d561",
+      "sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/concurrency.json",
+      "git_blob_oid": "40dd8e72c4fa1d57237c028c895137d2d03b4084",
+      "sha256": "bef9b1ec1124b4cb4483f9c4ab128d3ec81e56f4451d7201d6d0a3fff241d97e"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/concurrency.stderr.txt",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/concurrency_probe.py.txt",
+      "git_blob_oid": "947dcde8094bbaf54c95f0564f80cb381dec54c8",
+      "sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/reproduce_draft.py.txt",
+      "git_blob_oid": "3e4989e9411308bd46a1284b4615487919f4e4b4",
+      "sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/reproductions.json",
+      "git_blob_oid": "5bc0bd7b7d4115beeff6531beed9363788806eec",
+      "sha256": "dbe2f26291132b99f95f9303adfc584120e96cef1201e682b3747cf642b7e511"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/reproductions.stderr.txt",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/src/hive_mind_os/campaign_continuity.py",
+      "git_blob_oid": "c68ec5f5cd8a9828274f1027613fb227a722c490",
+      "sha256": "0a2f44dd5bb894c2aba083e2cff546c5213351153741751f8ba0d71905882c17"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/tests/test_campaign_continuity.py",
+      "git_blob_oid": "a649227271da17f3736e8bdf0d03bb696d62a448",
+      "sha256": "6e5cdf8d0f136fdc95c589968787850058212dd26ccdfb125397524b4b2e7746"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/probe-results.json",
+      "git_blob_oid": "ccf5b66cc81ec6ff34fcf38180ea0eda3866db29",
+      "sha256": "b87d30d8c618bef9200cea82d51d6c79ec71455d43f33bb0110719cfb2d39a7b"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/probe.py",
+      "git_blob_oid": "a636e538577c39b5d53a9b9120bb6105715ffede",
+      "sha256": "b1f5a43a7ae908b6e0c0361def82f8e7ae14d55d526d0ce13b1f81d86894fc89"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/probe.stderr.txt",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/seal_manifest.py",
+      "git_blob_oid": "de02eaa0c7130c125b76a260698064dfa5fea780",
+      "sha256": "e3093693f2af511d9c76c0353b6923a24f573c28010a1ff4a4efd7b032536999"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/review-repaired-5118508/status.json",
+      "git_blob_oid": "83662453a5f2278e7bd30f4a38072109190ee7c6",
+      "sha256": "bec0f197d2b880336f00cacd0870004d057d1eaad4b24103a3907a51d77325ce"
+    },
+    {
+      "path": "src/hive_mind_os/campaign_continuity.py",
+      "git_blob_oid": "aa2755237fcb588e432de9bedd25841bebdc5150",
+      "sha256": "e236d72a381c0cc12059330079b31a95fbf38bbf8c26d033114b869e00d19d76"
+    },
+    {
+      "path": "tests/test_campaign_continuity.py",
+      "git_blob_oid": "5a5bdaed6c8410f0890802806c257f1b1daa6e12",
+      "sha256": "b2ed6dea3e7d075241bb88eb4533fb4a7b1871b80660fb87b34fd8b5459c5bc3"
+    }
+  ],
+  "manifest_blob_oid": "a80c46a6a8b5143c3fd0ebf66a044a3688e97057",
+  "manifest_sha256": "451e5c46fda6060f2373c64902120109feccd4fa97cb1b31a62d22bf67ccc75a"
+}

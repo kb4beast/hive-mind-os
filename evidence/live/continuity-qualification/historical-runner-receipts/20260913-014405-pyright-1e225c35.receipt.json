@@ -1,0 +1,13 @@
+{
+  "stdout": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014405-pyright-1e225c35.stdout.log",
+  "stderr": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014405-pyright-1e225c35.stderr.log",
+  "timedOut": false,
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "seconds": 7.3184774,
+  "exitCode": 0,
+  "stdoutSha256": "891badf113c9012fa58f980e1aae7ef2b17902bef2043fd0ad0dd2dfa0dc6764",
+  "command": "C:\\Program Files\\nodejs\\node.exe",
+  "arguments": [
+    "C:\\Users\\beesp\\AppData\\Roaming\\npm\\node_modules\\pyright\\index.js"
+  ]
+}
