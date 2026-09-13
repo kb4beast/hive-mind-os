@@ -1,0 +1,7 @@
+{
+  "head": "6e134f6251fdd30b6da712df8342d1d8986093a5",
+  "observedAt": "2026-09-13T18:47:58.9421554Z",
+  "status": "superseded_during_focused_checks",
+  "runnerPid": 34636,
+  "reason": "Independent R1 proved remote-tracking-only history lost by normal clone; local history can mask regression. Stop obsolete focused run, repair explicit history source, then requalify new immutable candidate."
+}

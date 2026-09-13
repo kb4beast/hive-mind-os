@@ -11,6 +11,29 @@ canonical compiler. It never runs a plan. The Python `SubjectExecutionService`
 accepts repository, offline-local, research-artifact, and workflow modes through
 the same plan contract.
 
+For `build`, optional `--expected-request-id` and `--expected-subject-id` constrain
+the request and subject inside the plan, in addition to the required
+`--expected-plan-digest`. Either identity expectation can be supplied alone.
+They must be lowercase `sha256:<64 hex>` values. A malformed or mismatched
+expectation returns exit 2 with a `BLOCKED` contract error before output creation
+or replacement, including with `--replace`. Existing output bytes remain intact
+and no temporary output or runtime state is created. Matching expectations write
+the same canonical inert plan and return its bound request/subject identities.
+
+The Python `SubjectExecutionService.build_file` accepts the corresponding optional
+`expected_request_id` and `expected_subject_id` keywords, defaulting to `None`.
+The CLI forwards both through the service to the existing canonical validator
+before handling the output. This enforces caller identity constraints that build
+previously accepted but dropped; a correct digest alone cannot establish that the
+caller intended that request or subject. The checks do not authenticate a caller
+or grant execution authority. They use the existing binding contract described
+in [ADR-071](../architecture/ADR-071-PORTABLE-DAG-RUNTIME-AND-EXTERNAL-ACTIVATION.md).
+
+No schema or artifact migration is required. Calls that omit the expectations
+retain their existing behavior; a mismatching expectation now refuses the write.
+Rollback is a revert of this bounded forwarding change and its tests, retaining
+prior local output artifacts and validation evidence.
+
 Execution commands intentionally fail with `EXTERNAL_RUNTIME_REQUIRED` in the
 unconfigured CLI. A filename is not an authority capability. A host integration
 must independently verify the review, host attestation, issuer signature, and

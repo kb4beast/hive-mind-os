@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "reviewer": "/root/delivery_curator",
+  "created_utc": "2026-09-13T18:08:17.921169+00:00",
+  "subject_commit": "b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac",
+  "subject_tree": "6fb9b59c4c697ae9b9bc296676783f8ce662f3c0",
+  "selected_gap_id": "PUBLIC-RUNTIME-500-EXPECTED-IDENTITY-BUILD-001",
+  "gap_version": 1,
+  "basis": "static source and assertion inspection only",
+  "tests_executed": false,
+  "source_edits": false,
+  "artifacts": [
+    {
+      "path": "C:\\h\\node-completeness-audit\\next-delivery\\RECOMMENDATION.md",
+      "bytes": 11360,
+      "sha256": "3f06caf4e479dc495aac2871b5e727752aafc3938ed1db4fd9cf04e81f88ada4"
+    },
+    {
+      "path": "C:\\h\\node-completeness-audit\\next-delivery\\V4-ACCEPTANCE-MAPPING-V1.json",
+      "bytes": 255399,
+      "sha256": "aa8e65146634fe1e675b3facfc713be335f0e0166fdadae8556d21535069ff09"
+    },
+    {
+      "path": "C:\\h\\node-completeness-audit\\next-delivery\\map_acceptance.py",
+      "bytes": 10163,
+      "sha256": "b19c73e53d95762a4c830b24b62e46048af71c96a64469abff7064ffaa73f727"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "artifacts": [
+    {
+      "sha256": "5bde4940a40709e8960c0b089cbf043e3f43380fd2a969c96a7064c0b2118d9c",
+      "path": "MANIFEST.json",
+      "bytes": 898
+    },
+    {
+      "sha256": "b9be759dbe9ee4ea57711e20b70e507fe4ba23a0490f8d5ea83f07fb4d3e5c55",
+      "path": "pr179-linux314-failure-api.log",
+      "bytes": 440262
+    },
+    {
+      "sha256": "f2a8b515fc732ee258ebae57bbc8985ae3af944bbf856f124305a24e4940ec5d",
+      "path": "REPAIR.md",
+      "bytes": 3961
+    },
+    {
+      "sha256": "00d1cdbdc17853f10f45a52b188921ab93c8bf9808db08dc90ad17504ef481d7",
+      "path": "transport_probe.py",
+      "bytes": 4331
+    },
+    {
+      "sha256": "ae5057dae4b741dbabf4c93095612cdb29bb95a0ab715d9b4cfb878757ab2c99",
+      "path": "TRANSPORT-VALIDATION.json",
+      "bytes": 12477
+    },
+    {
+      "sha256": "59419bf3e05758e7fa2b31b9459d01eada84ea97eb8464c31ec540fa562614ad",
+      "path": "r1-resolution\\cold_history_probe.py",
+      "bytes": 3694
+    },
+    {
+      "sha256": "b6134f498c2ea83be53846fda37476d58cd088e7a7adae6ae10c0321e24a2166",
+      "path": "r1-resolution\\cold-focused.stderr.txt",
+      "bytes": 975
+    },
+    {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "r1-resolution\\cold-focused.stdout.txt",
+      "bytes": 0
+    },
+    {
+      "sha256": "2323f1235ee997c6ca8929a46df81fa9f6be8f74e53ab09be6f9c0cd0e7797c4",
+      "path": "r1-resolution\\COLD-HISTORY-VALIDATION.json",
+      "bytes": 243676
+    },
+    {
+      "sha256": "83f5923ba384d8170f3b95573b2922ebf3f5ba43e96776eb6b36c33b72919f95",
+      "path": "r1-resolution\\MANIFEST.json",
+      "bytes": 1068
+    },
+    {
+      "sha256": "9ef029f75685e4a04e6f212bfb7fc90083e2c9ce10ff63239839d3352a5ab179",
+      "path": "r1-resolution\\REPAIR.md",
+      "bytes": 4783
+    },
+    {
+      "sha256": "2cc9c90770610bcc4f96d18c6e0dd3dd34f7121abd3cd0bb4a96d71a97685a55",
+      "path": "review-r1\\PROBE-RESULTS.json",
+      "bytes": 994896
+    },
+    {
+      "sha256": "922a35d8822898df64c14be095b9c208e6f9a7b49d9f840457bac73a85f635a7",
+      "path": "review-r1\\probe.py",
+      "bytes": 7005
+    },
+    {
+      "sha256": "bc534bc03a7ff1793f46ebbfe71f2a2fbdde5b14419bcfeee313b7b07a6b637d",
+      "path": "review-r1\\QUALIFICATION-SUPERSEDED.json",
+      "bytes": 404
+    },
+    {
+      "sha256": "1dcb67cdfdcc61e9ceed5bc4c33be8d88596d17a86aae254e3868777dd6c502d",
+      "path": "review-r1\\REVIEW-MANIFEST.json",
+      "bytes": 1180
+    },
+    {
+      "sha256": "95528f88dc5e4a0705322e28251e1608f51acccdabb95c158994d87e68be0769",
+      "path": "review-r1\\REVIEW.md",
+      "bytes": 5551
+    },
+    {
+      "sha256": "c62c829456389ee685c700f079e415fc29586a92188ffd363834e3210097ba0b",
+      "path": "review-r1\\seal.py",
+      "bytes": 1454
+    },
+    {
+      "sha256": "bc8b29d2e12529bf0eeeda9cedb24f991b4aeb9c1f5cd2a979524194058c315e",
+      "path": "review-r1\\status.json",
+      "bytes": 737
+    }
+  ],
+  "source_path": "evidence/live/generic-dag-guide-20260913/ci-repair",
+  "copied_by": "/root",
+  "source_commit": "3bfd4edd504a1c1dc6b4448941dc38f4fdfcdbba"
+}

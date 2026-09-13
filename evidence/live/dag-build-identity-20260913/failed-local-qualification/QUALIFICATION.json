@@ -1,0 +1,24 @@
+{
+  "startedAt": "2026-09-13T18:25:43.9051249Z",
+  "phase": "full",
+  "status": "failed",
+  "repository": "C:\\h\\node-close1",
+  "head": "dac56971058a746a22fcad9bef92751ce456fdb7",
+  "tree": "b26ef57f068c20270a7bfcd7bcb7ed22fcc2cda1",
+  "runnerPid": 75284,
+  "evidenceDirectory": "C:\\h\\node-completeness-audit\\qualification\\full-20260913-132543-9822861a",
+  "checks": [
+    {
+      "stdout": "C:\\h\\node-completeness-audit\\qualification\\full-20260913-132543-9822861a\\20260913-132543-full-unittest-bc2df73f.stdout.log",
+      "timedOut": false,
+      "name": "full-unittest",
+      "exitCode": 1,
+      "seconds": 2381.5887544,
+      "stderr": "C:\\h\\node-completeness-audit\\qualification\\full-20260913-132543-9822861a\\20260913-132543-full-unittest-bc2df73f.stderr.log"
+    }
+  ],
+  "passed": false,
+  "independentReviewClaimed": false,
+  "sourceStable": true,
+  "finishedAt": "2026-09-13T19:05:25.6608617Z"
+}

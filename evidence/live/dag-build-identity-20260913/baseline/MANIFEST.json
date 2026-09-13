@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "reviewer": "/root/delivery_curator",
+  "subject_commit": "b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac",
+  "subject_tree": "6fb9b59c4c697ae9b9bc296676783f8ce662f3c0",
+  "status": "reproduced",
+  "probes": 15,
+  "actual_git_blob_comparisons": 252,
+  "all_blob_and_source_byte_checks_passed": true,
+  "artifacts": [
+    {
+      "path": "REPORT.md",
+      "bytes": 3924,
+      "sha256": "4d22b36366738b76cf0820d2d4567d499aa62731f9b310e16bade2f7bbf20ccb"
+    },
+    {
+      "path": "RESULTS.json",
+      "bytes": 99306,
+      "sha256": "9c8b3a34aab794115409bab03a775d584d470ecad454f7d9cdfbda2c83f8b639"
+    },
+    {
+      "path": "reproduce.py",
+      "bytes": 7453,
+      "sha256": "804b62aab2d7ea1b6d3460086227dc8ab72434f9a8dfc3c380f566d323384e99"
+    },
+    {
+      "path": "SETUP-ATTEMPT-1.txt",
+      "bytes": 514,
+      "sha256": "e0e4bc5c5b05f012e76e7529d8d891ecb1ea4438a9c642d9a30d161a3e1caada"
+    },
+    {
+      "path": "seal.py",
+      "bytes": 1833,
+      "sha256": "7b9534e7f1057a136e60335afc0592bac4095521226f10f51385a8d17262edd2"
+    },
+    {
+      "path": "inputs/plan.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "inputs/standard.md",
+      "bytes": 21,
+      "sha256": "0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776"
+    },
+    {
+      "path": "outputs/cli_matching.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "outputs/cli_wrong_request_absent.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "outputs/cli_wrong_request_existing.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "outputs/cli_wrong_subject_absent.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "outputs/cli_wrong_subject_existing.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "outputs/service_omitted_False.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "outputs/service_omitted_True.json",
+      "bytes": 5646,
+      "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+    },
+    {
+      "path": "outputs/service_wrong_request_existing.json",
+      "bytes": 49,
+      "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b"
+    },
+    {
+      "path": "outputs/service_wrong_subject_existing.json",
+      "bytes": 49,
+      "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b"
+    }
+  ],
+  "source_manifest_location": "RESULTS.json#/source_manifest",
+  "no_full_suite_or_execution_authority_claim": true
+}

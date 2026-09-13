@@ -1,0 +1,18 @@
+{
+  "timedOut": false,
+  "stdoutSha256": "6c46f3eb11ef70e7ef07600df68099b3c052ee7a9a5245c696d0a60ddf69d335",
+  "seconds": 2381.5887544,
+  "command": "C:\\Python314\\python.exe",
+  "arguments": [
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-v"
+  ],
+  "stderr": "C:\\h\\node-completeness-audit\\qualification\\full-20260913-132543-9822861a\\20260913-132543-full-unittest-bc2df73f.stderr.log",
+  "exitCode": 1,
+  "stderrSha256": "794e5411de26c42b8f15041dd58f0575a6af89b99c99db73e5a94f4a07b23421",
+  "stdout": "C:\\h\\node-completeness-audit\\qualification\\full-20260913-132543-9822861a\\20260913-132543-full-unittest-bc2df73f.stdout.log"
+}

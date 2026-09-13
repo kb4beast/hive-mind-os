@@ -1,0 +1,73 @@
+{
+  "mission_id": "MISSION-plan",
+  "plan_digest": "sha256:203dcdcfa015ba15a9762e2655aa5c0c672673a71413ba374ac52e89e65fd07c",
+  "sequences": [
+    2,
+    3
+  ]
+}
+{
+  "graph_digest": "sha256:7290603d81379220b97dc67184d7e47f3eb0cdfe24be0ec642f9d72e3e47d06d",
+  "mission_id": "MISSION-plan",
+  "ready_work_ids": [
+    "WORK-docs-implementation-1269e206227b"
+  ],
+  "work_items": [
+    {
+      "acceptance_specs": [
+        "ACCEPT-1"
+      ],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {
+        "fixture_kind": "docs"
+      },
+      "dependencies": [],
+      "depth": 1,
+      "expected_outputs": [
+        "fixture:docs"
+      ],
+      "idempotency_key": "sha256:4e11e02b9a0a0068457ee601588b276148fec0771790f4e160f36391ed76b72b",
+      "max_attempts": 1,
+      "mission_id": "MISSION-plan",
+      "objective": "deliver a bounded change",
+      "parent_work_id": "WORK-docs-aggregate-1269e206227b",
+      "requested_actions": [],
+      "required_inputs": [],
+      "risk_tier": "R1",
+      "role": "builder",
+      "status": "PROPOSED",
+      "title": "docs implementation",
+      "work_id": "WORK-docs-implementation-1269e206227b",
+      "write_scope": [
+        "fixtures/docs.txt"
+      ]
+    },
+    {
+      "acceptance_specs": [],
+      "authority_envelope_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "context_request": {
+        "fixture_kind": "docs"
+      },
+      "dependencies": [
+        "WORK-docs-implementation-1269e206227b"
+      ],
+      "depth": 0,
+      "expected_outputs": [],
+      "idempotency_key": "sha256:7029659549e78c1eabb1027b2838b66b81a12975e6116616513f90f766cf6594",
+      "max_attempts": 1,
+      "mission_id": "MISSION-plan",
+      "objective": "deliver a bounded change",
+      "parent_work_id": null,
+      "requested_actions": [],
+      "required_inputs": [
+        "fixture:docs"
+      ],
+      "risk_tier": "R0",
+      "role": "orchestrator",
+      "status": "PROPOSED",
+      "title": "docs aggregate",
+      "work_id": "WORK-docs-aggregate-1269e206227b",
+      "write_scope": []
+    }
+  ]
+}

@@ -130,12 +130,16 @@ class SubjectExecutionService:
         output_path: str | Path,
         mode: SubjectExecutionMode,
         replace_existing: bool = False,
+        expected_request_id: str | None = None,
+        expected_subject_id: str | None = None,
     ) -> PlanInspection:
         inspection = self.validate_files(
             plan_path=plan_path,
             standard_path=standard_path,
             expected_plan_digest=expected_plan_digest,
             mode=mode,
+            expected_request_id=expected_request_id,
+            expected_subject_id=expected_subject_id,
         )
         source = _absolute_file(plan_path, "plan_path")
         target = Path(output_path)
