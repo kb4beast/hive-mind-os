@@ -1,0 +1,28 @@
+{
+  "log_format": "GitHub job log text retained through gh api and PowerShell UTF-8 redirection",
+  "artifacts": [
+    {
+      "bytes": 440262,
+      "sha256": "b9be759dbe9ee4ea57711e20b70e507fe4ba23a0490f8d5ea83f07fb4d3e5c55",
+      "path": "pr179-linux314-failure-api.log"
+    },
+    {
+      "bytes": 3961,
+      "sha256": "f2a8b515fc732ee258ebae57bbc8985ae3af944bbf856f124305a24e4940ec5d",
+      "path": "REPAIR.md"
+    },
+    {
+      "bytes": 4331,
+      "sha256": "00d1cdbdc17853f10f45a52b188921ab93c8bf9808db08dc90ad17504ef481d7",
+      "path": "transport_probe.py"
+    },
+    {
+      "bytes": 12477,
+      "sha256": "ae5057dae4b741dbabf4c93095612cdb29bb95a0ab715d9b4cfb878757ab2c99",
+      "path": "TRANSPORT-VALIDATION.json"
+    }
+  ],
+  "failed_run": 34774982609,
+  "failed_candidate": "89925ecafc4ea4233ec921a26a6839bc2ca17f0a",
+  "failed_job": 103771336682
+}

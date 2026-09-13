@@ -1,0 +1,19 @@
+{
+  "reviewer": "/root/continuity_repair_builder",
+  "head": "6e134f6251fdd30b6da712df8342d1d8986093a5",
+  "tree": "a38f5ce501198b87739743114e0e155c0bf5b080",
+  "status": "revise",
+  "findings": [
+    {
+      "id": "R1",
+      "priority": 2,
+      "summary": "Two ROOT-derived fixtures now use normal transport but still switch to historical objects that may exist only through source remote-tracking refs. Import authenticated history or use the verified authoring source, and test a CI-like remote-only ref namespace."
+    }
+  ],
+  "original_assertion_calls_preserved": 457,
+  "additional_assertion_calls": 2,
+  "guide_docs_unchanged": true,
+  "candidate_clean": true,
+  "root_gates_duplicated": false,
+  "runtime_activation": false
+}

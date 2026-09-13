@@ -1,0 +1,565 @@
+{
+  "status": "passed",
+  "scope": "Documentation link/source checks and inert CLI fixtures only; no local execution, activation, signing, or full suite run.",
+  "base_commit": "b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac",
+  "base_tree": "6fb9b59c4c697ae9b9bc296676783f8ce662f3c0",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "git_blob": "b7efa65024b617962f882aad82f672b6dbfc6bbc",
+      "sha256": "2c0a9b7622acddbc41e5ecf24bec00fda04bb4adfeb99c78c7e52c7dd981d24e",
+      "byte_count": 8010
+    },
+    {
+      "path": "LICENSE",
+      "git_blob": "06da1af7996f5e2b059cd52045e36f9f2cfac201",
+      "sha256": "6e76d648ae297aa3dcefc739604cfcfab2a50b484ab7331090c745a089de21f8",
+      "byte_count": 1065
+    },
+    {
+      "path": "pyproject.toml",
+      "git_blob": "05b1266a8f92fbadfdebbb96c2a2d461090f9fa6",
+      "sha256": "7d3d2f0c37d22df9ba863f99c69e6b0ca69025b22a8ab826c22b20fadf95a1c2",
+      "byte_count": 930
+    },
+    {
+      "path": "src/hive_mind_os/cli.py",
+      "git_blob": "eb90b9d0fbe899a879bc3ef9de1f02dd1443d9df",
+      "sha256": "67f358fc3419c91f08551e1c520c5d95196e56ff4475f305bd621fc149302f04",
+      "byte_count": 73737
+    },
+    {
+      "path": "src/hive_mind_os/dag_cli.py",
+      "git_blob": "05df0436850fe0a2d68883723e95dc133b143e67",
+      "sha256": "6269392bea0115254c089258c9286308d4205da2ce3367ef53385a825bd0f42f",
+      "byte_count": 10054
+    },
+    {
+      "path": "src/hive_mind_os/dag_standard.py",
+      "git_blob": "81d87808ebf3c7d8612a4521a7faa97fc0294e9a",
+      "sha256": "9c58ff437e90b800a4a3a45b32ac2aeb4cc967ff5a6e673f0283e100606f5529",
+      "byte_count": 12950
+    },
+    {
+      "path": "src/hive_mind_os/portable_plan.py",
+      "git_blob": "7f90f0b5fd85f5d9e4480bd26252d276b97dfda4",
+      "sha256": "a013c7b7291b44af880c96381f6925f92a799cbd2712a80eada5a90283b7137d",
+      "byte_count": 35190
+    },
+    {
+      "path": "src/hive_mind_os/subject_execution.py",
+      "git_blob": "49b184b0d286da1f9e691e48fe27e57b6a5e2b18",
+      "sha256": "1613effaf188d673b69b1813a43bbd5c82f7c594f7287224e1277eaed0a27ffe",
+      "byte_count": 10126
+    },
+    {
+      "path": "src/hive_mind_os/local_dag_runtime.py",
+      "git_blob": "7aded676230ec0c8e5845c8a2b061e7f118bce06",
+      "sha256": "fe6f99499a88dfc8d451ac3efe53b54a0f7c19b2d5e1608d7a21897b2e364d52",
+      "byte_count": 62650
+    },
+    {
+      "path": "src/hive_mind_os/local_run_authority.py",
+      "git_blob": "24687c79a974452afb3d08c753b8374a76735f03",
+      "sha256": "f17b200c1a6095ee892fed82c5af0626a691137de6bb2a1afb3d1f5a3b24b43d",
+      "byte_count": 9260
+    },
+    {
+      "path": "src/hive_mind_os/local_codex_worker.py",
+      "git_blob": "12acc87be3ce81bcbe64a07c43f2fda2c69e6fc5",
+      "sha256": "aeafe961aa8398146f79ed023d764fd6abc26ac781fa18bf933e565080c495cd",
+      "byte_count": 21114
+    },
+    {
+      "path": "src/hive_mind_os/compiled_tournament.py",
+      "git_blob": "3d9d33e58b75467932d1b4831670895ea9e442a7",
+      "sha256": "bc76cd54edb4635e8e7ffc8be0783801ce2d079314a07d4e3111159d3395abbc",
+      "byte_count": 3823
+    },
+    {
+      "path": "src/hive_mind_os/powershell_preparation.py",
+      "git_blob": "07eab1565c9bf1403d38aa3809107cfb808f57d3",
+      "sha256": "a0967a0b6643c32d3353f9cab799f488c1e1b32f058b752fbed933519de12b9c",
+      "byte_count": 6771
+    },
+    {
+      "path": "docs/execution/PUBLIC_DAG_RUNTIME.md",
+      "git_blob": "9db7c1c103d41ef9d9827e93ab012b3d11bbc8dc",
+      "sha256": "fb1638f354090c9724bb0ca7e1ec048d9450113a50243bca7f7a6370ae98e3c7",
+      "byte_count": 2026
+    },
+    {
+      "path": "docs/execution/DAG_AUTHORING_STANDARD_V2.md",
+      "git_blob": "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374",
+      "sha256": "3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a",
+      "byte_count": 12312
+    },
+    {
+      "path": "tests/test_public_dag_cli.py",
+      "git_blob": "78be48dfa03b21f78f7a3603e47a487d78ae5651",
+      "sha256": "466667aea0865bde40b7fa5df6e942419d02547601cf947d349eb35333796491",
+      "byte_count": 7177
+    },
+    {
+      "path": "tests/test_subject_execution.py",
+      "git_blob": "75a46379a8b8b2749a055a8758d081cce4cb8256",
+      "sha256": "7b8b4dcdb09c2cdb731ca77ced723bacbbe1a78988a2a6ce8845e1c4102bcd2c",
+      "byte_count": 12726
+    },
+    {
+      "path": "tests/test_dag_standard_product.py",
+      "git_blob": "0aa24ae2f91a376f417ddcb08585ca520b111ee0",
+      "sha256": "be9c817ffcb094676c3b038481bbd59f0cdfb3b11e19b105cfe3e6d19d8af00f",
+      "byte_count": 6353
+    },
+    {
+      "path": "tests/test_portable_plan.py",
+      "git_blob": "53e310e39c125ccf76e6b57873e8cc6b27cd0c30",
+      "sha256": "4042ec7418f219a4f5aafe17c100d9a582778e444854fad2123e8a369a0289cc",
+      "byte_count": 8042
+    },
+    {
+      "path": "tests/test_local_dag_runtime.py",
+      "git_blob": "67dbb5b5cee56b5d349caedec542a27ab215abe7",
+      "sha256": "ea8ef8adca909ea9d4bd85a3232fbb0a685b6937d8a1f41aac09d5d0c13cf06b",
+      "byte_count": 46365
+    },
+    {
+      "path": "USER_GUIDE/00_START_HERE.md",
+      "git_blob": "86792023cd8b534fbb9a88986adb2aeda6cbdaaa",
+      "sha256": "7012dd105051832bf480716be6d65f739bbc168404977ba06d913421d67f8289",
+      "byte_count": 725
+    }
+  ],
+  "links": [
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "07_GENERIC_DAG_EXECUTION.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "../docs/execution/PUBLIC_DAG_RUNTIME.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "../docs/execution/DAG_AUTHORING_STANDARD_V2.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "00_START_HERE.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "01_BOOTSTRAP_ONCE.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "02_ONE_PROMPT_FOREVER.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "03_PARALLEL_EXECUTION.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "04_WHEN_TO_START_STOP.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "05_RECEIPTS_REPAIRS_RECONCILIATION.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "06_HUMAN_ESCALATION.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "07_MODEL_ROUTING.md"
+    },
+    {
+      "document": "USER_GUIDE/README.md",
+      "target": "08_CHATGPT_CODEX_WORKFLOW.md"
+    },
+    {
+      "document": "USER_GUIDE/00_START_HERE.md",
+      "target": "README.md"
+    },
+    {
+      "document": "USER_GUIDE/00_START_HERE.md",
+      "target": "07_GENERIC_DAG_EXECUTION.md"
+    },
+    {
+      "document": "USER_GUIDE/07_GENERIC_DAG_EXECUTION.md",
+      "target": "../docs/execution/PUBLIC_DAG_RUNTIME.md"
+    }
+  ],
+  "historical_start_body_preserved": true,
+  "commands": [
+    {
+      "label": "help-dag",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-dag.stdout.txt",
+        "sha256": "6d3738f067afd4d3457557e2e488aa6e9a4006b4188f00ed9ff7eded930b1f34",
+        "byte_count": 433
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-dag.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "help-build",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "build",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-build.stdout.txt",
+        "sha256": "cac7f24a95e1511dd67613167f547dc57fdc06f63e2b782cedc88dc76c939186",
+        "byte_count": 887
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-build.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "help-execute",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "execute",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-execute.stdout.txt",
+        "sha256": "82bd4f7534d140d05bdb2881d2d8c19af8d5fc95dc701208d87faa9ad6b4377a",
+        "byte_count": 1873
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-execute.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "help-resume",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "resume",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-resume.stdout.txt",
+        "sha256": "a9f579374128b75c78ac9667941d52e65e31c1c8187cbb2d29d6f66d27a1f846",
+        "byte_count": 1857
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\help-resume.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "validate",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "validate",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--mode",
+        "repository",
+        "--expected-request-id",
+        "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+        "--expected-subject-id",
+        "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\validate.stdout.txt",
+        "sha256": "1d38e0f7672f913bb05feac656d6c0b19a17474a5a4dbbf4e681dbe86ae18e0e",
+        "byte_count": 2077
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\validate.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "rounds",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "rounds",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--mode",
+        "repository",
+        "--expected-request-id",
+        "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+        "--expected-subject-id",
+        "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\rounds.stdout.txt",
+        "sha256": "863152bcbc584ab37e54d8f2ae652af4f8fb2304f0209f7e4ea6f3e1187bba0d",
+        "byte_count": 836
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\rounds.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "graph",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "graph",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--mode",
+        "repository",
+        "--expected-request-id",
+        "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+        "--expected-subject-id",
+        "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\graph.stdout.txt",
+        "sha256": "47bebf302f7cef7b834a55168b1d5c3b7d704d74ca2a369e499e2ffdf6a404f3",
+        "byte_count": 1662
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\graph.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "build",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "build",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--mode",
+        "repository",
+        "--output",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\sealed.json"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\build.stdout.txt",
+        "sha256": "93541661304cff094b8318555eaa063e0b0d062f3d9cd8db1677475353142c61",
+        "byte_count": 2055
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\build.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "build-existing",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "build",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--mode",
+        "repository",
+        "--output",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\sealed.json"
+      ],
+      "exit_code": 2,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\build-existing.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\build-existing.stderr.txt",
+        "sha256": "c37f2c1adf213c40ca16ba77a7a06c3a5a3d59f74aabf9c168aae175f623e50b",
+        "byte_count": 85
+      }
+    },
+    {
+      "label": "missing-status",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "status",
+        "--state-directory",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\absent-state",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\missing-status.stdout.txt",
+        "sha256": "584cd870f37ab2f677a08235fdf1fba9c6f4b6fd714b50015dee8ede2266bf2a",
+        "byte_count": 382
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\missing-status.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      }
+    },
+    {
+      "label": "external-refusal",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "execute",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--mode",
+        "repository",
+        "--state-directory",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\absent-state"
+      ],
+      "exit_code": 2,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\external-refusal.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\external-refusal.stderr.txt",
+        "sha256": "f4936841c104faeba6f5d9f0277c8b85ac29acd6d8052f8a90b4860f0d3e36e8",
+        "byte_count": 150
+      }
+    },
+    {
+      "label": "mismatched-identity",
+      "argv": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.cli",
+        "dag",
+        "validate",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--mode",
+        "repository",
+        "--expected-request-id",
+        "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      ],
+      "exit_code": 2,
+      "stdout": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\mismatched-identity.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_count": 0
+      },
+      "stderr": {
+        "path": "C:\\h\\node-completeness-audit\\guide-implementation\\mismatched-identity.stderr.txt",
+        "sha256": "6f436d99c14f9116e37d982715da8527bd659b19666b63bc335ccbce88d0d57e",
+        "byte_count": 108
+      }
+    }
+  ],
+  "document_working_bytes": [
+    {
+      "path": "USER_GUIDE/README.md",
+      "sha256": "dafae405dc1ff206f89d8a8ab09cd5af6066fc70f7604cfac365893de1d2fe32",
+      "byte_count": 1550
+    },
+    {
+      "path": "USER_GUIDE/00_START_HERE.md",
+      "sha256": "70593d8b902c3f9002fbe51303de5846a79c0566313ec36427daa5e47f8dfe1f",
+      "byte_count": 1171
+    },
+    {
+      "path": "USER_GUIDE/07_GENERIC_DAG_EXECUTION.md",
+      "sha256": "37b2923a90f70e8a5db8171111272c49036ddddaa58315866608ba7c41d411c7",
+      "byte_count": 10210
+    }
+  ]
+}

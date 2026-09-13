@@ -1,0 +1,18 @@
+[
+  {
+    "label": "threaded-01",
+    "diagnostic_interval_seconds": "0.01",
+    "exit_code": 0,
+    "stderr_bytes": 629808,
+    "diagnostic_occurrences": 201,
+    "terminal_marker_present": true
+  },
+  {
+    "label": "threaded-001",
+    "diagnostic_interval_seconds": "0.001",
+    "exit_code": 0,
+    "stderr_bytes": 631381,
+    "diagnostic_occurrences": 200,
+    "terminal_marker_present": true
+  }
+]

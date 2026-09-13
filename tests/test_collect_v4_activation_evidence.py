@@ -270,6 +270,12 @@ Get-V4UnittestTerminalResult `
                     check=False,
                 )
                 if completed.returncode != 0:
+                    receipt_path = output_directory / "evidence.json"
+                    receipt = (
+                        receipt_path.read_text(encoding="utf-8", errors="replace")
+                        if receipt_path.is_file()
+                        else "<collector receipt was not materialized>"
+                    )
                     focused_output_path = output_directory / "focused-test-output.txt"
                     focused_output = (
                         focused_output_path.read_text(encoding="utf-8", errors="replace")
@@ -281,6 +287,8 @@ Get-V4UnittestTerminalResult `
                         + completed.stdout
                         + "\n=== RETAINED FOCUSED TRANSCRIPT ===\n"
                         + focused_output
+                        + "\n=== RETAINED COLLECTOR RECEIPT ===\n"
+                        + receipt
                     )
                 evidence = json.loads(
                     (output_directory / "evidence.json").read_text(encoding="utf-8")
@@ -519,6 +527,66 @@ Get-V4UnittestTerminalResult `
             ):
                 with self.subTest(unresolved_name=unresolved_name):
                     self.assertNotIn(f"${unresolved_name}", review_request)
+
+    @staticmethod
+    def diagnostic_bootstrap_fixture() -> str:
+        source = SCRIPT.read_text(encoding="utf-8")
+        bootstrap = source.split('$testBootstrap = @"\n', 1)[1].split('\n"@', 1)[0]
+        bootstrap = bootstrap.replace("$pythonExecutableLiteral", json.dumps(sys.executable))
+        bootstrap = bootstrap.replace("$repositoryRootLiteral", json.dumps(str(ROOT)))
+        bootstrap = bootstrap.replace("$testResultMarkerLiteral", json.dumps(TERMINAL_RESULT_MARKER))
+        # Exercise the actual generated diagnostic implementation frequently while
+        # the real executor module creates/retires Python frames. Only this test's
+        # extracted bootstrap interval and requested module arguments are changed.
+        bootstrap = bootstrap.replace("diagnostic_stop.wait(15)", "diagnostic_stop.wait(0.001)")
+        bootstrap = bootstrap.replace(
+            "import unittest\n",
+            "import unittest\nsys.argv[1:] = ['-v', 'tests.test_dag_executor']\n",
+        )
+        return bootstrap
+
+    def test_generated_bootstrap_diagnostics_preserve_module_completion(self):
+        bootstrap = self.diagnostic_bootstrap_fixture()
+        expected_count = unittest.defaultTestLoader.loadTestsFromName(
+            "tests.test_dag_executor"
+        ).countTestCases()
+        self.assertGreater(expected_count, 0)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            completed, metadata, stdout, stderr = self.run_process_fixture(
+                root, bootstrap, timeout_seconds=300
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(metadata["actual_exit_code"], 0, stderr.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["effective_exit_code"], 0)
+            self.assertFalse(metadata["timed_out"])
+            diagnostic_text = stderr.read_text(encoding="utf-8")
+            self.assertIn("FOCUSED_VALIDATION_DIAGNOSTIC (not a process deadline)", diagnostic_text)
+            terminal = self.parse_terminal_result_fixture(
+                root / "terminal", stdout.read_text(encoding="utf-8"),
+                expected_tests_run=expected_count, stderr=diagnostic_text,
+            )
+            self.assertTrue(terminal["valid"], terminal)
+
+    def test_generated_bootstrap_rejects_diagnostic_thread_failure(self):
+        bootstrap = self.diagnostic_bootstrap_fixture().replace(
+            "faulthandler.dump_traceback(file=sys.stderr, all_threads=True)",
+            "raise RuntimeError('injected diagnostic failure')",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            completed, metadata, stdout, stderr = self.run_process_fixture(
+                root, bootstrap, timeout_seconds=300
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertNotEqual(metadata["actual_exit_code"], 0)
+            self.assertNotEqual(metadata["effective_exit_code"], 0)
+            self.assertFalse(metadata["timed_out"])
+            self.assertIn(
+                "focused validation diagnostic worker failed",
+                stderr.read_text(encoding="utf-8"),
+            )
+            self.assertNotIn(TERMINAL_RESULT_MARKER, stdout.read_text(encoding="utf-8"))
 
     def test_collector_records_bounded_focused_validation_timeout(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

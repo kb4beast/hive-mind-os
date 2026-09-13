@@ -1,0 +1,469 @@
+{
+  "status": "passed",
+  "controls": [
+    {
+      "name": "pre-fix",
+      "marker_copied": true,
+      "head": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1",
+      "tree": "618ed99f379bda1cbdfdd62689ded77d039f065e"
+    },
+    {
+      "name": "fixed",
+      "marker_copied": false,
+      "head": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1",
+      "tree": "618ed99f379bda1cbdfdd62689ded77d039f065e"
+    }
+  ],
+  "concurrent_transport_clones": 3,
+  "commit_graph_writes": 6,
+  "overlapping_command_pairs": 15,
+  "failed_ci_evidence": {
+    "path": "C:\\h\\node-completeness-audit\\guide-ci-repair\\pr179-linux314-failure-api.log",
+    "sha256": "b9be759dbe9ee4ea57711e20b70e507fe4ba23a0490f8d5ea83f07fb4d3e5c55"
+  },
+  "limitations": "Command intervals overlap; no claim that the exact Linux disappearance timing was reproduced. Stable marker control deterministically distinguishes private-directory copying from object transport.",
+  "records": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "init",
+        "--quiet"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.2050439,
+      "finished_monotonic": 385581.2658129,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "config",
+        "user.name",
+        "Transport fixture"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.2658227,
+      "finished_monotonic": 385581.3140392,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "config",
+        "user.email",
+        "transport@example.invalid"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.3140479,
+      "finished_monotonic": 385581.3603981,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "config",
+        "core.autocrlf",
+        "false"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.3604048,
+      "finished_monotonic": 385581.4092504,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "add",
+        "payload.txt"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.4098163,
+      "finished_monotonic": 385581.4656456,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "commit",
+        "--quiet",
+        "-m",
+        "fixture"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.4656653,
+      "finished_monotonic": 385581.5474013,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.5474081,
+      "finished_monotonic": 385581.594047,
+      "stdout": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.594055,
+      "finished_monotonic": 385581.6422045,
+      "stdout": "618ed99f379bda1cbdfdd62689ded77d039f065e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair",
+        "clone",
+        "--quiet",
+        "--no-hardlinks",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\pre-fix"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.6429136,
+      "finished_monotonic": 385581.7968287,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\pre-fix",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.7969582,
+      "finished_monotonic": 385581.8438218,
+      "stdout": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\pre-fix",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.8438311,
+      "finished_monotonic": 385581.8925361,
+      "stdout": "618ed99f379bda1cbdfdd62689ded77d039f065e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair",
+        "clone",
+        "--quiet",
+        "--no-local",
+        "--no-hardlinks",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\fixed"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385581.8928381,
+      "finished_monotonic": 385582.0933134,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\fixed",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.093454,
+      "finished_monotonic": 385582.1398745,
+      "stdout": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\fixed",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.1398832,
+      "finished_monotonic": 385582.1874711,
+      "stdout": "618ed99f379bda1cbdfdd62689ded77d039f065e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "commit-graph",
+        "write",
+        "--reachable",
+        "--split"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.1880092,
+      "finished_monotonic": 385582.245449,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "commit-graph",
+        "write",
+        "--reachable",
+        "--split"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.245456,
+      "finished_monotonic": 385582.2927942,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "commit-graph",
+        "write",
+        "--reachable",
+        "--split"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.2928014,
+      "finished_monotonic": 385582.3505779,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "commit-graph",
+        "write",
+        "--reachable",
+        "--split"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.3505871,
+      "finished_monotonic": 385582.4049444,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair",
+        "clone",
+        "--quiet",
+        "--no-local",
+        "--no-hardlinks",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-1"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.1885069,
+      "finished_monotonic": 385582.4482365,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair",
+        "clone",
+        "--quiet",
+        "--no-local",
+        "--no-hardlinks",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-2"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.1886348,
+      "finished_monotonic": 385582.4482721,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair",
+        "clone",
+        "--quiet",
+        "--no-local",
+        "--no-hardlinks",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-0"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.1882181,
+      "finished_monotonic": 385582.4483344,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "commit-graph",
+        "write",
+        "--reachable",
+        "--split"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.4049531,
+      "finished_monotonic": 385582.4573738,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-1",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.4482437,
+      "finished_monotonic": 385582.5018417,
+      "stdout": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-0",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.4483379,
+      "finished_monotonic": 385582.5022119,
+      "stdout": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-2",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.4482768,
+      "finished_monotonic": 385582.5132602,
+      "stdout": "fd35be9dc7a0722e4d71de6980e5506aaa496bc1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\source",
+        "commit-graph",
+        "write",
+        "--reachable",
+        "--split"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.4573793,
+      "finished_monotonic": 385582.5179886,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-1",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.5018548,
+      "finished_monotonic": 385582.560692,
+      "stdout": "618ed99f379bda1cbdfdd62689ded77d039f065e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-0",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.5022177,
+      "finished_monotonic": 385582.560822,
+      "stdout": "618ed99f379bda1cbdfdd62689ded77d039f065e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "C:\\h\\node-completeness-audit\\guide-ci-repair\\concurrent-2",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "exit_code": 0,
+      "started_monotonic": 385582.5132674,
+      "finished_monotonic": 385582.56091,
+      "stdout": "618ed99f379bda1cbdfdd62689ded77d039f065e\n",
+      "stderr": ""
+    }
+  ]
+}

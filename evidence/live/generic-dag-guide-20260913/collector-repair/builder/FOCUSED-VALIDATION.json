@@ -1,0 +1,37 @@
+{
+  "status": "passed",
+  "argv": [
+    "py",
+    "-3.12",
+    "-B",
+    "-m",
+    "unittest",
+    "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_generated_bootstrap_diagnostics_preserve_module_completion",
+    "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_generated_bootstrap_rejects_diagnostic_thread_failure",
+    "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_records_bounded_focused_validation_timeout",
+    "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_collector_attributes_a_module_process_timeout_with_partial_streams",
+    "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_terminal_result_rejects_skips_and_every_adverse_outcome",
+    "tests.test_collect_v4_activation_evidence.CollectV4ActivationEvidenceTests.test_bounded_runner_timeout_kills_descendants_but_not_unrelated_process",
+    "-v"
+  ],
+  "exit_code": 0,
+  "duration_seconds": 16.910456500016153,
+  "prior_assertions_preserved": 183,
+  "new_assertions": 13,
+  "source_working_bytes": [
+    {
+      "path": "scripts/Collect-V4ActivationEvidence.ps1",
+      "sha256": "4bb7083243f4271ccd52b5fed23c38f61961da682f17d0ad175bf7825d12958a"
+    },
+    {
+      "path": "scripts/V4EvidenceProcess.ps1",
+      "sha256": "0b2b4a6fb1bcfec8438e0248c9845065e93428a5ddbeaab804956d5098ba057d"
+    },
+    {
+      "path": "tests/test_collect_v4_activation_evidence.py",
+      "sha256": "d961ff34386838edb467e47191ad2d19431b54fb5a41b1ca391cc3a76b72f93c"
+    }
+  ],
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "845796fdc443f2529f85270363eccb7356bd8f457c44d492143e1ba99e1ab9b8"
+}

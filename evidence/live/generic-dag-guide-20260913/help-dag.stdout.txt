@@ -1,0 +1,11 @@
+usage: hive-mind dag [-h]
+                     {build,validate,rounds,graph,execute,resume,status,cancel,reconcile,prepare-powershell} ...
+
+Build, inspect, and run portable governed DAGs
+
+positional arguments:
+  {build,validate,rounds,graph,execute,resume,status,cancel,reconcile,prepare-powershell}
+    build               Seal canonical inert plan bytes
+
+options:
+  -h, --help            show this help message and exit

@@ -1,0 +1,32 @@
+{
+  "artifacts": [
+    {
+      "sha256": "59419bf3e05758e7fa2b31b9459d01eada84ea97eb8464c31ec540fa562614ad",
+      "path": "cold_history_probe.py",
+      "bytes": 3694
+    },
+    {
+      "sha256": "b6134f498c2ea83be53846fda37476d58cd088e7a7adae6ae10c0321e24a2166",
+      "path": "cold-focused.stderr.txt",
+      "bytes": 975
+    },
+    {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "cold-focused.stdout.txt",
+      "bytes": 0
+    },
+    {
+      "sha256": "2323f1235ee997c6ca8929a46df81fa9f6be8f74e53ab09be6f9c0cd0e7797c4",
+      "path": "COLD-HISTORY-VALIDATION.json",
+      "bytes": 243676
+    },
+    {
+      "sha256": "9ef029f75685e4a04e6f212bfb7fc90083e2c9ce10ff63239839d3352a5ab179",
+      "path": "REPAIR.md",
+      "bytes": 4783
+    }
+  ],
+  "builder": "/root/generic_guide_builder",
+  "sourceBytesValidation": "Cold checkout has repaired test working bytes; full exact-head qualification follows the commit",
+  "rejected_parent": "6e134f6251fdd30b6da712df8342d1d8986093a5"
+}

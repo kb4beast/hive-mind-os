@@ -1,0 +1,73 @@
+{
+  "reviewer": "/root/continuity_repair_builder",
+  "head": "3bfd4edd504a1c1dc6b4448941dc38f4fdfcdbba",
+  "tree": "b94944774c9cd08386eecd4822ae6e7f8e3457a0",
+  "conclusion": "Early non-timeout child failure supported; native cause and exit code unavailable; budget increase unsupported",
+  "artifacts": [
+    {
+      "path": "1038b5a-runtime_contracts.py",
+      "bytes": 46102,
+      "sha256": "bd759d5786751d44ed0de4f44ed119e42e2c1762bfe5e5b18d3705aa15be9306"
+    },
+    {
+      "path": "1038b5a-test_dag_executor.py",
+      "bytes": 58213,
+      "sha256": "ccaf3a2f500d02728bfd0f0df00ed629d786ee34c9b8ba0c962e2be4179aeef4"
+    },
+    {
+      "path": "3bfd4ed-Collect-V4ActivationEvidence.ps1",
+      "bytes": 40401,
+      "sha256": "0ac45f0e0b3c646bf160db2575419db79bcbe8fde3738d2ae46bd029a5584395"
+    },
+    {
+      "path": "3bfd4ed-test_collect_v4_activation_evidence.py",
+      "bytes": 41319,
+      "sha256": "4dad276b3072f8d6feaf8576a16f276cbe41dba3f309d8969f319ddbd83fafd5"
+    },
+    {
+      "path": "3bfd4ed-V4EvidenceProcess.ps1",
+      "bytes": 8888,
+      "sha256": "0b2b4a6fb1bcfec8438e0248c9845065e93428a5ddbeaab804956d5098ba057d"
+    },
+    {
+      "path": "diagnostic_probe.py",
+      "bytes": 1509,
+      "sha256": "0a3cf40262377f404edf892c51c1897e16efffc14ade809ffe3257c6641ca34c"
+    },
+    {
+      "path": "FAILED-CI.log",
+      "bytes": 421563,
+      "sha256": "f609b1bb06a3384c77125fa40fe947dc61c028249a096862a4b7b134544fdef0"
+    },
+    {
+      "path": "FINDINGS.md",
+      "bytes": 3731,
+      "sha256": "b1509044cc8e55353211ab93b8377f2508dd6d968aa9475808b7ac50fbce8708"
+    },
+    {
+      "path": "SOURCE-PINS.json",
+      "bytes": 1386,
+      "sha256": "7f202127e5a509c88bae334e856df2553ff23505f09a3cb9014324af9abf69ba"
+    },
+    {
+      "path": "TIMER-PROBE.json",
+      "bytes": 639,
+      "sha256": "479d3226b41c851520c9382fd66da93f145b07daba9dc1c5908a93bb54805802"
+    },
+    {
+      "path": "timer.stderr.txt",
+      "bytes": 168,
+      "sha256": "88df6d63267f0c1ec24e9ebf5623a7b14bf2060a50d1fadc883e0bab275a1c95"
+    },
+    {
+      "path": "timer.stdout.txt",
+      "bytes": 114,
+      "sha256": "d942c2150bcb9adb8b23f999182af4e6bb0b21d286ac9cd34dcf9970f15166a9"
+    },
+    {
+      "path": "timer_fixture.py",
+      "bytes": 253,
+      "sha256": "4337b3c0087c2295f676288a03cb1b3c23f10f0f1cf6e1278f12fb4745f828f1"
+    }
+  ]
+}

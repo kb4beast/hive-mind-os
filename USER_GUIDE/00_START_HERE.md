@@ -1,5 +1,15 @@
 # Start Here
 
+For the current installed package, use the [user guide index](README.md) and
+[Generic DAG execution](07_GENERIC_DAG_EXECUTION.md). An installed checkout does
+not need the archive-copy procedure below. A new objective needs its own bound
+plan and evidence; these historical prompts do not activate it.
+
+## Historical bootstrap bundle
+
+The original bundle instructions are retained below for interpreting that
+bootstrap workflow and its receipts.
+
 The bundle contains two different things:
 
 1. `REPO_ROOT/` — files to install once into the real repository root on a bootstrap branch.

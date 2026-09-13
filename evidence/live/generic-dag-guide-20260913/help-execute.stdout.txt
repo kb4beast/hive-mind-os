@@ -1,0 +1,38 @@
+usage: hive-mind dag execute [-h] --plan PLAN --standard STANDARD
+                             --expected-plan-digest EXPECTED_PLAN_DIGEST
+                             [--mode {repository,offline-local,research-artifact,workflow}]
+                             [--subject SUBJECT]
+                             [--expected-request-id EXPECTED_REQUEST_ID]
+                             [--expected-subject-id EXPECTED_SUBJECT_ID]
+                             [--activation ACTIVATION]
+                             --state-directory STATE_DIRECTORY
+                             [--runtime {external,local}]
+                             [--repository REPOSITORY]
+                             [--host-directory HOST_DIRECTORY]
+                             [--operator-request-file OPERATOR_REQUEST_FILE]
+                             [--brain-directory BRAIN_DIRECTORY]
+                             [--workers WORKERS] [--node-timeout NODE_TIMEOUT]
+                             [--worker-mode {evidence-packet,direct}]
+                             [--refresh-local-host] [--recover-recorded-patch]
+
+options:
+  -h, --help            show this help message and exit
+  --plan PLAN
+  --standard STANDARD
+  --expected-plan-digest EXPECTED_PLAN_DIGEST
+  --mode {repository,offline-local,research-artifact,workflow}
+  --subject SUBJECT     Operator label only; never an authority grant
+  --expected-request-id EXPECTED_REQUEST_ID
+  --expected-subject-id EXPECTED_SUBJECT_ID
+  --activation ACTIVATION
+  --state-directory STATE_DIRECTORY
+  --runtime {external,local}
+  --repository REPOSITORY
+  --host-directory HOST_DIRECTORY
+  --operator-request-file OPERATOR_REQUEST_FILE
+  --brain-directory BRAIN_DIRECTORY
+  --workers WORKERS
+  --node-timeout NODE_TIMEOUT
+  --worker-mode {evidence-packet,direct}
+  --refresh-local-host
+  --recover-recorded-patch

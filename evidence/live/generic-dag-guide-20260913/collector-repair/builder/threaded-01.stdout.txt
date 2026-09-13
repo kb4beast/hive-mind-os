@@ -1,0 +1,3 @@
+BOUND_PYTHON=C:\Users\beesp\AppData\Local\Programs\Python\Python312\python.exe
+BOUND_PACKAGE=C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\src\hive_mind_os\__init__.py
+HIVE_V4_UNITTEST_RESULT_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa tests_run=23 failures=0 errors=0 skipped=0 expected_failures=0 unexpected_successes=0 successful=true

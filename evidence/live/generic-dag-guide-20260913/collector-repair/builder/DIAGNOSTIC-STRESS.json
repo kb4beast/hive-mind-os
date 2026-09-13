@@ -1,0 +1,18 @@
+[
+  {
+    "label": "accelerated-01",
+    "diagnostic_interval_seconds": "0.01",
+    "exit_code": 3221225477,
+    "stderr_bytes": 10022,
+    "diagnostic_occurrences": 6,
+    "terminal_marker_present": false
+  },
+  {
+    "label": "accelerated-001",
+    "diagnostic_interval_seconds": "0.001",
+    "exit_code": 3221225477,
+    "stderr_bytes": 9150,
+    "diagnostic_occurrences": 5,
+    "terminal_marker_present": false
+  }
+]
