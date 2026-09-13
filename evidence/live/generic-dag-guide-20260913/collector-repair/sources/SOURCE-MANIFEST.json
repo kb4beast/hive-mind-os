@@ -1,0 +1,27 @@
+{
+  "license": "PSF license and incorporated license notices; retained LICENSE",
+  "purpose": "Read-only investigation of traceback timer crash hypothesis; no third-party code copied into product",
+  "sources": [
+    {
+      "uri": "https://github.com/python/cpython/blob/v3.12.10/Modules/faulthandler.c",
+      "retrieved_utc": "2026-09-13T19:52:48.935779+00:00",
+      "git_blob": "2f2b00787edd7614c3123b885b8538a78fe5c613",
+      "sha256": "1bab01c2c2e5a91420b2e46eb7adb2e9e936f86eb7cd46cdac2db1c2148a9def",
+      "path": "C:\\h\\node-completeness-audit\\windows-collector-sources\\Modules-faulthandler.c"
+    },
+    {
+      "uri": "https://github.com/python/cpython/blob/v3.12.10/Python/traceback.c",
+      "retrieved_utc": "2026-09-13T19:52:49.405203+00:00",
+      "git_blob": "1cb82c572037587bea78f9277b9eee2e70ca2063",
+      "sha256": "b217016f4fe72b9625fbf5a2126cbb5f3add8f409931e939116fa926be95eb2e",
+      "path": "C:\\h\\node-completeness-audit\\windows-collector-sources\\Python-traceback.c"
+    },
+    {
+      "uri": "https://github.com/python/cpython/blob/v3.12.10/LICENSE",
+      "retrieved_utc": "2026-09-13T19:52:49.905891+00:00",
+      "git_blob": "f26bcf4d2de6eb136e31006ca3ab447d5e488adf",
+      "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+      "path": "C:\\h\\node-completeness-audit\\windows-collector-sources\\LICENSE"
+    }
+  ]
+}

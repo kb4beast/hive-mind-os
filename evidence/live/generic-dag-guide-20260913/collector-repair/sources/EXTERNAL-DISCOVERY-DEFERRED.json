@@ -1,0 +1,13 @@
+{
+  "uri": "https://pypi.org/project/pytest-failure-instrumentation/",
+  "metadata_uri": "https://pypi.org/pypi/pytest-failure-instrumentation/json",
+  "retrieved_utc": "2026-09-13T19:56:20.028973+00:00",
+  "version": null,
+  "license": null,
+  "content_digest": null,
+  "disposition": "defer_unadmitted_discovery_lead",
+  "claim_observed_in_search": "Package author reports native crashes during repeating C-thread faulthandler dumps and describes Python-thread diagnostic sampling.",
+  "counterclaim": "External report cannot prove this CI cause; numeric original CI child exit absent.",
+  "metadata_retrieval_failure": "Python3.14 urllib certificate validation failed: Basic Constraints of CA cert not marked critical. No TLS validation bypass or package installation attempted.",
+  "application": "No external package code copied or installed; qualification uses independent local A/B and pinned CPython source. Full source/version/license ingestion remains unavailable for this optional lead."
+}

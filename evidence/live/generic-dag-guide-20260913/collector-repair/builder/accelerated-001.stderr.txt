@@ -1,0 +1,108 @@
+Timeout (0:00:00.001000)!
+Thread 0x00003df0 (most recent call first):
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 1063 in source_to_code
+  File "<frozen importlib._bootstrap_external>", line 1133 in get_code
+  File "<frozen importlib._bootstrap_external>", line 995 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 137 in loadTestsFromName
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 207 in loadTestsFromNames
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 164 in createTests
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 153 in parseArgs
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 104 in __init__
+  File "C:\h\node-completeness-audit\windows-collector-repair\accelerated-001.py", line 30 in <module>
+Timeout (0:00:00.001000)!
+Thread 0x00003df0 (most recent call first):
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 1063 in source_to_code
+  File "<frozen importlib._bootstrap_external>", line 1133 in get_code
+  File "<frozen importlib._bootstrap_external>", line 995 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\tests\test_dag_executor.py", line 13 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 137 in loadTestsFromName
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 207 in loadTestsFromNames
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 164 in createTests
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 153 in parseArgs
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 104 in __init__
+  File "C:\h\node-completeness-audit\windows-collector-repair\accelerated-001.py", line 30 in <module>
+Timeout (0:00:00.001000)!
+Thread 0x00003df0 (most recent call first):
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 1063 in source_to_code
+  File "<frozen importlib._bootstrap_external>", line 1133 in get_code
+  File "<frozen importlib._bootstrap_external>", line 995 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\src\hive_mind_os\portable_plan.py", line 15 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\src\hive_mind_os\dag_standard.py", line 13 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\src\hive_mind_os\dag_executor.py", line 28 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\tests\test_dag_executor.py", line 13 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 137 in loadTestsFromName
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 207 in loadTestsFromNames
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 164 in createTests
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 153 in parseArgs
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 104 in __init__
+  File "C:\h\node-completeness-audit\windows-collector-repair\accelerated-001.py", line 30 in <module>
+Timeout (0:00:00.001000)!
+Thread 0x00003df0 (most recent call first):
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 473 in _create_fn
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 619 in _init_fn
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 1063 in _process_class
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 1265 in wrap
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\src\hive_mind_os\host_adapter.py", line 108 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\src\hive_mind_os\dag_executor.py", line 29 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\h\node-completeness-audit\windows-collector-repair\frozen-v4\tests\test_dag_executor.py", line 13 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 137 in loadTestsFromName
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 207 in loadTestsFromNames
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 164 in createTests
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 153 in parseArgs
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\unittest\main.py", line 104 in __init__
+  File "C:\h\node-completeness-audit\windows-collector-repair\accelerated-001.py", line 30 in <module>
+Timeout (0:00:00.001000)!
+Thread 0x00003df0 (most recent call first):
+  File "C:\Users\beesp\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py"test_all_permitted_workers_start_before_poll_and_run_is_repeat_idempotent (tests.test_dag_executor.DagExecutorTests.test_all_permitted_workers_start_before_poll_and_run_is_repeat_idempotent) ... 

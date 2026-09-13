@@ -1,0 +1,71 @@
+{
+  "reviewer": "/root/continuity_repair_builder",
+  "purpose": "Independent mechanism and acceptance assessment; no implementation verdict",
+  "artifacts": [
+    {
+      "path": "accelerated-001.py",
+      "bytes": 2096,
+      "sha256": "0130541f0b88240350bbc3e9d5d83affb75e1c889bca36abb458fe0318531e19"
+    },
+    {
+      "path": "accelerated-001.stderr.txt",
+      "bytes": 9150,
+      "sha256": "a22754c35a9b3e3be6ea6ab249a1a71b06592214a92b71828d6616cdd743460a"
+    },
+    {
+      "path": "accelerated-001.stdout.txt",
+      "bytes": 188,
+      "sha256": "51339afa18e10e98d1d441d21b45c2faeb27f796d56cb10a7e54e5a55f56432d"
+    },
+    {
+      "path": "accelerated-01.py",
+      "bytes": 2095,
+      "sha256": "c52535805d8f14703400bf236c9c678054decd65fb3e61a989d1a1d626706163"
+    },
+    {
+      "path": "accelerated-01.stderr.txt",
+      "bytes": 10022,
+      "sha256": "5f5237973ec1d0bb1fc6bb2a0baeda7ce3c34c75b2fb6243e17f995419c0742d"
+    },
+    {
+      "path": "accelerated-01.stdout.txt",
+      "bytes": 188,
+      "sha256": "51339afa18e10e98d1d441d21b45c2faeb27f796d56cb10a7e54e5a55f56432d"
+    },
+    {
+      "path": "bootstrap.py",
+      "bytes": 2093,
+      "sha256": "82237ce0223d5e334624189e7d868cb58c2b21f923463c68886561559193333d"
+    },
+    {
+      "path": "CPYTHON-SOURCE-MANIFEST.json",
+      "bytes": 1416,
+      "sha256": "4f6f368da1721ae28a38f59029c4289451af51a17c56737fecf76bbd1feba5c0"
+    },
+    {
+      "path": "DIAGNOSTIC-STRESS.json",
+      "bytes": 438,
+      "sha256": "d09b3811f60613b470e08269f59c37291a54518abfafe2ac0fd8cc66e492832f"
+    },
+    {
+      "path": "diagnostic_stress.py",
+      "bytes": 1446,
+      "sha256": "b0dacbf8e96ff0893f9ed678bcdd46b56f489888dfd6908bcfd3b05683a23dfb"
+    },
+    {
+      "path": "FINDINGS.md",
+      "bytes": 3007,
+      "sha256": "5a30a9a8d1747ffae8470c28913fc402940f0210817f0c54be7bb0e5b72081c4"
+    },
+    {
+      "path": "MODULE-RESULT.json",
+      "bytes": 5370,
+      "sha256": "00ba277be8cdff1e5ac545879c0aa3385f9952b51d00c4865bf62ff197daba48"
+    },
+    {
+      "path": "REPRODUCTION.json",
+      "bytes": 337,
+      "sha256": "b8ab944edd070b33a717472812ea75abff07fb2b81cfd89e92144c5f4b93ae73"
+    }
+  ]
+}

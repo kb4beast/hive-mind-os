@@ -322,6 +322,7 @@ import gc
 import os
 import pathlib
 import sys
+import threading
 import unittest
 
 EXPECTED_EXECUTABLE = pathlib.Path($pythonExecutableLiteral).resolve()
@@ -341,11 +342,28 @@ if pathlib.Path(package.__file__).resolve() != expected_package:
     raise SystemExit("focused validation imported hive_mind_os from another checkout")
 print(f"BOUND_PYTHON={pathlib.Path(sys.executable).resolve()}", flush=True)
 print(f"BOUND_PACKAGE={pathlib.Path(package.__file__).resolve()}", flush=True)
-faulthandler.dump_traceback_later(15, repeat=True)
+# The C watchdog walks live frames without the GIL on CPython 3.12 and can
+# itself crash during frame churn. A Python thread owns the GIL when dumping.
+# It cannot diagnose a native hang that retains the GIL; the parent process's
+# finite module/overall deadlines still terminate and reject such a run.
+diagnostic_stop = threading.Event()
+diagnostic_failures = []
+def dump_diagnostics():
+    try:
+        while not diagnostic_stop.wait(15):
+            print("FOCUSED_VALIDATION_DIAGNOSTIC (not a process deadline)", file=sys.stderr, flush=True)
+            faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+    except BaseException as error:
+        diagnostic_failures.append(error)
+diagnostic_thread = threading.Thread(target=dump_diagnostics, daemon=True)
+diagnostic_thread.start()
 try:
     program = unittest.main(module=None, exit=False)
 finally:
-    faulthandler.cancel_dump_traceback_later()
+    diagnostic_stop.set()
+    diagnostic_thread.join()
+if diagnostic_failures:
+    raise RuntimeError("focused validation diagnostic worker failed") from diagnostic_failures[0]
 gc.collect()
 successful = program.result.wasSuccessful()
 print(

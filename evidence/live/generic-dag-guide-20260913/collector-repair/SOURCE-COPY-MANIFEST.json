@@ -1,0 +1,385 @@
+{
+  "copied_utc": "2026-09-13T20:00:29.743462+00:00",
+  "prior_candidate": "3bfd4edd504a1c1dc6b4448941dc38f4fdfcdbba",
+  "purpose": "Retain original Windows failure, diagnostic-crash experiments, independent examination and licensed primary sources; exact implementation review and final CI are separate",
+  "artifacts": [
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\accelerated-001.py",
+      "path": "builder/accelerated-001.py",
+      "bytes": 2096,
+      "sha256": "0130541f0b88240350bbc3e9d5d83affb75e1c889bca36abb458fe0318531e19"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\accelerated-001.stderr.txt",
+      "path": "builder/accelerated-001.stderr.txt",
+      "bytes": 9150,
+      "sha256": "a22754c35a9b3e3be6ea6ab249a1a71b06592214a92b71828d6616cdd743460a"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\accelerated-001.stdout.txt",
+      "path": "builder/accelerated-001.stdout.txt",
+      "bytes": 188,
+      "sha256": "51339afa18e10e98d1d441d21b45c2faeb27f796d56cb10a7e54e5a55f56432d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\accelerated-01.py",
+      "path": "builder/accelerated-01.py",
+      "bytes": 2095,
+      "sha256": "c52535805d8f14703400bf236c9c678054decd65fb3e61a989d1a1d626706163"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\accelerated-01.stderr.txt",
+      "path": "builder/accelerated-01.stderr.txt",
+      "bytes": 10022,
+      "sha256": "5f5237973ec1d0bb1fc6bb2a0baeda7ce3c34c75b2fb6243e17f995419c0742d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\accelerated-01.stdout.txt",
+      "path": "builder/accelerated-01.stdout.txt",
+      "bytes": 188,
+      "sha256": "51339afa18e10e98d1d441d21b45c2faeb27f796d56cb10a7e54e5a55f56432d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\bootstrap.py",
+      "path": "builder/bootstrap.py",
+      "bytes": 2093,
+      "sha256": "82237ce0223d5e334624189e7d868cb58c2b21f923463c68886561559193333d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\DIAGNOSTIC-STRESS.json",
+      "path": "builder/DIAGNOSTIC-STRESS.json",
+      "bytes": 438,
+      "sha256": "d09b3811f60613b470e08269f59c37291a54518abfafe2ac0fd8cc66e492832f"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\diagnostic_stress.py",
+      "path": "builder/diagnostic_stress.py",
+      "bytes": 1446,
+      "sha256": "b0dacbf8e96ff0893f9ed678bcdd46b56f489888dfd6908bcfd3b05683a23dfb"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\FOCUSED-VALIDATION.json",
+      "path": "builder/FOCUSED-VALIDATION.json",
+      "bytes": 1805,
+      "sha256": "e750aa8412f2bf5f4ae7a16c2e2d24441c4b3fd1b6a8dd9201d0d6aa8703a78e"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\focused.stderr.txt",
+      "path": "builder/focused.stderr.txt",
+      "bytes": 1386,
+      "sha256": "845796fdc443f2529f85270363eccb7356bd8f457c44d492143e1ba99e1ab9b8"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\focused.stdout.txt",
+      "path": "builder/focused.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\focused_checks.py",
+      "path": "builder/focused_checks.py",
+      "bytes": 2530,
+      "sha256": "91eab1ea9aa80876fc5f22cc12bb6dc376639c07825d7bc2160713a62f1fb0fc"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\invoke.ps1",
+      "path": "builder/invoke.ps1",
+      "bytes": 418,
+      "sha256": "ac8aaa5b3a5f4d1335d72f014e0af35cc5b5bef28dcd926125be999c3f4e4c68"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\MODULE-RESULT.json",
+      "path": "builder/MODULE-RESULT.json",
+      "bytes": 5370,
+      "sha256": "00ba277be8cdff1e5ac545879c0aa3385f9952b51d00c4865bf62ff197daba48"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\module.stderr.txt",
+      "path": "builder/module.stderr.txt",
+      "bytes": 4349,
+      "sha256": "9ac65d826816058d597b75812d17a0798c3550ae797d96d30a5623d4b39bfe17"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\module.stdout.txt",
+      "path": "builder/module.stdout.txt",
+      "bytes": 351,
+      "sha256": "02db220068516677b85e76d9f16f2a7671ef2d9d7bab59026f34161edfc68053"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\REPAIR.md",
+      "path": "builder/REPAIR.md",
+      "bytes": 6311,
+      "sha256": "472d0f31465226d3ac2dd706de9b8fc8a1ec1472a4c031e8d223936b3c040256"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\reproduce_module.py",
+      "path": "builder/reproduce_module.py",
+      "bytes": 3009,
+      "sha256": "12b5a107d1a6f47b7e1af50d75fe32d6c2c0b931993bf618bbf96afb2bd33e2f"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\REPRODUCTION.json",
+      "path": "builder/REPRODUCTION.json",
+      "bytes": 337,
+      "sha256": "b8ab944edd070b33a717472812ea75abff07fb2b81cfd89e92144c5f4b93ae73"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\runner.stderr.txt",
+      "path": "builder/runner.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\runner.stdout.txt",
+      "path": "builder/runner.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\threaded-001.py",
+      "path": "builder/threaded-001.py",
+      "bytes": 2451,
+      "sha256": "b63155879300c2ad20097a4b1fa2ab94e32b609dcd06e4a562418705d2ba336e"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\threaded-001.stderr.txt",
+      "path": "builder/threaded-001.stderr.txt",
+      "bytes": 631381,
+      "sha256": "34981f12dd56aa1bae8cff61d8366a74146942d27a456bda37d6ccf0f1924670"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\threaded-001.stdout.txt",
+      "path": "builder/threaded-001.stdout.txt",
+      "bytes": 348,
+      "sha256": "e20ba621f40c7a6609388c794122c6fc7fa625c000ee5eb3218c1c794d0643fc"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\threaded-01.py",
+      "path": "builder/threaded-01.py",
+      "bytes": 2450,
+      "sha256": "78627f993f78605076aa77e1b254072cc513e5ef0e770f20c073c99c99924c23"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\threaded-01.stderr.txt",
+      "path": "builder/threaded-01.stderr.txt",
+      "bytes": 629808,
+      "sha256": "325b352050db332f84a12484fafe5505093a39500058b9a738419bbb32efb4bb"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\threaded-01.stdout.txt",
+      "path": "builder/threaded-01.stdout.txt",
+      "bytes": 348,
+      "sha256": "e20ba621f40c7a6609388c794122c6fc7fa625c000ee5eb3218c1c794d0643fc"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\THREADED-DIAGNOSTIC-RESULT.json",
+      "path": "builder/THREADED-DIAGNOSTIC-RESULT.json",
+      "bytes": 419,
+      "sha256": "3959b66096dbdd92cf1771f4900d419c625684b922bd62a6ea80c8190b12c1ec"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-repair\\threaded_diagnostic_probe.py",
+      "path": "builder/threaded_diagnostic_probe.py",
+      "bytes": 2112,
+      "sha256": "45431fab3db40045cb853bf321dfdc6734962744dd87ea366dafac50ad59d7bc"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\1038b5a-runtime_contracts.py",
+      "path": "examination/1038b5a-runtime_contracts.py",
+      "bytes": 46102,
+      "sha256": "bd759d5786751d44ed0de4f44ed119e42e2c1762bfe5e5b18d3705aa15be9306"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\1038b5a-test_dag_executor.py",
+      "path": "examination/1038b5a-test_dag_executor.py",
+      "bytes": 58213,
+      "sha256": "ccaf3a2f500d02728bfd0f0df00ed629d786ee34c9b8ba0c962e2be4179aeef4"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\3bfd4ed-Collect-V4ActivationEvidence.ps1",
+      "path": "examination/3bfd4ed-Collect-V4ActivationEvidence.ps1",
+      "bytes": 40401,
+      "sha256": "0ac45f0e0b3c646bf160db2575419db79bcbe8fde3738d2ae46bd029a5584395"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\3bfd4ed-test_collect_v4_activation_evidence.py",
+      "path": "examination/3bfd4ed-test_collect_v4_activation_evidence.py",
+      "bytes": 41319,
+      "sha256": "4dad276b3072f8d6feaf8576a16f276cbe41dba3f309d8969f319ddbd83fafd5"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\3bfd4ed-V4EvidenceProcess.ps1",
+      "path": "examination/3bfd4ed-V4EvidenceProcess.ps1",
+      "bytes": 8888,
+      "sha256": "0b2b4a6fb1bcfec8438e0248c9845065e93428a5ddbeaab804956d5098ba057d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\accelerated-001.py",
+      "path": "examination/diagnostic-alternative/accelerated-001.py",
+      "bytes": 2096,
+      "sha256": "0130541f0b88240350bbc3e9d5d83affb75e1c889bca36abb458fe0318531e19"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\accelerated-001.stderr.txt",
+      "path": "examination/diagnostic-alternative/accelerated-001.stderr.txt",
+      "bytes": 9150,
+      "sha256": "a22754c35a9b3e3be6ea6ab249a1a71b06592214a92b71828d6616cdd743460a"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\accelerated-001.stdout.txt",
+      "path": "examination/diagnostic-alternative/accelerated-001.stdout.txt",
+      "bytes": 188,
+      "sha256": "51339afa18e10e98d1d441d21b45c2faeb27f796d56cb10a7e54e5a55f56432d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\accelerated-01.py",
+      "path": "examination/diagnostic-alternative/accelerated-01.py",
+      "bytes": 2095,
+      "sha256": "c52535805d8f14703400bf236c9c678054decd65fb3e61a989d1a1d626706163"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\accelerated-01.stderr.txt",
+      "path": "examination/diagnostic-alternative/accelerated-01.stderr.txt",
+      "bytes": 10022,
+      "sha256": "5f5237973ec1d0bb1fc6bb2a0baeda7ce3c34c75b2fb6243e17f995419c0742d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\accelerated-01.stdout.txt",
+      "path": "examination/diagnostic-alternative/accelerated-01.stdout.txt",
+      "bytes": 188,
+      "sha256": "51339afa18e10e98d1d441d21b45c2faeb27f796d56cb10a7e54e5a55f56432d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\bootstrap.py",
+      "path": "examination/diagnostic-alternative/bootstrap.py",
+      "bytes": 2093,
+      "sha256": "82237ce0223d5e334624189e7d868cb58c2b21f923463c68886561559193333d"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\CPYTHON-SOURCE-MANIFEST.json",
+      "path": "examination/diagnostic-alternative/CPYTHON-SOURCE-MANIFEST.json",
+      "bytes": 1416,
+      "sha256": "4f6f368da1721ae28a38f59029c4289451af51a17c56737fecf76bbd1feba5c0"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\DIAGNOSTIC-STRESS.json",
+      "path": "examination/diagnostic-alternative/DIAGNOSTIC-STRESS.json",
+      "bytes": 438,
+      "sha256": "d09b3811f60613b470e08269f59c37291a54518abfafe2ac0fd8cc66e492832f"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\diagnostic_stress.py",
+      "path": "examination/diagnostic-alternative/diagnostic_stress.py",
+      "bytes": 1446,
+      "sha256": "b0dacbf8e96ff0893f9ed678bcdd46b56f489888dfd6908bcfd3b05683a23dfb"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\FINDINGS.md",
+      "path": "examination/diagnostic-alternative/FINDINGS.md",
+      "bytes": 3007,
+      "sha256": "5a30a9a8d1747ffae8470c28913fc402940f0210817f0c54be7bb0e5b72081c4"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\MANIFEST.json",
+      "path": "examination/diagnostic-alternative/MANIFEST.json",
+      "bytes": 2181,
+      "sha256": "004ead180c995834e5fbd8e22ceafb9d98f99538c0efc257bb901f4cdb2ed6ec"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\MODULE-RESULT.json",
+      "path": "examination/diagnostic-alternative/MODULE-RESULT.json",
+      "bytes": 5370,
+      "sha256": "00ba277be8cdff1e5ac545879c0aa3385f9952b51d00c4865bf62ff197daba48"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic-alternative\\REPRODUCTION.json",
+      "path": "examination/diagnostic-alternative/REPRODUCTION.json",
+      "bytes": 337,
+      "sha256": "b8ab944edd070b33a717472812ea75abff07fb2b81cfd89e92144c5f4b93ae73"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\diagnostic_probe.py",
+      "path": "examination/diagnostic_probe.py",
+      "bytes": 1509,
+      "sha256": "0a3cf40262377f404edf892c51c1897e16efffc14ade809ffe3257c6641ca34c"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\FAILED-CI.log",
+      "path": "examination/FAILED-CI.log",
+      "bytes": 421563,
+      "sha256": "f609b1bb06a3384c77125fa40fe947dc61c028249a096862a4b7b134544fdef0"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\FINDINGS.md",
+      "path": "examination/FINDINGS.md",
+      "bytes": 3731,
+      "sha256": "b1509044cc8e55353211ab93b8377f2508dd6d968aa9475808b7ac50fbce8708"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\MANIFEST.json",
+      "path": "examination/MANIFEST.json",
+      "bytes": 2362,
+      "sha256": "b764bf2ea7c217a8b0a4ed35135597e1890eede2a2474277798b27ba17614360"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\SOURCE-PINS.json",
+      "path": "examination/SOURCE-PINS.json",
+      "bytes": 1386,
+      "sha256": "7f202127e5a509c88bae334e856df2553ff23505f09a3cb9014324af9abf69ba"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\TIMER-PROBE.json",
+      "path": "examination/TIMER-PROBE.json",
+      "bytes": 639,
+      "sha256": "479d3226b41c851520c9382fd66da93f145b07daba9dc1c5908a93bb54805802"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\timer.stderr.txt",
+      "path": "examination/timer.stderr.txt",
+      "bytes": 168,
+      "sha256": "88df6d63267f0c1ec24e9ebf5623a7b14bf2060a50d1fadc883e0bab275a1c95"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\timer.stdout.txt",
+      "path": "examination/timer.stdout.txt",
+      "bytes": 114,
+      "sha256": "d942c2150bcb9adb8b23f999182af4e6bb0b21d286ac9cd34dcf9970f15166a9"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-examination\\timer_fixture.py",
+      "path": "examination/timer_fixture.py",
+      "bytes": 253,
+      "sha256": "4337b3c0087c2295f676288a03cb1b3c23f10f0f1cf6e1278f12fb4745f828f1"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-sources\\EXTERNAL-DISCOVERY-DEFERRED.json",
+      "path": "sources/EXTERNAL-DISCOVERY-DEFERRED.json",
+      "bytes": 1014,
+      "sha256": "3ef9fc8e46ea362b69cf097403f7d57e5ffd6e6075e6cab4f0833eb1601fcc10"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-sources\\LICENSE",
+      "path": "sources/LICENSE",
+      "bytes": 13936,
+      "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-sources\\Modules-faulthandler.c",
+      "path": "sources/Modules-faulthandler.c",
+      "bytes": 40724,
+      "sha256": "1bab01c2c2e5a91420b2e46eb7adb2e9e936f86eb7cd46cdac2db1c2148a9def"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-sources\\Python-traceback.c",
+      "path": "sources/Python-traceback.c",
+      "bytes": 42599,
+      "sha256": "b217016f4fe72b9625fbf5a2126cbb5f3add8f409931e939116fa926be95eb2e"
+    },
+    {
+      "source": "C:\\h\\node-completeness-audit\\windows-collector-sources\\SOURCE-MANIFEST.json",
+      "path": "sources/SOURCE-MANIFEST.json",
+      "bytes": 1416,
+      "sha256": "4f6f368da1721ae28a38f59029c4289451af51a17c56737fecf76bbd1feba5c0"
+    }
+  ]
+}

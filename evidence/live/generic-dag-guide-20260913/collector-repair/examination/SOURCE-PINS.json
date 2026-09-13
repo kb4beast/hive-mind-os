@@ -1,0 +1,37 @@
+[
+  {
+    "commit": "3bfd4edd504a1c1dc6b4448941dc38f4fdfcdbba",
+    "path": "tests/test_collect_v4_activation_evidence.py",
+    "copy": "3bfd4ed-test_collect_v4_activation_evidence.py",
+    "bytes": 41319,
+    "sha256": "4dad276b3072f8d6feaf8576a16f276cbe41dba3f309d8969f319ddbd83fafd5"
+  },
+  {
+    "commit": "3bfd4edd504a1c1dc6b4448941dc38f4fdfcdbba",
+    "path": "scripts/Collect-V4ActivationEvidence.ps1",
+    "copy": "3bfd4ed-Collect-V4ActivationEvidence.ps1",
+    "bytes": 40401,
+    "sha256": "0ac45f0e0b3c646bf160db2575419db79bcbe8fde3738d2ae46bd029a5584395"
+  },
+  {
+    "commit": "3bfd4edd504a1c1dc6b4448941dc38f4fdfcdbba",
+    "path": "scripts/V4EvidenceProcess.ps1",
+    "copy": "3bfd4ed-V4EvidenceProcess.ps1",
+    "bytes": 8888,
+    "sha256": "0b2b4a6fb1bcfec8438e0248c9845065e93428a5ddbeaab804956d5098ba057d"
+  },
+  {
+    "commit": "1038b5a7d2eb49904c59957ad3e989af8bb2fcc5",
+    "path": "tests/test_dag_executor.py",
+    "copy": "1038b5a-test_dag_executor.py",
+    "bytes": 58213,
+    "sha256": "ccaf3a2f500d02728bfd0f0df00ed629d786ee34c9b8ba0c962e2be4179aeef4"
+  },
+  {
+    "commit": "1038b5a7d2eb49904c59957ad3e989af8bb2fcc5",
+    "path": "src/hive_mind_os/runtime_contracts.py",
+    "copy": "1038b5a-runtime_contracts.py",
+    "bytes": 46102,
+    "sha256": "bd759d5786751d44ed0de4f44ed119e42e2c1762bfe5e5b18d3705aa15be9306"
+  }
+]

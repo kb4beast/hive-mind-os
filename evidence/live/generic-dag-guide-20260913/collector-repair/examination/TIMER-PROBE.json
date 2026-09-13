@@ -1,0 +1,9 @@
+{
+  "purpose": "Diagnostic timer alone does not terminate this interpreter",
+  "exit_code": 0,
+  "seconds": 15.237488100014161,
+  "stdout_sha256": "d942c2150bcb9adb8b23f999182af4e6bb0b21d286ac9cd34dcf9970f15166a9",
+  "stderr_sha256": "88df6d63267f0c1ec24e9ebf5623a7b14bf2060a50d1fadc883e0bab275a1c95",
+  "stdout": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]\r\nSURVIVED_DIAGNOSTIC_INTERVAL\r\n",
+  "stderr": "Timeout (0:00:15)!\nThread 0x00016ac8 (most recent call first):\n  File \"C:\\h\\node-completeness-audit\\windows-collector-examination\\timer_fixture.py\", line 5 in <module>\n"
+}
