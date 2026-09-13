@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "status": "UNVERIFIED_DRAFT",
+  "base_commit": "b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac",
+  "base_tree": "6fb9b59c4c697ae9b9bc296676783f8ce662f3c0",
+  "branch": "codex/unverified-campaign-continuity",
+  "license": "MIT",
+  "candidate": "separate post-merge campaign continuity",
+  "authored_by": "promotion_builder session with root documentation",
+  "tests_executed": false,
+  "static_checks_executed": false,
+  "independent_verification_performed": false,
+  "tournament_performed": false,
+  "production_wiring": false,
+  "published": false,
+  "artifacts": [
+    {
+      "path": "src/hive_mind_os/campaign_continuity.py",
+      "worktree_sha256": "d6f68c02152b6e581374f7138c86ad0448849da22ec944a1c020f6120cc5351d",
+      "git_blob": "9d0e4fc70590018a1845a51b4971cf1c9cb2a443",
+      "bytes": 23002
+    },
+    {
+      "path": "tests/test_campaign_continuity.py",
+      "worktree_sha256": "5a42daa3e5cd32618e371e3f38622aea108a3f7768e444ca764d876db0acdff2",
+      "git_blob": "78beb657d20da25a063af1dacf4933bd00647b1c",
+      "bytes": 16912
+    },
+    {
+      "path": "docs/architecture/ADR-UNVERIFIED-CAMPAIGN-CONTINUITY.md",
+      "worktree_sha256": "1f11936396a8e5c9457b9c6e8a39ed20bb18fc55f428f8498ddde8d81b2737ad",
+      "git_blob": "9a9c68b1bd8465f7e20234d5eac3af3cfc0b2bfa",
+      "bytes": 7205
+    },
+    {
+      "path": "UNVERIFIED-CONTINUITY-DRAFT.md",
+      "worktree_sha256": "230c765119f9c2a6ada631720b74fb431bcbbef068ed7b1f7be83147b7a40e57",
+      "git_blob": "898b8b966f52278593996855ee55acec1892399b",
+      "bytes": 2501
+    }
+  ],
+  "outstanding": [
+    "Execute acceptance tests and complete platform matrix",
+    "Independent implementation and threat review",
+    "Authenticated adapter authority and real evidence verification",
+    "Adapter timeout enforcement",
+    "Multi-process fault injection and power-loss durability",
+    "Journal custody and filesystem hard-link support",
+    "Migration, rollback and live adapter qualification"
+  ]
+}
