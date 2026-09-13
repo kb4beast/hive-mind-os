@@ -11,7 +11,7 @@ from unittest import mock
 
 from hive_mind_os.dag_executor import ExecutionJournal
 from hive_mind_os.portable_plan import NonRepositorySubject, SubjectBinding
-from hive_mind_os.runtime_contracts import raw_sha256
+from hive_mind_os.runtime_contracts import ContractViolation, raw_sha256
 from hive_mind_os.subject_execution import (
     SubjectExecutionError,
     SubjectExecutionMode,
@@ -103,6 +103,100 @@ class SubjectExecutionTests(unittest.TestCase):
             self.assertFalse(
                 (root / f".{raced_output.name}.{os.getpid()}.tmp").exists()
             )
+
+    def test_build_rejects_identity_and_digest_expectations_before_output_mutation(
+        self,
+    ) -> None:
+        plan = compiler_plan()
+        wrong = raw_sha256(b"another request or subject")
+        cases = (
+            ("expected_request_id", wrong, "request binding is stale or substituted"),
+            ("expected_subject_id", wrong, "subject binding is stale or substituted"),
+            ("expected_request_id", "not-a-digest", "expected request_id must be lowercase sha256"),
+            ("expected_subject_id", "not-a-digest", "expected subject_id must be lowercase sha256"),
+            ("expected_plan_digest", "not-a-digest", "expected plan digest must be lowercase sha256"),
+        )
+        for field, value, message in cases:
+            for exists, replace_existing in (
+                (False, False), (False, True), (True, False), (True, True)
+            ):
+                with self.subTest(
+                    field=field, value=value, exists=exists,
+                    replace_existing=replace_existing,
+                ):
+                    with tempfile.TemporaryDirectory() as temporary:
+                        root = Path(temporary)
+                        proposal = root / "proposal.json"
+                        standard = root / "standard.md"
+                        output = root / "sealed.json"
+                        proposal.write_bytes(plan.canonical_bytes())
+                        standard.write_bytes(STANDARD)
+                        if exists:
+                            output.write_bytes(b"existing output must remain byte-identical\r\n")
+                        before = {path.name: path.read_bytes() for path in root.iterdir()}
+                        arguments = {
+                            "expected_plan_digest": plan.digest(),
+                            field: value,
+                        }
+                        with self.assertRaisesRegex(ContractViolation, message):
+                            SubjectExecutionService().build_file(
+                                plan_path=proposal.resolve(),
+                                standard_path=standard.resolve(),
+                                output_path=output.resolve(),
+                                mode=SubjectExecutionMode.REPOSITORY,
+                                replace_existing=replace_existing,
+                                **arguments,
+                            )
+                        self.assertEqual(exists, output.exists())
+                        self.assertEqual(
+                            before,
+                            {path.name: path.read_bytes() for path in root.iterdir()},
+                        )
+                        self.assertFalse(list(root.glob(".*.tmp")))
+
+    def test_build_accepts_matching_independent_or_omitted_identity_expectations(
+        self,
+    ) -> None:
+        plan = compiler_plan()
+        cases = (
+            {},
+            {"expected_request_id": plan.request_id},
+            {"expected_subject_id": plan.subject.subject_id},
+            {
+                "expected_request_id": plan.request_id,
+                "expected_subject_id": plan.subject.subject_id,
+            },
+        )
+        for expectations in cases:
+            for exists in (False, True):
+                with self.subTest(expectations=expectations, exists=exists):
+                    with tempfile.TemporaryDirectory() as temporary:
+                        root = Path(temporary)
+                        proposal = root / "proposal.json"
+                        standard = root / "standard.md"
+                        output = root / "sealed.json"
+                        proposal.write_bytes(plan.canonical_bytes())
+                        standard.write_bytes(STANDARD)
+                        if exists:
+                            output.write_bytes(b"authorized local replacement")
+                        result = SubjectExecutionService().build_file(
+                            plan_path=proposal.resolve(),
+                            standard_path=standard.resolve(),
+                            expected_plan_digest=plan.digest(),
+                            output_path=output.resolve(),
+                            mode=SubjectExecutionMode.REPOSITORY,
+                            replace_existing=exists,
+                            **expectations,
+                        )
+                        self.assertEqual(plan.canonical_bytes(), output.read_bytes())
+                        self.assertEqual(plan.request_id, result.request_id)
+                        self.assertEqual(plan.subject.subject_id, result.subject_id)
+                        self.assertEqual(plan.digest(), result.plan_digest)
+                        self.assertEqual(
+                            {"proposal.json", "standard.md", "sealed.json"},
+                            {path.name for path in root.iterdir()},
+                        )
+                        self.assertFalse(list(root.glob(".*.tmp")))
 
     def test_build_preserves_unowned_temp_and_concurrent_builds_clean_only_their_own(self) -> None:
         plan = compiler_plan()

@@ -172,6 +172,105 @@ class PublicDagCliTests(unittest.TestCase):
             self.assertNotIn("dag execute", document["text"])
             self.assertFalse((root / "state").exists())
 
+    def test_build_identity_and_digest_refusals_preserve_absent_and_existing_outputs(
+        self,
+    ) -> None:
+        wrong = "sha256:" + sha256(b"another request or subject").hexdigest()
+        cases = (
+            ("--expected-request-id", wrong, "request binding is stale or substituted"),
+            ("--expected-subject-id", wrong, "subject binding is stale or substituted"),
+            ("--expected-request-id", "not-a-digest", "expected request_id must be lowercase sha256"),
+            ("--expected-subject-id", "not-a-digest", "expected subject_id must be lowercase sha256"),
+            ("--expected-plan-digest", "not-a-digest", "expected plan digest must be lowercase sha256"),
+        )
+        for flag, value, message in cases:
+            for exists, replace_existing in (
+                (False, False), (False, True), (True, False), (True, True)
+            ):
+                with self.subTest(
+                    flag=flag, value=value, exists=exists,
+                    replace_existing=replace_existing,
+                ):
+                    with tempfile.TemporaryDirectory() as temporary:
+                        root = Path(temporary)
+                        plan, standard, digest = self.fixture(root)
+                        output = root / "sealed.json"
+                        if exists:
+                            output.write_bytes(b"existing output must remain byte-identical\r\n")
+                        before = {path.name: path.read_bytes() for path in root.iterdir()}
+                        options = {
+                            "--plan": str(plan.resolve()),
+                            "--standard": str(standard.resolve()),
+                            "--expected-plan-digest": digest,
+                            "--output": str(output.resolve()),
+                            flag: value,
+                        }
+                        arguments = [
+                            "build",
+                            *(part for item in options.items() for part in item),
+                        ]
+                        if replace_existing:
+                            arguments.append("--replace")
+                        completed = self.run_cli(arguments, cwd=root)
+                        self.assertEqual(2, completed.returncode)
+                        self.assertEqual("", completed.stdout)
+                        blocked = json.loads(completed.stderr)
+                        self.assertEqual("BLOCKED", blocked["status"])
+                        self.assertIn("ContractViolation:", blocked["error"])
+                        self.assertIn(message, blocked["error"])
+                        self.assertEqual(exists, output.exists())
+                        self.assertEqual(
+                            before,
+                            {path.name: path.read_bytes() for path in root.iterdir()},
+                        )
+                        self.assertFalse(list(root.glob(".*.tmp")))
+
+    def test_build_matching_independent_or_omitted_identities_write_only_canonical_output(
+        self,
+    ) -> None:
+        expected = compiler_plan()
+        cases = (
+            [],
+            ["--expected-request-id", expected.request_id],
+            ["--expected-subject-id", expected.subject.subject_id],
+            [
+                "--expected-request-id", expected.request_id,
+                "--expected-subject-id", expected.subject.subject_id,
+            ],
+        )
+        for expectations in cases:
+            for exists in (False, True):
+                with self.subTest(expectations=expectations, exists=exists):
+                    with tempfile.TemporaryDirectory() as temporary:
+                        root = Path(temporary)
+                        plan, standard, digest = self.fixture(root)
+                        output = root / "sealed.json"
+                        if exists:
+                            output.write_bytes(b"authorized local replacement")
+                        arguments = [
+                            "build",
+                            "--plan", str(plan.resolve()),
+                            "--standard", str(standard.resolve()),
+                            "--expected-plan-digest", digest,
+                            "--output", str(output.resolve()),
+                            *expectations,
+                        ]
+                        if exists:
+                            arguments.append("--replace")
+                        completed = self.run_cli(arguments, cwd=root)
+                        self.assertEqual(0, completed.returncode, completed.stderr)
+                        self.assertEqual("", completed.stderr)
+                        document = json.loads(completed.stdout)
+                        self.assertEqual(expected.request_id, document["request_id"])
+                        self.assertEqual(expected.subject.subject_id, document["subject_id"])
+                        self.assertEqual(digest, document["plan_digest"])
+                        self.assertEqual(expected.canonical_bytes(), output.read_bytes())
+                        self.assertEqual(
+                            {"plan.json", "standard.md", "sealed.json"},
+                            {path.name for path in root.iterdir()},
+                        )
+                        self.assertFalse(list(root.glob(".*.tmp")))
+
     def test_relative_paths_are_not_silently_promoted_to_explicit_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

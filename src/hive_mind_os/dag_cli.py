@@ -143,6 +143,8 @@ def run_dag_command(
                 mode=arguments.mode,
                 output_path=Path(args.output),
                 replace_existing=args.replace,
+                expected_request_id=arguments.expected_request_id,
+                expected_subject_id=arguments.expected_subject_id,
             ).to_document()
         elif args.dag_command == "validate":
             result = {

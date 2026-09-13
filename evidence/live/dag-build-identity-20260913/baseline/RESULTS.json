@@ -1,0 +1,2124 @@
+{
+  "schema_version": 1,
+  "reviewer": "/root/delivery_curator",
+  "timestamp_utc": "2026-09-13T18:21:39.137615+00:00",
+  "subject_commit": "b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac",
+  "subject_tree": "6fb9b59c4c697ae9b9bc296676783f8ce662f3c0",
+  "status": "reproduced",
+  "python": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]",
+  "python_executable": "C:\\Python314\\python.exe",
+  "service_signature": "(*, plan_path: 'str | Path', standard_path: 'str | Path', expected_plan_digest: 'str', output_path: 'str | Path', mode: 'SubjectExecutionMode', replace_existing: 'bool' = False) -> 'PlanInspection'",
+  "actual_request_id": "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+  "actual_subject_id": "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf",
+  "plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+  "wrong_identity": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "results": [
+    {
+      "case": "validate_wrong_request",
+      "boundary": "CLI",
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.dag_cli",
+        "validate",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--expected-request-id",
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "cwd": "C:\\h\\node-completeness-audit\\baseline-reproduction",
+      "pythonpath": "C:\\h\\node-completeness-audit\\baseline-reproduction\\baseline\\src",
+      "returncode": 2,
+      "stdout": "",
+      "stderr": "{\"error\": \"ContractViolation: portable plan request binding is stale or substituted\", \"status\": \"BLOCKED\"}\n",
+      "stdout_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_utf8_sha256": "c6b68a4be1b0968245a9c395b5f489adb4ad2ad7f03a40adfe471ee0d6f68814",
+      "before": null,
+      "after": null
+    },
+    {
+      "case": "service_validate_wrong_request",
+      "boundary": "service",
+      "operation": "validate_files",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "expected_request_id": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "before": null,
+      "exception": {
+        "type": "ContractViolation",
+        "message": "portable plan request binding is stale or substituted"
+      },
+      "after": null
+    },
+    {
+      "case": "build_wrong_request_absent",
+      "boundary": "CLI",
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.dag_cli",
+        "build",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--expected-request-id",
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "--output",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\cli_wrong_request_absent.json"
+      ],
+      "cwd": "C:\\h\\node-completeness-audit\\baseline-reproduction",
+      "pythonpath": "C:\\h\\node-completeness-audit\\baseline-reproduction\\baseline\\src",
+      "returncode": 0,
+      "stdout": "{\n  \"compilation\": {\n    \"compiler_package_digest\": \"sha256:0fcd6b6882e29759fd32502e13619f4b0b0adc48ad307b20dc5defe138c08d0c\",\n    \"compiler_package_id\": \"hive-mind-portable-compiler-v1\",\n    \"lint_errors\": [],\n    \"lint_warnings\": [],\n    \"maximum_workers\": 4,\n    \"metrics\": {\n      \"dependency_level_count\": 4,\n      \"node_count\": 8,\n      \"raw_edge_count\": 6,\n      \"transitive_direct_edge_count\": 0\n    },\n    \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n    \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n    \"rounds\": [\n      {\n        \"dependency_level\": 0,\n        \"node_ids\": [\n          \"explorer\",\n          \"orchestrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 0\n      },\n      {\n        \"dependency_level\": 1,\n        \"node_ids\": [\n          \"architect\",\n          \"builder\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 1\n      },\n      {\n        \"dependency_level\": 2,\n        \"node_ids\": [\n          \"curator\",\n          \"integrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 2\n      },\n      {\n        \"dependency_level\": 3,\n        \"node_ids\": [\n          \"optimizer\",\n          \"steward\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 3\n      }\n    ],\n    \"standard_digest\": \"sha256:0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776\",\n    \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\"\n  },\n  \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n  \"plan_id\": \"portable-plan\",\n  \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n  \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\",\n  \"subject_kind\": \"repository\"\n}\n",
+      "stderr": "",
+      "stdout_utf8_sha256": "9133de99422c2a4c234b728bfc507211f5acb9d5ee25f8feb32d68270ee22507",
+      "stderr_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      },
+      "after": {
+        "exists": true,
+        "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "canonical_plan": true
+      }
+    },
+    {
+      "case": "service_build_wrong_request_absent",
+      "boundary": "service",
+      "operation": "build_file",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "expected_request_id": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "output_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\service_wrong_request_absent.json",
+        "replace_existing": "False"
+      },
+      "before": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      },
+      "exception": {
+        "type": "TypeError",
+        "message": "SubjectExecutionService.build_file() got an unexpected keyword argument 'expected_request_id'"
+      },
+      "after": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      }
+    },
+    {
+      "case": "build_wrong_request_existing",
+      "boundary": "CLI",
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.dag_cli",
+        "build",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--expected-request-id",
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "--output",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\cli_wrong_request_existing.json",
+        "--replace"
+      ],
+      "cwd": "C:\\h\\node-completeness-audit\\baseline-reproduction",
+      "pythonpath": "C:\\h\\node-completeness-audit\\baseline-reproduction\\baseline\\src",
+      "returncode": 0,
+      "stdout": "{\n  \"compilation\": {\n    \"compiler_package_digest\": \"sha256:0fcd6b6882e29759fd32502e13619f4b0b0adc48ad307b20dc5defe138c08d0c\",\n    \"compiler_package_id\": \"hive-mind-portable-compiler-v1\",\n    \"lint_errors\": [],\n    \"lint_warnings\": [],\n    \"maximum_workers\": 4,\n    \"metrics\": {\n      \"dependency_level_count\": 4,\n      \"node_count\": 8,\n      \"raw_edge_count\": 6,\n      \"transitive_direct_edge_count\": 0\n    },\n    \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n    \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n    \"rounds\": [\n      {\n        \"dependency_level\": 0,\n        \"node_ids\": [\n          \"explorer\",\n          \"orchestrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 0\n      },\n      {\n        \"dependency_level\": 1,\n        \"node_ids\": [\n          \"architect\",\n          \"builder\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 1\n      },\n      {\n        \"dependency_level\": 2,\n        \"node_ids\": [\n          \"curator\",\n          \"integrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 2\n      },\n      {\n        \"dependency_level\": 3,\n        \"node_ids\": [\n          \"optimizer\",\n          \"steward\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 3\n      }\n    ],\n    \"standard_digest\": \"sha256:0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776\",\n    \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\"\n  },\n  \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n  \"plan_id\": \"portable-plan\",\n  \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n  \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\",\n  \"subject_kind\": \"repository\"\n}\n",
+      "stderr": "",
+      "stdout_utf8_sha256": "9133de99422c2a4c234b728bfc507211f5acb9d5ee25f8feb32d68270ee22507",
+      "stderr_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "exists": true,
+        "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b",
+        "canonical_plan": false
+      },
+      "after": {
+        "exists": true,
+        "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "canonical_plan": true
+      }
+    },
+    {
+      "case": "service_build_wrong_request_existing",
+      "boundary": "service",
+      "operation": "build_file",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "expected_request_id": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "output_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\service_wrong_request_existing.json",
+        "replace_existing": "True"
+      },
+      "before": {
+        "exists": true,
+        "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b",
+        "canonical_plan": false
+      },
+      "exception": {
+        "type": "TypeError",
+        "message": "SubjectExecutionService.build_file() got an unexpected keyword argument 'expected_request_id'"
+      },
+      "after": {
+        "exists": true,
+        "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b",
+        "canonical_plan": false
+      }
+    },
+    {
+      "case": "validate_wrong_subject",
+      "boundary": "CLI",
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.dag_cli",
+        "validate",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--expected-subject-id",
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "cwd": "C:\\h\\node-completeness-audit\\baseline-reproduction",
+      "pythonpath": "C:\\h\\node-completeness-audit\\baseline-reproduction\\baseline\\src",
+      "returncode": 2,
+      "stdout": "",
+      "stderr": "{\"error\": \"ContractViolation: portable plan subject binding is stale or substituted\", \"status\": \"BLOCKED\"}\n",
+      "stdout_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_utf8_sha256": "1a0844aa6de5f532717afcafae2ba2bfae579881e6b4cb98e430861409ad8bd7",
+      "before": null,
+      "after": null
+    },
+    {
+      "case": "service_validate_wrong_subject",
+      "boundary": "service",
+      "operation": "validate_files",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "expected_subject_id": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "before": null,
+      "exception": {
+        "type": "ContractViolation",
+        "message": "portable plan subject binding is stale or substituted"
+      },
+      "after": null
+    },
+    {
+      "case": "build_wrong_subject_absent",
+      "boundary": "CLI",
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.dag_cli",
+        "build",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--expected-subject-id",
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "--output",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\cli_wrong_subject_absent.json"
+      ],
+      "cwd": "C:\\h\\node-completeness-audit\\baseline-reproduction",
+      "pythonpath": "C:\\h\\node-completeness-audit\\baseline-reproduction\\baseline\\src",
+      "returncode": 0,
+      "stdout": "{\n  \"compilation\": {\n    \"compiler_package_digest\": \"sha256:0fcd6b6882e29759fd32502e13619f4b0b0adc48ad307b20dc5defe138c08d0c\",\n    \"compiler_package_id\": \"hive-mind-portable-compiler-v1\",\n    \"lint_errors\": [],\n    \"lint_warnings\": [],\n    \"maximum_workers\": 4,\n    \"metrics\": {\n      \"dependency_level_count\": 4,\n      \"node_count\": 8,\n      \"raw_edge_count\": 6,\n      \"transitive_direct_edge_count\": 0\n    },\n    \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n    \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n    \"rounds\": [\n      {\n        \"dependency_level\": 0,\n        \"node_ids\": [\n          \"explorer\",\n          \"orchestrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 0\n      },\n      {\n        \"dependency_level\": 1,\n        \"node_ids\": [\n          \"architect\",\n          \"builder\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 1\n      },\n      {\n        \"dependency_level\": 2,\n        \"node_ids\": [\n          \"curator\",\n          \"integrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 2\n      },\n      {\n        \"dependency_level\": 3,\n        \"node_ids\": [\n          \"optimizer\",\n          \"steward\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 3\n      }\n    ],\n    \"standard_digest\": \"sha256:0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776\",\n    \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\"\n  },\n  \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n  \"plan_id\": \"portable-plan\",\n  \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n  \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\",\n  \"subject_kind\": \"repository\"\n}\n",
+      "stderr": "",
+      "stdout_utf8_sha256": "9133de99422c2a4c234b728bfc507211f5acb9d5ee25f8feb32d68270ee22507",
+      "stderr_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      },
+      "after": {
+        "exists": true,
+        "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "canonical_plan": true
+      }
+    },
+    {
+      "case": "service_build_wrong_subject_absent",
+      "boundary": "service",
+      "operation": "build_file",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "expected_subject_id": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "output_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\service_wrong_subject_absent.json",
+        "replace_existing": "False"
+      },
+      "before": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      },
+      "exception": {
+        "type": "TypeError",
+        "message": "SubjectExecutionService.build_file() got an unexpected keyword argument 'expected_subject_id'"
+      },
+      "after": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      }
+    },
+    {
+      "case": "build_wrong_subject_existing",
+      "boundary": "CLI",
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.dag_cli",
+        "build",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--expected-subject-id",
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "--output",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\cli_wrong_subject_existing.json",
+        "--replace"
+      ],
+      "cwd": "C:\\h\\node-completeness-audit\\baseline-reproduction",
+      "pythonpath": "C:\\h\\node-completeness-audit\\baseline-reproduction\\baseline\\src",
+      "returncode": 0,
+      "stdout": "{\n  \"compilation\": {\n    \"compiler_package_digest\": \"sha256:0fcd6b6882e29759fd32502e13619f4b0b0adc48ad307b20dc5defe138c08d0c\",\n    \"compiler_package_id\": \"hive-mind-portable-compiler-v1\",\n    \"lint_errors\": [],\n    \"lint_warnings\": [],\n    \"maximum_workers\": 4,\n    \"metrics\": {\n      \"dependency_level_count\": 4,\n      \"node_count\": 8,\n      \"raw_edge_count\": 6,\n      \"transitive_direct_edge_count\": 0\n    },\n    \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n    \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n    \"rounds\": [\n      {\n        \"dependency_level\": 0,\n        \"node_ids\": [\n          \"explorer\",\n          \"orchestrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 0\n      },\n      {\n        \"dependency_level\": 1,\n        \"node_ids\": [\n          \"architect\",\n          \"builder\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 1\n      },\n      {\n        \"dependency_level\": 2,\n        \"node_ids\": [\n          \"curator\",\n          \"integrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 2\n      },\n      {\n        \"dependency_level\": 3,\n        \"node_ids\": [\n          \"optimizer\",\n          \"steward\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 3\n      }\n    ],\n    \"standard_digest\": \"sha256:0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776\",\n    \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\"\n  },\n  \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n  \"plan_id\": \"portable-plan\",\n  \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n  \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\",\n  \"subject_kind\": \"repository\"\n}\n",
+      "stderr": "",
+      "stdout_utf8_sha256": "9133de99422c2a4c234b728bfc507211f5acb9d5ee25f8feb32d68270ee22507",
+      "stderr_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "exists": true,
+        "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b",
+        "canonical_plan": false
+      },
+      "after": {
+        "exists": true,
+        "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "canonical_plan": true
+      }
+    },
+    {
+      "case": "service_build_wrong_subject_existing",
+      "boundary": "service",
+      "operation": "build_file",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "expected_subject_id": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "output_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\service_wrong_subject_existing.json",
+        "replace_existing": "True"
+      },
+      "before": {
+        "exists": true,
+        "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b",
+        "canonical_plan": false
+      },
+      "exception": {
+        "type": "TypeError",
+        "message": "SubjectExecutionService.build_file() got an unexpected keyword argument 'expected_subject_id'"
+      },
+      "after": {
+        "exists": true,
+        "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b",
+        "canonical_plan": false
+      }
+    },
+    {
+      "case": "service_build_omitted_False",
+      "boundary": "service",
+      "operation": "build_file",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "output_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\service_omitted_False.json",
+        "replace_existing": "False"
+      },
+      "before": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      },
+      "result": {
+        "plan_id": "portable-plan",
+        "plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "request_id": "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+        "subject_id": "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf",
+        "subject_kind": "repository",
+        "compilation": {
+          "plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+          "request_id": "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+          "subject_id": "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf",
+          "standard_digest": "sha256:0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776",
+          "compiler_package_id": "hive-mind-portable-compiler-v1",
+          "compiler_package_digest": "sha256:0fcd6b6882e29759fd32502e13619f4b0b0adc48ad307b20dc5defe138c08d0c",
+          "maximum_workers": 4,
+          "metrics": {
+            "node_count": 8,
+            "raw_edge_count": 6,
+            "dependency_level_count": 4,
+            "transitive_direct_edge_count": 0
+          },
+          "rounds": [
+            {
+              "round_index": 0,
+              "dependency_level": 0,
+              "node_ids": [
+                "explorer",
+                "orchestrator"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            },
+            {
+              "round_index": 1,
+              "dependency_level": 1,
+              "node_ids": [
+                "architect",
+                "builder"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            },
+            {
+              "round_index": 2,
+              "dependency_level": 2,
+              "node_ids": [
+                "curator",
+                "integrator"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            },
+            {
+              "round_index": 3,
+              "dependency_level": 3,
+              "node_ids": [
+                "optimizer",
+                "steward"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            }
+          ],
+          "lint_errors": [],
+          "lint_warnings": []
+        }
+      },
+      "exception": null,
+      "after": {
+        "exists": true,
+        "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "canonical_plan": true
+      }
+    },
+    {
+      "case": "service_build_omitted_True",
+      "boundary": "service",
+      "operation": "build_file",
+      "arguments": {
+        "plan_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "standard_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "expected_plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "mode": "repository",
+        "output_path": "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\service_omitted_True.json",
+        "replace_existing": "True"
+      },
+      "before": {
+        "exists": true,
+        "sha256": "ed5a368ded6f67bf76bb1f850fcb28183f6ad677e8698eec0b789cf4850fdf4b",
+        "canonical_plan": false
+      },
+      "result": {
+        "plan_id": "portable-plan",
+        "plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "request_id": "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+        "subject_id": "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf",
+        "subject_kind": "repository",
+        "compilation": {
+          "plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+          "request_id": "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+          "subject_id": "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf",
+          "standard_digest": "sha256:0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776",
+          "compiler_package_id": "hive-mind-portable-compiler-v1",
+          "compiler_package_digest": "sha256:0fcd6b6882e29759fd32502e13619f4b0b0adc48ad307b20dc5defe138c08d0c",
+          "maximum_workers": 4,
+          "metrics": {
+            "node_count": 8,
+            "raw_edge_count": 6,
+            "dependency_level_count": 4,
+            "transitive_direct_edge_count": 0
+          },
+          "rounds": [
+            {
+              "round_index": 0,
+              "dependency_level": 0,
+              "node_ids": [
+                "explorer",
+                "orchestrator"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            },
+            {
+              "round_index": 1,
+              "dependency_level": 1,
+              "node_ids": [
+                "architect",
+                "builder"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            },
+            {
+              "round_index": 2,
+              "dependency_level": 2,
+              "node_ids": [
+                "curator",
+                "integrator"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            },
+            {
+              "round_index": 3,
+              "dependency_level": 3,
+              "node_ids": [
+                "optimizer",
+                "steward"
+              ],
+              "resource_usage": {
+                "cpu": 2
+              }
+            }
+          ],
+          "lint_errors": [],
+          "lint_warnings": []
+        }
+      },
+      "exception": null,
+      "after": {
+        "exists": true,
+        "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "canonical_plan": true
+      }
+    },
+    {
+      "case": "build_matching",
+      "boundary": "CLI",
+      "command": [
+        "C:\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "hive_mind_os.dag_cli",
+        "build",
+        "--plan",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\plan.json",
+        "--standard",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\inputs\\standard.md",
+        "--expected-plan-digest",
+        "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "--expected-request-id",
+        "sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e",
+        "--expected-subject-id",
+        "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf",
+        "--output",
+        "C:\\h\\node-completeness-audit\\baseline-reproduction\\outputs\\cli_matching.json"
+      ],
+      "cwd": "C:\\h\\node-completeness-audit\\baseline-reproduction",
+      "pythonpath": "C:\\h\\node-completeness-audit\\baseline-reproduction\\baseline\\src",
+      "returncode": 0,
+      "stdout": "{\n  \"compilation\": {\n    \"compiler_package_digest\": \"sha256:0fcd6b6882e29759fd32502e13619f4b0b0adc48ad307b20dc5defe138c08d0c\",\n    \"compiler_package_id\": \"hive-mind-portable-compiler-v1\",\n    \"lint_errors\": [],\n    \"lint_warnings\": [],\n    \"maximum_workers\": 4,\n    \"metrics\": {\n      \"dependency_level_count\": 4,\n      \"node_count\": 8,\n      \"raw_edge_count\": 6,\n      \"transitive_direct_edge_count\": 0\n    },\n    \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n    \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n    \"rounds\": [\n      {\n        \"dependency_level\": 0,\n        \"node_ids\": [\n          \"explorer\",\n          \"orchestrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 0\n      },\n      {\n        \"dependency_level\": 1,\n        \"node_ids\": [\n          \"architect\",\n          \"builder\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 1\n      },\n      {\n        \"dependency_level\": 2,\n        \"node_ids\": [\n          \"curator\",\n          \"integrator\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 2\n      },\n      {\n        \"dependency_level\": 3,\n        \"node_ids\": [\n          \"optimizer\",\n          \"steward\"\n        ],\n        \"resource_usage\": {\n          \"cpu\": 2\n        },\n        \"round_index\": 3\n      }\n    ],\n    \"standard_digest\": \"sha256:0d7fe1cb5d5325879ff535ff7c907f5a4fda07f74c69f7871670de52fbce5776\",\n    \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\"\n  },\n  \"plan_digest\": \"sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e\",\n  \"plan_id\": \"portable-plan\",\n  \"request_id\": \"sha256:3b3cde5568d2cefb2530c266093b80573db5270cc53b54bcd46d284c123a0d9e\",\n  \"subject_id\": \"sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf\",\n  \"subject_kind\": \"repository\"\n}\n",
+      "stderr": "",
+      "stdout_utf8_sha256": "9133de99422c2a4c234b728bfc507211f5acb9d5ee25f8feb32d68270ee22507",
+      "stderr_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "exists": false,
+        "sha256": null,
+        "canonical_plan": false
+      },
+      "after": {
+        "exists": true,
+        "sha256": "fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+        "canonical_plan": true
+      }
+    }
+  ],
+  "source_bytes_unchanged": true,
+  "source_manifest": [
+    {
+      "path": "src/hive_mind_os/__init__.py",
+      "bytes": 8022,
+      "sha256": "3a26899120e10de16d09e8477e7c3b3b0f3f19679496d4fa849b55689953adf5",
+      "git_blob": "0c2068e66d3310706e953d644b0d206840f4381f"
+    },
+    {
+      "path": "src/hive_mind_os/acceptance.py",
+      "bytes": 5697,
+      "sha256": "c69d77aa9999358c659e682d868797500ee09b126abdb318158f160025e9467b",
+      "git_blob": "31582479d5e55af39ab82a1c7b08d6a907ec7a02"
+    },
+    {
+      "path": "src/hive_mind_os/activation_bundle.py",
+      "bytes": 48583,
+      "sha256": "0ffeb01440f06873016f49befcf829cbd107fd076eaf21de370e23ae2325ea80",
+      "git_blob": "9dedcfe585a53bf30a93688bd5d38a2d73ff9430"
+    },
+    {
+      "path": "src/hive_mind_os/adapter_registry.py",
+      "bytes": 11788,
+      "sha256": "79576c7965f777821bd6ddf0b66ca10db89911062291fda06876764a2084a4b8",
+      "git_blob": "31c0906e5c69c59a3a014434a31a1598474c17c3"
+    },
+    {
+      "path": "src/hive_mind_os/additional_video_docket.py",
+      "bytes": 6275,
+      "sha256": "8cf5c6067fb8b6db0c08893b2cfd417ec47d50b6c2864f13c74292c1068571ea",
+      "git_blob": "fc63cd9d28f35742db3e5edc4f4258eaf2d8cbce"
+    },
+    {
+      "path": "src/hive_mind_os/agents/__init__.py",
+      "bytes": 898,
+      "sha256": "1ab88b53a4f75c109c89758bbeaaa92f9cb31ce506a61669d24e18d1381089b7",
+      "git_blob": "99bf913ff91ed4d62a9c0861cdc6cbc218037353"
+    },
+    {
+      "path": "src/hive_mind_os/agents/architect.py",
+      "bytes": 893,
+      "sha256": "92db380ad21a96480d4b0e96990dc116db8f054c513b7e19a28b092d250ad777",
+      "git_blob": "3c29fe75b942fe719bb07e6954daa51e718fa3bb"
+    },
+    {
+      "path": "src/hive_mind_os/agents/base.py",
+      "bytes": 2271,
+      "sha256": "bb6523ee0d03207a7afbc854dd0d974719d32bc026703b5d98ef9358d58e85a4",
+      "git_blob": "423e73d3f3504d0302237e6b7f2af90a60d6fcbd"
+    },
+    {
+      "path": "src/hive_mind_os/agents/builder.py",
+      "bytes": 1132,
+      "sha256": "0ab44492bcdd63bf12312a243f9bc206834ca83cb633d3535df95326b48a3bf5",
+      "git_blob": "295c0d228517b79844f82fe239001483c9715e95"
+    },
+    {
+      "path": "src/hive_mind_os/agents/catalog.py",
+      "bytes": 1573,
+      "sha256": "95e7adf38e0d7d05b7c0a131b8ff7f0084d64b85d49bfc9df01aa0511a6de93b",
+      "git_blob": "ac6f89807fbb72f0102d9a66af6904fbcf2944b5"
+    },
+    {
+      "path": "src/hive_mind_os/agents/contracts.py",
+      "bytes": 1218,
+      "sha256": "6590390b946d2bd0fe2aa6647220ec5ef71f908763d9ef0e587bf17b66395b9b",
+      "git_blob": "e46d6bada1deb056db4f0ed804691ef4cee523c7"
+    },
+    {
+      "path": "src/hive_mind_os/agents/curator.py",
+      "bytes": 1106,
+      "sha256": "4f235d00a9809ba63cbfaa8af7fd5b29403fc6068b97d6e65425393bf1cf7d26",
+      "git_blob": "c98bc4b8ba3abecc5c47631887d870c1c601e2a3"
+    },
+    {
+      "path": "src/hive_mind_os/agents/explorer.py",
+      "bytes": 1017,
+      "sha256": "36b9c20f55bae07b8cbdce9641443f76854433bcc36dcd489c666003509158cd",
+      "git_blob": "09c2e8daca0f24a0a93b08f0d48071eacb70b64d"
+    },
+    {
+      "path": "src/hive_mind_os/agents/integrator.py",
+      "bytes": 931,
+      "sha256": "d20888eba6ac1c7c220998bd79d91338a299f496922e205ebed238ac5b68e759",
+      "git_blob": "b771afa56de971503f3021c8c9839081aac8ca4b"
+    },
+    {
+      "path": "src/hive_mind_os/agents/optimizer.py",
+      "bytes": 978,
+      "sha256": "eaa15997cd1b82d987862204bae502f22b75cd3d252473b53d2d98fd079abd31",
+      "git_blob": "f58523e89893acbc26cedc7e19e5ac3f1be39df3"
+    },
+    {
+      "path": "src/hive_mind_os/agents/orchestrator.py",
+      "bytes": 975,
+      "sha256": "2d7cec9711926e7b0ac564678c9fc638a233e4742bbaf210deac7b8ffe424889",
+      "git_blob": "cb268e97ec05bba28f3972c5285890736f7cf57c"
+    },
+    {
+      "path": "src/hive_mind_os/agents/steward.py",
+      "bytes": 955,
+      "sha256": "154270fb9c5daa715e7f55ced91b2b5a685e84b5f122b683550e5771b271fe1a",
+      "git_blob": "7dae9b3d1bc98e9d9be27dd391efce0cf9e5e22b"
+    },
+    {
+      "path": "src/hive_mind_os/autonomous_os.py",
+      "bytes": 58513,
+      "sha256": "f07df5d9aebc63d995e382f10c7bda6d40aef2b4f8b4ec432fd6876b0f92245a",
+      "git_blob": "304a6c992b414e9abf50998122f7f85c35559084"
+    },
+    {
+      "path": "src/hive_mind_os/autonomy.py",
+      "bytes": 13279,
+      "sha256": "9951eb6f99092688731ccf318cbc04ea8d9f53d99765845776f270ac40cd9d57",
+      "git_blob": "6ef39d55a1f7eb564a131edc95f0802384f4ba4a"
+    },
+    {
+      "path": "src/hive_mind_os/autopilot_workflow.py",
+      "bytes": 65878,
+      "sha256": "1e3e45eeb550d183ea68baa94f2e0f0cb6d7009fada3779ba6a51c763c5c043c",
+      "git_blob": "a4229c286d06bbd2850da397d9eccd1bfbadccb8"
+    },
+    {
+      "path": "src/hive_mind_os/benchmark_baseline.py",
+      "bytes": 2062,
+      "sha256": "4c275b95fdd8ae7e90f67d01460f2d2b5d8dd8829a577ebe9788f7f205426b7d",
+      "git_blob": "324b04c1c2b6955cd198e8debb6adc8577cef225"
+    },
+    {
+      "path": "src/hive_mind_os/benchmark_corpus.py",
+      "bytes": 12629,
+      "sha256": "422c871119d95fa0b2a6e0c976f7ecf69aa06118bbaaa9ce5f080100bbde6db7",
+      "git_blob": "6d402932668b70facbd86130ef41da9dd41b92a1"
+    },
+    {
+      "path": "src/hive_mind_os/benchmark_harness.py",
+      "bytes": 24157,
+      "sha256": "64c3b4cc7f46c6c3eb93401af0c0366da16b7e1dc8919027100f8832cd75a70b",
+      "git_blob": "e7489fb8d5dc41f0385a69809c358651b3e8e959"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/__init__.py",
+      "bytes": 4394,
+      "sha256": "1bb507c46717d0902425fc149894783cdb3c3901ffc39ba792c0b9717afff835",
+      "git_blob": "349ad147a2294dcc54baf1cd04b840d4337a79b2"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/architect.py",
+      "bytes": 8666,
+      "sha256": "3f416990e4a12ec7f96cd258e1267deba6fa1fa88f37fec76eaa57f2640932d5",
+      "git_blob": "8be5837dcdb738c1a06ddedb4e526844a7a075d0"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/authority.py",
+      "bytes": 18316,
+      "sha256": "40739b41bde118157b7e0ba670f6f65d1f6d708a92baf4573b989fa57316ba4c",
+      "git_blob": "5cc506ce26abaea887bd0d0edfe6aaae24f9aaf9"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/builder.py",
+      "bytes": 11006,
+      "sha256": "9022b03b0127da0965e3ae60b1c1cffd72090b79bbccd398ade7228b504e7ab0",
+      "git_blob": "d7dd1c30876e65dcf9b6f609b42e81f3d0a62e75"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/candidate_state.py",
+      "bytes": 21596,
+      "sha256": "5dcd76036a0820ffb0817d75540d3844e0d39ecffe454b1434dc836106f3ea4d",
+      "git_blob": "5ae6ad500cb3f5ac477e4d84ae613fa1c36e1bef"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/canonical.py",
+      "bytes": 1365,
+      "sha256": "bebc339b3b4b3f9242eac6b799f2db438f4d5e1e81579b4645a573487ddbd34c",
+      "git_blob": "24b460c598b9eac89c58a01a94aef13dc33d93ba"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/challengers.py",
+      "bytes": 17605,
+      "sha256": "79b2cbf9d714f2b558ffd282e2d6e96581095ed25aded0d3359ca5d829db3b85",
+      "git_blob": "f1baf53b8b46b9a31b505d3114dfc8e9084d3919"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/closeout.py",
+      "bytes": 12444,
+      "sha256": "fe3c8cb37184c0aa06df0e32f007cd3f769993c997aff2849ade53d44cdf1429",
+      "git_blob": "2f5b773308d3bb5edd620ae8cfef8f0dd7905e93"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/consultation.py",
+      "bytes": 21279,
+      "sha256": "ebfda1ca77d104c66f2507f662f5b9173cdd9e3dd21e210559ca815e05bd1574",
+      "git_blob": "d8022146adc42ab2be3a99ffd704f6214c3436fc"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/context.py",
+      "bytes": 28026,
+      "sha256": "9b0d39e989aebe3415c396521fcc7e7da6e968ab3795b8b12b28fdb78e070442",
+      "git_blob": "d16ef985cf4832de3186ebd65256040dcc42eedb"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/contracts.py",
+      "bytes": 25544,
+      "sha256": "aadef71c83d255bb48b95b3721b32c3466889f40342e0427833bea7a7fc5efdb",
+      "git_blob": "148450e241c25d00dccd7fc6b558dd5a0fe8410e"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/court_runtime.py",
+      "bytes": 12180,
+      "sha256": "2089142ce490f2eda4e5f23acc2354d6c7436af9d6b4db65ba6681fa8e1677ad",
+      "git_blob": "cef6804c65ae5d2d2cd6d9e87fde41247e2c1ae6"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/curator_runtime.py",
+      "bytes": 13477,
+      "sha256": "19ac2dd51898d18db3e580e1c917fcc8115b72609d5de435721033b2bb79fdc6",
+      "git_blob": "f7db1a689c01a6b3939c974237bf4570568b26d3"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/doctor.py",
+      "bytes": 12389,
+      "sha256": "6ab8d1693c09038bbd2a0b532f269f70c4fde427a39f01f9329cedd8745d3bee",
+      "git_blob": "660d0bf7e2cf49876a1d0e0009ae4eb622c4cc3f"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/effect_outbox.py",
+      "bytes": 10399,
+      "sha256": "51d0e7a15f47c737bc9d805d1817d31c15da9fc2f879109755f10619e21bb745",
+      "git_blob": "181c907832fe83ff8859cb2a1fcccaba06fef8fa"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/effects.py",
+      "bytes": 8618,
+      "sha256": "e832bc10a628d01be14926e7d977cd5650ddec044382797527395aa397ecd741",
+      "git_blob": "94f83ebbfb9c741b06c529d572406dbf3c746cb9"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/evaluation_admission.py",
+      "bytes": 21412,
+      "sha256": "8ed1479eec42407e232f55ca73f33796f6871017688f700fce2f6d9cb35bc950",
+      "git_blob": "0243b7fcfa990fe4f1231ca1cbcc6d7d8c1a4aae"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/evaluation_runtime.py",
+      "bytes": 33549,
+      "sha256": "ccfc472335b9ce910aafab7ab8f39ed709ea2c189d3dde100ef96013221c92d9",
+      "git_blob": "04cde64ec39d869b422bcd7d660bf048559dbef6"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/events.py",
+      "bytes": 2093,
+      "sha256": "83ba4a03f6f612bce9a2c2770990f56024e81b5014e13f657e8a24e824a05881",
+      "git_blob": "f50790ef776851f38afed8fb1bfdc1e0db9af2b5"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/explorer.py",
+      "bytes": 13564,
+      "sha256": "79c17fbc3a4a27933090a7a5def8602bb35715791d041e9058d00d56c26480ca",
+      "git_blob": "d40d491399244be1c43956971828a2d21f7d4a81"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/integrator.py",
+      "bytes": 11865,
+      "sha256": "6c0ee1f0ca67f959b9dbe4307637d3f445f7ce5e996778feb752f4a9052f4539",
+      "git_blob": "3e94d7545f12e3e92e8becd1e1f65d1e39fbef8e"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/learning_runtime.py",
+      "bytes": 18619,
+      "sha256": "a0139a0751651e1f941d549324a25ac1caa9e71da9277a72994540b870f1342d",
+      "git_blob": "dcd8070e01d2b044cc77371e7716d35a498cab02"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/local_assurance.py",
+      "bytes": 12580,
+      "sha256": "5dc0a427b0bf2f514846fecefb7f0ec8e1a108d09778f462472883b8e9d2217c",
+      "git_blob": "10c019fa7cf258622118a00c5c76c1df76a58fd4"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/memory.py",
+      "bytes": 35317,
+      "sha256": "65b358bb8e163de64e117c57168352081c215f72c5eea140cc87287a2a5cbd2b",
+      "git_blob": "db2994398f3b9d3489c98ffbfa831557e150d489"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/mission_runtime.py",
+      "bytes": 18027,
+      "sha256": "ba34272c529ed1b8ecda894e0efb06e171ea12ee21e951533a3c521d99c778dc",
+      "git_blob": "30b5338081df2f41be479396f57fcfd7eaba5bfd"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/objectives.py",
+      "bytes": 6258,
+      "sha256": "d8c3993fb3d5b8084843a0d6eb22c296f750871f0230e800cac61402ca81d5f5",
+      "git_blob": "079c5f27e9a99f2817a51126817962cd6602bf2b"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/optimizer.py",
+      "bytes": 14512,
+      "sha256": "6c3b18a28fd248a5324e3da989221d86a36b91a7ea9b395508529a63dace4b03",
+      "git_blob": "6678c93bcb7b79e28cc3e42ab32adbb833a76200"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/planner.py",
+      "bytes": 29809,
+      "sha256": "5642cc00e6f4d94828184069d70de66763119e427f5c93c354005b7ce1636673",
+      "git_blob": "188fb04d616cd2ab4f3813511455145a3f71db4b"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/projection.py",
+      "bytes": 12247,
+      "sha256": "3532c1aa9be2f8792b134fcd943ba7acca77ad13522936e581124a6e38c2b701",
+      "git_blob": "764af4f4487ca37e2a9da2fa6394ed2d984eb92d"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/promotion.py",
+      "bytes": 34684,
+      "sha256": "19a0a30d8acf7df349f342c9f7b68ba1645182ca2505904e34ce9837baa86a22",
+      "git_blob": "d77273dde5d33268cb8569568428334027fef5ca"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/promotion_auth.py",
+      "bytes": 20329,
+      "sha256": "6f37a61dd1b32363d4df0962a21500df75d4949fa2801dc9ca7657914808e27d",
+      "git_blob": "e2518aaa197bdfa05e59331f33e4158f015a98f8"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/reconciler.py",
+      "bytes": 22919,
+      "sha256": "25923a84c4f60a82f810a27b58561b503b2b5cc1797037e4a5e2a97364e0f943",
+      "git_blob": "401a0658e2a5e35038dd06bb804008791631bcb5"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/role_applicability.py",
+      "bytes": 12863,
+      "sha256": "9f84c8ccdc336d64a81873e79afb345ea9f0791acafaa8a45515a03a8c2e24f2",
+      "git_blob": "a79ca6a800c8facc3cc2f1e15c8f59fd12e37869"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/role_runtime.py",
+      "bytes": 18844,
+      "sha256": "3d1d8998272466a77118e04aa6ddd43eb668e038f9c582388364981c47bf7c8a",
+      "git_blob": "5489932cdbd56fc2e98d2ce6533e86d4417839bf"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/roles.py",
+      "bytes": 6306,
+      "sha256": "b7452f85c7e8168a55bb2726e717b65220eb9cff1b4bd472df432292aa5de652",
+      "git_blob": "039ebb00a8564c98a285ffbd5fafeef739c36763"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/self_healing.py",
+      "bytes": 12723,
+      "sha256": "ff2d016ba91fa2e71b2e1481e2dc1cf5cee80bb86b0dc1e94ce63f003b6991e6",
+      "git_blob": "69d62ac5e47a7552c48ce34d9461a3f1790ece67"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/steward.py",
+      "bytes": 15137,
+      "sha256": "21f3e59a0383dc24479098a3721efd6332cfac63ef60e7a6ec319e83f6dc7632",
+      "git_blob": "bb0e8a5e7417f29e423906d9d1f0f16d096a9195"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/store.py",
+      "bytes": 31254,
+      "sha256": "9d07bdaaed090982c637da36d7f8cfbaa2d0ec50df09d939d7e01fc413d95410",
+      "git_blob": "731513e3792223213065630b0e86d6bff2f6c900"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/verification.py",
+      "bytes": 12075,
+      "sha256": "850b9cc5f666ebcc6f3e7d0cea0c2e1d44e55d3d2ff08812efcf9f357f663e7b",
+      "git_blob": "4ac44a95b214a132e740cfd8d12009517afd1104"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/workers.py",
+      "bytes": 5172,
+      "sha256": "cd76a8c9e7d7005a881f99c8b619e834eba7ea5c35c86050029d4e24cd161cc5",
+      "git_blob": "7a10423dd59cd1ff201438d6cb467f7b62a20538"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/architect.json",
+      "bytes": 558,
+      "sha256": "de8d92ed357193fcaab05c74200964960db3d89eb12796210f84ea1c058c0cac",
+      "git_blob": "5a0f40b6ca2e9cc1bc4c9b51959b2401cad9ec78"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/builder.json",
+      "bytes": 586,
+      "sha256": "52d272dede937c4ca789edea1ad72816033cf375d28cde3a5a23a65888093801",
+      "git_blob": "99919f1bcfec12103a6687010c71fb397f116e47"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/curator.json",
+      "bytes": 585,
+      "sha256": "b9f575fc62016c93a91835cf2124d24f2fed024db39d2259e129f866d6d4138d",
+      "git_blob": "d7b2cb69f4486fa7011032f695b401ce5ebffd10"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/explorer.json",
+      "bytes": 598,
+      "sha256": "598306e1ba06081ff71fe07309d8ab489fe741ffd756954af74b5fe0a7eb748e",
+      "git_blob": "001a2a4c60b6ab27702a85ede3de1f5eb66a2433"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/integrator.json",
+      "bytes": 560,
+      "sha256": "de64896e73f9cb8be2138bd07f7af8587f0f274e90c3d970828fcda733fad064",
+      "git_blob": "eb84a817e8ba605642d21526ffd9be6a85edb519"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/optimizer.json",
+      "bytes": 568,
+      "sha256": "2be607b3edc2b70fcbd010e22526e139b55f563d880333942d358f1274263a5c",
+      "git_blob": "f0c58c2116249231bb0c984599dfaf2f8dbda8ad"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/orchestrator.json",
+      "bytes": 586,
+      "sha256": "30f5693f9f47579fbe10fca60461da6f06c089a5e2140f0a0e40f6504ab41f7b",
+      "git_blob": "bf78e3a9f4dae3e1f16bfa71b5a6d0c4bd9c9939"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/agents/steward.json",
+      "bytes": 553,
+      "sha256": "eee04363ca28417abf3d20524ad10e71eea90424599757890000ef01d8c278ba",
+      "git_blob": "79efb802052f498d00adfc3d8821cfb69b1bbea1"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/host_profiles/claude-code.json",
+      "bytes": 779,
+      "sha256": "ae72ff74e042752e98a5762ee471e2c64c9ae165c7c5c7e16b1e567e0a86bb49",
+      "git_blob": "b47f25fc75ab168b464b79d41404cb2b956d9935"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/host_profiles/codex.json",
+      "bytes": 770,
+      "sha256": "8d5acac91f357f351a6e0bedfffca1ca3b4c9eac18d18dc90fdf357f85f2671b",
+      "git_blob": "c1197b1417bef70d511a5cb621e17182228b2715"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/host_profiles/hermes.json",
+      "bytes": 607,
+      "sha256": "dc4e89e665b3c148958d375fe531f4d5d16eb98db37d65587e2884eb46e67170",
+      "git_blob": "b768095b49c7470d1c7df7dcb56463ecb89460af"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/package.json",
+      "bytes": 11060,
+      "sha256": "0f3c76b589f428358cb5a7bc78bf98b7930c7a58bb60f94ead2af5c4f95e7c97",
+      "git_blob": "5cd48f4e0d13aa8be12878066d381c9425dc6032"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/architect.json",
+      "bytes": 140,
+      "sha256": "5016b2e55213d1efc47adb81d09e6650a45778565861c6d1a988edd7df07e85e",
+      "git_blob": "c11196507481f0e49528d3fac300ab926b809e9c"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/builder.json",
+      "bytes": 141,
+      "sha256": "1ccb8900cdb41661c48896e95a68578bf824479f43f813300923767d83057a0d",
+      "git_blob": "744b6dcca88dd9fa6e934d8fe060843446bae8ec"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/curator.json",
+      "bytes": 147,
+      "sha256": "646d47db0a81705c21451c53c43aba517cdf57261c8e26b3862642d3180afa1e",
+      "git_blob": "7551847407aae8c20f9b2a270de7a0b36efd20c9"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/explorer.json",
+      "bytes": 124,
+      "sha256": "51c127736d01af02cc7c6029a3a4ec7a0abe74b7825223ce9557dfe47f7fb704",
+      "git_blob": "17d3c2284eaeda5f468e84752ec86f93c3ed4152"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/integrator.json",
+      "bytes": 136,
+      "sha256": "02532393862a07bc67fc81149b6e7ee7f03543fdd31b83bec474f10233d68175",
+      "git_blob": "5ab2f12fcd72e1889a050aba2f2ae48226f197ae"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/optimizer.json",
+      "bytes": 145,
+      "sha256": "4cd1a8e732a799b9807f89c5b81577dfd7f00b004b18fd0a35aecfe39f4a2fa8",
+      "git_blob": "084bb61f1ca2206b55374a537e66047bcc3b31fa"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/orchestrator.json",
+      "bytes": 147,
+      "sha256": "21a22117132696f50c750bc38dd3c97c34d084f73e7ca72cd88e0b294a69f66f",
+      "git_blob": "482abbab203adde27f99868bc47548fa6c321294"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/prompts/steward.json",
+      "bytes": 133,
+      "sha256": "122bdc5b9ef15105b5792eab9fce523779037d6629d20806ed5e8ab3a93c7362",
+      "git_blob": "88c56ef46a8a19a65993188b5e4a27064a324397"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/architect.json",
+      "bytes": 419,
+      "sha256": "a3e43fbba9a6baacdb904c232f2a5e476517b85ffb7c5246fdebbd6574ec4f71",
+      "git_blob": "c34fd9c902667a68c4a0152ad45a1962b938bd16"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/builder.json",
+      "bytes": 440,
+      "sha256": "1fbff9566b77d83718d7390377d9ab1be289df67f0bd20e3893ecbc7ba514c1c",
+      "git_blob": "5a126b92304aaa40ab19982890edddf7fc4ed1bf"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/curator.json",
+      "bytes": 433,
+      "sha256": "0dbe50c8d73eb510d853c19b03233dd60577c7eee8ae4ecea085a8caef33dc52",
+      "git_blob": "f9e7d63fe7eb066d963475008d7782d88408d99d"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/explorer.json",
+      "bytes": 446,
+      "sha256": "a869f8a54215ec6414aa2f275384033484c8dd24103054d650518adfd7dadde8",
+      "git_blob": "8a865b8d950347c81b35eb3049f6f93bb16cfc91"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/architect.json",
+      "bytes": 668,
+      "sha256": "6c92a01ca7685d0a4d902822d360f091e69388352c3ddfd370e21579bb790557",
+      "git_blob": "6d47745d7e80a082976074e622a586929a8156cb"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/builder.json",
+      "bytes": 636,
+      "sha256": "1382047a7a494a7d8be61e256b561008fe8c4321816e17f9ac7b74f6ca00f209",
+      "git_blob": "b6439d490d28be628b1774cc2e69045fa829ca11"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/curator.json",
+      "bytes": 695,
+      "sha256": "0f26c0723bccce3d98fbb54de3795b58dbce215e5aa8c4a58c7a605c84ec344a",
+      "git_blob": "a3510e530b253925597634f736e4c0d5e51ad408"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/explorer.json",
+      "bytes": 697,
+      "sha256": "2882ff73b15d980b19612022c3db053e9f6109fa87cb59dfd9eb9ec3504e6ee2",
+      "git_blob": "e3a21a76a0c651a7f476625e3593d45318703820"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/integrator.json",
+      "bytes": 652,
+      "sha256": "736254c7e199eb1f1c9654efa76f7237c899d80e768e6ef846989345d3acbc99",
+      "git_blob": "bb27d08b55e642511a3594fe420781d45f8d71e4"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/optimizer.json",
+      "bytes": 655,
+      "sha256": "646f2d37fdf834f87a4f0b3d6a9f04a01302e2c3bee4b90da4774b5b1d6a4b7f",
+      "git_blob": "ee6c93a95e8ac82fe7655322bfaf48a379267148"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/orchestrator.json",
+      "bytes": 703,
+      "sha256": "b554dcdb21181ba2eb9d9e47ac7ed70edc382ef70289ab6c5e7a719dfbf21811",
+      "git_blob": "1ea5c3b3f16e190f260ce7b43ae16a93339ff0bf"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/instructions/steward.json",
+      "bytes": 648,
+      "sha256": "6356a2bd4f0ce9c1e16c02184dddfa62bdd79b99809d0b640a25c38889a34a8f",
+      "git_blob": "9ffda9210431f53f440f597f23ed37a0c6df47c9"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/integrator.json",
+      "bytes": 415,
+      "sha256": "3bc0b077adad00b359fb253a74f17a51ba56bbdcad5c9f1cbec64ba3ef51bb14",
+      "git_blob": "58c37c5128aee82ec610c36e569cf32fafe252c6"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/optimizer.json",
+      "bytes": 427,
+      "sha256": "f9e6e84c637c59ebf29deff0284333c4dd607caca8ca26ef6b70a4bf484c06b6",
+      "git_blob": "e025b7e6c5ade505ed56debbde6a0c678db40c40"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/orchestrator.json",
+      "bytes": 453,
+      "sha256": "47d1b252ba14cbe23eb58723366e12f4dd8ea931523d18527d602ac250068743",
+      "git_blob": "078c2b5ce87bed5ed6d4bcb9145f6b2380c78af0"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/skills/steward.json",
+      "bytes": 441,
+      "sha256": "bbb114556e963b3174a7328fbb73bcc895cb2d4a341351254ade34f4f31d6f29",
+      "git_blob": "1939dff70339bb8cf1e102760a5b8c0f4aaf8a36"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/contract-validate.json",
+      "bytes": 339,
+      "sha256": "6201536bcdcda12418cf670016585ec986d0e0297b1aaa1c9320a05b97ef8dbb",
+      "git_blob": "2e02ae49091ad52ef06940aa8699a10c0bbeb821"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/evidence-query.json",
+      "bytes": 324,
+      "sha256": "0566e9d4c2e135c5b4d7a1ec74e880d7825fa5fd0a737518c1a78eed3f71cec5",
+      "git_blob": "5ec8ede4f8fd4e8448e66af8c43b79d9128c2c74"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/repository-inspect.json",
+      "bytes": 339,
+      "sha256": "951a3c0bb6944cf78ee1244776ff3f1075318f2328ec78ea75cf284a0c1caedb",
+      "git_blob": "47d77b4dff30535042cdd76287efa3533021e421"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/schemas/contract-validate-input.json",
+      "bytes": 390,
+      "sha256": "4ea21723c4ce7e12a66a5164b013f9d63a3235998a72cb6170b7dd34fcb1fa6c",
+      "git_blob": "0ef44092ad91e662d79e6886b38fe8f4a95a4ee7"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/schemas/contract-validate-output.json",
+      "bytes": 434,
+      "sha256": "dcae3dad7b4702ddd7d6f87f341c8a6379329950eb695ad26199f841fee52f56",
+      "git_blob": "1febd65ec66aa5d6cb34532bbd1e95560e176d22"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/schemas/evidence-query-input.json",
+      "bytes": 381,
+      "sha256": "b7fa676dcf57fcaa184e7f36b48edb95e062374cec0eaa308dfcd4f2202e4b1c",
+      "git_blob": "aaec521e1f5655f0479fedc85d4fa8a01b2317c1"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/schemas/evidence-query-output.json",
+      "bytes": 411,
+      "sha256": "4915095f4f5329de2bce375c6aa47e36a0a5b7dcf4ec310cca882eca737b607f",
+      "git_blob": "371aa27b02719c5ccc92d2882d8619af612e0324"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/schemas/repository-inspect-input.json",
+      "bytes": 398,
+      "sha256": "9f7c06097b9ea395c19654823b75c2f4a651ef9d28be6751395c6c6663f71185",
+      "git_blob": "aa5dbcda4e61c9c6c13cc5bfd80c02194b136a72"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/tools/schemas/repository-inspect-output.json",
+      "bytes": 469,
+      "sha256": "5d9333a46215227a4fd8263d0ad5e1954f05524d76722446e97041aa7792a20b",
+      "git_blob": "be300c4e58992ed5b979f3eecabeb1fb1f10e434"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/workflows/challenger-experiment.json",
+      "bytes": 1970,
+      "sha256": "764201b72e0ccb58ce7dfb50110a5fe0d150b262b5e49ac152b5a66506501f94",
+      "git_blob": "90ae42bcdda3e87e049d19eaf949b046eae05bc9"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/workflows/default-lifecycle.json",
+      "bytes": 1914,
+      "sha256": "eb66e6ec827d56d6451cce63b66e2726afb6350979860554736ddba035e7d675",
+      "git_blob": "c3e7127bf37a1047cea49c52371e7bb447966598"
+    },
+    {
+      "path": "src/hive_mind_os/builtin_packages/hive-core/workflows/ooda.json",
+      "bytes": 1805,
+      "sha256": "36865fc0462ccf86dcb38a096705d90ac5d259feddf0955dd5dd4341694953ae",
+      "git_blob": "f19a868d0810e8f333cf3225fce4b4098dc80eb7"
+    },
+    {
+      "path": "src/hive_mind_os/classic_gpt_docket.py",
+      "bytes": 6645,
+      "sha256": "ad8f42b530c2a677f13fe6e6c8415946a0015f8c0412b9b535e96efb68f67655",
+      "git_blob": "59385dab4ac92f6cb49e1d59451c331069a5bf21"
+    },
+    {
+      "path": "src/hive_mind_os/cli.py",
+      "bytes": 73737,
+      "sha256": "67f358fc3419c91f08551e1c520c5d95196e56ff4475f305bd621fc149302f04",
+      "git_blob": "eb90b9d0fbe899a879bc3ef9de1f02dd1443d9df"
+    },
+    {
+      "path": "src/hive_mind_os/compiled_tournament.py",
+      "bytes": 3823,
+      "sha256": "bc76cd54edb4635e8e7ffc8be0783801ce2d079314a07d4e3111159d3395abbc",
+      "git_blob": "3d9d33e58b75467932d1b4831670895ea9e442a7"
+    },
+    {
+      "path": "src/hive_mind_os/context_capsule.py",
+      "bytes": 13583,
+      "sha256": "023473eaa176f9be4ba0e007c36c9f78cceeff8483a6af8723b0d7e520ae7780",
+      "git_blob": "7526d6e3cd065045e709b9a4b44b57ced1867235"
+    },
+    {
+      "path": "src/hive_mind_os/continuation.py",
+      "bytes": 12068,
+      "sha256": "6c404c7129ad030fc0bf70d8bda267a44cceea1540ec1fbbdc73cb69b20384e0",
+      "git_blob": "a5fc88aad8418168d0872289a96cc9cd452f0d6e"
+    },
+    {
+      "path": "src/hive_mind_os/contracts.py",
+      "bytes": 18357,
+      "sha256": "d6c06f4e0bcf8d1be994967a815cac11cf621133f96d9e43976ad700b5a1f28f",
+      "git_blob": "d31ccc197ee62a793595f79fb940119468f8a47c"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/__init__.py",
+      "bytes": 75,
+      "sha256": "3c559b9c48a2be44960a7f5643afb26c66f6d6b560a4b9b466e2d4cd9ea61a28",
+      "git_blob": "21b757854a2c42d2408b661a1006ebbad0e22061"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/compatibility/__init__.py",
+      "bytes": 1039,
+      "sha256": "9ebc0eb2ac954a7f9cb095a854ba5c48a685857a47fb2d33a980486ca5e4e9f6",
+      "git_blob": "a0f5506bad2960300597ff380de09d84a0e9a5fb"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/compatibility/adapters.py",
+      "bytes": 10924,
+      "sha256": "6638623fa2368c0ca4889c88374d0b0d4d9527fef55af11c48b84dd5b28ab7db",
+      "git_blob": "264333e4ec10a700d3cff3387c051b64c90bc8d9"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/compatibility/models.py",
+      "bytes": 5143,
+      "sha256": "62b1e5d5c53868e05db57c5891ef0d3e7e80bc8259a8323202c48254b10dbd9f",
+      "git_blob": "ba516272d3f0e9368eea4e84ba16756381f77c81"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/compatibility/parity.py",
+      "bytes": 4391,
+      "sha256": "b4cabe8de1a272348f8148a5c968d2823885a550df47c0c6642f9030f8555daf",
+      "git_blob": "587d0d6bd0e8abd142a7f690fe0b83e2c6a53002"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/compatibility/routing.py",
+      "bytes": 2960,
+      "sha256": "ab0bb3e9e19bc70397c6c847ebe58b004707bc066ac050c460a0ea8fdc78a1f0",
+      "git_blob": "7fa675e08444d6718329b203d61756c12e53f8cf"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/github/__init__.py",
+      "bytes": 75,
+      "sha256": "87bae7c2583b2e795e7622a082fba5cad69121893187627f890d9e0910680f7d",
+      "git_blob": "63b40af61e2002e2e330b68ebd3777e50354767b"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/github/delivery_adapter.py",
+      "bytes": 13567,
+      "sha256": "046a6646bdc1c0b9b9b17d1817da602507fa696ceee59d0314aaa26f4bec5f18",
+      "git_blob": "0867366982bb93372d238fafcb15cd2498662627"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/github/grants.py",
+      "bytes": 17791,
+      "sha256": "f905c6bb3c56167b36c91d7117f7dda3b47f3f6032a431a6b791547d094f6548",
+      "git_blob": "e09a6a7160fda1467610bed0e56ce824636e807a"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/github/push_executor.py",
+      "bytes": 4427,
+      "sha256": "527443eaa29e07274e9942aa26c9fa46fd4bf66ac02b6fd9afb79961cf5a9c7d",
+      "git_blob": "bee38e7821e7be1bc12acab8b9d594231288b04d"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/github/rest_gateway.py",
+      "bytes": 12629,
+      "sha256": "72bca6f050db3bc2c13b1b0c1f7bee6ab14e7582c516a7d5ce76f680310131be",
+      "git_blob": "c817eb3481d18ff90f710b63b805683bfc6c2799"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/repository/__init__.py",
+      "bytes": 144,
+      "sha256": "8cd8d0cc718509d939e96bbadbe77e843e2283d51d60ec059c9f197aa6d35b2b",
+      "git_blob": "1ca0636e277477fa716a40fd797106685b3af9c8"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/repository/builder_adapter.py",
+      "bytes": 15029,
+      "sha256": "da30d700216ca43d5ae679b0d65a940f5ed71ef0c2b7ef2d09779d2a52583c89",
+      "git_blob": "b2101fb48c2edcc2895df7eff9bdc1c8562f1f83"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/repository/local_execution.py",
+      "bytes": 10981,
+      "sha256": "6088f57c9b2e5dbf3621f86e45d2d8a57ef6555b523f8061de9f92c06b15ed96",
+      "git_blob": "9a4fb83d844b435ac421738de2cab0896a6b3b9c"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/repository/mission_adapter.py",
+      "bytes": 10565,
+      "sha256": "d2a4146ff890afcab93ffbff882f5b6eef863c69fd677f84341b263906d29553",
+      "git_blob": "e880b2fa100975d309ce36fbe4e0ccdab34f2438"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/repository/role_handlers.py",
+      "bytes": 8325,
+      "sha256": "11fb61280515d999205a0b836e0a785b1f74736efaf2b5a15b463a4a46fcf2f0",
+      "git_blob": "e0a261726c4a8b96ae5704b296babc4fa33f4dde"
+    },
+    {
+      "path": "src/hive_mind_os/courtroom.py",
+      "bytes": 23308,
+      "sha256": "566fff03917f44252e1cfd7d25a0bc71daa0ea1e9772289668057f34f8f0287d",
+      "git_blob": "a2971412fb1b2a536a458a00194eb434be7e97f4"
+    },
+    {
+      "path": "src/hive_mind_os/curator.py",
+      "bytes": 28038,
+      "sha256": "774ee895516b8dc67e5eada912cc9b5a482b550d77abebdf2b23f60664f439fe",
+      "git_blob": "cf9b2e7dd17deecf2b365b07246a7d5f190c0d5f"
+    },
+    {
+      "path": "src/hive_mind_os/current_state_audit.py",
+      "bytes": 76818,
+      "sha256": "d056a386054b4379ccff6d9c4f53c1ff4d5a15bb2b10ddab6426170093d58426",
+      "git_blob": "5b6c8198f93d43365dec43ed4ee15fe80b95e586"
+    },
+    {
+      "path": "src/hive_mind_os/dag_cli.py",
+      "bytes": 10054,
+      "sha256": "6269392bea0115254c089258c9286308d4205da2ce3367ef53385a825bd0f42f",
+      "git_blob": "05df0436850fe0a2d68883723e95dc133b143e67"
+    },
+    {
+      "path": "src/hive_mind_os/dag_executor.py",
+      "bytes": 63209,
+      "sha256": "0c6f1c8a68faf75a87ecce8dddfa8b41018a408195a078765614fea158e90d41",
+      "git_blob": "eee5cde436160c96bafbb4b60d65d250bda85958"
+    },
+    {
+      "path": "src/hive_mind_os/dag_standard.py",
+      "bytes": 12950,
+      "sha256": "9c58ff437e90b800a4a3a45b32ac2aeb4cc967ff5a6e673f0283e100606f5529",
+      "git_blob": "81d87808ebf3c7d8612a4521a7faa97fc0294e9a"
+    },
+    {
+      "path": "src/hive_mind_os/delivery_boundary.py",
+      "bytes": 4568,
+      "sha256": "072eee8456004be9e8ae6a498f9ea370d940523671de3e64301003ce622c0664",
+      "git_blob": "ca8274a50839c31c4c818edfef99979bc6cfde91"
+    },
+    {
+      "path": "src/hive_mind_os/demo_fixture.py",
+      "bytes": 4869,
+      "sha256": "6602a12999b34ef4bf8713c24d6ac68011380513caa806bd72e9f05a59c8991b",
+      "git_blob": "93177afdebbb29bd6b28b6cc6d6fec3fae09415d"
+    },
+    {
+      "path": "src/hive_mind_os/evidence_compaction.py",
+      "bytes": 7580,
+      "sha256": "b050ca1b088cad6aa3e82f24a4b2921363b7dc5465d7bf7081750aac8d7edc28",
+      "git_blob": "0356e8b2d36ba7ffd9b56690ed4403ca3a1e3af4"
+    },
+    {
+      "path": "src/hive_mind_os/evidence_court.py",
+      "bytes": 10097,
+      "sha256": "aae09fcb44ae33da64bed6197b35c82846b5078432e9d81524811b7938f8b335",
+      "git_blob": "3c803f332ce29679785a7c518287650a7400bfee"
+    },
+    {
+      "path": "src/hive_mind_os/experiment_runner.py",
+      "bytes": 26582,
+      "sha256": "5b4b43ca6251713d94eb26c9bc56f5815e64ad3512e418b779e697d35a61f3e3",
+      "git_blob": "920a26cb56b5578f6a28f7aa27f0e6ab74475900"
+    },
+    {
+      "path": "src/hive_mind_os/founding_docket.py",
+      "bytes": 25928,
+      "sha256": "f82639b0c3b7c1160c27138183e05bc49072af4b737ad25eacaf477e51fdbb9b",
+      "git_blob": "efc242f13657d2296cf722823227014ebcc72da6"
+    },
+    {
+      "path": "src/hive_mind_os/git_adapter.py",
+      "bytes": 45301,
+      "sha256": "a9bacb5adcf2e42db45c5040ebb7acc7fea86d5d065e446c5f6900a5339d0033",
+      "git_blob": "11cd0152b6da75155e0cf9280f3e66332b1f1412"
+    },
+    {
+      "path": "src/hive_mind_os/github_adapter.py",
+      "bytes": 48426,
+      "sha256": "2bbe02fd429e7e37708960f0a2e0cdbf5b69d809c81bac5718effaae32c39511",
+      "git_blob": "17915061364b1a0e4d63109f1db60b9f2797301b"
+    },
+    {
+      "path": "src/hive_mind_os/governed_sources.py",
+      "bytes": 12443,
+      "sha256": "5748cd0e3e1c724708afb371cbb28cd4765f9e5e518317c407130d805de4c9f0",
+      "git_blob": "8d60f09737d3fae9a2236ee730529674d282830d"
+    },
+    {
+      "path": "src/hive_mind_os/host_adapter.py",
+      "bytes": 14059,
+      "sha256": "0e202867c7b293eefe6c44a931398e1d07d34e7959e0c4411c3f91aaee169c82",
+      "git_blob": "589d6c7148f591469f82bd486e0f7a3bbd6f5da1"
+    },
+    {
+      "path": "src/hive_mind_os/host_runtime.py",
+      "bytes": 157982,
+      "sha256": "caafa13567311aabf099c562aae0aacddc41c7d14e293879b558daaa87f336c4",
+      "git_blob": "eafe0169dc8fcfd42179776db04ab80455767683"
+    },
+    {
+      "path": "src/hive_mind_os/idea_lineage.py",
+      "bytes": 16106,
+      "sha256": "4982441eca0d1928b1e72aaf982bfe52d478d37aa4ac4f9e684b167da79f2a18",
+      "git_blob": "534e38c78e2018dd2f798559068cae8f8a0d217d"
+    },
+    {
+      "path": "src/hive_mind_os/identity_attestation.py",
+      "bytes": 5809,
+      "sha256": "7e64521934014ee9096885ff679cf7e9f7645465f6ed5245a9f9e8ad207f64c3",
+      "git_blob": "2b88a8498b497fea2fa856f0688b38dcbf030ffd"
+    },
+    {
+      "path": "src/hive_mind_os/ingestion.py",
+      "bytes": 28396,
+      "sha256": "aaf5ed01decf53f4bee39920a5e56b200b8ac446eedc16409b0563bc8f418ee4",
+      "git_blob": "a48c9ba0bd364c6678e160587d723c9ee6b3ee7c"
+    },
+    {
+      "path": "src/hive_mind_os/integration_transaction.py",
+      "bytes": 61371,
+      "sha256": "568ca72bfdd63c7ac2898abfa1ed6048a852516638a056b0b9fb07ea42364cd4",
+      "git_blob": "1295abbaee56213a81236b704c85acd0ee5962fe"
+    },
+    {
+      "path": "src/hive_mind_os/learning.py",
+      "bytes": 2840,
+      "sha256": "e7f49777274d00a0ceba5c09e1159ac1545fc33539dbc6ffaf33353b0f3d2891",
+      "git_blob": "890bf37b966ed80e1bd88315f264ee7446808ab2"
+    },
+    {
+      "path": "src/hive_mind_os/ledger.py",
+      "bytes": 7855,
+      "sha256": "9a2df02af1a47f08dbb4be27603102bb11f702a32d6cb82c24a00e7d647354d9",
+      "git_blob": "5cd313109c6e45cd259ff3b23e0fc3a0a7a2cb3b"
+    },
+    {
+      "path": "src/hive_mind_os/local_codex_worker.py",
+      "bytes": 21114,
+      "sha256": "aeafe961aa8398146f79ed023d764fd6abc26ac781fa18bf933e565080c495cd",
+      "git_blob": "12acc87be3ce81bcbe64a07c43f2fda2c69e6fc5"
+    },
+    {
+      "path": "src/hive_mind_os/local_dag_runtime.py",
+      "bytes": 62650,
+      "sha256": "fe6f99499a88dfc8d451ac3efe53b54a0f7c19b2d5e1608d7a21897b2e364d52",
+      "git_blob": "7aded676230ec0c8e5845c8a2b061e7f118bce06"
+    },
+    {
+      "path": "src/hive_mind_os/local_evidence_packet.py",
+      "bytes": 32434,
+      "sha256": "f000893bf62f355beac6404e8e7bd0625a34544821a1cd003c6eabdccf0c7f7a",
+      "git_blob": "2ed80fecc51e68b6637316c471274fdcde1db104"
+    },
+    {
+      "path": "src/hive_mind_os/local_run_authority.py",
+      "bytes": 9260,
+      "sha256": "f17b200c1a6095ee892fed82c5af0626a691137de6bb2a1afb3d1f5a3b24b43d",
+      "git_blob": "24687c79a974452afb3d08c753b8374a76735f03"
+    },
+    {
+      "path": "src/hive_mind_os/mission.py",
+      "bytes": 113086,
+      "sha256": "0854056128de17111596effc728defda0cd3895e67234907034fe27ce2894f6a",
+      "git_blob": "962afcc7ae9a29cb5c38cb0cf735cf16b2961f3f"
+    },
+    {
+      "path": "src/hive_mind_os/mission_loop.py",
+      "bytes": 85552,
+      "sha256": "a27d9d54d6964b41da77cd1c898b7cce1f6eb1c32df2b45adc5fd56b2b2770bf",
+      "git_blob": "b32fa0a8eb2bc6daace90839fe7af5cd2d2cabe4"
+    },
+    {
+      "path": "src/hive_mind_os/mission_store.py",
+      "bytes": 44553,
+      "sha256": "f5e82a21be9e0fe1c6b12f13f6f27858e5960128fd5a8f8327df7d8bb98ff874",
+      "git_blob": "78f09b77b888ff006002136e335bb05b6dd69016"
+    },
+    {
+      "path": "src/hive_mind_os/model_action_adapter.py",
+      "bytes": 9525,
+      "sha256": "e34a4f6e617a23a3f7d34a37dc186eede2005fd8ab3b9305b66c8386eadfadb6",
+      "git_blob": "3abf72507221b07847cdbacbe83fc4655869fbac"
+    },
+    {
+      "path": "src/hive_mind_os/model_backend.py",
+      "bytes": 22569,
+      "sha256": "a527f0cc74bc17d54fa0207e38be7d050a6f1ee926cc1e19cb91c8b5b61ef62e",
+      "git_blob": "8486a62e50d3589571c767bbb66b30cc09d9719f"
+    },
+    {
+      "path": "src/hive_mind_os/model_provider.py",
+      "bytes": 25825,
+      "sha256": "1ee9349846fe7bd85e4af6d04a81bf0afa8a3d296878651f82c8c5e0c6b9aa4a",
+      "git_blob": "f52f55291be14496ae7d27aaa0b40557528c4927"
+    },
+    {
+      "path": "src/hive_mind_os/models.py",
+      "bytes": 2732,
+      "sha256": "24e3f87dc0e26f04902bafd0fb0f9dc2420b8622f30543e6c3f4d5bbbc3cbcd9",
+      "git_blob": "cd0215552b62d31524a2f21c6dc8f36eab3a2919"
+    },
+    {
+      "path": "src/hive_mind_os/path_boundary.py",
+      "bytes": 1672,
+      "sha256": "bdb919abbe206d251c6338b96f742ff44225b19d3a41a3ff88d4abf9bd60e2ef",
+      "git_blob": "20157e93b13e19fb038800723ab304a7457d066a"
+    },
+    {
+      "path": "src/hive_mind_os/pit_oracle.py",
+      "bytes": 46788,
+      "sha256": "e8651ab6315ac0832f50bdf702d3067c9dfaf5516ac0e10533297a14076458e5",
+      "git_blob": "99ac83b0dc877931b66059c4788057b6b99bf581"
+    },
+    {
+      "path": "src/hive_mind_os/plan_generation.py",
+      "bytes": 9140,
+      "sha256": "bbc73bd1268626fd529efe09b843c9f02d5535dd964bfe21e57b6eb0f2aee111",
+      "git_blob": "b672049cf8e78e9647595ea5245caf693aefcc0d"
+    },
+    {
+      "path": "src/hive_mind_os/plan_lineage.py",
+      "bytes": 19826,
+      "sha256": "2486c241cbed16feb04789140f3c0955e67d9e2d1a5e3d5d00d0a45eadd23a0a",
+      "git_blob": "adc5980d59a83072f8b05682ea5bdb076615e17a"
+    },
+    {
+      "path": "src/hive_mind_os/planner_prompt.py",
+      "bytes": 2038,
+      "sha256": "a410f23342f0054f0afbe6f145d5373bc6fc2d1d5a56ad40f71dcc5c32699eef",
+      "git_blob": "ebe2c461711ae9aaf1c20cb047271a6b602bc2c6"
+    },
+    {
+      "path": "src/hive_mind_os/policy.py",
+      "bytes": 5644,
+      "sha256": "9c184de9cc2ac5ca22939f1539ddb8a8afc854314f225bbafc1b17532c8cca4d",
+      "git_blob": "b2c5c3ec93bd3b5ff0f040ba33a32241a5402573"
+    },
+    {
+      "path": "src/hive_mind_os/portable_autopilot_docket.py",
+      "bytes": 3891,
+      "sha256": "ed3eefd599fc40143584a1124f13e277947d6c38b6474b93aef79af8a45b3255",
+      "git_blob": "f5c2f5090fcb17db0eb0c0c65355f99dfeb40372"
+    },
+    {
+      "path": "src/hive_mind_os/portable_plan.py",
+      "bytes": 35190,
+      "sha256": "a013c7b7291b44af880c96381f6925f92a799cbd2712a80eada5a90283b7137d",
+      "git_blob": "7f90f0b5fd85f5d9e4480bd26252d276b97dfda4"
+    },
+    {
+      "path": "src/hive_mind_os/powershell_preparation.py",
+      "bytes": 6771,
+      "sha256": "a0967a0b6643c32d3353f9cab799f488c1e1b32f058b752fbed933519de12b9c",
+      "git_blob": "07eab1565c9bf1403d38aa3809107cfb808f57d3"
+    },
+    {
+      "path": "src/hive_mind_os/projection.py",
+      "bytes": 16085,
+      "sha256": "155a940969d3c8ad8b20b37d9d941e3b3996b7c26c44470e012ca7c983d9e548",
+      "git_blob": "1f90009df27a32416ec80ec62a5552f009356688"
+    },
+    {
+      "path": "src/hive_mind_os/prompt_registry.py",
+      "bytes": 69084,
+      "sha256": "42a2deff53888a06355e70b1bd211b7135f306e9d13ccee88b53275098255baa",
+      "git_blob": "d56551253439c45e254695513553ab6b5d221c60"
+    },
+    {
+      "path": "src/hive_mind_os/receipts.py",
+      "bytes": 9846,
+      "sha256": "6a0f9b003674b4b017b19a18b0a516863722d7d079a291e9cb9e1ff0fca86ba2",
+      "git_blob": "61e2df71f6b4678eca3e08bd70d65c1a02b0ffa3"
+    },
+    {
+      "path": "src/hive_mind_os/recursive_improvement.py",
+      "bytes": 14056,
+      "sha256": "77bd6609f281577fdccd9a88c0aeb296b39142caee05f26f4ef22259de5db616",
+      "git_blob": "b123a9e40a2318ed14e2878fbccea55f7a533c97"
+    },
+    {
+      "path": "src/hive_mind_os/recursive_improvement_docket.py",
+      "bytes": 6654,
+      "sha256": "6fe280e6cc6228560e058e3a8aace0442515116d9526ea234423ee0b4badd26f",
+      "git_blob": "efadf86884bf6fee7c3c08b1199a23459d88b728"
+    },
+    {
+      "path": "src/hive_mind_os/reference/__init__.py",
+      "bytes": 81,
+      "sha256": "bd2334e32ba8f1dd39822166c8f74190fae05d571be4e06269cb547bc41248f5",
+      "git_blob": "ca622a15a63b14fab9bb84ec2fd5ca0abe3da7fe"
+    },
+    {
+      "path": "src/hive_mind_os/reference/classic_gpt.py",
+      "bytes": 20526,
+      "sha256": "08a4152660eef775cf8ea8d0018ad90d5b6ba5a24882f6dc0274f324bbf3821b",
+      "git_blob": "b3e1e5ecec49db12095283a01f6f1df3d3b3f7ef"
+    },
+    {
+      "path": "src/hive_mind_os/reference/package_system/__init__.py",
+      "bytes": 1632,
+      "sha256": "a9da3ba5c191af3f8b23e370298ce07391e2c744a06059fbadae8bf6a461b7a3",
+      "git_blob": "d80fbe955dca57b3e65c76047a180994e1833431"
+    },
+    {
+      "path": "src/hive_mind_os/reference/package_system/builtins.py",
+      "bytes": 454,
+      "sha256": "89d70c2b81830460bcf974a3e5265791cae7af06cfb00461d50130607dfc5ef7",
+      "git_blob": "080f72bc0ce417d095cdf374f3fd9df91cee1bfd"
+    },
+    {
+      "path": "src/hive_mind_os/reference/package_system/catalog.py",
+      "bytes": 38658,
+      "sha256": "80ac57a0db954157ea4a7739cabf570ed3da41c0a3f543f2996f0ae8c13b7055",
+      "git_blob": "41f8ebf181ea567ab24929655b4ba022b5c89cf8"
+    },
+    {
+      "path": "src/hive_mind_os/reference/package_system/host_profiles.py",
+      "bytes": 9831,
+      "sha256": "f7cc75450f0315a72e77344de6065e57db000d3e79f036131502b853c4d3940f",
+      "git_blob": "d6665901cea37cca06507785cb0281c61ab751f3"
+    },
+    {
+      "path": "src/hive_mind_os/reference/package_system/models.py",
+      "bytes": 17410,
+      "sha256": "31a42afeff459a12ff296dcd312f5516200a920358e84cedc08b8417b83bb1ef",
+      "git_blob": "c03af456fe2383a060b60609020c026802204898"
+    },
+    {
+      "path": "src/hive_mind_os/reference/package_system/ooda.py",
+      "bytes": 19940,
+      "sha256": "4445e6a903dee3b93aeb9a9a87d0b06b5754c9bb2dadfc89782b5c75bbc71f9c",
+      "git_blob": "c4073301cc7b733efd6a206e2a395ed56e2b2f61"
+    },
+    {
+      "path": "src/hive_mind_os/reference/vision.py",
+      "bytes": 10822,
+      "sha256": "b32e3a4b455c6728e80d9c0a251178a59dafd5aa64071e1a54eb77b5b995bc36",
+      "git_blob": "2051ec2dab7767eac349a34d29a9996194d6451d"
+    },
+    {
+      "path": "src/hive_mind_os/repository_compatibility.py",
+      "bytes": 7435,
+      "sha256": "d869e800aae8b888eedc2575d7bd635219ae7500793a77a0b0100487369d5a78",
+      "git_blob": "e88506c7f2d149c46e36613593c854567c138dc6"
+    },
+    {
+      "path": "src/hive_mind_os/repository_index.py",
+      "bytes": 12840,
+      "sha256": "4357d9fffd06d1f964fbd1f8a494322a69bf0f99660f2f29fe7fbde263941e03",
+      "git_blob": "17f9df64af86deac90e02ba3b64d9dd37d98546f"
+    },
+    {
+      "path": "src/hive_mind_os/repository_learning.py",
+      "bytes": 6265,
+      "sha256": "33a58623caebe7a390e1c1f2ed0f0a94e64b9e9ff6f89c8896d3009aeb13460a",
+      "git_blob": "a6c976954b0e036967ce2c2c07431e320def8e89"
+    },
+    {
+      "path": "src/hive_mind_os/resource_adapter.py",
+      "bytes": 8617,
+      "sha256": "d60f81620abe493f66bbba0d8e732c45dc8ee3b33c91fcb33802fbd6144a715f",
+      "git_blob": "c6fe21ed62c8dc4821b14b28fe87ec7d2016cae2"
+    },
+    {
+      "path": "src/hive_mind_os/roles.py",
+      "bytes": 835,
+      "sha256": "9eab3afe6ff6795d3e8a6667ed8858ff748c57e2982c38624b7d0823f325298a",
+      "git_blob": "ab753b2606ed84d32ee6e7ab6c0624a82aba2bef"
+    },
+    {
+      "path": "src/hive_mind_os/runtime.py",
+      "bytes": 6889,
+      "sha256": "4fa18b5b5734423a5c98346b57ef36191e99b8905cf70e32aa0f4327c526fb30",
+      "git_blob": "e321d0b26d39af4674e2f1c4064f9cae6fc9f148"
+    },
+    {
+      "path": "src/hive_mind_os/runtime_contracts.py",
+      "bytes": 46102,
+      "sha256": "bd759d5786751d44ed0de4f44ed119e42e2c1762bfe5e5b18d3705aa15be9306",
+      "git_blob": "0dff965d067876e86d2e6ac32696d6c700d603e3"
+    },
+    {
+      "path": "src/hive_mind_os/sandbox.py",
+      "bytes": 39118,
+      "sha256": "4efaa63b0efbc2808a5dd33a7a0e6491377d7f0c0ebe51db3698e6060936108b",
+      "git_blob": "f6c4c85916c0c9c4c4a832ff8c7ab9cf212f7dfe"
+    },
+    {
+      "path": "src/hive_mind_os/scheduler.py",
+      "bytes": 11639,
+      "sha256": "11580bf837f43d8b5ff185a893e28d6117f7634025ae22bc5c6ac2581b8a5b88",
+      "git_blob": "fbfea67aaaa7263a380f744397dc4e6f722de8e7"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/acceptance-specification.schema.json",
+      "bytes": 1035,
+      "sha256": "c4d4846aa9d4ffa5e13492d2968b579cdfd0626553dc6837a8dedb84c742c679",
+      "git_blob": "eb033980c28bf1a319b4e393a59f7ee8e5cdfc3b"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/agent-component.schema.json",
+      "bytes": 1803,
+      "sha256": "da3a815c284ba7848b53141ab3408c246f8a3520d04992a65804c980a1645dea",
+      "git_blob": "dd2941d7fb6e56cf213a2ed7e3f4ebca95958807"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/artifact-manifest.schema.json",
+      "bytes": 881,
+      "sha256": "099a9aa334f391ee0b71100c33d80c2283f9ba2afef21b01b2bc466d6b04b8ae",
+      "git_blob": "a892773a66cc16a045003f2bfd0894527d042636"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/autonomous-run.schema.json",
+      "bytes": 1540,
+      "sha256": "c9a0c235ca455306289da152b597d36cbba29d8bf71134c16c8017c6f8396912",
+      "git_blob": "d1486b035b7ffbf2d7ee0bbae119dcb33cf3b8a7"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-authority.schema.json",
+      "bytes": 1656,
+      "sha256": "c6d50089cb2d4e7c144b7f84813a52ebe7a89b6ca0482d2ce6d14058fd6d1782",
+      "git_blob": "6d81366c8f5ab7c4fc59423d5204484151f4e01f"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-candidate.schema.json",
+      "bytes": 768,
+      "sha256": "513dee5f8bdc863eec77108e3e775c57c9ae7c57928460be0e3d7ff76c45fab6",
+      "git_blob": "3c9b15411a14c772605d0cbd8ad54cbb30bd35f1"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-charter.schema.json",
+      "bytes": 2272,
+      "sha256": "866516daa1055ae9d7027a3cf5f9d7bbb1a061dc34c36d38046071476885a1d5",
+      "git_blob": "e9c4a9252101548abfb8997feef262c0635b7cfb"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-context-manifest.schema.json",
+      "bytes": 1442,
+      "sha256": "b5e18c7997a56490c3d0864129083267f7bf7c61b864ef75b69d154f495bb568",
+      "git_blob": "37b858410f4b599f5660542330622b31a0e7f893"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-effect-intent.schema.json",
+      "bytes": 1390,
+      "sha256": "0d17523c5494901d98f94f28f4fc782699f91a9e46369ebdeebd379355ea2667",
+      "git_blob": "29a596986c690cce446c57fc356df331330dc7e4"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-effect-receipt.schema.json",
+      "bytes": 1171,
+      "sha256": "4ed2acc92622b482d3341a4f4881aca1b229c9488ce04326de934c5c07a33353",
+      "git_blob": "56a17377637082d983579d695e9536218349d8d1"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-evaluation.schema.json",
+      "bytes": 1504,
+      "sha256": "09b4c8aa81934e7c6dd9445bf1482dde2924e45723021f93616125d59e72ca65",
+      "git_blob": "e345a213e372437fdc424528287e923ec11b22b2"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-event.schema.json",
+      "bytes": 972,
+      "sha256": "a264b79e9aaa93e9117b27de7239816ca407dc96c16681b4044e4ea7b29401d4",
+      "git_blob": "a580a7210efac5e0c1c3065cafe3ed19b598ac9d"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-historical-evidence-reference.schema.json",
+      "bytes": 579,
+      "sha256": "53a49427e38c834991be84179c87dc00e0ca0522dac7c143d2a90bf3b716c2d7",
+      "git_blob": "f9b3592f59815921c5c177a82faec363465a38cd"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-memory-record.schema.json",
+      "bytes": 1498,
+      "sha256": "4e47d99f5ac6d131fb717dabf2f645d00ceb4c7b1d7a2e8efe197934f1b1f4e9",
+      "git_blob": "63cabe963b82c9b8161cf3fa944de5c5a8fe92b2"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-technical-closeout-report.schema.json",
+      "bytes": 1633,
+      "sha256": "09b564e1e61b515a939acc93c43456d9eef68b17f5551af61353dd92b0910ce8",
+      "git_blob": "aa2f305dbfffe1260e432589fed3a22d92e82666"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/brain-kernel-work-item.schema.json",
+      "bytes": 1817,
+      "sha256": "afbd6f5a63bdaecdb2d076d2366e8c0a6f46e9975c1cb6af484b2dc3a20c3589",
+      "git_blob": "2c2c7581afba2fbab130e9a0a87912086f06f4a8"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/capability-lease.schema.json",
+      "bytes": 1167,
+      "sha256": "0de7b2680c1928f44e68f0d3f18699fbd086be6e106de5753947f17baba87133",
+      "git_blob": "91d5c5412590d0ac964d501ebab684d447c879ea"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/claim.schema.json",
+      "bytes": 2003,
+      "sha256": "8fc20e7d7b54efdb8c66adbc300704136d8e7510c5024a4bf0f47dc72f0e485e",
+      "git_blob": "54f64060ee8c29c8f9dcc29a0795037155e07a21"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/continuation-packet.schema.json",
+      "bytes": 3554,
+      "sha256": "8d38c14cbf700a03203d94ca5d38057bf1dcb72e5b4e0e11e2e37cb2666288dd",
+      "git_blob": "e82a505e41dfcd3d7392be4accf7f2a5bad3d1d9"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/event.schema.json",
+      "bytes": 1131,
+      "sha256": "50a1039c3468edd05a6a5a88b1edf0eec665de1264b1b3bb1aff061022c3b660",
+      "git_blob": "06f286c0a5a48f8b16f90a2ed720f756258154bf"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/handoff.schema.json",
+      "bytes": 1201,
+      "sha256": "07953d26c516d8015aad87f757c8b5b849fd15bf64829fc534e55cadd1c000dd",
+      "git_blob": "68054d16113ec9d90b631552384374cae59ad855"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/hive-cortex-consultation.schema.json",
+      "bytes": 2478,
+      "sha256": "2c550e16fd4459c0688b372ab25179eef406f7715e56cad9b4e4395f5022517e",
+      "git_blob": "bfe0fa4881654c7bea06815825cba300a4604969"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/host-capability-profile.schema.json",
+      "bytes": 2258,
+      "sha256": "07a49bb8f4400f1bcbd551c3c7e0fc25c1bc1abb8b2c60ccb5b90882f91a0deb",
+      "git_blob": "57a6e159c018a50ab2fc09a898538c546cc42079"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/identity.schema.json",
+      "bytes": 1074,
+      "sha256": "f1f9c675c833949c358758ed82a143cda70ced743308a3038ad030585414a64a",
+      "git_blob": "a55bd77049f76f376298ffe30631cef2660053f7"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/mission-state.schema.json",
+      "bytes": 3611,
+      "sha256": "4ecb698da9ee3bdbbb66b64347ddec0ce3200b85245e5df7dc184a3785694f8f",
+      "git_blob": "22f9139432fee03ac9f68885ed70b685d1682e49"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/model-turn.schema.json",
+      "bytes": 746,
+      "sha256": "e1c6d291f382c5d20753e40bf51d53e23bd5240b0116e6e0171810dbef43cc52",
+      "git_blob": "e6e674c38bf34492fd8a0c270e16f00d0639bb2c"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/ooda-state.schema.json",
+      "bytes": 7087,
+      "sha256": "e546b83ba13801970a18a2465b4144efa62ade30dc6672d03adb57f17e747766",
+      "git_blob": "6ec87c64ecd94353701224eea2b3fc4b36588b28"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/package-manifest.schema.json",
+      "bytes": 4886,
+      "sha256": "863876ecb6f9ef3ac7299dad7eabb1074b07aa798171fa2b4d3f4c79eb6e1d38",
+      "git_blob": "d04150caf3ad28e7b4adb87959e78eba5107bff2"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/policy-decision.schema.json",
+      "bytes": 1052,
+      "sha256": "71b572be2e3b077062a31d74df8027f46301aaeefe3944a6a4bc3d62d9c5df47",
+      "git_blob": "cecb5683102ff2429b6de0f516d8e4879f5357ec"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/skill-component.schema.json",
+      "bytes": 1236,
+      "sha256": "f6d97e46e474510fd81b362372f5d152fd99064296d7524c7d32e39a4c27758e",
+      "git_blob": "737fc674cfd5c9aa0e08cad4b321c3a6df3690ca"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/source.schema.json",
+      "bytes": 1535,
+      "sha256": "1fc2f2da85b9ef8bb26688d9ba9d7d7d45df364fc11e7ef0a613559b58581776",
+      "git_blob": "aa93cd4547620cacc1fbc29e76257c8ac3effd85"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/tool-component.schema.json",
+      "bytes": 1086,
+      "sha256": "03b43db925c331553bdbb20245d19827bc31ad0f7b4e60cae2107407e94940dd",
+      "git_blob": "ad434463add0effe15b55b4c5b5dbde60e7445b1"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/tool-intent.schema.json",
+      "bytes": 2191,
+      "sha256": "4f353a22b278d520e1f6906c62879523545101b274d7b3ef46a7ddf97446faba",
+      "git_blob": "12aab3090d9f4375723aff2e11922f8cd28bfe77"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/tool-receipt.schema.json",
+      "bytes": 4160,
+      "sha256": "745577bd23d2e46561a6d2a9f60d38f1ab6cf3f59c799c1bea5bb4409381b454",
+      "git_blob": "5758a833efe0d24627aec4a3beddf5a2f7a9ae48"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/war-room-event.schema.json",
+      "bytes": 1688,
+      "sha256": "10555813d656ce204b85f227910d59033664fc31e570e6f46a516bfff523cd7c",
+      "git_blob": "240776515a0c483e9531b201d67572aab90f3816"
+    },
+    {
+      "path": "src/hive_mind_os/schemas/workflow-component.schema.json",
+      "bytes": 2018,
+      "sha256": "eaf487ea402d80e536f07675cc5d063745f719f51f57a07bcd7561b57cb4f469",
+      "git_blob": "8f0141840601c3a62e09e3f7b60eafc07314c3b5"
+    },
+    {
+      "path": "src/hive_mind_os/sibling_gpt_docket.py",
+      "bytes": 3205,
+      "sha256": "64d917495b134d5fed8000ae040884062eaf4b7407fdea648d874d19480d5c16",
+      "git_blob": "bb0e3e0d5c56507502d9c4386e7d83da1d2a9c4c"
+    },
+    {
+      "path": "src/hive_mind_os/sidecar_calibration.py",
+      "bytes": 10970,
+      "sha256": "7ae0f240e7f943fbe3e56563ddfc4755c3c2aa18f566a939ef297cc24f586b4f",
+      "git_blob": "7b19f748d8e3efaa5827f4f775c5eec8986b7789"
+    },
+    {
+      "path": "src/hive_mind_os/source_docket.py",
+      "bytes": 6266,
+      "sha256": "ca687521605472523b0224f788ca118b6679d7e30742511304dc505453769d5b",
+      "git_blob": "bf1a217c3a8d9e2f91172705b75528357408b007"
+    },
+    {
+      "path": "src/hive_mind_os/subject_adapter.py",
+      "bytes": 7063,
+      "sha256": "8804c6d2640856fb7b034e765748bd3dbbc9d884be3ee10469d634956495e49e",
+      "git_blob": "f2af310a428aeeada15b37c902f45443f15d2aab"
+    },
+    {
+      "path": "src/hive_mind_os/subject_execution.py",
+      "bytes": 10126,
+      "sha256": "1613effaf188d673b69b1813a43bbd5c82f7c594f7287224e1277eaed0a27ffe",
+      "git_blob": "49b184b0d286da1f9e691e48fe27e57b6a5e2b18"
+    },
+    {
+      "path": "src/hive_mind_os/task_reuse.py",
+      "bytes": 26144,
+      "sha256": "8868d25d6d87cf76b262430e74bae3ee886765d865b6c6499cf737d829752cf9",
+      "git_blob": "780a3af51f69a8adff3f5414651c2df3cbf49ae2"
+    },
+    {
+      "path": "src/hive_mind_os/test_result_cache.py",
+      "bytes": 15964,
+      "sha256": "91050aeec377e5f40f85edb1f20feca0a960d448450e3d0039d1f66e537d1757",
+      "git_blob": "80a377cb29e43bc998020a4fa1ab3a83aa628ace"
+    },
+    {
+      "path": "src/hive_mind_os/token_benchmark.py",
+      "bytes": 10076,
+      "sha256": "92156031239601900c8be5ab1c202530f3328547d4320a0718f2f5f08d1bd116",
+      "git_blob": "3c9a49151b4d1f8b02edf456fbbdc81816566227"
+    },
+    {
+      "path": "src/hive_mind_os/token_ledger.py",
+      "bytes": 15147,
+      "sha256": "4f628f9c2fb048f8c75606edc67dad6d8296122f9889e217ad210af748601cfd",
+      "git_blob": "e0c6681c59f3569208751281f90c395d6663b2aa"
+    },
+    {
+      "path": "src/hive_mind_os/tournament_cli.py",
+      "bytes": 15918,
+      "sha256": "315e7894fb783185b9b548607846862594733827b5abfd2ead1319542a3a0310",
+      "git_blob": "54aaf70728f47a5b3f339ac173f658209f60e601"
+    },
+    {
+      "path": "src/hive_mind_os/tournament_plan_factory.py",
+      "bytes": 24094,
+      "sha256": "551048f8308730acd1b79c703b0008c2a289297315b584b892817a9c2d10841f",
+      "git_blob": "ecbb2233a392bb235f6820a2767e7162f0a06ab4"
+    },
+    {
+      "path": "src/hive_mind_os/verification_adapters.py",
+      "bytes": 22698,
+      "sha256": "1f35e7fa8cd73ce59daa2a3175b5ec9ad85747291c54fdbb5980c6cb26eb43ce",
+      "git_blob": "51e6a040723e4a332aa57ef1e39d58f3d38be5b0"
+    },
+    {
+      "path": "src/hive_mind_os/verify.py",
+      "bytes": 48293,
+      "sha256": "9a246ee6fa22d918d73372aad93c424286ce44e6af58c4b5b6dbefcc5646d5a2",
+      "git_blob": "8b5948f884a20e8ce210e20c9c4014e3b0e295f4"
+    },
+    {
+      "path": "src/hive_mind_os/wave_manifest.py",
+      "bytes": 11892,
+      "sha256": "0e8d8971930f1d5b03337e78350786165459aef6055c564e173e564e9223a852",
+      "git_blob": "0fe777e26adde6db12235ff80ae8755a8cf5d9c8"
+    },
+    {
+      "path": "src/hive_mind_os/workers.py",
+      "bytes": 14626,
+      "sha256": "3b378499c38e94d67e1f3118fe803e58201eae80e42f90fa662e1acdfe81706c",
+      "git_blob": "f46f609517a7842fe691f2c6bf92ebe30ba9dd91"
+    },
+    {
+      "path": "tests/test_dag_standard_product.py",
+      "bytes": 6353,
+      "sha256": "be9c817ffcb094676c3b038481bbd59f0cdfb3b11e19b105cfe3e6d19d8af00f",
+      "git_blob": "0aa24ae2f91a376f417ddcb08585ca520b111ee0"
+    },
+    {
+      "path": "tests/test_portable_plan.py",
+      "bytes": 8042,
+      "sha256": "4042ec7418f219a4f5aafe17c100d9a582778e444854fad2123e8a369a0289cc",
+      "git_blob": "53e310e39c125ccf76e6b57873e8cc6b27cd0c30"
+    }
+  ],
+  "limits": [
+    "Only local inert plan build/validation operations invoked",
+    "No authentication, activation, dispatcher, runtime execution or full suite",
+    "Fixture helper imported from exact baseline tests; no test suite executed",
+    "Direct service mismatches raise TypeError because the API lacks these keywords; silent loss is at the CLI boundary"
+  ]
+}

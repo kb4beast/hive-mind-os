@@ -1,0 +1,6 @@
+Initial extraction attempt failed before fixture creation or product probe execution.
+Command: python -B C:\h\node-completeness-audit\baseline-reproduction\reproduce.py
+Exit: 1
+Git error: fatal: path 'tests/__init__.py' does not exist in 'b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+Cause: reproduction harness assumed a regular tests package; the baseline uses namespace packaging.
+Correction: extract only the two actual fixture helper files; use git archive for exact byte extraction. No baseline source changes.
