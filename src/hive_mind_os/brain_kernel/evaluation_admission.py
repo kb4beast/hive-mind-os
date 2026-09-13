@@ -198,7 +198,7 @@ def _nullable_text(value: object, label: str) -> str | None:
 def _nullable_number(value: object, label: str) -> float | None:
     if value is None:
         return None
-    if type(value) not in (float, int) or not math.isfinite(float(value)):
+    if (type(value) is not float and type(value) is not int) or not math.isfinite(float(value)):
         raise EvaluationError(label + " must be a finite number or null")
     return float(value)
 

@@ -12,10 +12,14 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
 if TYPE_CHECKING:
-    from .evaluation_runtime import ChallengerDescriptor, EvaluationRecordReference, PromptEvaluationSubject
+    from .evaluation_runtime import (
+        ChallengerDescriptor,
+        EvaluationRecordReference,
+        PromptEvaluationSubject,
+    )
 
 from ..models import Role, utc_now
-from ..prompt_registry import PromptRegistry, PromotionCommittedEvidencePending
+from ..prompt_registry import PromotionCommittedEvidencePending, PromptRegistry
 from ..recursive_improvement import ExperimentVerdict
 from .canonical import canonical_digest
 from .court_runtime import CourtClaimKind, CourtDisposition, CourtHistory

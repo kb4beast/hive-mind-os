@@ -5,14 +5,24 @@ from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 
+from promotion_auth_fixtures import authorize, verifier_for
+
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.brain_kernel.evaluation_runtime import (
-    ChallengerDescriptor, EvaluationContract, EvaluationIdentities, EvaluationRuntime,
-    SealedHoldout, SurfaceKind, SurfaceResult,
+    ChallengerDescriptor,
+    EvaluationContract,
+    EvaluationIdentities,
+    EvaluationRuntime,
+    SealedHoldout,
+    SurfaceKind,
+    SurfaceResult,
 )
-from hive_mind_os.brain_kernel.promotion import PromotionAuthority, PromotionCandidate, PromotionDecision
+from hive_mind_os.brain_kernel.promotion import (
+    PromotionAuthority,
+    PromotionCandidate,
+    PromotionDecision,
+)
 from hive_mind_os.recursive_improvement import ExperimentVerdict
-from promotion_auth_fixtures import authorize, verifier_for
 
 
 def evidence_refs(root: Path, candidate_id: str) -> tuple[str, ...]:

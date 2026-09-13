@@ -444,8 +444,16 @@ class PromptRegistry:
     def _resolve_event_evidence(self, event: Mapping[str, Any], *, promoted_by: str,
                                 admitted_at: str | None = None) -> tuple[Any, Any, Any]:
         from .brain_kernel.canonical import canonical_digest
-        from .brain_kernel.evaluation_admission import resolve_decision_evidence, recheck_resolved_evidence
-        from .brain_kernel.evaluation_runtime import PromptEvaluationSubject, EvaluationRecordReference, EvaluationError, EvaluationVerdict
+        from .brain_kernel.evaluation_admission import (
+            recheck_resolved_evidence,
+            resolve_decision_evidence,
+        )
+        from .brain_kernel.evaluation_runtime import (
+            EvaluationError,
+            EvaluationRecordReference,
+            EvaluationVerdict,
+            PromptEvaluationSubject,
+        )
 
         payload = event["payload"]
         if not payload.get("evaluation_subject") or not payload.get("evaluation_record"):

@@ -7,12 +7,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from promotion_auth_fixtures import verifier_for
+from promotion_fixtures import authenticated_rollback, decision_payload
+
 from hive_mind_os.ledger import EvidenceLedger
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import PromptRegistry, generation_zero_prompt
 from hive_mind_os.roles import ROLE_CONTRACTS
-from promotion_fixtures import decision_payload, authenticated_rollback
-from promotion_auth_fixtures import verifier_for
 
 
 class PromptRegistryTests(unittest.TestCase):

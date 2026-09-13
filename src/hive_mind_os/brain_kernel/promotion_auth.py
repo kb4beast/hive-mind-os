@@ -17,7 +17,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from types import MappingProxyType
-from typing import Any, Protocol
+from typing import Any, NoReturn, Protocol
 
 from .canonical import canonical_bytes, canonical_digest
 
@@ -33,7 +33,7 @@ class PromotionAuthenticationError(RuntimeError):
         super().__init__(message)
 
 
-def _fail(code: str, message: str) -> None:
+def _fail(code: str, message: str) -> NoReturn:
     raise PromotionAuthenticationError(code, message)
 
 

@@ -245,3 +245,37 @@ The separate continuation/controller campaign is explicitly deferred to
 Existing dissent, failed tournament evidence and source-ingestion obligations
 remain in their original locations and are neither replayed nor superseded by
 an invented court verdict.
+
+## Static-check repair handoff, 2026-09-12
+
+The builder read the complete diff from
+`aff97517b5d2c416bbfc2dd148e34910f0ae9d29`, this ADR, the changed tests, and all
+four supplied failed-command logs. The logs are retained unchanged under
+`C:/h/one-touch/state/run-20260912-183953-1214c3cd/`:
+
+- `20260912-193306-ruff-5a928be6.stdout.log`, SHA-256
+  `4e958e2ea4576b3fc80d8a9fcad987e5002603c061abbbaf89a3b57b3d4ea2a3`.
+- `20260912-193306-pyright-e72b0324.stdout.log`, SHA-256
+  `c9290aaba86933befd98002d260022ef86b054db8619364fdf3584f87b1c8be7`.
+- The corresponding `.stderr.log` files are both empty, SHA-256
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+This repair sorts the eight reported import blocks, annotates the authentication
+failure helper as `NoReturn`, and expresses the nullable-number exact-type guard
+as explicit float/int comparisons so the type checker can narrow its input.
+The helper still always raises; booleans, numeric subclasses and nonfinite values
+remain refused. No runtime authority, acceptance criterion, test assertion or
+configured check was relaxed. Existing malformed-number and unknown-principal
+tests remain the verification specifications for these paths.
+
+The caller inspection again located registry promotion and rollback as the
+authoritative prompt-pointer writers, with bootstrap and model-backend
+initialization entering the same admission gate. The external-sink adapter's
+separate boundary and the controller follow-up above remain unchanged.
+
+This batch is ready for launcher verification, not a green-check or independent
+review claim. The builder ran no tests, Ruff, Pyright or launcher. The supplied
+Pyright log also contains six `reportUnsupportedDunderAll` warnings in
+`brain_kernel/__init__.py`, which is unchanged from the pinned base; they remain
+visible for launcher review. Independent review, deterministic verification and
+non-draft PR delivery remain launcher-owned outstanding work.

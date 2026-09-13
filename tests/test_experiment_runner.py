@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from promotion_fixtures import decision_payload, authenticated_rollback
-from promotion_auth_fixtures import verifier_for
-
 import asyncio
 import json
 import subprocess
@@ -11,6 +8,9 @@ import unittest
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
+
+from promotion_auth_fixtures import verifier_for
+from promotion_fixtures import authenticated_rollback, decision_payload
 
 from hive_mind_os.experiment_runner import (
     EVALUATION_SURFACE_UNAVAILABLE,

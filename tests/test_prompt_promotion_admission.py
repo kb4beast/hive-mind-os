@@ -10,17 +10,26 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
+from promotion_auth_fixtures import authorize, verifier_for
+from promotion_fixtures import (
+    authenticated_rollback,
+    bound_decision,
+    decision_payload,
+    rollback_payload,
+)
+
 from hive_mind_os.brain_kernel.canonical import canonical_bytes
 from hive_mind_os.brain_kernel.promotion import PromotionAuthority, PromotionCandidate
-from hive_mind_os.recursive_improvement import ExperimentVerdict
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import (
-    PromptRegistry, PromotionAdmissionError, PromotionCommittedEvidencePending,
-    RejectionPersistenceError, generation_zero_prompt,
+    PromotionAdmissionError,
+    PromotionCommittedEvidencePending,
+    PromptRegistry,
+    RejectionPersistenceError,
+    generation_zero_prompt,
 )
+from hive_mind_os.recursive_improvement import ExperimentVerdict
 from hive_mind_os.roles import ROLE_CONTRACTS
-from promotion_auth_fixtures import authorize, verifier_for
-from promotion_fixtures import bound_decision, decision_payload, authenticated_rollback, rollback_payload
 
 
 class PromptPromotionAdmissionTests(unittest.TestCase):

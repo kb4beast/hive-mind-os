@@ -4,6 +4,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from promotion_auth_fixtures import verifier_for
+from promotion_fixtures import bound_decision, evidence_refs
+
 from hive_mind_os.brain_kernel.court_runtime import (
     CourtBrief,
     CourtCase,
@@ -24,10 +27,11 @@ from hive_mind_os.brain_kernel.promotion import (
     PromotionDecisionLog,
 )
 from hive_mind_os.models import Role
-from hive_mind_os.prompt_registry import PromptRegistry, PromotionCommittedEvidencePending
+from hive_mind_os.prompt_registry import (
+    PromotionCommittedEvidencePending,
+    PromptRegistry,
+)
 from hive_mind_os.recursive_improvement import ExperimentVerdict
-from promotion_fixtures import bound_decision, evidence_refs
-from promotion_auth_fixtures import verifier_for
 
 PROPOSER = "proposer-1"
 BUILDER = "builder-1"
