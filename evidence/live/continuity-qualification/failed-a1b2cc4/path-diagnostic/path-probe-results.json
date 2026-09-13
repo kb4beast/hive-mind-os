@@ -1,0 +1,29 @@
+{
+  "os_name": "nt",
+  "fixture_directory_retained": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\path-primitives-mxskt52r",
+  "cases": [
+    {
+      "mode": "ordinary",
+      "path": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\path-primitives-mxskt52r\\ordinary\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component",
+      "characters": 336,
+      "abspath_preserves_prefix": true,
+      "created": false,
+      "exception": "FileNotFoundError",
+      "winerror": 3,
+      "errno": 2,
+      "message": "[WinError 3] The system cannot find the path specified: 'C:\\\\h\\\\continuity-qualification\\\\builder-longpath-a1b2cc4\\\\path-primitives-mxskt52r\\\\ordinary\\\\continuity-long-path-component\\\\continuity-long-path-component\\\\continuity-long-path-component\\\\continuity-long-path-component\\\\continuity-long-path-component\\\\continuity-long-path-component'"
+    },
+    {
+      "mode": "extended",
+      "path": "\\\\?\\C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\path-primitives-mxskt52r\\extended\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component",
+      "characters": 340,
+      "abspath_preserves_prefix": true,
+      "created": true,
+      "bytes": "primitive path probe\n",
+      "listed": [
+        "marker.txt",
+        "published.txt"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "command": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "seconds": 0.0624952,
+  "stderr": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-checkpoint-ancestry-016d61c6.stderr.log",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "exitCode": 0,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-checkpoint-ancestry-016d61c6.stdout.log",
+  "timedOut": false,
+  "arguments": [
+    "merge-base",
+    "--is-ancestor",
+    "1a28b0c0587cc9a576c8f0aa2c287df3e3d2f366",
+    "HEAD"
+  ]
+}

@@ -2,12 +2,24 @@
   "schema_version": 2,
   "status": "IMPLEMENTED_AWAITING_ROOT_QUALIFICATION",
   "builder": "/root/continuity_repair_builder",
-  "recorded_at_utc": "2026-09-13T16:08:04.206295+00:00",
+  "recorded_at_utc": "2026-09-13T16:19:25.107968+00:00",
   "repository": "https://github.com/kb4beast/hive-mind-os",
   "license": "MIT",
   "branch": "codex/unverified-campaign-continuity",
   "reviewed_commit": "511850802afe2b58c0609f12d469f3751be4a3cb",
   "reviewed_tree": "48824828bb2c571c0ae4f25ad85361bda5bedffd",
+  "repair_base_commit": "a1b2cc410e9f54b01eee97003c3323083ac93c0d",
+  "prior_repair_qualification": {
+    "commit": "a1b2cc410e9f54b01eee97003c3323083ac93c0d",
+    "tree": "79f0e89a1c3ac247cd91637fe101197abe0fd7e5",
+    "status": "FAILED",
+    "focused_tests": 46,
+    "errors": 1,
+    "skips": 1,
+    "failure": "Unprefixed Windows long-path mkdir raised WinError 3. Previous test allowed only error 206 skip.",
+    "static_results": "Root receipts: Ruff pass, Pyright zero errors/six warnings; no full gate.",
+    "retention": "evidence/live/continuity-qualification/failed-a1b2cc4/"
+  },
   "sealed_review_manifest_sha256": "36b2458b1f83d7918c1558325a773c137012475cd0d3c41e8a5c66edb5e7181b",
   "historical_manifest": "docs/architecture/CONTINUITY-QUALIFICATION-MANIFEST.json",
   "historical_manifest_interpretation": "Unchanged first-repair working-tree receipt; five artifact hashes differ from reviewed committed LF bytes. Not a current qualification or immutable-byte claim.",
@@ -38,9 +50,9 @@
     {
       "path": "docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
       "representation": "repository-lf",
-      "sha256": "b9a8885083adec5494fb8df1696a0f4d18954e49a27682f22c556cc0960e11bc",
-      "bytes": 18219,
-      "git_blob_oid": "983a4a2f9aaf234e60f79179f030cb06a7822271"
+      "sha256": "53499f8957887b9d7e502025ac993ddac97e9aa0a85b259e59009e0c7d925d8c",
+      "bytes": 20818,
+      "git_blob_oid": "2b1e229437cc9c8da908172aec569d66674aaf56"
     },
     {
       "path": "docs/architecture/ADR-UNVERIFIED-CAMPAIGN-CONTINUITY.md",
@@ -125,6 +137,272 @@
       "sha256": "a1a9e435253a9ea6e9405764dcdc07a16d98c04965f90b8c07f8d1b7a879c16a",
       "bytes": 4734,
       "git_blob_oid": "7a6e1700b8528ba4dfb5960ffe340c8a0eae299a"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/PRECOMMIT-R1R2-ARTIFACT-AUDIT.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "4e2d0826a616f8fe8a7be4d7f663665aa6c5d7c928735d53c0c0bc7b85a9917e",
+      "bytes": 16071,
+      "git_blob_oid": "bae2ee93dbb3ff6969c76ed2ea78ad9a04ce6b13"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-checkpoint-ancestry-016d61c6.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "eef2e4c69e66e2a9a13634b2a2f466a8e8e3d1b9c7e5814c887ce79b361b5500",
+      "bytes": 702,
+      "git_blob_oid": "387a5101488866625cc52a7ec85311e42eddf1a3"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-checkpoint-ancestry-016d61c6.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-checkpoint-ancestry-016d61c6.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-508540c2.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "b02b4e33b3d456d1a364c3115eb3ff5bf5342cdf1dc25ab29917e29f48321c52",
+      "bytes": 598,
+      "git_blob_oid": "a20b63cf8f056f396a2a5fcb6119f6ddae162222"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-508540c2.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-508540c2.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "339837ffb8047f97e7d79cf2147c11b7c5766fd3729821a72ad2cd49899280e1",
+      "bytes": 41,
+      "git_blob_oid": "410c16d9adac0f8e7ed54aa0873345c511dd30d8"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-6e6792d3.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "69b26a8e6623c3ffeb1182798342a2b95ec81471b3d9828f76e791e758f896af",
+      "bytes": 602,
+      "git_blob_oid": "6d39580931f229ad1d41365a65c81fb50b40de6b"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-6e6792d3.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-6e6792d3.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-7b6034f4.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "b2d396e3a4b76fe138eef2d0be3c2492e769489b3c89e6185f12ec5370e81139",
+      "bytes": 605,
+      "git_blob_oid": "9691770e76fdc2a6aad1fe3a14ae9d8c3cb6a805"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-7b6034f4.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-7b6034f4.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "a49b87ffb889eba5f23d5d4f42309ee080c29750574c00c115dd300108a22204",
+      "bytes": 37,
+      "git_blob_oid": "f60d156cd3c2959a7d6edd6cf80a6e79ca3ea9e3"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-unittest-9109126b.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "a2e6ce37e88265a26fcda1c9dc900e47b178d98e81547bedc906f40dee8ed673",
+      "bytes": 694,
+      "git_blob_oid": "351d5bd74a5c61751dee743e91bd4b8752ce71cf"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-unittest-9109126b.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "676503507bd0dad1b7599e30bf65437732f2cd135cb6835159156d4943610296",
+      "bytes": 12846,
+      "git_blob_oid": "f6e38b65e320e4065b86e9c1cd5d017c23616c15"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-unittest-9109126b.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111542-ruff-bf35a4d9.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "9dbaed99bc358aa41c711b100f87ea71815500bf66ece24b3d16751f592628f4",
+      "bytes": 622,
+      "git_blob_oid": "572cb25a700e401c0d2962394ca3861869614740"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111542-ruff-bf35a4d9.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111542-ruff-bf35a4d9.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19,
+      "git_blob_oid": "1f5f344d054fae10f39140fb7199c99321d9190a"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111543-pyright-c3ce1815.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "4d1b3d73a6d602009420ff178f9d8fedb36deaf1e5f7a8b9aa6298f534a99662",
+      "bytes": 654,
+      "git_blob_oid": "d93ee3e233886fdb3a8fcfc80b25f83322d6321e"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111543-pyright-c3ce1815.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111543-pyright-c3ce1815.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "891badf113c9012fa58f980e1aae7ef2b17902bef2043fd0ad0dd2dfa0dc6764",
+      "bytes": 1263,
+      "git_blob_oid": "01a38e572443ba7693df1b7ab79b2b37552820e6"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-33738f05.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "8b7b59d44a049919a8db64e4f418f814996fd194b49d0641b94be4b58cd6ec48",
+      "bytes": 605,
+      "git_blob_oid": "ed9daf9d8c92609b9ff28bf5492ce1ac19ccb99d"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-33738f05.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-33738f05.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "3b943cce37012319d7137943005aa4d3d8558518b97db035287eda2f442f4aa9",
+      "bytes": 41,
+      "git_blob_oid": "040ccddc27a4445a32c743b23c12fe9f75a2d93e"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-b31af705.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "eb53bc352f451ec08773f91a60a0dcb80cfc0928326ed08933b052f37b6a95a8",
+      "bytes": 598,
+      "git_blob_oid": "05f13f060d0826c098ec4bd4f5eb266563c18056"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-b31af705.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-b31af705.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "339837ffb8047f97e7d79cf2147c11b7c5766fd3729821a72ad2cd49899280e1",
+      "bytes": 41,
+      "git_blob_oid": "410c16d9adac0f8e7ed54aa0873345c511dd30d8"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-caf8d8b0.receipt.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "9f28e5dec85ca3dfc0980969448c8efdf2ef9e8ca7935f213a8adfe5aaf8781c",
+      "bytes": 602,
+      "git_blob_oid": "b02d79e325ff584e755529a3f409216d7935fe35"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-caf8d8b0.stderr.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-caf8d8b0.stdout.log",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/FOCUSED-QUALIFICATION.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "07700e4fe9bef7966b0a6b46a43e1b3f1e334bb939b42784d7d9430da72f89c5",
+      "bytes": 751,
+      "git_blob_oid": "7a1727388e4ca1c33e96ea98d36ecf6ae21ecd03"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "representation": "exact-evidence-bytes",
+      "sha256": "b9a8885083adec5494fb8df1696a0f4d18954e49a27682f22c556cc0960e11bc",
+      "bytes": 18219,
+      "git_blob_oid": "983a4a2f9aaf234e60f79179f030cb06a7822271"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/docs/architecture/CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "451e5c46fda6060f2373c64902120109feccd4fa97cb1b31a62d22bf67ccc75a",
+      "bytes": 46011,
+      "git_blob_oid": "a80c46a6a8b5143c3fd0ebf66a044a3688e97057"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/src/hive_mind_os/campaign_continuity.py",
+      "representation": "exact-evidence-bytes",
+      "sha256": "e236d72a381c0cc12059330079b31a95fbf38bbf8c26d033114b869e00d19d76",
+      "bytes": 48243,
+      "git_blob_oid": "aa2755237fcb588e432de9bedd25841bebdc5150"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/tests/test_campaign_continuity.py",
+      "representation": "exact-evidence-bytes",
+      "sha256": "b2ed6dea3e7d075241bb88eb4533fb4a7b1871b80660fb87b34fd8b5459c5bc3",
+      "bytes": 53851,
+      "git_blob_oid": "5a5bdaed6c8410f0890802806c257f1b1daa6e12"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/path-diagnostic/path-probe-results.json",
+      "representation": "exact-evidence-bytes",
+      "sha256": "36b21c8e37e3fbb10d4c252e283a6e38f797aafc2effdd1f64c3e11cd5b99622",
+      "bytes": 1760,
+      "git_blob_oid": "f103df77f4a1ce17de707ff12f88f30b5cf1f8ee"
+    },
+    {
+      "path": "evidence/live/continuity-qualification/failed-a1b2cc4/path-diagnostic/path_probe.py",
+      "representation": "exact-evidence-bytes",
+      "sha256": "5b401e6718b9574d58344e7cc852b87b13a7fb9f7f64534263cc13379d41bdba",
+      "bytes": 1582,
+      "git_blob_oid": "e2390fb69962fecda714d8ef39a5a797474de354"
     },
     {
       "path": "evidence/live/continuity-qualification/historical-runner-receipts/20260913-014401-unittest-ce463543.receipt.json",
@@ -409,9 +687,9 @@
     {
       "path": "tests/test_campaign_continuity.py",
       "representation": "repository-lf",
-      "sha256": "b2ed6dea3e7d075241bb88eb4533fb4a7b1871b80660fb87b34fd8b5459c5bc3",
-      "bytes": 53851,
-      "git_blob_oid": "5a5bdaed6c8410f0890802806c257f1b1daa6e12"
+      "sha256": "477ade42c6b680953b7b2ee0748ce75afbf6b817b23e10308cb65c3ec769a00e",
+      "bytes": 55140,
+      "git_blob_oid": "9af75c193a8e73f8126bd659f037c20334147eea"
     }
   ],
   "historical_git_artifacts": [
@@ -518,6 +796,38 @@
       "sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
       "bytes": 11076,
       "retained_exact_blob": "evidence/live/continuity-qualification/review-repaired-5118508/immutable-git-blobs/docs/architecture/continuity-qualification-review/REVIEW.md"
+    },
+    {
+      "path": "src/hive_mind_os/campaign_continuity.py",
+      "commit": "a1b2cc410e9f54b01eee97003c3323083ac93c0d",
+      "git_blob_oid": "aa2755237fcb588e432de9bedd25841bebdc5150",
+      "sha256": "e236d72a381c0cc12059330079b31a95fbf38bbf8c26d033114b869e00d19d76",
+      "bytes": 48243,
+      "retained_exact_blob": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/src/hive_mind_os/campaign_continuity.py"
+    },
+    {
+      "path": "tests/test_campaign_continuity.py",
+      "commit": "a1b2cc410e9f54b01eee97003c3323083ac93c0d",
+      "git_blob_oid": "5a5bdaed6c8410f0890802806c257f1b1daa6e12",
+      "sha256": "b2ed6dea3e7d075241bb88eb4533fb4a7b1871b80660fb87b34fd8b5459c5bc3",
+      "bytes": 53851,
+      "retained_exact_blob": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/tests/test_campaign_continuity.py"
+    },
+    {
+      "path": "docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "commit": "a1b2cc410e9f54b01eee97003c3323083ac93c0d",
+      "git_blob_oid": "983a4a2f9aaf234e60f79179f030cb06a7822271",
+      "sha256": "b9a8885083adec5494fb8df1696a0f4d18954e49a27682f22c556cc0960e11bc",
+      "bytes": 18219,
+      "retained_exact_blob": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md"
+    },
+    {
+      "path": "docs/architecture/CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json",
+      "commit": "a1b2cc410e9f54b01eee97003c3323083ac93c0d",
+      "git_blob_oid": "a80c46a6a8b5143c3fd0ebf66a044a3688e97057",
+      "sha256": "451e5c46fda6060f2373c64902120109feccd4fa97cb1b31a62d22bf67ccc75a",
+      "bytes": 46011,
+      "retained_exact_blob": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/docs/architecture/CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json"
     }
   ],
   "original_review_mapping": [
@@ -810,6 +1120,234 @@
       "retained_path": "evidence/live/continuity-qualification/historical-working-tree/CONTINUITY-QUALIFICATION-MANIFEST.json",
       "sha256": "3ad253c21395176f030d6564ba824ca12e4d42316819aef45c3ce6c79f297413",
       "bytes": 3973
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-checkpoint-ancestry-016d61c6.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-checkpoint-ancestry-016d61c6.receipt.json",
+      "sha256": "eef2e4c69e66e2a9a13634b2a2f466a8e8e3d1b9c7e5814c887ce79b361b5500",
+      "bytes": 702
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-checkpoint-ancestry-016d61c6.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-checkpoint-ancestry-016d61c6.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-checkpoint-ancestry-016d61c6.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-checkpoint-ancestry-016d61c6.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-508540c2.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-508540c2.receipt.json",
+      "sha256": "b02b4e33b3d456d1a364c3115eb3ff5bf5342cdf1dc25ab29917e29f48321c52",
+      "bytes": 598
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-508540c2.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-508540c2.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-508540c2.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-508540c2.stdout.log",
+      "sha256": "339837ffb8047f97e7d79cf2147c11b7c5766fd3729821a72ad2cd49899280e1",
+      "bytes": 41
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-6e6792d3.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-6e6792d3.receipt.json",
+      "sha256": "69b26a8e6623c3ffeb1182798342a2b95ec81471b3d9828f76e791e758f896af",
+      "bytes": 602
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-6e6792d3.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-6e6792d3.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-6e6792d3.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-6e6792d3.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-7b6034f4.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-7b6034f4.receipt.json",
+      "sha256": "b2d396e3a4b76fe138eef2d0be3c2492e769489b3c89e6185f12ec5370e81139",
+      "bytes": 605
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-7b6034f4.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-7b6034f4.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-git-7b6034f4.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-git-7b6034f4.stdout.log",
+      "sha256": "a49b87ffb889eba5f23d5d4f42309ee080c29750574c00c115dd300108a22204",
+      "bytes": 37
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-unittest-9109126b.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-unittest-9109126b.receipt.json",
+      "sha256": "a2e6ce37e88265a26fcda1c9dc900e47b178d98e81547bedc906f40dee8ed673",
+      "bytes": 694
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-unittest-9109126b.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-unittest-9109126b.stderr.log",
+      "sha256": "676503507bd0dad1b7599e30bf65437732f2cd135cb6835159156d4943610296",
+      "bytes": 12846
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111533-unittest-9109126b.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111533-unittest-9109126b.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111542-ruff-bf35a4d9.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111542-ruff-bf35a4d9.receipt.json",
+      "sha256": "9dbaed99bc358aa41c711b100f87ea71815500bf66ece24b3d16751f592628f4",
+      "bytes": 622
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111542-ruff-bf35a4d9.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111542-ruff-bf35a4d9.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111542-ruff-bf35a4d9.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111542-ruff-bf35a4d9.stdout.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111543-pyright-c3ce1815.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111543-pyright-c3ce1815.receipt.json",
+      "sha256": "4d1b3d73a6d602009420ff178f9d8fedb36deaf1e5f7a8b9aa6298f534a99662",
+      "bytes": 654
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111543-pyright-c3ce1815.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111543-pyright-c3ce1815.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111543-pyright-c3ce1815.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111543-pyright-c3ce1815.stdout.log",
+      "sha256": "891badf113c9012fa58f980e1aae7ef2b17902bef2043fd0ad0dd2dfa0dc6764",
+      "bytes": 1263
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-33738f05.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-33738f05.receipt.json",
+      "sha256": "8b7b59d44a049919a8db64e4f418f814996fd194b49d0641b94be4b58cd6ec48",
+      "bytes": 605
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-33738f05.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-33738f05.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-33738f05.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-33738f05.stdout.log",
+      "sha256": "3b943cce37012319d7137943005aa4d3d8558518b97db035287eda2f442f4aa9",
+      "bytes": 41
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-b31af705.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-b31af705.receipt.json",
+      "sha256": "eb53bc352f451ec08773f91a60a0dcb80cfc0928326ed08933b052f37b6a95a8",
+      "bytes": 598
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-b31af705.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-b31af705.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-b31af705.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-b31af705.stdout.log",
+      "sha256": "339837ffb8047f97e7d79cf2147c11b7c5766fd3729821a72ad2cd49899280e1",
+      "bytes": 41
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-caf8d8b0.receipt.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-caf8d8b0.receipt.json",
+      "sha256": "9f28e5dec85ca3dfc0980969448c8efdf2ef9e8ca7935f213a8adfe5aaf8781c",
+      "bytes": 602
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-caf8d8b0.stderr.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-caf8d8b0.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111549-git-caf8d8b0.stdout.log",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/20260913-111549-git-caf8d8b0.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\FOCUSED-QUALIFICATION.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/focused-qualification/FOCUSED-QUALIFICATION.json",
+      "sha256": "07700e4fe9bef7966b0a6b46a43e1b3f1e334bb939b42784d7d9430da72f89c5",
+      "bytes": 751
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\PRECOMMIT-R1R2-ARTIFACT-AUDIT.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/PRECOMMIT-R1R2-ARTIFACT-AUDIT.json",
+      "sha256": "4e2d0826a616f8fe8a7be4d7f663665aa6c5d7c928735d53c0c0bc7b85a9917e",
+      "bytes": 16071
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\path_probe.py",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/path-diagnostic/path_probe.py",
+      "sha256": "5b401e6718b9574d58344e7cc852b87b13a7fb9f7f64534263cc13379d41bdba",
+      "bytes": 1582
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\path-probe-results.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/path-diagnostic/path-probe-results.json",
+      "sha256": "36b21c8e37e3fbb10d4c252e283a6e38f797aafc2effdd1f64c3e11cd5b99622",
+      "bytes": 1760
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\immutable-git-blobs\\src\\hive_mind_os\\campaign_continuity.py",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/src/hive_mind_os/campaign_continuity.py",
+      "sha256": "e236d72a381c0cc12059330079b31a95fbf38bbf8c26d033114b869e00d19d76",
+      "bytes": 48243
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\immutable-git-blobs\\tests\\test_campaign_continuity.py",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/tests/test_campaign_continuity.py",
+      "sha256": "b2ed6dea3e7d075241bb88eb4533fb4a7b1871b80660fb87b34fd8b5459c5bc3",
+      "bytes": 53851
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\immutable-git-blobs\\docs\\architecture\\ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "sha256": "b9a8885083adec5494fb8df1696a0f4d18954e49a27682f22c556cc0960e11bc",
+      "bytes": 18219
+    },
+    {
+      "original_path": "C:\\h\\continuity-qualification\\builder-longpath-a1b2cc4\\immutable-git-blobs\\docs\\architecture\\CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json",
+      "retained_path": "evidence/live/continuity-qualification/failed-a1b2cc4/immutable-git-blobs/docs/architecture/CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json",
+      "sha256": "451e5c46fda6060f2373c64902120109feccd4fa97cb1b31a62d22bf67ccc75a",
+      "bytes": 46011
     }
   ],
   "outstanding": [

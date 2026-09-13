@@ -1,0 +1,105 @@
+test_candidate_replacement_is_retained_and_stops_campaign (test_campaign_continuity.CampaignContinuityDraftTests.test_candidate_replacement_is_retained_and_stops_campaign) ... ok
+test_completed_merge_without_green_checks_is_ineligible (test_campaign_continuity.CampaignContinuityDraftTests.test_completed_merge_without_green_checks_is_ineligible) ... ok
+test_corrupt_checkpoint_never_reaches_adapter (test_campaign_continuity.CampaignContinuityDraftTests.test_corrupt_checkpoint_never_reaches_adapter) ... ok
+test_delivery_replacement_cannot_relaunch (test_campaign_continuity.CampaignContinuityDraftTests.test_delivery_replacement_cannot_relaunch) ... ok
+test_denied_authority_is_terminal_and_never_retried (test_campaign_continuity.CampaignContinuityDraftTests.test_denied_authority_is_terminal_and_never_retried) ... ok
+test_deterministic_selection_retains_every_disposition_and_dissent (test_campaign_continuity.CampaignContinuityDraftTests.test_deterministic_selection_retains_every_disposition_and_dissent) ... ok
+test_duplicate_delivery_and_candidate_intake_are_idempotent (test_campaign_continuity.CampaignContinuityDraftTests.test_duplicate_delivery_and_candidate_intake_are_idempotent) ... ok
+test_hardlinked_event_is_rejected_before_adapter (test_campaign_continuity.CampaignContinuityDraftTests.test_hardlinked_event_is_rejected_before_adapter) ... ok
+test_hardlinked_lock_never_writes_external_target (test_campaign_continuity.CampaignContinuityDraftTests.test_hardlinked_lock_never_writes_external_target) ... ok
+test_interruption_after_intent_preserves_attempt_and_requires_inspection (test_campaign_continuity.CampaignContinuityDraftTests.test_interruption_after_intent_preserves_attempt_and_requires_inspection) ... ok
+test_invalid_journal_shapes_fail_closed_even_with_valid_digest (test_campaign_continuity.CampaignContinuityDraftTests.test_invalid_journal_shapes_fail_closed_even_with_valid_digest) ... ok
+test_invalid_json_roots_and_deleted_journal_are_typed (test_campaign_continuity.CampaignContinuityDraftTests.test_invalid_json_roots_and_deleted_journal_are_typed) ... ok
+test_launch_budget_is_durable_across_restart (test_campaign_continuity.CampaignContinuityDraftTests.test_launch_budget_is_durable_across_restart) ... ok
+test_launch_denial_is_terminal_without_retry (test_campaign_continuity.CampaignContinuityDraftTests.test_launch_denial_is_terminal_without_retry) ... ok
+test_long_path_journal_roundtrip_or_explicit_platform_refusal (test_campaign_continuity.CampaignContinuityDraftTests.test_long_path_journal_roundtrip_or_explicit_platform_refusal) ... ERROR
+test_lost_launch_response_is_observed_before_any_possible_retry (test_campaign_continuity.CampaignContinuityDraftTests.test_lost_launch_response_is_observed_before_any_possible_retry) ... ok
+test_malformed_or_denied_launch_receipt_keeps_effect_recoverable (test_campaign_continuity.CampaignContinuityDraftTests.test_malformed_or_denied_launch_receipt_keeps_effect_recoverable) ... ok
+test_mutated_observation_cannot_bypass_boundary_validation (test_campaign_continuity.CampaignContinuityDraftTests.test_mutated_observation_cannot_bypass_boundary_validation) ... ok
+test_observation_persistence_failure_is_not_an_adapter_denial (test_campaign_continuity.CampaignContinuityDraftTests.test_observation_persistence_failure_is_not_an_adapter_denial) ... ok
+test_observed_scope_worktree_authority_and_evidence_must_match (test_campaign_continuity.CampaignContinuityDraftTests.test_observed_scope_worktree_authority_and_evidence_must_match) ... ok
+test_pending_effect_recovery_after_expiry_denial_and_final_attempt (test_campaign_continuity.CampaignContinuityDraftTests.test_pending_effect_recovery_after_expiry_denial_and_final_attempt) ... ok
+test_process_kill_releases_lock_and_preserves_pending_effect_recovery (test_campaign_continuity.CampaignContinuityDraftTests.test_process_kill_releases_lock_and_preserves_pending_effect_recovery) ... ok
+test_publication_and_cleanup_errors_preserve_primary_failure (test_campaign_continuity.CampaignContinuityDraftTests.test_publication_and_cleanup_errors_preserve_primary_failure) ... ok
+test_qualification_manifest_binds_canonical_git_artifacts_and_exact_evidence (test_campaign_continuity.CampaignContinuityDraftTests.test_qualification_manifest_binds_canonical_git_artifacts_and_exact_evidence) ... ok
+test_receipt_persistence_failure_recovers_external_result_without_relaunch (test_campaign_continuity.CampaignContinuityDraftTests.test_receipt_persistence_failure_recovers_external_result_without_relaunch) ... ok
+test_recovery_absence_closes_unknown_without_launching (test_campaign_continuity.CampaignContinuityDraftTests.test_recovery_absence_closes_unknown_without_launching) ... ok
+test_recovery_unknown_is_bounded_and_never_reopens_dispatch (test_campaign_continuity.CampaignContinuityDraftTests.test_recovery_unknown_is_bounded_and_never_reopens_dispatch) ... ok
+test_replay_preserves_exhausted_recovery_receipt_outcomes (test_campaign_continuity.CampaignContinuityDraftTests.test_replay_preserves_exhausted_recovery_receipt_outcomes) ... ok
+test_replay_rejects_appended_terminal_dispatch_regressions (test_campaign_continuity.CampaignContinuityDraftTests.test_replay_rejects_appended_terminal_dispatch_regressions) ... ok
+test_replay_rejects_receipt_state_and_binding_contradictions (test_campaign_continuity.CampaignContinuityDraftTests.test_replay_rejects_receipt_state_and_binding_contradictions) ... ok
+test_replay_rejects_unexplained_counters_pending_blocker_and_event_kind (test_campaign_continuity.CampaignContinuityDraftTests.test_replay_rejects_unexplained_counters_pending_blocker_and_event_kind) ... ok
+test_replay_requires_intent_and_payload_for_success (test_campaign_continuity.CampaignContinuityDraftTests.test_replay_requires_intent_and_payload_for_success) ... ok
+test_response_dataclasses_require_exact_fields (test_campaign_continuity.CampaignContinuityDraftTests.test_response_dataclasses_require_exact_fields) ... ok
+test_restart_waiting_selected_and_launched_preserves_one_operation (test_campaign_continuity.CampaignContinuityDraftTests.test_restart_waiting_selected_and_launched_preserves_one_operation) ... ok
+test_scope_change_on_reopen_is_typed_and_preserves_original_bytes (test_campaign_continuity.CampaignContinuityDraftTests.test_scope_change_on_reopen_is_typed_and_preserves_original_bytes) ... ok
+test_selected_candidate_and_operation_are_revalidated_on_restart (test_campaign_continuity.CampaignContinuityDraftTests.test_selected_candidate_and_operation_are_revalidated_on_restart) ... ok
+test_spawned_process_exclusion_and_single_launch (test_campaign_continuity.CampaignContinuityDraftTests.test_spawned_process_exclusion_and_single_launch) ... ok
+test_stale_or_out_of_scope_candidates_remain_retained_but_cannot_launch (test_campaign_continuity.CampaignContinuityDraftTests.test_stale_or_out_of_scope_candidates_remain_retained_but_cannot_launch) ... ok
+test_substituted_launch_receipt_is_retained_as_a_typed_blocker (test_campaign_continuity.CampaignContinuityDraftTests.test_substituted_launch_receipt_is_retained_as_a_typed_blocker) ... ok
+test_symbolic_directory_and_lock_are_rejected (test_campaign_continuity.CampaignContinuityDraftTests.test_symbolic_directory_and_lock_are_rejected) ... skipped "platform does not permit fixture symlinks: [WinError 1314] A required privilege is not held by the client: 'C:\\\\Users\\\\beesp\\\\AppData\\\\Local\\\\Temp\\\\tmpvee2c0tx\\\\outside' -> 'C:\\\\Users\\\\beesp\\\\AppData\\\\Local\\\\Temp\\\\tmpvee2c0tx\\\\alias'"
+test_typed_inspect_failure_is_retained_without_authorizing_launch (test_campaign_continuity.CampaignContinuityDraftTests.test_typed_inspect_failure_is_retained_without_authorizing_launch) ... ok
+test_typed_launch_denial_after_effect_stops_dispatch_but_allows_recovery (test_campaign_continuity.CampaignContinuityDraftTests.test_typed_launch_denial_after_effect_stops_dispatch_but_allows_recovery) ... ok
+test_typed_observer_denial_is_retained_once (test_campaign_continuity.CampaignContinuityDraftTests.test_typed_observer_denial_is_retained_once) ... ok
+test_unconfirmed_absence_does_not_authorize_launch (test_campaign_continuity.CampaignContinuityDraftTests.test_unconfirmed_absence_does_not_authorize_launch) ... ok
+test_unknown_effect_never_authorizes_retry_and_reconciliation_is_bounded (test_campaign_continuity.CampaignContinuityDraftTests.test_unknown_effect_never_authorizes_retry_and_reconciliation_is_bounded) ... ok
+test_wrong_scope_restore_is_rejected_by_every_public_read (test_campaign_continuity.CampaignContinuityDraftTests.test_wrong_scope_restore_is_rejected_by_every_public_read) ... ok
+
+======================================================================
+ERROR: test_long_path_journal_roundtrip_or_explicit_platform_refusal (test_campaign_continuity.CampaignContinuityDraftTests.test_long_path_journal_roundtrip_or_explicit_platform_refusal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Python314\Lib\pathlib\__init__.py", line 1011, in mkdir
+    os.mkdir(self, mode)
+    ~~~~~~~~^^^^^^^^^^^^
+FileNotFoundError: [WinError 3] The system cannot find the path specified: 'C:\\Users\\beesp\\AppData\\Local\\Temp\\tmpmku5tnbf\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Python314\Lib\pathlib\__init__.py", line 1011, in mkdir
+    os.mkdir(self, mode)
+    ~~~~~~~~^^^^^^^^^^^^
+FileNotFoundError: [WinError 3] The system cannot find the path specified: 'C:\\Users\\beesp\\AppData\\Local\\Temp\\tmpmku5tnbf\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Python314\Lib\pathlib\__init__.py", line 1011, in mkdir
+    os.mkdir(self, mode)
+    ~~~~~~~~^^^^^^^^^^^^
+FileNotFoundError: [WinError 3] The system cannot find the path specified: 'C:\\Users\\beesp\\AppData\\Local\\Temp\\tmpmku5tnbf\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\h\continuity-draft1\src\hive_mind_os\campaign_continuity.py", line 271, in __init__
+    self.root.mkdir(parents=True, exist_ok=True)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\pathlib\__init__.py", line 1015, in mkdir
+    self.parent.mkdir(parents=True, exist_ok=True)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\pathlib\__init__.py", line 1015, in mkdir
+    self.parent.mkdir(parents=True, exist_ok=True)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\pathlib\__init__.py", line 1016, in mkdir
+    self.mkdir(mode, parents=False, exist_ok=exist_ok)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\pathlib\__init__.py", line 1011, in mkdir
+    os.mkdir(self, mode)
+    ~~~~~~~~^^^^^^^^^^^^
+FileNotFoundError: [WinError 3] The system cannot find the path specified: 'C:\\Users\\beesp\\AppData\\Local\\Temp\\tmpmku5tnbf\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component\\continuity-long-path-component'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\h\continuity-draft1\tests\test_campaign_continuity.py", line 932, in test_long_path_journal_roundtrip_or_explicit_platform_refusal
+    controller = CampaignContinuityController(root, self.scope, clock=lambda: 100)
+  File "C:\h\continuity-draft1\src\hive_mind_os\campaign_continuity.py", line 273, in __init__
+    raise ContinuityError("checkpoint-storage", "cannot create state directory") from error
+hive_mind_os.campaign_continuity.ContinuityError: cannot create state directory
+
+----------------------------------------------------------------------
+Ran 46 tests in 8.541s
+
+FAILED (errors=1, skipped=1)

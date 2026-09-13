@@ -215,9 +215,10 @@ restart must regain the native lock and inspect the stable operation without
 observing authority or relaunching. Waits and cleanup are bounded. This covers
 abrupt process death at two library/fixture boundaries, not power loss, adapter
 cancellation, distributed effects or every publication microstep. A journal path
-longer than 320 characters exercises registration, launch and restart; a Windows
-host that explicitly returns error 206 records a skip and typed storage refusal
-before any adapter call. Broader filesystem/long-path matrices and Windows/Linux
+longer than 320 characters exercises registration, launch and restart. The initial
+fixture's error-206-only refusal handling failed on this Windows host, as recorded
+below; the repaired fixture requires an explicit extended-path roundtrip and
+separately checks typed storage refusal without adapter effects. Broader filesystem/long-path matrices and Windows/Linux
 Python 3.11/3.12/3.14 execution remain unclaimed until actual receipts are appended.
 
 Migration is validation tightening within schema 2: structurally legal prior
@@ -231,3 +232,40 @@ Root owns focused/static gates, separate Curator review, the subsequent full gat
 and any reversible Git delivery. No launcher, test/static execution, commit, push,
 PR, protected merge, production activation or external effect was performed by
 this repair builder.
+
+## Windows path fixture repair after a1b2cc4 qualification failure
+
+Root committed the R1/R2 implementation as
+`a1b2cc410e9f54b01eee97003c3323083ac93c0d` (tree
+`79f0e89a1c3ac247cd91637fe101197abe0fd7e5`). Its deterministic artifact audit
+matched all 56 declared staged artifacts and preserved the original 19 and prior
+38 test ASTs. The subsequent focused run executed 46 tests with one error and one
+symlink privilege skip. All replay/recovery/process-kill/manifest cases passed;
+the long-path case failed before adapter calls. Ruff passed; Pyright reported zero
+errors and six warnings. These root receipts are historical evidence and do not
+qualify the current fixture repair. No full suite ran.
+
+The traceback identifies ordinary, unprefixed Windows path creation beyond the
+legacy length boundary returning WinError 3, rather than the test's assumed 206.
+A narrow external pathlib diagnostic reproduced that ordinary-path refusal and
+successfully created a 340-character directory, wrote/read files and published a
+hard link using explicit `\\?\` syntax. This is a path-primitive diagnostic, not
+execution of repository tests or evidence of a production adapter guarantee.
+
+The library remains unchanged. The fixture now supplies an absolute extended
+Windows path (`\\?\C:\...`, or `\\?\UNC\...` when its temporary root is UNC),
+retaining that prefix for recursive fixture cleanup. On other platforms it uses
+the ordinary absolute path. Long-path creation, registration, single launch,
+restart and event equality must complete; no long-path exception is converted to
+a skip. A separately injected FileNotFoundError must become `checkpoint-storage`
+with the original cause, no directory creation and no observation, inspection or
+launch. The earlier roundtrip, launched-phase and single-launch assertions remain.
+No Windows registry setting, ACL, global policy or library normalization changed.
+
+All failed qualification files, the successful earlier artifact audit, diagnostic
+source/results and exact a1b2cc4 source/test/ADR/manifest blobs are retained under
+`evidence/live/continuity-qualification/failed-a1b2cc4/`. The current manifest is
+rebound to the changed test/ADR and new evidence bytes; the a1b2cc4 manifest remains
+an immutable historical snapshot. Focused/static and independent exact-head review
+of this repair are pending root execution. Migration/rollback and all custody,
+authority, adapter, process-kill and broader platform limits above are unchanged.

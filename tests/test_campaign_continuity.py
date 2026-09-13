@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import multiprocessing
 import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -925,17 +926,38 @@ class CampaignContinuityDraftTests(unittest.TestCase):
                             process.close()
 
     def test_long_path_journal_roundtrip_or_explicit_platform_refusal(self):
-        root = self.root
+        # A generic mkdir refusal is an error with no adapter effects, never a
+        # reason to skip the executable long-path acceptance below.
+        refused = self.root / "refused-long-path-fixture"
+        failure = FileNotFoundError(2, "fixture directory creation refused", str(refused))
+        with patch.object(Path, "mkdir", side_effect=failure):
+            with self.assertRaises(ContinuityError) as raised:
+                CampaignContinuityController(refused, self.scope, clock=lambda: 100)
+        self.assertEqual(raised.exception.code, "checkpoint-storage")
+        self.assertIs(raised.exception.__cause__, failure)
+        self.assertEqual(self.adapter.observations, 0)
+        self.assertFalse(self.adapter.inspections)
+        self.assertFalse(self.adapter.launches)
+        self.assertFalse(refused.exists())
+
+        fixture = self.root / "long-path-fixture"
+        if os.name == "nt":
+            # The caller explicitly opts into Windows extended-length syntax.
+            # No registry/global path setting or library authority changes.
+            absolute = str(fixture.absolute())
+            if not absolute.startswith("\\\\?\\"):
+                absolute = "\\\\?\\UNC\\" + absolute[2:] if absolute.startswith("\\\\") else "\\\\?\\" + absolute
+            fixture = Path(absolute)
+        fixture.mkdir()
+        # Cleanup uses the same prefix; unprefixed recursive traversal can hit
+        # MAX_PATH even though all the journal operations used extended paths.
+        self.addCleanup(shutil.rmtree, fixture)
+        root = fixture
         while len(str(root)) < 320:
             root /= "continuity-long-path-component"
-        try:
-            controller = CampaignContinuityController(root, self.scope, clock=lambda: 100)
-        except ContinuityError as error:
-            if os.name == "nt" and isinstance(error.__cause__, OSError) and getattr(error.__cause__, "winerror", None) == 206:
-                self.assertEqual(error.code, "checkpoint-storage")
-                self.assertEqual(self.adapter.observations, 0)
-                self.skipTest("host refuses extended paths with Windows error 206; no adapter call")
-            raise
+        self.assertGreaterEqual(len(str(root)), 320)
+        controller = CampaignContinuityController(root, self.scope, clock=lambda: 100)
+        self.assertEqual(controller.root, root)
         controller.record_delivery(self.delivery)
         controller.record_candidate(self.candidate())
         controller.step(self.adapter)
@@ -944,6 +966,7 @@ class CampaignContinuityDraftTests(unittest.TestCase):
         self.assertEqual(reopened.step(self.adapter), state)
         self.assertEqual(state["phase"], Phase.LAUNCHED)
         self.assertEqual(len(self.adapter.launches), 1)
+        self.assertEqual(reopened.events(), controller.events())
 
     def test_qualification_manifest_binds_canonical_git_artifacts_and_exact_evidence(self):
         repository = Path(__file__).resolve().parents[1]

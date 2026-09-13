@@ -1,0 +1,17 @@
+{
+  "command": "C:\\Python314\\python.exe",
+  "seconds": 0.1616454,
+  "stderr": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111542-ruff-bf35a4d9.stderr.log",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "exitCode": 0,
+  "stdoutSha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "stdout": "C:\\h\\continuity-qualification\\focused-20260913-111533-c4c101f3\\20260913-111542-ruff-bf35a4d9.stdout.log",
+  "timedOut": false,
+  "arguments": [
+    "-m",
+    "ruff",
+    "check",
+    "src",
+    "tests"
+  ]
+}
