@@ -579,6 +579,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "core.eol=lf",
                 "clone",
                 "--quiet",
+                "--no-local",
                 "--no-hardlinks",
                 str(ROOT),
                 str(cls.authoring_root),
@@ -1385,6 +1386,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "core.eol=lf",
                 "clone",
                 "--quiet",
+                "--no-local",
                 "--no-hardlinks",
                 str(ROOT),
                 str(checkout),
@@ -1708,6 +1710,12 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
             candidate = self.make_committed_checkout(parent)
+            # Maintenance may replace source-private object-info files during a
+            # clone. Transport objects instead of copying that mutable directory.
+            source_only = Path("objects/info/source-maintenance-probe.lock")
+            source_marker = candidate / ".git" / source_only
+            source_marker.parent.mkdir(parents=True, exist_ok=True)
+            source_marker.write_bytes(b"source-only maintenance metadata\n")
             system_config = parent / "system.gitconfig"
             global_config = parent / "global.gitconfig"
             config_text = "[core]\n\tautocrlf = true\n"
@@ -1730,6 +1738,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     str(self.git_executable),
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
                     str(candidate),
                     str(fresh),
@@ -1741,6 +1750,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 env=hostile_environment,
             )
             self.assertEqual(clone.returncode, 0, clone.stdout + clone.stderr)
+            self.assertFalse((fresh / ".git" / source_only).exists())
+            self.assertEqual(
+                source_marker.read_bytes(), b"source-only maintenance metadata\n"
+            )
             observed_config = subprocess.run(
                 [
                     str(self.git_executable),
@@ -1842,6 +1855,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     str(self.git_executable),
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
                     str(fixture),
                     str(hostile_fixture),
@@ -4129,6 +4143,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     "core.eol=lf",
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
                     str(checkout),
                     str(shadow),
@@ -4224,6 +4239,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     "core.eol=lf",
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
                     str(ROOT),
                     str(checkout),
