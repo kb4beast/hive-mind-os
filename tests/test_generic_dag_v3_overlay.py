@@ -822,6 +822,31 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     )
                     self.assertNotEqual(result.returncode, 0)
 
+            # A cold ROOT has no incidental historical objects. Fixture creation
+            # must transport the explicitly authenticated authoring history.
+            with mock.patch(f"{__name__}.ROOT", repository):
+                for label, base in (
+                    ("correction-parent", CORRECTION_PARENT),
+                    ("negative-parent", CORRECTION_PARENT + "^"),
+                ):
+                    checkout = self.make_committed_checkout(
+                        Path(directory) / label, base=base
+                    )
+                    expected_parent = self.run_git(
+                        self.authoring_root, "rev-parse", base
+                    ).stdout.strip()
+                    self.assertEqual(
+                        self.run_git(checkout, "rev-parse", "HEAD^").stdout.strip(),
+                        expected_parent,
+                    )
+                    for required_commit, expected_tree in expected_trees.items():
+                        self.assertEqual(
+                            self.run_git(
+                                checkout, "rev-parse", f"{required_commit}^{{tree}}"
+                            ).stdout.strip(),
+                            expected_tree,
+                        )
+
             self.run_git(repository, "bundle", "verify", str(HISTORY_BUNDLE))
             self.run_git(
                 repository,
@@ -1377,6 +1402,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         executable_path: str | None = None,
     ) -> Path:
         checkout = parent / "committed"
+        # The verified authoring branch advertises the pinned history imported
+        # from bundles. ROOT may retain that history only in remote-tracking refs,
+        # which normal clone transport does not fetch.
         subprocess.run(
             [
                 str(self.git_executable),
@@ -1388,7 +1416,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "--quiet",
                 "--no-local",
                 "--no-hardlinks",
-                str(ROOT),
+                str(self.authoring_root),
                 str(checkout),
             ],
             cwd=ROOT,
@@ -4230,6 +4258,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             checkout = root / "authoring-filter-boundary"
+            # Use the authenticated historical branch, not incidental ROOT objects.
             subprocess.run(
                 [
                     str(self.git_executable),
@@ -4241,7 +4270,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     "--quiet",
                     "--no-local",
                     "--no-hardlinks",
-                    str(ROOT),
+                    str(self.authoring_root),
                     str(checkout),
                 ],
                 cwd=ROOT,

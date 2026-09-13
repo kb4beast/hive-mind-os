@@ -1,0 +1,9 @@
+test_history_bundle_supplies_required_objects_to_prerequisite_only_repository (tests.test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_history_bundle_supplies_required_objects_to_prerequisite_only_repository) ... ok
+test_authenticated_attributes_defeat_system_and_global_autocrlf (tests.test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authenticated_attributes_defeat_system_and_global_autocrlf) ... ok
+test_authoring_authenticates_root_attributes_and_rejects_info_attributes_before_filters (tests.test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_authoring_authenticates_root_attributes_and_rejects_info_attributes_before_filters) ... ok
+test_git_replace_hidden_worktree_and_mode_substitution_fail_closed (tests.test_generic_dag_v3_overlay.GenericDagV3OverlayTests.test_git_replace_hidden_worktree_and_mode_substitution_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 126.593s
+
+OK
