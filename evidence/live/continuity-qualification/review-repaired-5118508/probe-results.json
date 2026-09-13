@@ -1,0 +1,218 @@
+{
+  "illegal_terminal_regression": {
+    "prior_phase": "blocked",
+    "prior_blocker": "authority-denied",
+    "accepted_phase": "launched",
+    "launches": 1,
+    "reconciliations": 2
+  },
+  "success_without_receipt_payload": {
+    "phase": "launched",
+    "inspections": 0,
+    "launches": 0
+  },
+  "expired_pending_recovery_control": {
+    "pending": true,
+    "blocker": "authority-expired",
+    "recovered_phase": "launched",
+    "recovered_pending": false,
+    "launches": 1
+  },
+  "manifest_artifacts": [
+    {
+      "path": "src/hive_mind_os/campaign_continuity.py",
+      "declared_sha256": "3250666dfe788b9a2492e58494b5fb8b04a94a10197ee20e029b890b1248f91c",
+      "declared_bytes": 38780,
+      "git_blob_sha256": "0a2f44dd5bb894c2aba083e2cff546c5213351153741751f8ba0d71905882c17",
+      "git_blob_bytes": 38426,
+      "working_tree_sha256": "3250666dfe788b9a2492e58494b5fb8b04a94a10197ee20e029b890b1248f91c",
+      "working_tree_bytes": 38780,
+      "matches_git_blob": false,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "tests/test_campaign_continuity.py",
+      "declared_sha256": "5b2c4702d99e3e39dbf991b961174bd357adc232e732bb8ece7185f753223c4a",
+      "declared_bytes": 38312,
+      "git_blob_sha256": "6e5cdf8d0f136fdc95c589968787850058212dd26ccdfb125397524b4b2e7746",
+      "git_blob_bytes": 37992,
+      "working_tree_sha256": "5b2c4702d99e3e39dbf991b961174bd357adc232e732bb8ece7185f753223c4a",
+      "working_tree_bytes": 38312,
+      "matches_git_blob": false,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/ADR-CAMPAIGN-CONTINUITY-QUALIFICATION.md",
+      "declared_sha256": "c734da87bf6d623d1ac0a990cfdcecc9f493f4ef09e2f32a4f914d89e69186d3",
+      "declared_bytes": 11336,
+      "git_blob_sha256": "c734da87bf6d623d1ac0a990cfdcecc9f493f4ef09e2f32a4f914d89e69186d3",
+      "git_blob_bytes": 11336,
+      "working_tree_sha256": "c734da87bf6d623d1ac0a990cfdcecc9f493f4ef09e2f32a4f914d89e69186d3",
+      "working_tree_bytes": 11336,
+      "matches_git_blob": true,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency_probe.py.txt",
+      "declared_sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "declared_bytes": 3356,
+      "git_blob_sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "git_blob_bytes": 3356,
+      "working_tree_sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "working_tree_bytes": 3356,
+      "matches_git_blob": true,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency.json",
+      "declared_sha256": "b9230f010bb08343921adf2bf2c4182dd45778d643aec8bcedfa81a89fd45645",
+      "declared_bytes": 232,
+      "git_blob_sha256": "bef9b1ec1124b4cb4483f9c4ab128d3ec81e56f4451d7201d6d0a3fff241d97e",
+      "git_blob_bytes": 216,
+      "working_tree_sha256": "b9230f010bb08343921adf2bf2c4182dd45778d643aec8bcedfa81a89fd45645",
+      "working_tree_bytes": 232,
+      "matches_git_blob": false,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/concurrency.stderr.txt",
+      "declared_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "declared_bytes": 0,
+      "git_blob_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_bytes": 0,
+      "working_tree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "working_tree_bytes": 0,
+      "matches_git_blob": true,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproduce_draft.py.txt",
+      "declared_sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "declared_bytes": 6148,
+      "git_blob_sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "git_blob_bytes": 6148,
+      "working_tree_sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "working_tree_bytes": 6148,
+      "matches_git_blob": true,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproductions.json",
+      "declared_sha256": "19547fbf88f566f6c62794eec100b59225e2b1b3d3704bf77e8289760bbbde75",
+      "declared_bytes": 1290,
+      "git_blob_sha256": "dbe2f26291132b99f95f9303adfc584120e96cef1201e682b3747cf642b7e511",
+      "git_blob_bytes": 1237,
+      "working_tree_sha256": "19547fbf88f566f6c62794eec100b59225e2b1b3d3704bf77e8289760bbbde75",
+      "working_tree_bytes": 1290,
+      "matches_git_blob": false,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/reproductions.stderr.txt",
+      "declared_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "declared_bytes": 0,
+      "git_blob_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_bytes": 0,
+      "working_tree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "working_tree_bytes": 0,
+      "matches_git_blob": true,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/REVIEW-MANIFEST.json",
+      "declared_sha256": "5030f65bc0970b1ed9a0f795049bc2f4f850ef556b0b3c1763c6e6c2e1932732",
+      "declared_bytes": 2090,
+      "git_blob_sha256": "1b04a9c2feae96bd9a1b6eea83f456c755523927526b802018be673f0400d1a4",
+      "git_blob_bytes": 2036,
+      "working_tree_sha256": "5030f65bc0970b1ed9a0f795049bc2f4f850ef556b0b3c1763c6e6c2e1932732",
+      "working_tree_bytes": 2090,
+      "matches_git_blob": false,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    },
+    {
+      "path": "docs/architecture/continuity-qualification-review/REVIEW.md",
+      "declared_sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "declared_bytes": 11076,
+      "git_blob_sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "git_blob_bytes": 11076,
+      "working_tree_sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "working_tree_bytes": 11076,
+      "matches_git_blob": true,
+      "matches_working_tree": true,
+      "line_ending_normalization_only": true
+    }
+  ],
+  "copied_original_evidence": [
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\concurrency.json",
+      "copy": "docs/architecture/continuity-qualification-review/concurrency.json",
+      "original_sha256": "b9230f010bb08343921adf2bf2c4182dd45778d643aec8bcedfa81a89fd45645",
+      "git_copy_sha256": "bef9b1ec1124b4cb4483f9c4ab128d3ec81e56f4451d7201d6d0a3fff241d97e",
+      "byte_identical": false
+    },
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\concurrency.stderr.txt",
+      "copy": "docs/architecture/continuity-qualification-review/concurrency.stderr.txt",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true
+    },
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\concurrency_probe.py",
+      "copy": "docs/architecture/continuity-qualification-review/concurrency_probe.py.txt",
+      "original_sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "git_copy_sha256": "f1d50c78f2011e5b0ef93c6b97dab7941542d3c0e0b13517f46c44deaebe6412",
+      "byte_identical": true
+    },
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\reproduce_draft.py",
+      "copy": "docs/architecture/continuity-qualification-review/reproduce_draft.py.txt",
+      "original_sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "git_copy_sha256": "2c8511ccb891b20ad61d0c02affa5ec8895884a621ca6b233fa74970d1de334c",
+      "byte_identical": true
+    },
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\reproductions.json",
+      "copy": "docs/architecture/continuity-qualification-review/reproductions.json",
+      "original_sha256": "19547fbf88f566f6c62794eec100b59225e2b1b3d3704bf77e8289760bbbde75",
+      "git_copy_sha256": "dbe2f26291132b99f95f9303adfc584120e96cef1201e682b3747cf642b7e511",
+      "byte_identical": false
+    },
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\reproductions.stderr.txt",
+      "copy": "docs/architecture/continuity-qualification-review/reproductions.stderr.txt",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true
+    },
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\REVIEW-MANIFEST.json",
+      "copy": "docs/architecture/continuity-qualification-review/REVIEW-MANIFEST.json",
+      "original_sha256": "5030f65bc0970b1ed9a0f795049bc2f4f850ef556b0b3c1763c6e6c2e1932732",
+      "git_copy_sha256": "1b04a9c2feae96bd9a1b6eea83f456c755523927526b802018be673f0400d1a4",
+      "byte_identical": false
+    },
+    {
+      "original": "C:\\h\\continuity-qualification\\review\\REVIEW.md",
+      "copy": "docs/architecture/continuity-qualification-review/REVIEW.md",
+      "original_sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "git_copy_sha256": "063ff77f53b55a1c8d854fcc77ac758c34abb06bd155783935a00af060837c76",
+      "byte_identical": true
+    }
+  ],
+  "original_test_methods": {
+    "original_count": 19,
+    "current_count": 38,
+    "missing_or_changed": []
+  }
+}

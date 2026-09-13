@@ -1,10 +1,12 @@
 # Campaign continuity qualification repair record
 
-Status: implementation ready for launcher verification; **not yet verified**.
+Status: R1/R2 repair implemented; current focused/static, independent review and
+full-gate qualification are **pending the root coordinator**.
 Current artifact bindings are in
-[CONTINUITY-QUALIFICATION-MANIFEST.json](CONTINUITY-QUALIFICATION-MANIFEST.json).
-Builder: `/root`, acting under the owner's bounded builder instruction on
-2026-09-13. No independent approval or production authority is claimed here.
+[CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json](CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json).
+Current builder: `/root/continuity_repair_builder`, acting under the owner's
+bounded repair authority on 2026-09-13. The first repair builder was `/root`.
+No independent approval or production authority is claimed here.
 
 ## Subject, authority and historical evidence
 
@@ -24,20 +26,25 @@ original draft, **not these repaired working-tree bytes**. This document is the
 current qualification record; it does not retroactively qualify that snapshot.
 
 The owner authorized routine repairs, tests, review and Git delivery while waiving
-preimplementation tournaments/courts. For this builder turn the owner expressly
+preimplementation tournaments/courts. For the first repair builder turn the owner expressly
 reserved focused checks, comprehensive independent review, the full gate, commits,
 pushes and PR publication to the existing launcher, and prohibited a second
-runner or agent. This builder has not executed tests, static checks, a launcher,
+runner or agent. That builder reported no execution of tests, static checks, a launcher,
 Git delivery, production wiring, credentials, deployment, payment, protected merge,
 policy changes or challenger promotion. The target delivery remains a separate
 non-draft PR only after launcher qualification; none is claimed published here.
 
 All eight retained files under `C:\h\continuity-qualification\review` were read.
-They are preserved byte-for-byte in [continuity-qualification-review](continuity-qualification-review/REVIEW.md).
+The [documentation copies](continuity-qualification-review/REVIEW.md) are
+normalized views: Git changed CRLF to LF in three JSON files. The previous
+byte-for-byte statement was incorrect for those committed views. Exact original
+bytes now reside under
+[`evidence/live/continuity-qualification/original-review`](../../evidence/live/continuity-qualification/original-review/REVIEW.md)
+(repository-relative path; the manifest contains exact mappings).
 The two reproduction programs have a `.txt` suffix in this evidence copy to keep
 historical programs out of current code discovery. Original names and digests
 remain in the [review manifest](continuity-qualification-review/REVIEW-MANIFEST.json).
-Those files are evidence, not execution instructions. The review is by
+Those files are evidence, not execution instructions. That original review is by
 `/root/delivery_curator` against the original draft, with a **repair required**
 verdict. Its reproduced failures, positive control, platform limits and dissent
 are not superseded by the builder's implementation claims below.
@@ -124,11 +131,103 @@ the test, using bounded waits and child cleanup. The symlink fixture reports a
 skip if Windows does not grant symlink creation; hard-link and process-exclusion
 cases do not silently skip that behavior.
 
-No current tests, static checks, independent review or full CI receipts are
-claimed by this builder. The launcher must append actual focused/platform
+The first repair builder claimed no tests, static checks, independent review or
+full CI receipts at that handoff. The launcher must append actual focused/platform
 results, skips and independent finding dispositions before the final full gate
 and delivery. Linux/Windows Python-version coverage, process-kill and long-path
 fault matrices, production adapter authority/idempotence/deadlines, trusted
 storage and any activation remain outstanding evidence obligations. Neither
 this library nor its fixture tests constitute a complete autonomous production
 controller or evidence of superiority.
+
+## Consolidated R1/R2 repair after independent review of 5118508
+
+The independent `/root/delivery_curator` review of commit
+`511850802afe2b58c0609f12d469f3751be4a3cb` (tree
+`48824828bb2c571c0ae4f25ad85361bda5bedffd`) returned **revise**. Its R1 probe
+appended an impossible BLOCKED-to-RECONCILING event and observed a launch; another
+appended LAUNCHED without receipt evidence. R2 found five qualification hashes
+bound CRLF working-tree bytes instead of committed LF bytes. That adverse verdict,
+its probes, source blob snapshots and root hash audit are retained exactly under
+`evidence/live/continuity-qualification/`. The sealed review manifest SHA-256 is
+`36b2458b1f83d7918c1558325a773c137012475cd0d3c41e8a5c66edb5e7181b`.
+These are repository-owned MIT source/evidence artifacts, not new external
+licensed code or execution authority. The earlier six findings and all 38 prior
+test methods remain; no current test run is claimed by this builder.
+The consolidated review attributes 38 tests (one skip), Ruff success and Pyright
+zero errors/six warnings to the earlier runner against 5118508, with receipt/log
+hashes checked by the Curator and root. Those historical receipts are retained;
+they do not qualify this subsequent repair. The failed CLI reviewer remains
+blocked evidence, and contributes no clean-review result.
+
+R1 builder disposition: adapt, pending independent verification. Schema 2 is
+unchanged. Replay and publication now validate the allowed event kind, its
+predecessor and its entire checkpoint delta. Counters increment exactly at their
+corresponding intent. Delivery/candidate intake and deterministic selection must
+have their matching payloads. Dispatch transitions require the preceding retained
+observation and launch requires the immediately preceding reconciliation's
+authoritative ABSENT receipt. Every result requires its adjacent unmatched intent;
+receipt fields, operation and candidate binding are reconstructed with the same
+typed receipt contract as execution. The live and replay paths share receipt
+state updates. Unsupported kinds, unexplained counter changes, cleared blockers,
+premature success and unknown-result pending clearance fail with
+`checkpoint-corrupt` before adapter calls.
+
+BLOCKED, EXHAUSTED and LAUNCHED never reopen dispatch. A terminal checkpoint may
+retain additional stop evidence. Pending-effect recovery may consume its separate
+inspection reserve, retain UNKNOWN/DENIED, clear pending on authoritative ABSENT,
+or record LAUNCHED on authoritative STARTED, preserving the earlier blocker.
+Recovery exhaustion retains the handoff requirement. The existing recovery path's
+EXHAUSTED-to-BLOCKED recovery-intent transition remains legal; it grants no dispatch
+authority. Interrupted unmatched intents remain consumed and can be inspected
+after restart. Self-consistent forged history, replay-time proof of historical
+wall-clock freshness, authenticated custody and external truncation anchors remain
+outside the library's guarantees.
+
+R1 acceptance additions cover all three terminal dispatch regressions, success
+without intent/payload, ten receipt/state or binding contradictions, unexplained
+counter/blocker/pending changes, unknown event kinds, and all four receipt outcomes
+after exhausted dispatch. All checks are authored and await root execution.
+
+R2 builder disposition: adapt, pending immutable commit audit. The earlier
+`CONTINUITY-QUALIFICATION-MANIFEST.json` remains unchanged historical evidence;
+its recorded hashes describe the first repair's working-tree representation and
+are not corrected retroactively. The new repair manifest specifies each artifact's
+representation: repository text uses canonical LF bytes and an expected immutable
+Git blob object ID; exact retained evidence uses raw bytes under the existing
+`evidence/live/** -text -diff` attributes. SHA-256 and byte counts bind those stated
+bytes. Historical source blobs are pinned to the reviewed commit and retained
+exactly so shallow CI can validate them without fetching history. Original raw
+review hashes and normalized-view mappings are explicit. No repository-wide Git
+attribute change is needed. The manifest excludes itself to avoid a circular
+digest; the root must bind its eventual committed blob in the delivery receipt.
+The current artifact set must be checked against the root's immutable repair
+commit before qualification, not inferred from working-tree checks alone.
+
+The manifest regression checks canonical SHA-256/length, the actual Git clean
+representation's blob ID, retained historical blob bytes, and exact original
+review-to-normalized-view mappings. It requires Git, already a repository gate
+dependency, and does not fetch or mutate Git state. It is pending execution.
+
+Two bounded platform cases were added for later execution. A spawned fixture is
+killed after launch intent, both before and after a flushed synthetic local effect;
+restart must regain the native lock and inspect the stable operation without
+observing authority or relaunching. Waits and cleanup are bounded. This covers
+abrupt process death at two library/fixture boundaries, not power loss, adapter
+cancellation, distributed effects or every publication microstep. A journal path
+longer than 320 characters exercises registration, launch and restart; a Windows
+host that explicitly returns error 206 records a skip and typed storage refusal
+before any adapter call. Broader filesystem/long-path matrices and Windows/Linux
+Python 3.11/3.12/3.14 execution remain unclaimed until actual receipts are appended.
+
+Migration is validation tightening within schema 2: structurally legal prior
+journals continue to replay; inconsistent journals fail closed and must be
+retained for host investigation, not rewritten into compliance. Schema 1 remains
+unsupported. Rollback stops the opt-in caller, retains all versions of code,
+journals, failed reviews and manifest receipts, and reconciles possible effects
+through the original adapter. Do not downgrade replay checks to resume a rejected
+journal, erase evidence, replenish budgets or activate a production caller.
+Root owns focused/static gates, separate Curator review, the subsequent full gate
+and any reversible Git delivery. No launcher, test/static execution, commit, push,
+PR, protected merge, production activation or external effect was performed by
+this repair builder.

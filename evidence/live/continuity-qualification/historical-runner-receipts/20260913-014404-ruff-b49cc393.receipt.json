@@ -1,0 +1,17 @@
+{
+  "stdout": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014404-ruff-b49cc393.stdout.log",
+  "stderr": "C:\\h\\continuity-qualification\\state\\run-20260913-012909-3fecfe58\\20260913-014404-ruff-b49cc393.stderr.log",
+  "timedOut": false,
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "seconds": 0.1495525,
+  "exitCode": 0,
+  "stdoutSha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "command": "C:\\Python314\\python.exe",
+  "arguments": [
+    "-m",
+    "ruff",
+    "check",
+    "src",
+    "tests"
+  ]
+}

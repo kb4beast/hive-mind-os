@@ -4,9 +4,11 @@ from __future__ import annotations
 import json
 import multiprocessing
 import os
+import subprocess
 import tempfile
+import time
 import unittest
-from dataclasses import replace
+from dataclasses import asdict, replace
 from hashlib import sha256
 from pathlib import Path
 from unittest.mock import patch
@@ -96,6 +98,25 @@ def _compete_transaction(root, scope, results):
         results.put(error.code)
     else:
         results.put("unexpected-lock-acquisition")
+
+
+def _hold_after_launch_intent(root, scope, effect_path, after_effect, entered):
+    """Kill fixture: retained intent, optional durable synthetic effect, no real work."""
+    class HeldLaunchAdapter(MemoryAdapter):
+        def launch(self, operation_id, candidate, scope):
+            if after_effect:
+                with Path(effect_path).open("wb") as handle:
+                    handle.write(json.dumps({"operation_id": operation_id,
+                                             "candidate_digest": candidate.version_digest}).encode())
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            entered.set()
+            # Do not wait on a shared synchronization lock that a kill could
+            # abandon while the parent attempts cleanup.
+            time.sleep(20)
+            raise SystemExit("kill fixture deadline elapsed without receipt")
+
+    CampaignContinuityController(root, scope, clock=lambda: 100).step(HeldLaunchAdapter())
 
 
 class CampaignContinuityDraftTests(unittest.TestCase):
@@ -730,3 +751,231 @@ class CampaignContinuityDraftTests(unittest.TestCase):
                     process.join(5)
             results.close()
             results.join_thread()
+
+    @staticmethod
+    def append_fixture_event(controller, kind, payload, **changes):
+        last = controller.events()[-1]
+        document = {"schema_version": 2, "sequence": last["sequence"] + 1,
+                    "previous_digest": last["event_digest"], "kind": kind, "payload": payload,
+                    "checkpoint": {**last["checkpoint"], **changes}}
+        raw = json.dumps(document, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        document["event_digest"] = "sha256:" + sha256(raw).hexdigest()
+        destination = controller.root / f"event-{document['sequence']:08d}.json"
+        destination.write_bytes(json.dumps(document, sort_keys=True, separators=(",", ":"),
+                                          allow_nan=False).encode() + b"\n")
+
+    def assert_corrupt_replay(self, controller, scope, adapter):
+        calls = (adapter.observations, len(adapter.inspections), len(adapter.launches))
+        for read in (lambda: CampaignContinuityController(controller.root, scope, clock=lambda: 100),
+                     controller.checkpoint, controller.events, lambda: controller.step(adapter),
+                     lambda: controller.recover(adapter)):
+            with self.assertRaises(ContinuityError) as raised:
+                read()
+            self.assertEqual(raised.exception.code, "checkpoint-corrupt")
+        self.assertEqual((adapter.observations, len(adapter.inspections), len(adapter.launches)), calls)
+
+    def test_replay_rejects_appended_terminal_dispatch_regressions(self):
+        for index, terminal in enumerate((Phase.BLOCKED, Phase.EXHAUSTED, Phase.LAUNCHED)):
+            with self.subTest(terminal=terminal):
+                scope = replace(self.scope, maximum_reconciliations=1)
+                controller = CampaignContinuityController(self.root / str(index), scope, clock=lambda: 100)
+                controller.record_delivery(self.delivery)
+                controller.record_candidate(self.candidate())
+                adapter = MemoryAdapter()
+                controller.step(adapter)
+                if terminal == Phase.BLOCKED:
+                    with patch.object(adapter, "inspect", side_effect=ContinuityError("authority-denied", "fixture")):
+                        state = controller.step(adapter)
+                elif terminal == Phase.EXHAUSTED:
+                    adapter.inspect_status = LaunchStatus.UNKNOWN
+                    controller.step(adapter)
+                    state = controller.step(adapter)
+                else:
+                    state = controller.step(adapter)
+                self.assertEqual(state["phase"], terminal)
+                self.append_fixture_event(controller, "reconciliation-receipt", {},
+                                          phase=Phase.RECONCILING, blocker=None)
+                self.assert_corrupt_replay(controller, scope, adapter)
+
+    def test_replay_requires_intent_and_payload_for_success(self):
+        self.ready()
+        self.controller.step(self.adapter)
+        self.append_fixture_event(self.controller, "reconciliation-receipt", {},
+                                  phase=Phase.LAUNCHED, reconciliations=1)
+        self.assert_corrupt_replay(self.controller, self.scope, self.adapter)
+
+    def test_replay_rejects_receipt_state_and_binding_contradictions(self):
+        mutations = (
+            (lambda payload: payload.clear(), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(authoritative=False), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(status="absent"), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(operation_id=digest("e")), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(candidate_digest=digest("e")), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(authoritative=1), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(receipt={}), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(detail=[]), {"phase": Phase.LAUNCHED, "outcome_pending": False}),
+            (lambda payload: payload.update(status="unknown"), {"outcome_pending": False}),
+            (lambda payload: None, {}),
+        )
+        for index, (mutate, changes) in enumerate(mutations):
+            with self.subTest(index=index):
+                controller = CampaignContinuityController(self.root / str(index), self.scope, clock=lambda: 100)
+                controller.record_delivery(self.delivery)
+                controller.record_candidate(self.candidate())
+                adapter = MemoryAdapter()
+                selected = controller.step(adapter)
+                adapter.raise_before_effect = True
+                with self.assertRaises(SystemExit):
+                    controller.step(adapter)
+                payload = asdict(adapter.receipt(selected["operation_id"], self.candidate(), LaunchStatus.STARTED))
+                mutate(payload)
+                self.append_fixture_event(controller, "launch-receipt", payload, **changes)
+                self.assert_corrupt_replay(controller, self.scope, adapter)
+
+    def test_replay_rejects_unexplained_counters_pending_blocker_and_event_kind(self):
+        cases = (("unrecognized-event", {}), ("authority-observed", {"reconciliations": 1}),
+                 ("authority-observed", {"blocker": "invented"}),
+                 ("authority-observed", {"launches": 1, "reconciliations": 1, "outcome_pending": True}))
+        for index, (kind, changes) in enumerate(cases):
+            with self.subTest(index=index):
+                controller = CampaignContinuityController(self.root / str(index), self.scope, clock=lambda: 100)
+                controller.record_delivery(self.delivery)
+                controller.record_candidate(self.candidate())
+                adapter = MemoryAdapter()
+                controller.step(adapter)
+                payload = asdict(adapter.observe(self.scope, self.evidence))
+                self.append_fixture_event(controller, kind, payload, **changes)
+                self.assert_corrupt_replay(controller, self.scope, adapter)
+
+    def test_replay_preserves_exhausted_recovery_receipt_outcomes(self):
+        for index, status in enumerate(LaunchStatus):
+            with self.subTest(status=status):
+                scope = replace(self.scope, maximum_reconciliations=1)
+                root = self.root / str(index)
+                controller = CampaignContinuityController(root, scope, clock=lambda: 100)
+                controller.record_delivery(self.delivery)
+                controller.record_candidate(self.candidate())
+                adapter = MemoryAdapter()
+                selected = controller.step(adapter)
+                adapter.raise_before_effect = True
+                with self.assertRaises(SystemExit):
+                    controller.step(adapter)
+                stopped = controller.step(adapter)
+                self.assertEqual(stopped["phase"], Phase.EXHAUSTED)
+                adapter.inspect_status = status
+                with patch.object(adapter, "observe", side_effect=AssertionError("recovery cannot observe authority")), \
+                        patch.object(adapter, "launch", side_effect=AssertionError("recovery cannot dispatch")):
+                    state = controller.recover(adapter)
+                    reopened = CampaignContinuityController(root, scope, clock=lambda: scope.expires_at)
+                    self.assertEqual(reopened.checkpoint(), state)
+                    self.assertEqual(reopened.step(adapter), state)
+                self.assertEqual(state["operation_id"], selected["operation_id"])
+                self.assertEqual(state["blocker"], stopped["blocker"])
+                self.assertEqual(state["launches"], 1)
+                self.assertEqual(state["recoveries"], 1)
+                self.assertEqual(state["outcome_pending"], status in {LaunchStatus.UNKNOWN, LaunchStatus.DENIED})
+                self.assertEqual(state["phase"], Phase.LAUNCHED if status == LaunchStatus.STARTED else Phase.BLOCKED)
+
+    def test_process_kill_releases_lock_and_preserves_pending_effect_recovery(self):
+        for index, after_effect in enumerate((False, True)):
+            with self.subTest(after_effect=after_effect):
+                root = self.root / str(index)
+                controller = CampaignContinuityController(root, self.scope, clock=lambda: 100)
+                controller.record_delivery(self.delivery)
+                controller.record_candidate(self.candidate())
+                selected = controller.step(MemoryAdapter())
+                effect_path = root / "fixture-effect.json"
+                context = multiprocessing.get_context("spawn")
+                entered = context.Event()
+                process = context.Process(target=_hold_after_launch_intent,
+                    args=(root, self.scope, effect_path, after_effect, entered))
+                try:
+                    process.start()
+                    self.assertTrue(entered.wait(10), "child did not retain launch intent")
+                    process.kill()
+                    process.join(10)
+                    self.assertFalse(process.is_alive(), "killed child did not exit")
+                    self.assertNotEqual(process.exitcode, 0)
+                    restarted = CampaignContinuityController(root, self.scope, clock=lambda: self.scope.expires_at)
+                    pending = restarted.checkpoint()
+                    self.assertTrue(pending["outcome_pending"])
+                    self.assertEqual(pending["launches"], 1)
+                    self.assertEqual(pending["operation_id"], selected["operation_id"])
+                    adapter = MemoryAdapter()
+                    if after_effect:
+                        effect = json.loads(effect_path.read_bytes())
+                        self.assertEqual(effect, {"operation_id": selected["operation_id"],
+                                                  "candidate_digest": self.candidate().version_digest})
+                        adapter.operations[effect["operation_id"]] = effect["candidate_digest"]
+                    else:
+                        self.assertFalse(effect_path.exists())
+                    recovered = restarted.recover(adapter)
+                    self.assertFalse(recovered["outcome_pending"])
+                    self.assertEqual(recovered["phase"], Phase.LAUNCHED if after_effect else Phase.BLOCKED)
+                    self.assertEqual(restarted.step(adapter), recovered)
+                    self.assertEqual(adapter.observations, 0)
+                    self.assertFalse(adapter.launches)
+                    self.assertEqual(adapter.inspections, [selected["operation_id"]])
+                finally:
+                    if process.pid is not None:
+                        if process.is_alive():
+                            process.kill()
+                        process.join(5)
+                        if not process.is_alive():
+                            process.close()
+
+    def test_long_path_journal_roundtrip_or_explicit_platform_refusal(self):
+        root = self.root
+        while len(str(root)) < 320:
+            root /= "continuity-long-path-component"
+        try:
+            controller = CampaignContinuityController(root, self.scope, clock=lambda: 100)
+        except ContinuityError as error:
+            if os.name == "nt" and isinstance(error.__cause__, OSError) and getattr(error.__cause__, "winerror", None) == 206:
+                self.assertEqual(error.code, "checkpoint-storage")
+                self.assertEqual(self.adapter.observations, 0)
+                self.skipTest("host refuses extended paths with Windows error 206; no adapter call")
+            raise
+        controller.record_delivery(self.delivery)
+        controller.record_candidate(self.candidate())
+        controller.step(self.adapter)
+        state = controller.step(self.adapter)
+        reopened = CampaignContinuityController(root, self.scope, clock=lambda: 100)
+        self.assertEqual(reopened.step(self.adapter), state)
+        self.assertEqual(state["phase"], Phase.LAUNCHED)
+        self.assertEqual(len(self.adapter.launches), 1)
+
+    def test_qualification_manifest_binds_canonical_git_artifacts_and_exact_evidence(self):
+        repository = Path(__file__).resolve().parents[1]
+        manifest = json.loads((repository / "docs/architecture/CONTINUITY-QUALIFICATION-REPAIR-MANIFEST.json").read_bytes())
+        self.assertEqual(manifest["status"], "IMPLEMENTED_AWAITING_ROOT_QUALIFICATION")
+        self.assertTrue(manifest["artifacts"])
+        self.assertEqual(len({item["path"] for item in manifest["artifacts"]}), len(manifest["artifacts"]))
+        for item in manifest["artifacts"]:
+            with self.subTest(path=item["path"]):
+                raw = (repository / item["path"]).read_bytes()
+                if item["representation"] == "repository-lf":
+                    raw = raw.replace(b"\r\n", b"\n")
+                else:
+                    self.assertEqual(item["representation"], "exact-evidence-bytes")
+                    self.assertTrue(item["path"].startswith("evidence/live/continuity-qualification/"))
+                self.assertEqual(len(raw), item["bytes"])
+                self.assertEqual(sha256(raw).hexdigest(), item["sha256"])
+                git_blob = subprocess.run(["git", "hash-object", "--stdin", "--path", item["path"]],
+                    cwd=repository, input=(repository / item["path"]).read_bytes(), capture_output=True,
+                    check=True, timeout=10).stdout.decode().strip()
+                self.assertEqual(git_blob, item["git_blob_oid"])
+        for item in manifest["historical_git_artifacts"]:
+            with self.subTest(historical=item["path"]):
+                # These retained immutable blob bytes also work in shallow CI clones.
+                raw = (repository / item["retained_exact_blob"]).read_bytes()
+                self.assertEqual(len(raw), item["bytes"])
+                self.assertEqual(sha256(raw).hexdigest(), item["sha256"])
+                oid = subprocess.run(["git", "hash-object", "--stdin"], cwd=repository, input=raw,
+                    capture_output=True, check=True, timeout=10).stdout.decode().strip()
+                self.assertEqual(oid, item["git_blob_oid"])
+        for item in manifest["original_review_mapping"]:
+            original = (repository / item["exact_copy"]).read_bytes()
+            view = (repository / item["normalized_view"]).read_bytes().replace(b"\r\n", b"\n")
+            self.assertEqual(sha256(original).hexdigest(), item["original_sha256"])
+            self.assertEqual(original.replace(b"\r\n", b"\n"), view)

@@ -442,6 +442,162 @@ class CampaignContinuityController:
                     pending.unlink()
                     break
 
+    @staticmethod
+    def _receipt_state(state: dict[str, Any], receipt: LaunchReceipt) -> dict[str, Any]:
+        if receipt.status == LaunchStatus.DENIED:
+            return {**state, "phase": Phase.BLOCKED, "blocker": state["blocker"] or "launch-denied"}
+        if receipt.status == LaunchStatus.STARTED and receipt.authoritative:
+            return {**state, "phase": Phase.LAUNCHED, "outcome_pending": False}
+        if receipt.status == LaunchStatus.ABSENT and receipt.authoritative:
+            return {**state, "outcome_pending": False}
+        return state
+
+    def _validate_transition(self, events: list[dict[str, Any]], document: dict[str, Any]) -> None:
+        """Check schema-2 event semantics, without claiming authenticated history.
+
+        Each event must explain its entire checkpoint delta. Intent/receipt pairs
+        are adjacent; restart can abandon an intent but cannot invent its result.
+        Only the separate recovery path can change a terminal dispatch outcome.
+        """
+        kind, payload, current = document["kind"], document["payload"], document["checkpoint"]
+        if not events:
+            expected = {
+                "schema_version": 2, "scope_binding": self.scope_binding,
+                "phase": Phase.WAITING, "delivery": None, "candidates": {},
+                "selected": None, "operation_id": None, "launches": 0,
+                "reconciliations": 0, "recoveries": 0, "outcome_pending": False, "blocker": None,
+            }
+            if kind != "initialized" or _bytes(payload) != _bytes({"scope": asdict(self.scope)}):
+                raise ValueError("invalid initialization")
+        else:
+            previous = events[-1]
+            state = previous["checkpoint"]
+            phase = Phase(state["phase"])
+            expected = state
+            if phase in _TERMINAL and kind not in {
+                "stopped", "recovery-intent", "recovery-receipt", "recovery-unknown", "recovery-exhausted",
+            }:
+                raise ValueError("terminal dispatch cannot resume")
+            if kind == "delivery-recorded":
+                if phase != Phase.WAITING or state["delivery"] is not None:
+                    raise ValueError("delivery intake is closed")
+                expected = {**state, "delivery": payload}
+            elif kind == "candidate-recorded":
+                candidate = self._candidate(payload)
+                if phase != Phase.WAITING or candidate.candidate_id in state["candidates"]:
+                    raise ValueError("candidate intake is closed")
+                expected = {**state, "candidates": {**state["candidates"], candidate.candidate_id: payload}}
+            elif kind == "authority-observed":
+                if state["delivery"] is None:
+                    raise ValueError("observation requires delivery")
+                observed = AuthorityObservation(**{**payload, "subject": RepositorySubject(**payload["subject"]),
+                    "verified_evidence": tuple(EvidenceReference(**item) for item in payload["verified_evidence"]),
+                    "receipt": EvidenceReference(**payload["receipt"])})
+                if _bytes(asdict(observed)) != _bytes(payload):
+                    raise ValueError("invalid retained observation")
+            elif kind == "candidate-selected":
+                if phase != Phase.WAITING:
+                    raise ValueError("selection requires waiting")
+                self._validate_dispatch_observation(previous)
+                choices = [self._candidate(item) for item in state["candidates"].values()]
+                eligible = [item for item in choices if self._eligible(item)]
+                candidate = sorted(eligible, key=lambda item: (-item.priority, item.candidate_id))[0]
+                selection = {
+                    "selected": candidate.candidate_id,
+                    "dispositions": [{"candidate_id": item.candidate_id,
+                        "source_disposition": item.disposition, "eligible": item in eligible,
+                        "dissent": list(item.dissent)} for item in sorted(choices, key=lambda item: item.candidate_id)],
+                    "eligible": sorted(item.candidate_id for item in eligible),
+                    "not_selected": sorted(item.candidate_id for item in choices if item != candidate),
+                }
+                if _bytes(payload) != _bytes(selection):
+                    raise ValueError("selection evidence disagrees")
+                expected = {**state, "phase": Phase.SELECTED, "selected": candidate.candidate_id,
+                            "operation_id": self._operation(state["delivery"], candidate)}
+            elif kind == "reconciliation-intent":
+                if phase not in {Phase.SELECTED, Phase.RECONCILING} or payload:
+                    raise ValueError("invalid reconciliation intent")
+                self._validate_dispatch_observation(previous)
+                expected = {**state, "phase": Phase.RECONCILING, "reconciliations": state["reconciliations"] + 1}
+            elif kind == "launch-intent":
+                if phase != Phase.RECONCILING or payload != {"operation_id": state["operation_id"]}:
+                    raise ValueError("invalid launch intent")
+                self._validate_dispatch_observation(previous)
+                absence = events[-2] if len(events) >= 2 else {}
+                if (absence.get("kind") != "reconciliation-receipt"
+                        or absence["payload"].get("status") != LaunchStatus.ABSENT
+                        or absence["payload"].get("authoritative") is not True):
+                    raise ValueError("launch requires immediately reconciled absence")
+                expected = {**state, "launches": state["launches"] + 1, "outcome_pending": True}
+            elif kind == "recovery-intent":
+                if not state["outcome_pending"] or payload != {"operation_id": state["operation_id"]}:
+                    raise ValueError("recovery requires pending operation")
+                expected = {**state, "phase": Phase.BLOCKED, "blocker": state["blocker"] or "recovery-only",
+                            "recoveries": state["recoveries"] + 1}
+            elif kind in {"reconciliation-receipt", "launch-receipt", "recovery-receipt"}:
+                if previous["kind"] != kind.replace("-receipt", "-intent"):
+                    raise ValueError("receipt requires its unmatched intent")
+                receipt = LaunchReceipt(**{**payload, "status": LaunchStatus(payload["status"]),
+                                          "receipt": EvidenceReference(**payload["receipt"])})
+                candidate = state["candidates"][state["selected"]]
+                if (_bytes(asdict(receipt)) != _bytes(payload) or receipt.operation_id != state["operation_id"]
+                        or receipt.candidate_digest != candidate["version_digest"]):
+                    raise ValueError("retained receipt binding mismatch")
+                expected = self._receipt_state(state, receipt)
+            elif kind in {"reconciliation-unknown", "launch-outcome-unknown", "recovery-unknown"}:
+                intent = {"reconciliation-unknown": "reconciliation-intent",
+                          "launch-outcome-unknown": "launch-intent", "recovery-unknown": "recovery-intent"}[kind]
+                if previous["kind"] != intent or set(payload) not in ({"error"}, {"error", "code", "message"}):
+                    raise ValueError("unknown result requires its unmatched intent and error")
+                _text(payload["error"])
+                if "code" in payload:
+                    _text(payload["code"])
+                    if type(payload["message"]) is not str:
+                        raise ValueError("invalid error detail")
+                    if phase not in _TERMINAL:
+                        expected = {**state, "phase": Phase.BLOCKED, "blocker": payload["code"]}
+            elif kind == "recovery-exhausted":
+                if (not state["outcome_pending"] or state["recoveries"] != self.scope.maximum_recoveries
+                        or payload != {"code": "recovery-budget-exhausted", "handoff_required": True}):
+                    raise ValueError("invalid recovery exhaustion")
+                expected = {**state, "phase": Phase.EXHAUSTED,
+                            "blocker": state["blocker"] or "recovery-budget-exhausted"}
+            elif kind == "stopped":
+                if set(payload) != {"code", "evidence"} or (payload["evidence"] is not None
+                                                           and type(payload["evidence"]) is not dict):
+                    raise ValueError("invalid stop evidence")
+                _text(payload["code"])
+                if phase not in _TERMINAL:
+                    exhausted = current["phase"] == Phase.EXHAUSTED
+                    exhausted_budgets = {"launch-budget-exhausted": ("launches", self.scope.maximum_launches),
+                                         "reconciliation-budget-exhausted": ("reconciliations", self.scope.maximum_reconciliations)}
+                    if exhausted:
+                        budget, maximum = exhausted_budgets[payload["code"]]
+                        if state[budget] != maximum:
+                            raise ValueError("exhaustion requires consumed budget")
+                    expected = {**state, "phase": Phase.EXHAUSTED if exhausted else Phase.BLOCKED,
+                                "blocker": payload["code"]}
+            else:
+                raise ValueError("unknown event kind")
+        if _bytes(current) != _bytes(expected):
+            raise ValueError("event does not explain checkpoint delta")
+
+    def _validate_dispatch_observation(self, event: dict[str, Any]) -> None:
+        # Replay can check retained bindings, not re-observe historical wall time.
+        # Current dispatch still obtains a new observation and checks the clock.
+        if event["kind"] != "authority-observed":
+            raise ValueError("dispatch transition requires an observation")
+        payload, state = event["payload"], event["checkpoint"]
+        evidence = [*self.scope.evidence, *(EvidenceReference(**item) for item in state["delivery"]["evidence"])]
+        if state["selected"] is not None:
+            evidence.extend(self._candidate(state["candidates"][state["selected"]]).evidence)
+        if (payload["subject"] != asdict(self.scope.subject) or payload["scope_digest"] != self.scope.scope_digest
+                or payload["authority_digest"] != self.scope.authority_digest or payload["owner_id"] != self.scope.owner_id
+                or payload["observer_id"] == self.scope.owner_id or payload["launch_allowed"] is not True
+                or payload["observed_at"] >= self.scope.expires_at
+                or {EvidenceReference(**item) for item in payload["verified_evidence"]} != set(evidence)):
+            raise ValueError("retained observation does not permit dispatch")
+
     def _events(self, *, allow_empty: bool = False) -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []
         prior = None
@@ -467,20 +623,7 @@ class CampaignContinuityController:
                     raise ValueError("checkpoint chain mismatch")
                 _text(document["kind"])
                 self._validate_state(document["checkpoint"])
-                if sequence == 1 and (document["kind"] != "initialized"
-                        or _bytes(document["payload"]) != _bytes({"scope": asdict(self.scope)})):
-                    raise ValueError("invalid initialization")
-                if events:
-                    previous = events[-1]["checkpoint"]
-                    current = document["checkpoint"]
-                    for key in ("launches", "reconciliations", "recoveries"):
-                        if current[key] < previous[key]:
-                            raise ValueError("attempt counter regressed")
-                    for key in ("delivery", "selected", "operation_id"):
-                        if previous[key] is not None and previous[key] != current[key]:
-                            raise ValueError("immutable operation changed")
-                    if any(current["candidates"].get(k) != v for k, v in previous["candidates"].items()):
-                        raise ValueError("retained candidate disappeared")
+                self._validate_transition(events, document)
                 prior = document["event_digest"]
                 events.append(document)
             if not events and not allow_empty:
@@ -489,7 +632,7 @@ class CampaignContinuityController:
                 count, digest = self._seen
                 if len(events) < count or events[count - 1]["event_digest"] != digest:
                     raise ValueError("previously observed journal history changed")
-        except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError) as error:
+        except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError, RecursionError) as error:
             raise ContinuityError("checkpoint-corrupt", "retained checkpoints cannot be safely resumed") from error
         if events:
             self._seen = (len(events), events[-1]["event_digest"])
@@ -503,6 +646,10 @@ class CampaignContinuityController:
             "previous_digest": events[-1]["event_digest"] if events else None,
             "kind": kind, "payload": payload, "checkpoint": state,
         }
+        try:
+            self._validate_transition(events, document)
+        except (ValueError, KeyError, IndexError, TypeError, AttributeError) as error:
+            raise ContinuityError("checkpoint-corrupt", "event cannot explain its checkpoint") from error
         document["event_digest"] = _digest(document)
         destination = self.root / f"event-{len(events) + 1:08d}.json"
         temporary: Path | None = None
@@ -663,14 +810,7 @@ class CampaignContinuityController:
             }})
         if receipt.operation_id != state["operation_id"] or receipt.candidate_digest != candidate["version_digest"]:
             return self._stop(state, "launch-receipt-mismatch", evidence={"receipt": document})
-        updated = state
-        if receipt.status == LaunchStatus.DENIED:
-            updated = {**state, "phase": Phase.BLOCKED, "blocker": state["blocker"] or "launch-denied"}
-        elif receipt.status == LaunchStatus.STARTED and receipt.authoritative:
-            updated = {**state, "phase": Phase.LAUNCHED, "outcome_pending": False}
-        elif receipt.status == LaunchStatus.ABSENT and receipt.authoritative:
-            updated = {**state, "outcome_pending": False}
-        return self._append(kind, document, updated)
+        return self._append(kind, document, self._receipt_state(state, receipt))
 
     def recover(self, adapter: CampaignAdapter) -> dict[str, Any]:
         """Inspect a possible effect even after dispatch has stopped; never launch.

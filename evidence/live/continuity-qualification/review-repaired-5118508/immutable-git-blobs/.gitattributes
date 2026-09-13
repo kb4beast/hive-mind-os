@@ -1,0 +1,39 @@
+# Repository-authored text remains normalized and reproducible.
+.gitattributes text eol=lf
+LICENSE text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.ps1 text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Source exhibits are evidentiary bytes. Never normalize line endings or text diffs.
+evidence/sources/**/raw/** -text -diff
+
+# Live receipts and provider artifacts are evidentiary bytes. Preserve them exactly.
+evidence/live/** -text -diff
+
+# Benchmark receipts are also evidentiary bytes. Their recorded digests bind the exact
+# repository bytes, so checkout must never rewrite JSONL line endings.
+evidence/benchmarks/** -text -diff
+
+# Prompt-experiment artifacts are retained evidence, including JSON reports and command
+# streams generated on Windows. Git must preserve their pre-commit bytes exactly.
+evidence/experiments/_artifacts/** -text -diff
+evidence/experiments/_failed/** -text -diff
+
+# Local-assurance transcripts are content-addressed evidentiary bytes.
+evidence/local_assurance/**/logs/** -text -diff
+
+# The V3 history recovery fixture is a Git bundle whose exact binary bytes are
+# authenticated by its adjacent provenance manifest and regression tests.
+tests/fixtures/*.bundle -text -diff
+
+# Preserved V4 source branches are complete Git bundles, not text exhibits.
+evidence/sources/v4-successor-recovery/** -text -diff
+evidence/sources/**/*.bundle -text -diff
+
+# Local V4 gate transcripts are retained as exact adverse evidence.
+evidence/audits/v4-successor-recovery/logs/** -text -diff
