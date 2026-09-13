@@ -1,0 +1,1592 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> .autopilot\bin\controller.py:8:1
+   |
+ 6 |   """
+ 7 |
+ 8 | / from __future__ import annotations
+ 9 | |
+10 | | import fnmatch
+11 | | import codecs
+12 | | import ctypes
+13 | | import importlib.util
+14 | | import json
+15 | | import os
+16 | | import re
+17 | | import signal
+18 | | import subprocess
+19 | | import sys
+20 | | import tempfile
+21 | | import time
+22 | | from contextlib import contextmanager
+23 | | from ctypes import wintypes
+24 | | from dataclasses import asdict, dataclass
+25 | | from datetime import UTC, datetime, timedelta
+26 | | from hashlib import sha256
+27 | | from pathlib import Path
+28 | | from threading import Thread
+29 | | from typing import Any, Callable, Mapping, Sequence
+30 | | from urllib.parse import urlparse
+   | |_________________________________^
+31 |
+32 |   SCHEMA_VERSION = 1
+   |
+help: Organize imports
+   |
+9  |
+   - import fnmatch
+10 | import codecs
+11 | import ctypes
+12 + import fnmatch
+13 | import importlib.util
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> .autopilot\bin\durable_controller.py:14:1
+   |
+12 |   """
+13 |
+14 | / from __future__ import annotations
+15 | |
+16 | | import json
+17 | | import os
+18 | | from pathlib import Path
+19 | | from typing import Any, Mapping, Sequence
+20 | |
+21 | | from controller import (
+22 | |     FULL_SHA,
+23 | |     AutopilotError,
+24 | |     ClaimError,
+25 | |     ConfigurationError,
+26 | |     ControlPlane as BaseControlPlane,
+27 | |     NodeView,
+28 | |     ReceiptError,
+29 | |     append_jsonl,
+30 | |     atomic_write_json,
+31 | |     canonical_bytes,
+32 | |     digest_json,
+33 | |     normalize_path,
+34 | |     parse_time,
+35 | |     path_matches_scope,
+36 | |     read_json,
+37 | | )
+   | |_^
+38 |
+39 |   RECEIPT_COMMIT_MARKER = "HIVE-MIND-AUTOPILOT-COMPLETION-V1"
+   |
+help: Organize imports
+   |
+25 |     ConfigurationError,
+   -     ControlPlane as BaseControlPlane,
+26 |     NodeView,
+--------------------------------------------------------------------------------
+36 | )
+37 + from controller import (
+38 +     ControlPlane as BaseControlPlane,
+39 + )
+40 |
+   |
+
+F401 [*] `os` imported but unused
+  --> .autopilot\bin\durable_controller.py:17:8
+   |
+16 | import json
+17 | import os
+   |        ^^
+18 | from pathlib import Path
+19 | from typing import Any, Mapping, Sequence
+   |
+help: Remove unused import: `os`
+   |
+16 | import json
+   - import os
+17 | from pathlib import Path
+   |
+
+F401 [*] `typing.Sequence` imported but unused
+  --> .autopilot\bin\durable_controller.py:19:34
+   |
+17 | import os
+18 | from pathlib import Path
+19 | from typing import Any, Mapping, Sequence
+   |                                  ^^^^^^^^
+20 |
+21 | from controller import (
+   |
+help: Remove unused import: `typing.Sequence`
+   |
+18 | from pathlib import Path
+   - from typing import Any, Mapping, Sequence
+19 + from typing import Any, Mapping
+20 |
+   |
+
+F401 [*] `controller.AutopilotError` imported but unused
+  --> .autopilot\bin\durable_controller.py:23:5
+   |
+21 | from controller import (
+22 |     FULL_SHA,
+23 |     AutopilotError,
+   |     ^^^^^^^^^^^^^^
+24 |     ClaimError,
+25 |     ConfigurationError,
+   |
+help: Remove unused import: `controller.AutopilotError`
+   |
+22 |     FULL_SHA,
+   -     AutopilotError,
+23 |     ClaimError,
+   |
+
+F541 [*] f-string without any placeholders
+    --> benchmarks\hive-cortex\runner.py:1223:17
+     |
+1221 |                 f"- Disposition: `{verdict['disposition']}` "
+1222 |                 "(the only disposition this court can express)",
+1223 |                 f"- Lane identities: "
+     |                 ^^^^^^^^^^^^^^^^^^^^^^
+1224 |                 + ", ".join(f"`{name}`" for name in verdict["lane_identities"]),
+1225 |                 f"- Results digest: `{verdict['results_digest']}`",
+     |
+help: Remove extraneous `f` prefix
+     |
+1222 |                 "(the only disposition this court can express)",
+     -                 f"- Lane identities: "
+1223 +                 "- Lane identities: "
+1224 |                 + ", ".join(f"`{name}`" for name in verdict["lane_identities"]),
+     |
+
+E402 Module level import not at top of file
+  --> evidence\experiments\hive-cortex\generate_records.py:24:1
+   |
+22 | os.chdir(REPOSITORY_ROOT)
+23 |
+24 | from hive_mind_os.brain_kernel.canonical import canonical_bytes, canonical_digest
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 | from hive_mind_os.brain_kernel.evaluation_runtime import (
+26 |     ChallengerDescriptor,
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> evidence\experiments\hive-cortex\generate_records.py:25:1
+   |
+24 |   from hive_mind_os.brain_kernel.canonical import canonical_bytes, canonical_digest
+25 | / from hive_mind_os.brain_kernel.evaluation_runtime import (
+26 | |     ChallengerDescriptor,
+27 | |     EvaluationIdentities,
+28 | |     EvaluationRuntime,
+29 | |     SealedHoldout,
+30 | |     SurfaceKind,
+31 | |     SurfaceResult,
+32 | | )
+   | |_^
+33 |
+34 |   EVIDENCE_ROOT = Path("evidence/experiments/hive-cortex")
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\continuity-qualification\failed-a1b2cc4\path-diagnostic\path_probe.py:2:1
+  |
+1 |   """Bounded Windows path primitive probe; no repository code or test execution."""
+2 | / import json
+3 | | import os
+4 | | from pathlib import Path
+5 | | import tempfile
+  | |_______________^
+6 |
+7 |   OUT = Path(__file__).parent
+  |
+help: Organize imports
+  |
+3 | import os
+4 + import tempfile
+5 | from pathlib import Path
+  - import tempfile
+6 |
+  |
+
+F401 [*] `pathlib` imported but unused
+ --> evidence\live\continuity-qualification\original-review\concurrency_probe.py:4:8
+  |
+2 | import json
+3 | import multiprocessing as mp
+4 | import pathlib
+  |        ^^^^^^^
+5 | import sys
+6 | import tempfile
+  |
+help: Remove unused import: `pathlib`
+  |
+3 | import multiprocessing as mp
+  - import pathlib
+4 | import sys
+  |
+
+E402 Module level import not at top of file
+  --> evidence\live\continuity-qualification\original-review\concurrency_probe.py:10:1
+   |
+ 8 |   sys.dont_write_bytecode = True
+ 9 |   sys.path[:0] = ['C:/h/continuity-draft1/src', 'C:/h/continuity-draft1/tests']
+10 | / from hive_mind_os.campaign_continuity import (
+11 | |     CampaignContinuityController, CampaignCandidate, CompletedDelivery,
+12 | |     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+13 | | )
+   | |_^
+14 |   from test_campaign_continuity import MemoryAdapter
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\continuity-qualification\original-review\concurrency_probe.py:10:1
+   |
+ 8 |   sys.dont_write_bytecode = True
+ 9 |   sys.path[:0] = ['C:/h/continuity-draft1/src', 'C:/h/continuity-draft1/tests']
+10 | / from hive_mind_os.campaign_continuity import (
+11 | |     CampaignContinuityController, CampaignCandidate, CompletedDelivery,
+12 | |     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+13 | | )
+14 | | from test_campaign_continuity import MemoryAdapter
+   | |__________________________________________________^
+15 |
+16 |   def scope():
+   |
+help: Organize imports
+   |
+9  | sys.path[:0] = ['C:/h/continuity-draft1/src', 'C:/h/continuity-draft1/tests']
+10 + from test_campaign_continuity import MemoryAdapter
+11 +
+12 | from hive_mind_os.campaign_continuity import (
+   -     CampaignContinuityController, CampaignCandidate, CompletedDelivery,
+   -     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+13 +     CampaignCandidate,
+14 +     CampaignContinuityController,
+15 +     CompletedDelivery,
+16 +     ContinuityError,
+17 +     ContinuityScope,
+18 +     EvidenceReference,
+19 +     RepositorySubject,
+20 | )
+   - from test_campaign_continuity import MemoryAdapter
+21 |
+22 +
+23 | def scope():
+   |
+
+E402 Module level import not at top of file
+  --> evidence\live\continuity-qualification\original-review\concurrency_probe.py:14:1
+   |
+12 |     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+13 | )
+14 | from test_campaign_continuity import MemoryAdapter
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |
+16 | def scope():
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> evidence\live\continuity-qualification\original-review\reproduce_draft.py:13:1
+   |
+11 |   SUBJECT = pathlib.Path('C:/h/continuity-draft1')
+12 |   sys.path[:0] = [str(SUBJECT / 'src'), str(SUBJECT / 'tests')]
+13 | / from hive_mind_os.campaign_continuity import (
+14 | |     CampaignContinuityController, CampaignCandidate, CompletedDelivery,
+15 | |     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+16 | | )
+   | |_^
+17 |   from test_campaign_continuity import MemoryAdapter
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\continuity-qualification\original-review\reproduce_draft.py:13:1
+   |
+11 |   SUBJECT = pathlib.Path('C:/h/continuity-draft1')
+12 |   sys.path[:0] = [str(SUBJECT / 'src'), str(SUBJECT / 'tests')]
+13 | / from hive_mind_os.campaign_continuity import (
+14 | |     CampaignContinuityController, CampaignCandidate, CompletedDelivery,
+15 | |     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+16 | | )
+17 | | from test_campaign_continuity import MemoryAdapter
+   | |__________________________________________________^
+18 |
+19 |   def digest(c):
+   |
+help: Organize imports
+   |
+12 | sys.path[:0] = [str(SUBJECT / 'src'), str(SUBJECT / 'tests')]
+13 + from test_campaign_continuity import MemoryAdapter
+14 +
+15 | from hive_mind_os.campaign_continuity import (
+   -     CampaignContinuityController, CampaignCandidate, CompletedDelivery,
+   -     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+16 +     CampaignCandidate,
+17 +     CampaignContinuityController,
+18 +     CompletedDelivery,
+19 +     ContinuityError,
+20 +     ContinuityScope,
+21 +     EvidenceReference,
+22 +     RepositorySubject,
+23 | )
+   - from test_campaign_continuity import MemoryAdapter
+24 |
+25 +
+26 | def digest(c):
+   |
+
+E402 Module level import not at top of file
+  --> evidence\live\continuity-qualification\original-review\reproduce_draft.py:17:1
+   |
+15 |     ContinuityScope, ContinuityError, EvidenceReference, RepositorySubject,
+16 | )
+17 | from test_campaign_continuity import MemoryAdapter
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | def digest(c):
+   |
+help: Move module level imports to top of file
+
+F401 [*] `tempfile` imported but unused
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:8:8
+   |
+ 6 | import subprocess
+ 7 | import sys
+ 8 | import tempfile
+   |        ^^^^^^^^
+ 9 | from dataclasses import replace
+10 | from unittest.mock import patch
+   |
+help: Remove unused import: `tempfile`
+  |
+7 | import sys
+  - import tempfile
+8 | from dataclasses import replace
+  |
+
+F401 [*] `dataclasses.replace` imported but unused
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:9:25
+   |
+ 7 | import sys
+ 8 | import tempfile
+ 9 | from dataclasses import replace
+   |                         ^^^^^^^
+10 | from unittest.mock import patch
+   |
+help: Remove unused import: `dataclasses.replace`
+  |
+8 | import tempfile
+  - from dataclasses import replace
+9 | from unittest.mock import patch
+  |
+
+E402 Module level import not at top of file
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:17:1
+   |
+15 | COMMIT = '511850802afe2b58c0609f12d469f3751be4a3cb'
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+17 | from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:17:1
+   |
+15 |   COMMIT = '511850802afe2b58c0609f12d469f3751be4a3cb'
+16 |   sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+17 | / from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+18 | | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   | |________________________________________________________________________________^
+19 |
+20 |   def canonical(value):
+   |
+help: Organize imports
+   |
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+   - from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+17 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+18 |
+19 + from hive_mind_os.campaign_continuity import (
+20 +     CampaignContinuityController,
+21 +     ContinuityError,
+22 +     Phase,
+23 + )
+24 +
+25 +
+26 | def canonical(value):
+   |
+
+F401 [*] `hive_mind_os.campaign_continuity.CampaignContinuityController` imported but unused
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:17:46
+   |
+15 | COMMIT = '511850802afe2b58c0609f12d469f3751be4a3cb'
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+17 | from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   |
+help: Remove unused import
+   |
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+   - from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+17 + from hive_mind_os.campaign_continuity import ContinuityError
+18 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   |
+
+F401 [*] `hive_mind_os.campaign_continuity.Phase` imported but unused
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:17:93
+   |
+15 | COMMIT = '511850802afe2b58c0609f12d469f3751be4a3cb'
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+17 | from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+   |                                                                                             ^^^^^
+18 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   |
+help: Remove unused import
+   |
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+   - from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+17 + from hive_mind_os.campaign_continuity import ContinuityError
+18 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   |
+
+E402 Module level import not at top of file
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:18:1
+   |
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+17 | from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+18 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+19 |
+20 | def canonical(value):
+   |
+help: Move module level imports to top of file
+
+F401 [*] `test_campaign_continuity.MemoryAdapter` imported but unused
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:18:68
+   |
+16 | sys.path[:0] = [str(SOURCE/'src'), str(SOURCE/'tests')]
+17 | from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+18 | from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+   |                                                                    ^^^^^^^^^^^^^
+19 |
+20 | def canonical(value):
+   |
+help: Remove unused import: `test_campaign_continuity.MemoryAdapter`
+   |
+17 | from hive_mind_os.campaign_continuity import CampaignContinuityController, ContinuityError, Phase
+   - from test_campaign_continuity import CampaignContinuityDraftTests, MemoryAdapter
+18 + from test_campaign_continuity import CampaignContinuityDraftTests
+19 |
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:89:22
+   |
+87 | rows=[]
+88 | for item in manifest['artifacts']:
+89 |     path=item['path']; raw=subprocess.check_output(['git','-C',str(SOURCE),'show',COMMIT+':'+path])
+   |                      ^
+90 |     working=(SOURCE/path).read_bytes()
+91 |     rows.append({'path':path,'declared_sha256':item['sha256'],'declared_bytes':item['bytes'],
+   |
+
+E701 Multiple statements on one line (colon)
+   --> evidence\live\continuity-qualification\review-repaired-5118508\probe.py:100:30
+    |
+ 98 | copied=[]
+ 99 | for original in sorted(original_review.iterdir()):
+100 |     if not original.is_file(): continue
+    |                              ^
+101 |     name=original.name+'.txt' if original.suffix=='.py' else original.name
+102 |     path='docs/architecture/continuity-qualification-review/'+name
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\dag-build-identity-20260913\baseline\reproduce.py:2:1
+   |
+ 1 |   """Independent bounded baseline reproduction; no dispatcher or execution calls."""
+ 2 | / from pathlib import Path
+ 3 | | import hashlib
+ 4 | | import json
+ 5 | | import os
+ 6 | | import subprocess
+ 7 | | import sys
+ 8 | | import datetime
+ 9 | | import inspect
+10 | | import argparse
+11 | | import io
+12 | | import tarfile
+   | |______________^
+13 |
+14 |   parser = argparse.ArgumentParser()
+   |
+help: Organize imports
+   |
+1  | """Independent bounded baseline reproduction; no dispatcher or execution calls."""
+   - from pathlib import Path
+2  + import argparse
+3  + import datetime
+4  | import hashlib
+5  + import inspect
+6  + import io
+7  | import json
+8  | import os
+9  | import subprocess
+10 | import sys
+   - import datetime
+   - import inspect
+   - import argparse
+   - import io
+11 | import tarfile
+12 + from pathlib import Path
+13 |
+   |
+
+E402 Module level import not at top of file
+  --> evidence\live\dag-build-identity-20260913\baseline\reproduce.py:43:1
+   |
+41 | sys.dont_write_bytecode = True
+42 | sys.path[:0] = [str(EXTRACT / "src"), str(EXTRACT)]
+43 | from tests.test_dag_standard_product import compiler_plan, STANDARD
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 | from hive_mind_os.subject_execution import SubjectExecutionService, SubjectExecutionMode
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\dag-build-identity-20260913\baseline\reproduce.py:43:1
+   |
+41 |   sys.dont_write_bytecode = True
+42 |   sys.path[:0] = [str(EXTRACT / "src"), str(EXTRACT)]
+43 | / from tests.test_dag_standard_product import compiler_plan, STANDARD
+44 | | from hive_mind_os.subject_execution import SubjectExecutionService, SubjectExecutionMode
+   | |________________________________________________________________________________________^
+45 |
+46 |   plan = compiler_plan()
+   |
+help: Organize imports
+   |
+42 | sys.path[:0] = [str(EXTRACT / "src"), str(EXTRACT)]
+   - from tests.test_dag_standard_product import compiler_plan, STANDARD
+   - from hive_mind_os.subject_execution import SubjectExecutionService, SubjectExecutionMode
+43 + from hive_mind_os.subject_execution import SubjectExecutionMode, SubjectExecutionService
+44 + from tests.test_dag_standard_product import STANDARD, compiler_plan
+45 |
+   |
+
+E402 Module level import not at top of file
+  --> evidence\live\dag-build-identity-20260913\baseline\reproduce.py:44:1
+   |
+42 | sys.path[:0] = [str(EXTRACT / "src"), str(EXTRACT)]
+43 | from tests.test_dag_standard_product import compiler_plan, STANDARD
+44 | from hive_mind_os.subject_execution import SubjectExecutionService, SubjectExecutionMode
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | plan = compiler_plan()
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\dag-build-identity-20260913\baseline\seal.py:2:1
+  |
+1 |   """Bind retained reproduction artifacts to actual immutable Git objects."""
+2 | / import hashlib
+3 | | import json
+4 | | from pathlib import Path
+5 | | import subprocess
+  | |_________________^
+6 |   root = Path(__file__).resolve().parent
+7 |   receipt = json.loads((root / "RESULTS.json").read_text(encoding="utf-8"))
+  |
+help: Organize imports
+  |
+3 | import json
+4 + import subprocess
+5 | from pathlib import Path
+  - import subprocess
+6 +
+7 | root = Path(__file__).resolve().parent
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\dag-build-identity-20260913\fixture-repair\r1-resolution\cold_history_probe.py:2:1
+   |
+ 1 |   """Run repaired fixtures with no developer historical heads or copied objects."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import ast
+ 5 | | import hashlib
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import subprocess
+10 | | import sys
+   | |__________^
+11 |
+12 |   OUT = Path(__file__).resolve().parent
+   |
+help: Organize imports
+   |
+7  | import os
+   - from pathlib import Path
+8  | import subprocess
+9  | import sys
+10 + from pathlib import Path
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\dag-build-identity-20260913\fixture-repair\review-r1\probe.py:2:1
+   |
+ 1 |   """Independent fixture transport/ref-availability review; external synthetic Git only."""
+ 2 | / import ast
+ 3 | | from collections import Counter
+ 4 | | from concurrent.futures import ThreadPoolExecutor
+ 5 | | import hashlib
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import subprocess
+10 | | import time
+   | |___________^
+11 |
+12 |   ROOT = Path("C:/h/node-guide1")
+   |
+help: Organize imports
+   |
+2  | import ast
+   - from collections import Counter
+   - from concurrent.futures import ThreadPoolExecutor
+3  | import hashlib
+4  | import json
+5  | import os
+   - from pathlib import Path
+6  | import subprocess
+7  | import time
+8  + from collections import Counter
+9  + from concurrent.futures import ThreadPoolExecutor
+10 + from pathlib import Path
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\dag-build-identity-20260913\fixture-repair\review-r1\seal.py:1:1
+  |
+1 | / from datetime import datetime, timezone
+2 | | import hashlib
+3 | | import json
+4 | | from pathlib import Path
+5 | | import subprocess
+  | |_________________^
+6 |
+7 |   root = Path("C:/h/node-guide1")
+  |
+help: Organize imports
+  |
+  - from datetime import datetime, timezone
+1 | import hashlib
+2 | import json
+3 + import subprocess
+4 + from datetime import datetime, timezone
+5 | from pathlib import Path
+  - import subprocess
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\dag-build-identity-20260913\fixture-repair\transport_probe.py:2:1
+   |
+ 1 |   """Retained fixture transport control and concurrent commit-graph exercise."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | from concurrent.futures import ThreadPoolExecutor
+ 5 | | import hashlib
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import subprocess
+10 | | import time
+   | |___________^
+11 |
+12 |   OUT = Path(__file__).resolve().parent
+   |
+help: Organize imports
+   |
+3  |
+   - from concurrent.futures import ThreadPoolExecutor
+4  | import hashlib
+5  | import json
+6  | import os
+   - from pathlib import Path
+7  | import subprocess
+8  | import time
+9  + from concurrent.futures import ThreadPoolExecutor
+10 + from pathlib import Path
+11 |
+   |
+
+E401 [*] Multiple imports on one line
+ --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:2:1
+  |
+1 | """Static Git-blob audit only; never imports product code or executes tests."""
+2 | import ast, hashlib, json, pathlib, subprocess
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+4 | def git(*a):return subprocess.check_output(['git','-C',R,*a])
+  |
+help: Split imports
+  |
+1 | """Static Git-blob audit only; never imports product code or executes tests."""
+  - import ast, hashlib, json, pathlib, subprocess
+2 + import ast
+3 + import hashlib
+4 + import json
+5 + import pathlib
+6 + import subprocess
+7 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:2:1
+  |
+1 | """Static Git-blob audit only; never imports product code or executes tests."""
+2 | import ast, hashlib, json, pathlib, subprocess
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+4 | def git(*a):return subprocess.check_output(['git','-C',R,*a])
+  |
+help: Organize imports
+  |
+1 | """Static Git-blob audit only; never imports product code or executes tests."""
+  - import ast, hashlib, json, pathlib, subprocess
+2 + import ast
+3 + import hashlib
+4 + import json
+5 + import pathlib
+6 + import subprocess
+7 +
+8 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+  |
+
+E741 Ambiguous variable name: `O`
+ --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:3:1
+  |
+1 | """Static Git-blob audit only; never imports product code or executes tests."""
+2 | import ast, hashlib, json, pathlib, subprocess
+3 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+  | ^
+4 | def git(*a):return subprocess.check_output(['git','-C',R,*a])
+5 | files=set(git('ls-tree','-r','--name-only',C).decode().splitlines());inventory={}
+  |
+
+E702 Multiple statements on one line (semicolon)
+ --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:3:32
+  |
+1 | """Static Git-blob audit only; never imports product code or executes tests."""
+2 | import ast, hashlib, json, pathlib, subprocess
+3 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+  |                                ^
+4 | def git(*a):return subprocess.check_output(['git','-C',R,*a])
+5 | files=set(git('ls-tree','-r','--name-only',C).decode().splitlines());inventory={}
+  |
+
+E702 Multiple statements on one line (semicolon)
+ --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:3:59
+  |
+1 | """Static Git-blob audit only; never imports product code or executes tests."""
+2 | import ast, hashlib, json, pathlib, subprocess
+3 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+  |                                                           ^
+4 | def git(*a):return subprocess.check_output(['git','-C',R,*a])
+5 | files=set(git('ls-tree','-r','--name-only',C).decode().splitlines());inventory={}
+  |
+
+E702 Multiple statements on one line (semicolon)
+ --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:5:69
+  |
+3 | O=pathlib.Path(__file__).parent;R='C:/h/continuity-draft1';C='b19b2a177e2d10ebf49b565dcdd1ad9878bbaeac'
+4 | def git(*a):return subprocess.check_output(['git','-C',R,*a])
+5 | files=set(git('ls-tree','-r','--name-only',C).decode().splitlines());inventory={}
+  |                                                                     ^
+6 | def load(path):
+7 |  if path in inventory:return (O/'pinned'/path).read_bytes()
+  |
+
+E701 Multiple statements on one line (colon)
+ --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:7:22
+  |
+5 | files=set(git('ls-tree','-r','--name-only',C).decode().splitlines());inventory={}
+6 | def load(path):
+7 |  if path in inventory:return (O/'pinned'/path).read_bytes()
+  |                      ^
+8 |  raw=git('show',C+':'+path);target=O/'pinned'/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+9 |  record={'path':path,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'git_blob_oid':git('rev-parse',C+':'+path).decode().str…
+  |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:8:28
+   |
+ 6 | def load(path):
+ 7 |  if path in inventory:return (O/'pinned'/path).read_bytes()
+ 8 |  raw=git('show',C+':'+path);target=O/'pinned'/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+   |                            ^
+ 9 |  record={'path':path,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'git_blob_oid':git('rev-parse',C+':'+path).decode().str…
+10 |  if path.startswith('tests/') and path.endswith('.py'):
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:8:51
+   |
+ 6 | def load(path):
+ 7 |  if path in inventory:return (O/'pinned'/path).read_bytes()
+ 8 |  raw=git('show',C+':'+path);target=O/'pinned'/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+   |                                                   ^
+ 9 |  record={'path':path,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'git_blob_oid':git('rev-parse',C+':'+path).decode().str…
+10 |  if path.startswith('tests/') and path.endswith('.py'):
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:8:99
+   |
+ 6 | def load(path):
+ 7 |  if path in inventory:return (O/'pinned'/path).read_bytes()
+ 8 |  raw=git('show',C+':'+path);target=O/'pinned'/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+   |                                                                                                   ^
+ 9 |  record={'path':path,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'git_blob_oid':git('rev-parse',C+':'+path).decode().str…
+10 |  if path.startswith('tests/') and path.endswith('.py'):
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:16:24
+   |
+14 |     assertions=[ast.unparse(v) for v in ast.walk(n) if isinstance(v,ast.Call) and isinstance(v.func,ast.Attribute) and v.func.attr.sta…
+15 |     record['test_methods'].append({'name':n.name,'line':n.lineno,'assertions':assertions})
+16 |  inventory[path]=record;return raw
+   |                        ^
+17 | v3p='docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json';v4p='docs/execution/dags/generic-hive-mind-product-v4/plan.…
+18 | v3=json.loads(load(v3p));v4=json.loads(load(v4p));rows=[]
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:17:75
+   |
+15 |     record['test_methods'].append({'name':n.name,'line':n.lineno,'assertions':assertions})
+16 |  inventory[path]=record;return raw
+17 | v3p='docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json';v4p='docs/execution/dags/generic-hive-mind-product-v4/plan.…
+   |                                                                           ^
+18 | v3=json.loads(load(v3p));v4=json.loads(load(v4p));rows=[]
+19 | extra={
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:18:25
+   |
+16 |  inventory[path]=record;return raw
+17 | v3p='docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json';v4p='docs/execution/dags/generic-hive-mind-product-v4/plan.…
+18 | v3=json.loads(load(v3p));v4=json.loads(load(v4p));rows=[]
+   |                         ^
+19 | extra={
+20 |  'BASELINE-000':['tests/test_generic_dag_v4_plan.py','tests/test_v4_source_provenance.py','evidence/audits/v4-successor-recovery/SOURC…
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:18:50
+   |
+16 |  inventory[path]=record;return raw
+17 | v3p='docs/execution/dags/generic-hive-mind-product-v3/node-contracts.json';v4p='docs/execution/dags/generic-hive-mind-product-v4/plan.…
+18 | v3=json.loads(load(v3p));v4=json.loads(load(v4p));rows=[]
+   |                                                  ^
+19 | extra={
+20 |  'BASELINE-000':['tests/test_generic_dag_v4_plan.py','tests/test_v4_source_provenance.py','evidence/audits/v4-successor-recovery/SOURC…
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:52:61
+   |
+50 | 'HANDOFF-700':'Public runtime/PowerShell implementation and tests provide inert preparation. Required complete generic user guide lack…
+51 | for n in v4['nodes']:
+52 |  prior=next(x for x in v3['nodes'] if x['id']==n['node_id']);planned=prior['write_scope'];actual=sorted(set([p for p in planned if p i…
+   |                                                             ^
+53 |  for p in actual:load(p)
+54 |  rows.append({'node_id':n['node_id'],'acceptance_criteria':n['acceptance_criteria'],'planned_v3_paths':planned,'actual_mapped_artifact…
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:52:90
+   |
+50 | 'HANDOFF-700':'Public runtime/PowerShell implementation and tests provide inert preparation. Required complete generic user guide lack…
+51 | for n in v4['nodes']:
+52 |  prior=next(x for x in v3['nodes'] if x['id']==n['node_id']);planned=prior['write_scope'];actual=sorted(set([p for p in planned if p i…
+   |                                                                                          ^
+53 |  for p in actual:load(p)
+54 |  rows.append({'node_id':n['node_id'],'acceptance_criteria':n['acceptance_criteria'],'planned_v3_paths':planned,'actual_mapped_artifact…
+   |
+
+E701 Multiple statements on one line (colon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:53:17
+   |
+51 | for n in v4['nodes']:
+52 |  prior=next(x for x in v3['nodes'] if x['id']==n['node_id']);planned=prior['write_scope'];actual=sorted(set([p for p in planned if p i…
+53 |  for p in actual:load(p)
+   |                 ^
+54 |  rows.append({'node_id':n['node_id'],'acceptance_criteria':n['acceptance_criteria'],'planned_v3_paths':planned,'actual_mapped_artifact…
+55 |  'assessment':assess[n['node_id']],'acceptance_disposition':'partial_static_mapping_not_node_completion','tests_executed':False})
+   |
+
+E701 Multiple statements on one line (colon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:56:212
+   |
+54 | …absent_planned_literal_paths':[p for p in planned if p not in files],
+55 | …
+56 | …mind-product-v4/manifest.json','src/hive_mind_os/dag_standard.py']:load(p)
+   |                                                                    ^
+57 | …
+58 | …
+   |
+
+E702 Multiple statements on one line (semicolon)
+  --> evidence\live\dag-build-identity-20260913\selection\map_acceptance.py:58:51
+   |
+56 | for p in ['USER_GUIDE/00_START_HERE.md','USER_GUIDE/02_ONE_PROMPT_FOREVER.md','docs/execution/PLAN_LINEAGE.md','docs/execution/dags/ge…
+57 | # Machine-visible static proof of the selected dropped-binding path.
+58 | cli=ast.parse(load('src/hive_mind_os/dag_cli.py'));service=ast.parse(load('src/hive_mind_os/subject_execution.py'))
+   |                                                   ^
+59 | calls=[n for n in ast.walk(cli) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr=='build_file']
+60 | method=next(n for n in ast.walk(service) if isinstance(n,ast.FunctionDef) and n.name=='build_file')
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\ci-repair\r1-resolution\cold_history_probe.py:2:1
+   |
+ 1 |   """Run repaired fixtures with no developer historical heads or copied objects."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import ast
+ 5 | | import hashlib
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import subprocess
+10 | | import sys
+   | |__________^
+11 |
+12 |   OUT = Path(__file__).resolve().parent
+   |
+help: Organize imports
+   |
+7  | import os
+   - from pathlib import Path
+8  | import subprocess
+9  | import sys
+10 + from pathlib import Path
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\ci-repair\review-r1\probe.py:2:1
+   |
+ 1 |   """Independent fixture transport/ref-availability review; external synthetic Git only."""
+ 2 | / import ast
+ 3 | | from collections import Counter
+ 4 | | from concurrent.futures import ThreadPoolExecutor
+ 5 | | import hashlib
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import subprocess
+10 | | import time
+   | |___________^
+11 |
+12 |   ROOT = Path("C:/h/node-guide1")
+   |
+help: Organize imports
+   |
+2  | import ast
+   - from collections import Counter
+   - from concurrent.futures import ThreadPoolExecutor
+3  | import hashlib
+4  | import json
+5  | import os
+   - from pathlib import Path
+6  | import subprocess
+7  | import time
+8  + from collections import Counter
+9  + from concurrent.futures import ThreadPoolExecutor
+10 + from pathlib import Path
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\generic-dag-guide-20260913\ci-repair\review-r1\seal.py:1:1
+  |
+1 | / from datetime import datetime, timezone
+2 | | import hashlib
+3 | | import json
+4 | | from pathlib import Path
+5 | | import subprocess
+  | |_________________^
+6 |
+7 |   root = Path("C:/h/node-guide1")
+  |
+help: Organize imports
+  |
+  - from datetime import datetime, timezone
+1 | import hashlib
+2 | import json
+3 + import subprocess
+4 + from datetime import datetime, timezone
+5 | from pathlib import Path
+  - import subprocess
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\ci-repair\transport_probe.py:2:1
+   |
+ 1 |   """Retained fixture transport control and concurrent commit-graph exercise."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | from concurrent.futures import ThreadPoolExecutor
+ 5 | | import hashlib
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import subprocess
+10 | | import time
+   | |___________^
+11 |
+12 |   OUT = Path(__file__).resolve().parent
+   |
+help: Organize imports
+   |
+3  |
+   - from concurrent.futures import ThreadPoolExecutor
+4  | import hashlib
+5  | import json
+6  | import os
+   - from pathlib import Path
+7  | import subprocess
+8  | import time
+9  + from concurrent.futures import ThreadPoolExecutor
+10 + from pathlib import Path
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\accelerated-001.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+  |
+2 |
+  - import importlib
+3 | import faulthandler
+4 | import gc
+5 + import importlib
+6 | import os
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\accelerated-01.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+  |
+2 |
+  - import importlib
+3 | import faulthandler
+4 | import gc
+5 + import importlib
+6 | import os
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\bootstrap.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+  |
+2 |
+  - import importlib
+3 | import faulthandler
+4 | import gc
+5 + import importlib
+6 | import os
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\diagnostic_stress.py:2:1
+  |
+1 |   """External-only acceleration of diagnostic sampling; production limits untouched."""
+2 | / import json
+3 | | import os
+4 | | from pathlib import Path
+5 | | import subprocess
+  | |_________________^
+6 |
+7 |   OUT = Path(__file__).resolve().parent
+  |
+help: Organize imports
+  |
+3 | import os
+4 + import subprocess
+5 | from pathlib import Path
+  - import subprocess
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\focused_checks.py:2:1
+   |
+ 1 |   """Retain diagnostic and timeout refusal checks without rerunning the full suite."""
+ 2 | / import ast
+ 3 | | import hashlib
+ 4 | | import json
+ 5 | | import os
+ 6 | | from pathlib import Path
+ 7 | | import subprocess
+ 8 | | import time
+   | |___________^
+ 9 |
+10 |   ROOT = Path(r"C:\h\node-guide1")
+   |
+help: Organize imports
+  |
+5 | import os
+  - from pathlib import Path
+6 | import subprocess
+7 | import time
+8 + from pathlib import Path
+9 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\reproduce_module.py:2:1
+   |
+ 1 |   """Capture the actual bounded-process result for the frozen V4 DAG module."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import hashlib
+ 5 | | import io
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import subprocess
+10 | | import tarfile
+   | |______________^
+11 |
+12 |   ROOT = Path(r"C:\h\node-guide1")
+   |
+help: Organize imports
+   |
+7  | import os
+   - from pathlib import Path
+8  | import subprocess
+9  | import tarfile
+10 + from pathlib import Path
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\threaded-001.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+10 | | import threading
+   | |________________^
+11 |
+12 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+   |
+2  |
+   - import importlib
+3  | import faulthandler
+4  | import gc
+5  + import importlib
+6  | import os
+7  | import pathlib
+8  | import sys
+9  + import threading
+10 | import unittest
+   - import threading
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\threaded-01.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+10 | | import threading
+   | |________________^
+11 |
+12 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+   |
+2  |
+   - import importlib
+3  | import faulthandler
+4  | import gc
+5  + import importlib
+6  | import os
+7  | import pathlib
+8  | import sys
+9  + import threading
+10 | import unittest
+   - import threading
+11 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\generic-dag-guide-20260913\collector-repair\builder\threaded_diagnostic_probe.py:2:1
+  |
+1 |   """A/B candidate: identical module, Python-thread-owned diagnostic snapshots."""
+2 | / import json
+3 | | import os
+4 | | from pathlib import Path
+5 | | import subprocess
+  | |_________________^
+6 |
+7 |   OUT = Path(__file__).resolve().parent
+  |
+help: Organize imports
+  |
+3 | import os
+4 + import subprocess
+5 | from pathlib import Path
+  - import subprocess
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\examination\diagnostic-alternative\accelerated-001.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+  |
+2 |
+  - import importlib
+3 | import faulthandler
+4 | import gc
+5 + import importlib
+6 | import os
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\examination\diagnostic-alternative\accelerated-01.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+  |
+2 |
+  - import importlib
+3 | import faulthandler
+4 | import gc
+5 + import importlib
+6 | import os
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\collector-repair\examination\diagnostic-alternative\bootstrap.py:1:1
+   |
+ 1 | / from __future__ import annotations
+ 2 | |
+ 3 | | import importlib
+ 4 | | import faulthandler
+ 5 | | import gc
+ 6 | | import os
+ 7 | | import pathlib
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   EXPECTED_EXECUTABLE = pathlib.Path("C:\\Users\\beesp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe").resolve()
+   |
+help: Organize imports
+  |
+2 |
+  - import importlib
+3 | import faulthandler
+4 | import gc
+5 + import importlib
+6 | import os
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\generic-dag-guide-20260913\collector-repair\examination\diagnostic-alternative\diagnostic_stress.py:2:1
+  |
+1 |   """External-only acceleration of diagnostic sampling; production limits untouched."""
+2 | / import json
+3 | | import os
+4 | | from pathlib import Path
+5 | | import subprocess
+  | |_________________^
+6 |
+7 |   OUT = Path(__file__).resolve().parent
+  |
+help: Organize imports
+  |
+3 | import os
+4 + import subprocess
+5 | from pathlib import Path
+  - import subprocess
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\generic-dag-guide-20260913\collector-repair\examination\diagnostic_probe.py:2:1
+  |
+1 |   """Distinguish diagnostic faulthandler timer from actual process deadline."""
+2 | / import hashlib
+3 | | import json
+4 | | from pathlib import Path
+5 | | import subprocess
+6 | | import time
+  | |___________^
+7 |
+8 |   out = Path(__file__).resolve().parent
+  |
+help: Organize imports
+  |
+3 | import json
+  - from pathlib import Path
+4 | import subprocess
+5 | import time
+6 + from pathlib import Path
+7 |
+  |
+
+E401 [*] Multiple imports on one line
+ --> evidence\live\generic-dag-guide-20260913\collector-repair\examination\timer_fixture.py:1:1
+  |
+1 | import faulthandler, sys, time
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | print(sys.version, flush=True)
+3 | faulthandler.dump_traceback_later(15, repeat=True)
+  |
+help: Split imports
+  |
+  - import faulthandler, sys, time
+1 + import faulthandler
+2 + import sys
+3 + import time
+4 | print(sys.version, flush=True)
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> evidence\live\generic-dag-guide-20260913\collector-repair\examination\timer_fixture.py:1:1
+  |
+1 | import faulthandler, sys, time
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | print(sys.version, flush=True)
+3 | faulthandler.dump_traceback_later(15, repeat=True)
+  |
+help: Organize imports
+  |
+  - import faulthandler, sys, time
+1 + import faulthandler
+2 + import sys
+3 + import time
+4 +
+5 | print(sys.version, flush=True)
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\validate_guide.py:2:1
+   |
+ 1 |   """Read-only source checks plus inert CLI examples in an external fixture folder."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import hashlib
+ 5 | | import json
+ 6 | | import os
+ 7 | | from pathlib import Path
+ 8 | | import re
+ 9 | | import subprocess
+10 | | import sys
+   | |__________^
+11 |
+12 |   ROOT = Path(r"C:\h\node-guide1")
+   |
+help: Organize imports
+   |
+6  | import os
+   - from pathlib import Path
+7  | import re
+8  | import subprocess
+9  | import sys
+10 + from pathlib import Path
+11 |
+   |
+
+E402 Module level import not at top of file
+  --> evidence\live\generic-dag-guide-20260913\validate_guide.py:52:1
+   |
+50 | fixture.mkdir(exist_ok=False)
+51 | sys.path[:0] = [str(ROOT / "src"), str(ROOT)]
+52 | from tests.test_dag_standard_product import STANDARD, compiler_plan
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | plan = compiler_plan()
+54 | (fixture / "plan.json").write_bytes(plan.canonical_bytes())
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\live\generic-dag-guide-20260913\validate_guide.py:52:1
+   |
+50 | fixture.mkdir(exist_ok=False)
+51 | sys.path[:0] = [str(ROOT / "src"), str(ROOT)]
+52 | from tests.test_dag_standard_product import STANDARD, compiler_plan
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | plan = compiler_plan()
+54 | (fixture / "plan.json").write_bytes(plan.canonical_bytes())
+   |
+help: Organize imports
+   |
+52 | from tests.test_dag_standard_product import STANDARD, compiler_plan
+53 +
+54 | plan = compiler_plan()
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> evidence\sources\v4-successor-recovery\spdx-tools\v0.8.5\src\spdx_tools\spdx\clitools\pyspdxtools.py:15:1
+   |
+13 |   # See the License for the specific language governing permissions and
+14 |   # limitations under the License.
+15 | / import logging
+16 | | import sys
+17 | | from json import JSONDecodeError
+18 | | from xml.parsers.expat import ExpatError
+19 | | from xml.sax import SAXParseException
+20 | |
+21 | | import click
+22 | | from beartype.typing import List
+23 | | from yaml.scanner import ScannerError
+24 | |
+25 | | from spdx_tools.spdx.graph_generation import export_graph_from_document
+26 | | from spdx_tools.spdx.model import Document
+27 | | from spdx_tools.spdx.parser.error import SPDXParsingError
+28 | | from spdx_tools.spdx.parser.parse_anything import parse_file
+29 | | from spdx_tools.spdx.validation.document_validator import validate_full_spdx_document
+30 | | from spdx_tools.spdx.validation.validation_message import ValidationMessage
+31 | | from spdx_tools.spdx.writer.tagvalue import tagvalue_writer
+32 | | from spdx_tools.spdx.writer.write_anything import write_file
+   | |____________________________________________________________^
+   |
+help: Organize imports
+   |
+22 | from beartype.typing import List
+   - from yaml.scanner import ScannerError
+   -
+23 | from spdx_tools.spdx.graph_generation import export_graph_from_document
+--------------------------------------------------------------------------------
+30 | from spdx_tools.spdx.writer.write_anything import write_file
+31 + from yaml.scanner import ScannerError
+32 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> scripts\normalize_spdx_json.py:4:1
+   |
+ 2 |   """Normalize Syft SPDX 2.2 JSON output before standards validation."""
+ 3 |
+ 4 | / from __future__ import annotations
+ 5 | |
+ 6 | | import argparse
+ 7 | | import json
+ 8 | | import os
+ 9 | | import re
+10 | | import tempfile
+11 | | from datetime import datetime
+12 | | from pathlib import Path
+13 | | from typing import Any
+   | |______________________^
+   |
+help: Organize imports
+   |
+14 |
+   -
+15 | _SPDX_22_CREATED = re.compile(
+   |
+
+Found 79 errors.
+[*] 49 fixable with the `--fix` option.

@@ -1,0 +1,23 @@
+test_collector_records_bounded_focused_validation_timeout (baseline_collector.CollectV4ActivationEvidenceTests.test_collector_records_bounded_focused_validation_timeout) ... FAIL
+test_collector_attributes_a_module_process_timeout_with_partial_streams (baseline_collector.CollectV4ActivationEvidenceTests.test_collector_attributes_a_module_process_timeout_with_partial_streams) ... FAIL
+
+======================================================================
+FAIL: test_collector_records_bounded_focused_validation_timeout (baseline_collector.CollectV4ActivationEvidenceTests.test_collector_records_bounded_focused_validation_timeout)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\h\collector-merge1\tests\test_collect_v4_activation_evidence.py", line 602, in test_collector_records_bounded_focused_validation_timeout
+    )
+AssertionError: 'Focused V4 validation' not found in "The V4 candidate must be exactly one direct-child commit with one sole parent.\nAt C:\\h\\collector-merge1\\scripts\\Collect-V4ActivationEvidence.ps1:253 char:9\n+         throw 'The V4 candidate must be exactly one direct-child comm ...\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n    + CategoryInfo          : OperationStopped: (The V4 candidat...ne sole parent.:String) [], RuntimeException\n    + FullyQualifiedErrorId : The V4 candidate must be exactly one direct-child commit with one sole parent.\n \n"
+
+======================================================================
+FAIL: test_collector_attributes_a_module_process_timeout_with_partial_streams (baseline_collector.CollectV4ActivationEvidenceTests.test_collector_attributes_a_module_process_timeout_with_partial_streams)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\h\collector-merge1\tests\test_collect_v4_activation_evidence.py", line 670, in test_collector_attributes_a_module_process_timeout_with_partial_streams
+    timeout_scope, {"module_process", "overall_deadline_before_module"}
+AssertionError: 'exceeded a module deadline' not found in "The V4 candidate must be exactly one direct-child commit with one sole parent.\nAt C:\\h\\collector-merge1\\scripts\\Collect-V4ActivationEvidence.ps1:253 char:9\n+         throw 'The V4 candidate must be exactly one direct-child comm ...\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n    + CategoryInfo          : OperationStopped: (The V4 candidat...ne sole parent.:String) [], RuntimeException\n    + FullyQualifiedErrorId : The V4 candidate must be exactly one direct-child commit with one sole parent.\n \n"
+
+----------------------------------------------------------------------
+Ran 2 tests in 1.277s
+
+FAILED (failures=2)

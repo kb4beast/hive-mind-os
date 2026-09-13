@@ -1,0 +1,73 @@
+{
+  "created_at": "2026-09-13T22:40:33.400638+00:00",
+  "identity": "/root/merge_failure_examiner",
+  "subject_identity": "0d161d869a9a717b891872fc9b8203ae07eae51f 81d638986bf3553bdf2ebd45d224bd40a526fbc4 4dc099e031a1bc7f5f787a9f82768fef5ffbe5ed 4d6828386a1b3b73bb4377541eb635b8800b77ca",
+  "frozen_candidate_identity": "1038b5a7d2eb49904c59957ad3e989af8bb2fcc5 a41ed6f3b9a242857c06e9e53878ea60b1620a57 59a5364501c5e49ceb28574aad7a4ac1512291b9",
+  "method": "read-only pinned Git object and complete provided CI log inspection; no tests executed",
+  "sources": [
+    {
+      "repository_path": "AGENTS.md",
+      "snapshot": "C:\\h\\postmerge-windows-20260913\\examiner\\sources\\AGENTS.md",
+      "bytes": 8010,
+      "sha256": "2c0a9b7622acddbc41e5ecf24bec00fda04bb4adfeb99c78c7e52c7dd981d24e"
+    },
+    {
+      "repository_path": "LICENSE",
+      "snapshot": "C:\\h\\postmerge-windows-20260913\\examiner\\sources\\LICENSE",
+      "bytes": 1065,
+      "sha256": "6e76d648ae297aa3dcefc739604cfcfab2a50b484ab7331090c745a089de21f8"
+    },
+    {
+      "repository_path": ".github/workflows/ci.yml",
+      "snapshot": "C:\\h\\postmerge-windows-20260913\\examiner\\sources\\.github\\workflows\\ci.yml",
+      "bytes": 7936,
+      "sha256": "31d42eabed8c7d73662b311bc7a4b249050a784c514d7a628b5d8c36dc3a1421"
+    },
+    {
+      "repository_path": "scripts/Collect-V4ActivationEvidence.ps1",
+      "snapshot": "C:\\h\\postmerge-windows-20260913\\examiner\\sources\\scripts\\Collect-V4ActivationEvidence.ps1",
+      "bytes": 41297,
+      "sha256": "4bb7083243f4271ccd52b5fed23c38f61961da682f17d0ad175bf7825d12958a"
+    },
+    {
+      "repository_path": "scripts/V4EvidenceProcess.ps1",
+      "snapshot": "C:\\h\\postmerge-windows-20260913\\examiner\\sources\\scripts\\V4EvidenceProcess.ps1",
+      "bytes": 8888,
+      "sha256": "0b2b4a6fb1bcfec8438e0248c9845065e93428a5ddbeaab804956d5098ba057d"
+    },
+    {
+      "repository_path": "tests/test_collect_v4_activation_evidence.py",
+      "snapshot": "C:\\h\\postmerge-windows-20260913\\examiner\\sources\\tests\\test_collect_v4_activation_evidence.py",
+      "bytes": 45082,
+      "sha256": "d961ff34386838edb467e47191ad2d19431b54fb5a41b1ca391cc3a76b72f93c"
+    },
+    {
+      "repository_path": "tests/test_v4_source_provenance.py",
+      "snapshot": "C:\\h\\postmerge-windows-20260913\\examiner\\sources\\tests\\test_v4_source_provenance.py",
+      "bytes": 16852,
+      "sha256": "a4fc298fecda2a2bfa72730fbd6ab5e69cb34d2e6f6112340a2ef05408542434"
+    }
+  ],
+  "ci_log": {
+    "path": "C:\\h\\postmerge-windows-20260913\\ci-full.log",
+    "bytes": 3281557,
+    "sha256": "b0f60d883ac1087ca0c26808407eb67493b353ed35d5d1e27d7a170580970f79"
+  },
+  "artifacts": [
+    {
+      "path": "REPORT.md",
+      "bytes": 6665,
+      "sha256": "c3599c7387d824fb340df60303370a4b797b4dffc5e1344307879d1647b6cd37"
+    },
+    {
+      "path": "failure-excerpts.txt",
+      "bytes": 4913,
+      "sha256": "41cbed3c38d5bc5e1bf42c2515f3beaa86adfe66fee04edfbce8d29b731c9b67"
+    },
+    {
+      "path": "seal.py",
+      "bytes": 9119,
+      "sha256": "b702764e32ee3cade4ea8d7f70253fcf76fbdcb123f2c2a9d13082d9c1305708"
+    }
+  ]
+}
