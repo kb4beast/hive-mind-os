@@ -579,6 +579,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "core.eol=lf",
                 "clone",
                 "--quiet",
+                "--no-local",
                 "--no-hardlinks",
                 str(ROOT),
                 str(cls.authoring_root),
@@ -820,6 +821,31 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                         env=self.git_environment,
                     )
                     self.assertNotEqual(result.returncode, 0)
+
+            # A cold ROOT has no incidental historical objects. Fixture creation
+            # must transport the explicitly authenticated authoring history.
+            with mock.patch(f"{__name__}.ROOT", repository):
+                for label, base in (
+                    ("correction-parent", CORRECTION_PARENT),
+                    ("negative-parent", CORRECTION_PARENT + "^"),
+                ):
+                    checkout = self.make_committed_checkout(
+                        Path(directory) / label, base=base
+                    )
+                    expected_parent = self.run_git(
+                        self.authoring_root, "rev-parse", base
+                    ).stdout.strip()
+                    self.assertEqual(
+                        self.run_git(checkout, "rev-parse", "HEAD^").stdout.strip(),
+                        expected_parent,
+                    )
+                    for required_commit, expected_tree in expected_trees.items():
+                        self.assertEqual(
+                            self.run_git(
+                                checkout, "rev-parse", f"{required_commit}^{{tree}}"
+                            ).stdout.strip(),
+                            expected_tree,
+                        )
 
             self.run_git(repository, "bundle", "verify", str(HISTORY_BUNDLE))
             self.run_git(
@@ -1376,6 +1402,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         executable_path: str | None = None,
     ) -> Path:
         checkout = parent / "committed"
+        # The verified authoring branch advertises the pinned history imported
+        # from bundles. ROOT may retain that history only in remote-tracking refs,
+        # which normal clone transport does not fetch.
         subprocess.run(
             [
                 str(self.git_executable),
@@ -1385,8 +1414,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 "core.eol=lf",
                 "clone",
                 "--quiet",
+                "--no-local",
                 "--no-hardlinks",
-                str(ROOT),
+                str(self.authoring_root),
                 str(checkout),
             ],
             cwd=ROOT,
@@ -1708,6 +1738,12 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
             candidate = self.make_committed_checkout(parent)
+            # Maintenance may replace source-private object-info files during a
+            # clone. Transport objects instead of copying that mutable directory.
+            source_only = Path("objects/info/source-maintenance-probe.lock")
+            source_marker = candidate / ".git" / source_only
+            source_marker.parent.mkdir(parents=True, exist_ok=True)
+            source_marker.write_bytes(b"source-only maintenance metadata\n")
             system_config = parent / "system.gitconfig"
             global_config = parent / "global.gitconfig"
             config_text = "[core]\n\tautocrlf = true\n"
@@ -1730,6 +1766,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     str(self.git_executable),
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
                     str(candidate),
                     str(fresh),
@@ -1741,6 +1778,10 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                 env=hostile_environment,
             )
             self.assertEqual(clone.returncode, 0, clone.stdout + clone.stderr)
+            self.assertFalse((fresh / ".git" / source_only).exists())
+            self.assertEqual(
+                source_marker.read_bytes(), b"source-only maintenance metadata\n"
+            )
             observed_config = subprocess.run(
                 [
                     str(self.git_executable),
@@ -1842,6 +1883,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     str(self.git_executable),
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
                     str(fixture),
                     str(hostile_fixture),
@@ -4129,6 +4171,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     "core.eol=lf",
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
                     str(checkout),
                     str(shadow),
@@ -4215,6 +4258,7 @@ class GenericDagV3OverlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             checkout = root / "authoring-filter-boundary"
+            # Use the authenticated historical branch, not incidental ROOT objects.
             subprocess.run(
                 [
                     str(self.git_executable),
@@ -4224,8 +4268,9 @@ class GenericDagV3OverlayTests(unittest.TestCase):
                     "core.eol=lf",
                     "clone",
                     "--quiet",
+                    "--no-local",
                     "--no-hardlinks",
-                    str(ROOT),
+                    str(self.authoring_root),
                     str(checkout),
                 ],
                 cwd=ROOT,
