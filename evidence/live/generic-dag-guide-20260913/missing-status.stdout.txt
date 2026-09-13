@@ -1,0 +1,9 @@
+{
+  "binding": {
+    "plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+    "subject_id": "sha256:0ad3112fa955e1476bf1145884445e51479ff73ced401c4547c5172ff5270caf"
+  },
+  "runs": [],
+  "state_path": "C:\\h\\node-completeness-audit\\guide-implementation\\inert-fixture\\absent-state\\dag-execution.sqlite3",
+  "state_present": false
+}

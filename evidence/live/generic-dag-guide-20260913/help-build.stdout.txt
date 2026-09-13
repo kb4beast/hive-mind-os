@@ -1,0 +1,19 @@
+usage: hive-mind dag build [-h] --plan PLAN --standard STANDARD
+                           --expected-plan-digest EXPECTED_PLAN_DIGEST
+                           [--mode {repository,offline-local,research-artifact,workflow}]
+                           [--subject SUBJECT]
+                           [--expected-request-id EXPECTED_REQUEST_ID]
+                           [--expected-subject-id EXPECTED_SUBJECT_ID]
+                           --output OUTPUT [--replace]
+
+options:
+  -h, --help            show this help message and exit
+  --plan PLAN
+  --standard STANDARD
+  --expected-plan-digest EXPECTED_PLAN_DIGEST
+  --mode {repository,offline-local,research-artifact,workflow}
+  --subject SUBJECT     Operator label only; never an authority grant
+  --expected-request-id EXPECTED_REQUEST_ID
+  --expected-subject-id EXPECTED_SUBJECT_ID
+  --output OUTPUT
+  --replace

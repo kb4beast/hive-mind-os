@@ -1,0 +1,92 @@
+{
+  "edges": [
+    {
+      "from": "orchestrator",
+      "to": "architect"
+    },
+    {
+      "from": "explorer",
+      "to": "builder"
+    },
+    {
+      "from": "architect",
+      "to": "curator"
+    },
+    {
+      "from": "builder",
+      "to": "integrator"
+    },
+    {
+      "from": "curator",
+      "to": "steward"
+    },
+    {
+      "from": "integrator",
+      "to": "optimizer"
+    }
+  ],
+  "metrics": {
+    "dependency_level_count": 4,
+    "node_count": 8,
+    "raw_edge_count": 6,
+    "transitive_direct_edge_count": 0
+  },
+  "nodes": [
+    "orchestrator",
+    "explorer",
+    "architect",
+    "builder",
+    "curator",
+    "integrator",
+    "steward",
+    "optimizer"
+  ],
+  "plan_digest": "sha256:fae3d838c9285d76cc433d7f9e5123def954e7b500316e1a02f22c740d20094e",
+  "plan_id": "portable-plan",
+  "rounds": [
+    {
+      "dependency_level": 0,
+      "node_ids": [
+        "explorer",
+        "orchestrator"
+      ],
+      "resource_usage": {
+        "cpu": 2
+      },
+      "round_index": 0
+    },
+    {
+      "dependency_level": 1,
+      "node_ids": [
+        "architect",
+        "builder"
+      ],
+      "resource_usage": {
+        "cpu": 2
+      },
+      "round_index": 1
+    },
+    {
+      "dependency_level": 2,
+      "node_ids": [
+        "curator",
+        "integrator"
+      ],
+      "resource_usage": {
+        "cpu": 2
+      },
+      "round_index": 2
+    },
+    {
+      "dependency_level": 3,
+      "node_ids": [
+        "optimizer",
+        "steward"
+      ],
+      "resource_usage": {
+        "cpu": 2
+      },
+      "round_index": 3
+    }
+  ]
+}
