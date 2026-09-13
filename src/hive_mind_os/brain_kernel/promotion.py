@@ -409,12 +409,29 @@ class PromotionAuthority:
                     self._persist_receipt(receipt, experiment_id="promotion:unbound", actor="promotion-authority")
             raise
 
+    def _current_champion(self, decision: PromotionDecision, operation: str) -> str | None:
+        """Retain read failures before an action, without classifying commit failures."""
+        try:
+            return self.registry.champion_digest(decision.candidate.role)
+        except (PromotionCommittedEvidencePending, RejectionPersistenceError):
+            # These already describe an outcome/persistence obligation, not a
+            # new pre-action rejection. Keep their recovery semantics intact.
+            raise
+        except (RuntimeError, OSError, ValueError) as error:
+            unknown = getattr(error, "code", "") == "commit-state-unknown"
+            self._record_receipt(
+                decision, action=operation,
+                status="commit-state-unknown" if unknown else "rejected",
+                prior_digest=None, pointer_after=None, reasons=(str(error),),
+            )
+            raise
+
     def _apply(self, decision_id: str) -> dict[str, Any]:
         """Carry out a logged decision.  Only KEEP may move the pointer."""
 
         decision = self._actionable(decision_id)
         candidate = decision.candidate
-        current = self.registry.champion_digest(candidate.role)
+        current = self._current_champion(decision, "apply")
         if candidate.artifact_digest == current:
             raise PromotionAuthorityError(
                 "decisions against the active champion must go through rollback()"
@@ -542,7 +559,7 @@ class PromotionAuthority:
             raise PromotionAuthorityError(
                 "rollback requires a retained prior champion digest"
             )
-        current = self.registry.champion_digest(candidate.role)
+        current = self._current_champion(decision, "rollback")
         if current != candidate.artifact_digest:
             raise PromotionAuthorityError(
                 "rollback requires the candidate to be the active champion"

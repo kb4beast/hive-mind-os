@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from promotion_auth_fixtures import verifier_for
@@ -19,6 +20,7 @@ from hive_mind_os.brain_kernel.court_runtime import (
     CourtVerdict,
     record_case,
 )
+from hive_mind_os.brain_kernel.evaluation_admission import EvaluationAdmissionError
 from hive_mind_os.brain_kernel.promotion import (
     PromotionAuthority,
     PromotionAuthorityError,
@@ -28,6 +30,7 @@ from hive_mind_os.brain_kernel.promotion import (
 )
 from hive_mind_os.models import Role
 from hive_mind_os.prompt_registry import (
+    PromotionAdmissionError,
     PromotionCommittedEvidencePending,
     PromptRegistry,
     RejectionPersistenceError,
@@ -175,6 +178,94 @@ def _keep(
 
 
 class HiveCortexPromotionTests(unittest.TestCase):
+    def _pending_champion_action(self, operation, verdict):
+        registry = _registry(self)
+        authority = PromotionAuthority(registry)
+        parent = _keep(authority, registry, content="read failure parent", parent=None,
+                       candidate_id="CAND-parent", experiment_id="EXP-parent",
+                       case_id="CASE-parent", decision_id="DEC-parent")
+        active = _keep(authority, registry, content="read failure active",
+                       parent=parent.candidate.artifact_digest,
+                       candidate_id="CAND-active", experiment_id="EXP-active",
+                       case_id="CASE-active", decision_id="DEC-active")
+        rollback = operation == "rollback"
+        candidate = _registered_candidate(
+            registry, content="read failure active" if rollback else "read failure pending",
+            parent=parent.candidate.artifact_digest if rollback else active.candidate.artifact_digest,
+            candidate_id="CAND-pending", experiment_id="EXP-pending")
+        decision = _decision(candidate, verdict, "CASE-pending", "DEC-pending", action=operation)
+        disposition = {ExperimentVerdict.KEEP: CourtDisposition.ADOPT,
+                       ExperimentVerdict.RETEST: CourtDisposition.DEFER,
+                       ExperimentVerdict.DISCARD: CourtDisposition.REJECT}[verdict]
+        authority.submit(decision, court_history=_court_history(
+            candidate.artifact_digest, disposition=disposition, case_id="CASE-pending"))
+        return registry, authority, active, decision
+
+    def test_champion_read_failures_retain_exact_signed_evidence_before_actions(self) -> None:
+        for operation, verdict in (("apply", ExperimentVerdict.KEEP),
+                                   ("apply", ExperimentVerdict.RETEST),
+                                   ("rollback", ExperimentVerdict.DISCARD)):
+            for fault in ("evaluation", "admission", "missing-manifest", "unknown"):
+                with self.subTest(operation=operation, verdict=verdict, fault=fault):
+                    registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                    pointers = registry._read_pointers()
+                    manifest = registry.admission_root / (pointers["promotion_bindings"]["builder"][7:] + ".json")
+                    if fault == "evaluation":
+                        assert active.evaluation_record is not None
+                        Path(active.evaluation_record.record_path).unlink()
+                        expected_error = EvaluationAdmissionError
+                    elif fault == "admission":
+                        manifest.write_bytes(manifest.read_bytes() + b"\n")
+                        expected_error = PromotionAdmissionError
+                    elif fault == "missing-manifest":
+                        manifest.unlink()
+                        expected_error = OSError
+                    else:
+                        registry._mark_unknown_commit({"reason": "retained ambiguous commit fixture"})
+                        expected_error = PromotionAdmissionError
+                    before = registry.pointer_path.read_bytes()
+                    events_before = registry.ledger.events()
+                    receipts_before = authority.receipts
+                    with self.assertRaises(expected_error) as caught:
+                        getattr(authority, operation)(decision.decision_id)
+                    self.assertEqual(registry.pointer_path.read_bytes(), before)
+                    self.assertEqual(len(authority.receipts), len(receipts_before) + 1)
+                    receipt = authority.receipts[-1]
+                    self.assertEqual(receipt["status"], "commit-state-unknown" if fault == "unknown" else "rejected")
+                    self.assertEqual(receipt["action"], operation)
+                    self.assertEqual(receipt["reasons"], [str(caught.exception)])
+                    self.assertEqual(receipt["decision_payload"], authority.decision_payload(decision))
+                    self.assertIsNone(receipt["prior_digest"])
+                    self.assertIsNone(receipt["pointer_after"])
+                    signed = registry.principal_verifier.verify_rejection_receipt(receipt["authentication"])
+                    self.assertEqual(signed, {key: value for key, value in receipt.items() if key != "authentication"})
+                    self.assertIn(receipt, [item["receipt"] for item in registry.events()
+                                            if item["kind"] == "promotion-authority-rejection"])
+                    events_after = registry.ledger.events()
+                    self.assertEqual(events_after[:-1], events_before)
+                    self.assertEqual(events_after[-1]["event_type"], "promotion.receipt")
+                    self.assertEqual(events_after[-1]["payload"], receipt)
+                    self.assertEqual(authority._actionable(decision.decision_id), decision)
+
+    def test_action_observation_failures_keep_committed_status_without_rejection(self) -> None:
+        for operation, verdict in (("apply", ExperimentVerdict.KEEP),
+                                   ("apply", ExperimentVerdict.RETEST),
+                                   ("rollback", ExperimentVerdict.DISCARD)):
+            with self.subTest(operation=operation, verdict=verdict):
+                registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                observer = "_observe_promotion" if verdict is ExperimentVerdict.KEEP else "_observe_adverse"
+                with patch.object(registry, observer, side_effect=OSError("observation unavailable")):
+                    receipt = getattr(authority, operation)(decision.decision_id)
+                self.assertEqual(receipt["status"], "committed-evidence-pending")
+                expected = (decision.candidate.parent_champion_digest if operation == "rollback" else
+                            decision.candidate.artifact_digest if verdict is ExperimentVerdict.KEEP else
+                            active.candidate.artifact_digest)
+                self.assertEqual(receipt["pointer_after"], expected)
+                self.assertEqual(registry.champion_digest("builder"), expected)
+                assert decision.evaluation_record is not None
+                self.assertIn(decision.evaluation_record.record_digest, registry._read_pointers()["consumed_evaluations"])
+                self.assertFalse(any(item["kind"] == "promotion-authority-rejection" for item in registry.events()))
+
     def test_authenticated_stop_retains_champion_and_closes_candidate(self) -> None:
         registry = _registry(self)
         authority = PromotionAuthority(registry)

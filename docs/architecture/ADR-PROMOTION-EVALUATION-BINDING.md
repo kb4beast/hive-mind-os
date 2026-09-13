@@ -342,3 +342,43 @@ were executed by this builder. Original assertions remain; the non-KEEP coverage
 loop additionally includes STOP. Independent reproduction, deterministic checks
 and non-draft PR delivery remain outstanding and owned by the launcher. This
 addendum records implementation reasoning, not an independent approval or green CI.
+
+## Active-champion read refusal repair, 2026-09-12
+
+The builder read the complete diff from
+`aff97517b5d2c416bbfc2dd148e34910f0ae9d29`, this ADR, changed tests and the
+independent review of `c9ab5ef` at
+`C:/h/one-touch/state/run-20260912-183953-1214c3cd/independent-review-1a8eaade97a343e3a9fe4e32c04b7882.json`,
+SHA-256 `8fffa53562eb4183e15b919222b7c25b36115871f6ab436a625befe72bafd32a`.
+Its retained `revise` verdict identifies a P2 gap: evaluation, admission or I/O
+errors while resolving the active champion could escape apply/rollback before
+the action's rejection receipt handling. The review's earlier green verification
+receipts do not verify this repair.
+
+Both action paths now share a guarded initial champion read. Read failures retain
+the exact requested decision and operation through the existing signed immutable
+file and ledger sinks, then propagate the original exception. The receipt leaves
+both observed pointer fields unset because resolution failed. An existing
+`commit-state-unknown` blocker retains that distinct status; committed-evidence
+and rejection-persistence exceptions keep their original recovery semantics.
+The guard does not encompass pointer mutation or postcommit observation, so it
+cannot relabel those outcomes as pre-action rejection. Signing or sink outages
+continue through the existing typed unavailable-receipt diagnostic path.
+
+New regression specifications exercise KEEP, RETEST and rollback with a deleted
+active evaluation record, a noncanonical active admission manifest, an unreadable
+manifest and a retained unknown-state marker. They check exact signature payloads,
+both durable sinks, unchanged pointer/replay bytes, no decision/action ledger
+event and continued action eligibility. Additional observation fault cases retain
+committed-evidence-pending status and consumption without a rejection receipt.
+All original assertions remain. These specifications are not execution receipts.
+
+The pointer-writer inspection again located promotion/bootstrap and adverse/
+rollback behind the shared registry commit primitive; model-backend initialization
+uses the same generation-zero admission. The separate controller campaign remains
+in `PROMOTION-BINDING-CONTROLLER-FOLLOW-UP.md`. No controller work or live action
+is included. Earlier dissent, review findings and provenance remain retained.
+
+Builder disposition: ready for launcher verification. No tests, static-check
+commands, launcher or Git mutations were run. Independent review, deterministic
+verification and non-draft PR delivery remain launcher-owned outstanding work.
