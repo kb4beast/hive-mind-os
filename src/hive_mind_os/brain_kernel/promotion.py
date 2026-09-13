@@ -417,7 +417,10 @@ class PromotionAuthority:
             # These already describe an outcome/persistence obligation, not a
             # new pre-action rejection. Keep their recovery semantics intact.
             raise
-        except (RuntimeError, OSError, ValueError) as error:
+        except Exception as error:
+            # Ledger/provider read errors (including native SQLite exceptions)
+            # need refusal evidence too. This guard covers only the initial
+            # read, before publication or admission can change the champion.
             unknown = getattr(error, "code", "") == "commit-state-unknown"
             self._record_receipt(
                 decision, action=operation,

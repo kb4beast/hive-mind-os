@@ -430,3 +430,49 @@ Builder disposition: implementation ready for launcher verification. No tests,
 static-check commands, launcher, Git mutations or live promotions were run.
 Independent review, deterministic verification and non-draft PR delivery remain
 launcher-owned outstanding work; this handoff claims none of those results.
+
+## Native SQLite champion-read refusal repair, 2026-09-12
+
+The builder read the full diff from
+`aff97517b5d2c416bbfc2dd148e34910f0ae9d29`, this ADR, the changed tests and the
+independent review of `f461fc25766cc364f40c209a7596527cff992f17` at
+`C:/h/one-touch/state/run-20260912-183953-1214c3cd/independent-review-1db06775cc2c41598503b188f26afee5.json`,
+SHA-256 `d1135d46d904dcb09288fe3860ebd844c9cf7fc06d8047f20a541360026a0a00`.
+Its retained `revise` verdict identifies a P2 gap: native SQLite failures from
+`EvidenceLedger.events()` during the initial champion read escaped the limited
+exception tuple without signed refusal evidence or a persistence diagnostic.
+The review's reported verification of its pinned HEAD does not verify this repair.
+
+The initial read guard now handles `Exception`, including SQLite and other
+provider read errors. The explicit earlier exclusions still propagate
+`PromotionCommittedEvidencePending` and `RejectionPersistenceError` unchanged.
+The guard covers only champion resolution before decision publication or registry
+admission, so it cannot reclassify a new pointer commit as a rejected action.
+Successful refusal persistence re-raises the original read exception; unavailable
+custody or receipt sinks retain the existing typed persistence-failure behavior.
+No read, action, signing attempt or failed sink operation is automatically retried.
+
+Added regression specifications inject `sqlite3.OperationalError` and
+`sqlite3.DatabaseError` at the ledger read reached by KEEP, RETEST and rollback.
+Each covers available sinks, ledger loss, file loss, both sinks lost and signing
+custody loss. Assertions inspect the exact signed decision and operation, unknown
+pointer observations, bounded sink attempts, durable signed file proof or unsigned
+diagnostics where available, and explicit failure when neither sink can persist.
+They also inspect unchanged pointer/replay bytes, manifests and lineage, absence
+of decision publication/admission, continued decision eligibility, and retained
+evidence after opening a new registry instance. Separate cases require existing
+commit/persistence exceptions to propagate by identity without new refusal records.
+Original assertions remain intact. These specifications are not execution receipts.
+
+The pointer-writer inspection again found promotion/bootstrap and adverse/rollback
+using the shared registry commit primitive. Model-backend missing-role initialization
+enters the generation-zero gate; experiment-runner quarantine is restriction-only.
+The separately configured external-sink adapter does not write registry pointers.
+The next controller campaign remains concretely documented in
+`PROMOTION-BINDING-CONTROLLER-FOLLOW-UP.md`, outside this repair. Earlier dissent,
+failed reports, source obligations and review provenance remain retained unchanged.
+
+Builder disposition: implementation ready for launcher verification. No tests,
+static-check commands, launcher, Git mutations or live promotions were run.
+Remaining delivery obligations are launcher verification of this repair batch,
+independent review and green non-draft PR delivery; no protected merge is authorized.

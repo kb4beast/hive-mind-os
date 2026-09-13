@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
@@ -246,6 +247,129 @@ class HiveCortexPromotionTests(unittest.TestCase):
                     self.assertEqual(events_after[:-1], events_before)
                     self.assertEqual(events_after[-1]["event_type"], "promotion.receipt")
                     self.assertEqual(events_after[-1]["payload"], receipt)
+                    self.assertEqual(authority._actionable(decision.decision_id), decision)
+
+    def test_champion_sqlite_read_failures_retain_evidence_or_report_sink_outages(self) -> None:
+        for operation, verdict, admission_method in (
+            ("apply", ExperimentVerdict.KEEP, "promote"),
+            ("apply", ExperimentVerdict.RETEST, "apply_adverse_decision"),
+            ("rollback", ExperimentVerdict.DISCARD, "rollback_champion"),
+        ):
+            for error_type in (sqlite3.OperationalError, sqlite3.DatabaseError):
+                for outage in ("none", "ledger", "file", "both", "custody"):
+                    with self.subTest(operation=operation, verdict=verdict, error=error_type, outage=outage):
+                        registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                        before = registry.pointer_path.read_bytes()
+                        events_before = registry.ledger.events()
+                        receipts_before = authority.receipts
+                        manifests_before = {path.name: path.read_bytes() for path in registry.admission_root.iterdir()}
+                        lineage_before = registry._read_records(registry.lineage_root)
+                        failure = error_type("active champion ledger read unavailable")
+                        expected_error = error_type if outage == "none" else RejectionPersistenceError
+                        with ExitStack() as stack:
+                            read = stack.enter_context(patch.object(registry.ledger, "events", side_effect=failure))
+                            admit = stack.enter_context(patch.object(
+                                registry, admission_method, side_effect=AssertionError("admission started after read failure")))
+                            append = stack.enter_context(patch.object(
+                                registry.ledger, "append_event", wraps=registry.ledger.append_event,
+                                side_effect=error_type("ledger sink offline") if outage in {"ledger", "both"} else None))
+                            write = stack.enter_context(patch.object(
+                                registry, "_write_immutable_record", wraps=registry._write_immutable_record,
+                                side_effect=OSError("file sink offline") if outage in {"file", "both"} else None))
+                            sign = stack.enter_context(patch.object(
+                                registry.principal_verifier, "sign_rejection", wraps=registry.principal_verifier.sign_rejection,
+                                side_effect=OSError("custody offline") if outage == "custody" else None))
+                            with self.assertRaises(expected_error) as caught:
+                                getattr(authority, operation)(decision.decision_id)
+                        read.assert_called_once_with(active.candidate.experiment_id)
+                        admit.assert_not_called()
+                        sign.assert_called_once()
+                        self.assertEqual(write.call_count, 1 if outage in {"none", "custody"} else 2)
+                        self.assertEqual([call.args[1] for call in append.call_args_list],
+                                         ["promotion.receipt"] if outage == "none" else
+                                         ["promotion.receipt", "promotion.receipt_unavailable"] if outage == "ledger" else
+                                         ["promotion.receipt_unavailable"])
+                        self.assertEqual(registry.pointer_path.read_bytes(), before)
+                        self.assertEqual({path.name: path.read_bytes() for path in registry.admission_root.iterdir()},
+                                         manifests_before)
+                        self.assertEqual(registry._read_records(registry.lineage_root), lineage_before)
+                        self.assertFalse(registry.unknown_commit_path.exists())
+                        self.assertEqual(authority._actionable(decision.decision_id), decision)
+                        # Inspect the attempted payload even if no sink could retain it.
+                        # Only the separate durable-file/ledger assertions below prove persistence.
+                        receipt = write.call_args_list[0].args[1]["receipt"]
+                        self.assertEqual(receipt["status"], "rejected")
+                        self.assertEqual(receipt["action"], operation)
+                        self.assertEqual(receipt["decision_payload"], authority.decision_payload(decision))
+                        self.assertEqual(receipt["reasons"], [str(failure)])
+                        self.assertIsNone(receipt["prior_digest"])
+                        self.assertIsNone(receipt["pointer_after"])
+                        unsigned = {key: value for key, value in receipt.items() if key != "authentication"}
+                        if outage != "custody":
+                            self.assertEqual(registry.principal_verifier.verify_rejection_receipt(receipt["authentication"]),
+                                             unsigned)
+                        files = registry.events()
+                        signed_files = [item["receipt"] for item in files if item["kind"] == "promotion-authority-rejection"]
+                        self.assertEqual(signed_files, [receipt] if outage in {"none", "ledger"} else [])
+                        events_after = registry.ledger.events()
+                        self.assertEqual(events_after[:len(events_before)], events_before)
+                        new_events = events_after[len(events_before):]
+                        if outage == "none":
+                            self.assertIs(caught.exception, failure)
+                            self.assertEqual(authority.receipts, (*receipts_before, receipt))
+                            self.assertEqual([item["event_type"] for item in new_events], ["promotion.receipt"])
+                            self.assertEqual(new_events[0]["payload"], receipt)
+                            self.assertEqual(len(files), 1)
+                        else:
+                            assert isinstance(caught.exception, RejectionPersistenceError)
+                            self.assertEqual(caught.exception.code, "rejection-persistence-failed")
+                            self.assertEqual(authority.receipts, receipts_before)
+                            diagnostic = append.call_args_list[-1].args[3]
+                            self.assertEqual(diagnostic["kind"], "promotion-receipt-unavailable")
+                            self.assertEqual(diagnostic["receipt"], unsigned)
+                            self.assertEqual(diagnostic["authentication_status"], "unavailable")
+                            self.assertEqual(diagnostic["actor"], decision.judge_id)
+                            self.assertEqual(diagnostic["experiment_id"], decision.candidate.experiment_id)
+                            self.assertNotIn("authentication", diagnostic["receipt"])
+                            self.assertEqual([item for item in files if item["kind"] == "promotion-receipt-unavailable"],
+                                             [diagnostic] if outage in {"ledger", "custody"} else [])
+                            self.assertEqual([item["event_type"] for item in new_events],
+                                             ["promotion.receipt_unavailable"] if outage in {"file", "custody"} else [])
+                            if new_events:
+                                self.assertEqual(new_events[0]["payload"], diagnostic)
+                            if outage == "both":
+                                self.assertIn("file: file sink offline; ledger: ledger sink offline", str(caught.exception))
+                        restarted = PromptRegistry(registry.root, principal_verifier=registry.principal_verifier)
+                        self.addCleanup(restarted.close)
+                        self.assertEqual(restarted.pointer_path.read_bytes(), before)
+                        self.assertEqual(restarted.champion_digest("builder"), active.candidate.artifact_digest)
+                        self.assertEqual(restarted.events(), files)
+                        self.assertEqual(restarted.ledger.events(), events_after)
+
+    def test_champion_read_preserves_existing_commit_and_persistence_exceptions(self) -> None:
+        for operation, verdict in (("apply", ExperimentVerdict.KEEP),
+                                   ("apply", ExperimentVerdict.RETEST),
+                                   ("rollback", ExperimentVerdict.DISCARD)):
+            for pending in (True, False):
+                with self.subTest(operation=operation, verdict=verdict, pending=pending):
+                    registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                    binding = registry._read_pointers()["promotion_bindings"]["builder"]
+                    failure = (PromotionCommittedEvidencePending(binding, active.candidate.parent_champion_digest,
+                                                                  active.candidate.artifact_digest, "retained-observation")
+                               if pending else RejectionPersistenceError("rejection-persistence-failed", "retained sink failure"))
+                    before = registry.pointer_path.read_bytes()
+                    events_before = registry.ledger.events()
+                    receipts_before = authority.receipts
+                    with patch.object(registry.ledger, "events", side_effect=failure):
+                        with patch.object(authority, "_record_receipt", wraps=authority._record_receipt) as record:
+                            with self.assertRaises(type(failure)) as caught:
+                                getattr(authority, operation)(decision.decision_id)
+                    self.assertIs(caught.exception, failure)
+                    record.assert_not_called()
+                    self.assertEqual(registry.pointer_path.read_bytes(), before)
+                    self.assertEqual(registry.ledger.events(), events_before)
+                    self.assertEqual(registry.events(), ())
+                    self.assertEqual(authority.receipts, receipts_before)
                     self.assertEqual(authority._actionable(decision.decision_id), decision)
 
     def test_action_observation_failures_keep_committed_status_without_rejection(self) -> None:
