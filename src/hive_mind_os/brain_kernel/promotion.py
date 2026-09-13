@@ -439,8 +439,7 @@ class PromotionAuthority:
 
         if decision.verdict is not ExperimentVerdict.KEEP:
             action = "quarantine-candidate" if decision.verdict is ExperimentVerdict.QUARANTINE else "retain-champion"
-            sequence = self.registry.ledger.append_event(candidate.experiment_id, "experiment.decision",
-                                                         decision.judge_id, self.decision_payload(decision))
+            sequence = self._publish_decision(decision, "apply", current)
             try:
                 current = self.registry.apply_adverse_decision(
                     candidate.role, actor=decision.promoter_id or decision.judge_id,
@@ -466,10 +465,7 @@ class PromotionAuthority:
                 pointer_after=current,
             )
 
-        payload = self.decision_payload(decision)
-        sequence = self.registry.ledger.append_event(
-            candidate.experiment_id, "experiment.decision", decision.judge_id, payload,
-        )
+        sequence = self._publish_decision(decision, "apply", current)
         try:
             prior = self.registry.promote(
                 candidate.role, candidate.artifact_digest,
@@ -498,6 +494,24 @@ class PromotionAuthority:
             decision, action="promote", status="applied", prior_digest=prior,
             reasons=decision.reasons, pointer_after=candidate.artifact_digest,
         )
+
+    def _publish_decision(self, decision: PromotionDecision, operation: str, current: str | None) -> int:
+        """Retain publication failures before any registry action can start."""
+        try:
+            return self.registry.ledger.append_event(
+                decision.candidate.experiment_id, "experiment.decision",
+                decision.judge_id, self.decision_payload(decision),
+            )
+        except Exception as error:
+            # SQLite/provider errors are not necessarily RuntimeError or OSError.
+            # Even if the event was appended before the error, admission has not
+            # started. Do not retry publication or classify this as a pointer commit.
+            self._record_receipt(
+                decision, action=operation, status="rejected", prior_digest=current,
+                restored_digest=decision.candidate.parent_champion_digest if operation == "rollback" else None,
+                pointer_after=None, reasons=(str(error),),
+            )
+            raise
 
     @staticmethod
     def decision_payload(decision: PromotionDecision, *, include_authorization: bool = True) -> dict[str, Any]:
@@ -564,9 +578,8 @@ class PromotionAuthority:
             raise PromotionAuthorityError(
                 "rollback requires the candidate to be the active champion"
             )
+        sequence = self._publish_decision(decision, "rollback", current)
         try:
-            sequence = self.registry.ledger.append_event(candidate.experiment_id, "experiment.decision",
-                                                         decision.judge_id, self.decision_payload(decision))
             prior = self.registry.rollback_champion(
                 candidate.role,
                 restored,

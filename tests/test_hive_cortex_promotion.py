@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -265,6 +266,94 @@ class HiveCortexPromotionTests(unittest.TestCase):
                 assert decision.evaluation_record is not None
                 self.assertIn(decision.evaluation_record.record_digest, registry._read_pointers()["consumed_evaluations"])
                 self.assertFalse(any(item["kind"] == "promotion-authority-rejection" for item in registry.events()))
+
+    def test_decision_publication_failures_retain_signed_evidence_without_admission(self) -> None:
+        for operation, verdict, admission_method in (
+            ("apply", ExperimentVerdict.KEEP, "promote"),
+            ("apply", ExperimentVerdict.RETEST, "apply_adverse_decision"),
+            ("rollback", ExperimentVerdict.DISCARD, "rollback_champion"),
+        ):
+            for error_type in (OSError, sqlite3.OperationalError):
+                for fault in ("decision-only", "after-publication", "ledger-outage"):
+                    with self.subTest(operation=operation, verdict=verdict, error=error_type, fault=fault):
+                        registry, authority, active, decision = self._pending_champion_action(operation, verdict)
+                        before = registry.pointer_path.read_bytes()
+                        events_before = registry.ledger.events()
+                        receipts_before = authority.receipts
+                        manifests_before = {path.name: path.read_bytes() for path in registry.admission_root.iterdir()}
+                        lineage_before = registry._read_records(registry.lineage_root)
+                        append = registry.ledger.append_event
+                        failure = error_type("decision ledger unavailable")
+
+                        def fail_publication(run_id, event_type, actor, payload):
+                            if event_type == "experiment.decision":
+                                if fault == "after-publication":
+                                    append(run_id, event_type, actor, payload)
+                                raise failure
+                            if fault == "ledger-outage":
+                                raise failure
+                            return append(run_id, event_type, actor, payload)
+
+                        expected_error = RejectionPersistenceError if fault == "ledger-outage" else error_type
+                        with patch.object(registry.ledger, "append_event", side_effect=fail_publication) as publisher:
+                            with patch.object(registry, admission_method,
+                                              side_effect=AssertionError("admission started after publication failure")) as admit:
+                                with self.assertRaises(expected_error) as caught:
+                                    getattr(authority, operation)(decision.decision_id)
+                        admit.assert_not_called()
+                        self.assertEqual([call.args[1] for call in publisher.call_args_list],
+                                         ["experiment.decision", "promotion.receipt"] +
+                                         (["promotion.receipt_unavailable"] if fault == "ledger-outage" else []))
+                        self.assertEqual(registry.pointer_path.read_bytes(), before)
+                        self.assertEqual(registry.champion_digest("builder"), active.candidate.artifact_digest)
+                        self.assertEqual({path.name: path.read_bytes() for path in registry.admission_root.iterdir()},
+                                         manifests_before)
+                        self.assertEqual(registry._read_records(registry.lineage_root), lineage_before)
+                        self.assertFalse(registry.unknown_commit_path.exists())
+                        self.assertEqual(authority._actionable(decision.decision_id), decision)
+                        signed_records = [item["receipt"] for item in registry.events()
+                                          if item["kind"] == "promotion-authority-rejection"]
+                        self.assertEqual(len(signed_records), 1)
+                        receipt = signed_records[0]
+                        verified = registry.principal_verifier.verify_rejection_receipt(receipt["authentication"])
+                        self.assertEqual(verified, {key: value for key, value in receipt.items() if key != "authentication"})
+                        self.assertEqual(receipt["status"], "rejected")
+                        self.assertEqual(receipt["action"], operation)
+                        self.assertEqual(receipt["decision_payload"], authority.decision_payload(decision))
+                        self.assertEqual(receipt["reasons"], [str(failure)])
+                        self.assertEqual(receipt["prior_digest"], active.candidate.artifact_digest)
+                        self.assertEqual(receipt["restored_digest"],
+                                         decision.candidate.parent_champion_digest if operation == "rollback" else None)
+                        self.assertIsNone(receipt["pointer_after"])  # No under-lock post-action observation.
+                        events_after = registry.ledger.events()
+                        self.assertEqual(events_after[:len(events_before)], events_before)
+                        new_events = events_after[len(events_before):]
+                        if fault == "ledger-outage":
+                            assert isinstance(caught.exception, RejectionPersistenceError)
+                            self.assertEqual(caught.exception.code, "rejection-persistence-failed")
+                            self.assertEqual(authority.receipts, receipts_before)
+                            self.assertEqual(new_events, [])
+                            diagnostic = next(item for item in registry.events()
+                                              if item["kind"] == "promotion-receipt-unavailable")
+                            self.assertEqual(diagnostic["receipt"], verified)
+                            self.assertEqual(diagnostic["authentication_status"], "unavailable")
+                            self.assertEqual(diagnostic["persistence_error"], str(failure))
+                            self.assertNotIn("authentication", diagnostic["receipt"])
+                        else:
+                            self.assertIs(caught.exception, failure)
+                            self.assertEqual(authority.receipts, (*receipts_before, receipt))
+                            self.assertEqual([item["event_type"] for item in new_events],
+                                             (["experiment.decision"] if fault == "after-publication" else []) +
+                                             ["promotion.receipt"])
+                            self.assertEqual(new_events[-1]["payload"], receipt)
+                            if fault == "after-publication":
+                                self.assertEqual(new_events[0]["payload"], authority.decision_payload(decision))
+                        restarted = PromptRegistry(registry.root, principal_verifier=registry.principal_verifier)
+                        self.addCleanup(restarted.close)
+                        self.assertEqual(restarted.pointer_path.read_bytes(), before)
+                        self.assertEqual(restarted.champion_digest("builder"), active.candidate.artifact_digest)
+                        self.assertIn(receipt, [item["receipt"] for item in restarted.events()
+                                                if item["kind"] == "promotion-authority-rejection"])
 
     def test_authenticated_stop_retains_champion_and_closes_candidate(self) -> None:
         registry = _registry(self)

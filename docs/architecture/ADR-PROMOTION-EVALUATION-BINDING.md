@@ -382,3 +382,51 @@ is included. Earlier dissent, review findings and provenance remain retained.
 Builder disposition: ready for launcher verification. No tests, static-check
 commands, launcher or Git mutations were run. Independent review, deterministic
 verification and non-draft PR delivery remain launcher-owned outstanding work.
+
+## Decision publication refusal repair, 2026-09-12
+
+The builder read the full branch diff from
+`aff97517b5d2c416bbfc2dd148e34910f0ae9d29`, this ADR, the changed tests and the
+independent review of `cdc687a` at
+`C:/h/one-touch/state/run-20260912-183953-1214c3cd/independent-review-473e6b9239b840ec8319b36e63d5babb.json`,
+SHA-256 `ede2f4b6d09aec1164eaaa60249921a8a3eabbd2d7e5b8f3105ada0b42d77ae2`.
+Its retained `revise` verdict identifies a P2 gap: KEEP and non-KEEP decision
+publication preceded receipt handling, while rollback's handler excluded native
+SQLite failures. The review's earlier verification receipts do not verify this
+repair. Original review evidence and dissent remain unchanged.
+
+All three authority action paths now publish through one guarded helper before
+entering registry admission. Publication exceptions, including native SQLite
+errors, use the existing signed immutable file and ledger rejection sinks. The
+receipt binds the requested operation, exact decision payload, last observed
+champion and requested rollback target. Its post-action pointer field remains
+unset: publication does not obtain an under-lock pointer observation. The helper
+does not retry publication, consume evidence or mark the decision applied. Even
+an event retained before a publication error remains evidence, without starting
+admission or implying a pointer commit.
+
+If rejection ledger publication also fails, signed file proof remains retained
+and the existing diagnostic fallback reports `rejection-persistence-failed`.
+Successful rejection persistence propagates the original publication exception.
+The guard excludes registry mutation and postcommit observations, preserving
+their distinct committed-evidence-pending and unknown-state recovery behavior.
+
+Added regression specifications exercise KEEP, RETEST and rollback with both
+`OSError` and `sqlite3.OperationalError`, before publication, after event retention,
+and throughout a ledger-write outage. They check exact signed payloads, bounded
+sink attempts, retained event provenance, unchanged pointer/replay bytes and
+admission/lineage records, no registry admission call, continued action eligibility,
+and signed file evidence after opening a new registry instance. Original assertions
+are retained. These specifications have not been executed by this builder.
+
+The pointer-writer inspection again found the shared registry commit primitive
+behind promotion/bootstrap and adverse/rollback; model-backend initialization
+uses the same bootstrap gate. Arena/controller recommendations and the separately
+configured external-sink adapter remain outside authoritative registry mutation.
+The concrete next campaign remains in
+`PROMOTION-BINDING-CONTROLLER-FOLLOW-UP.md`; no controller work is included here.
+
+Builder disposition: implementation ready for launcher verification. No tests,
+static-check commands, launcher, Git mutations or live promotions were run.
+Independent review, deterministic verification and non-draft PR delivery remain
+launcher-owned outstanding work; this handoff claims none of those results.
