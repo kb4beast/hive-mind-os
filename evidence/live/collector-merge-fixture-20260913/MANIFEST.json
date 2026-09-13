@@ -1,0 +1,18 @@
+{
+  "baseline-reproduction.log": "e8ed579e7b63766185b45e3dbeb36a7d488d9625de08361f78cbece0e5d9ecb9",
+  "collector-312-bound.log": "89e919f3b3e2995b7746de6b7a53c8bda04539228650b4508294f82f5bae1bc8",
+  "collector-312-source-path.log": "0f98b39969af38e7e30af7e2a8b16211ad986af2084576e3e117a87a5441e77c",
+  "collector-312.log": "a50cd4f56674289940fbe4cd4a9db754d417f15995a07e694dabcfc86b84cdec",
+  "collector-314-bound.log": "b81bf8a80a33a8613b4b7fdacedf60925bfa0864d46b0063f7d5a5b517992cad",
+  "collector-314.log": "2a6176b5b76332aec6552eeadabfd2ec68bce6e85d0ed6f7db5e95ee32de2e65",
+  "EXAMINER-MANIFEST.json": "eae15f0422165f7c96d21193e294f278f6f26d42b46aba977cfbd357c7050ad6",
+  "EXAMINER.md": "c3599c7387d824fb340df60303370a4b797b4dffc5e1344307879d1647b6cd37",
+  "pyright.log": "22b02822980f7092b9fe05596693c9f3d653a9903d63c20e548c9b8f13eb2c02",
+  "python312-binding.log": "d00c0011fb390e71bd6dbdf849af66d1ae9d8d384208a44d0685a40bfc164572",
+  "python312-version.log": "6a5d9f6462ca5dfc6788cfd216ba579fffd7875776ab9d9b35659be78858f73a",
+  "python314-binding.log": "ad765d30150cbdb5005cab82b0746d099e192ead1bf5e816e79961809446f5ab",
+  "python314-version.log": "d4f847780c539fcd1ed56a70c4a97a3e243b40418b79213460cfa71723a08620",
+  "README.md": "d71dd82afa450531efe51e1335e97c02d808e9c7ecb0c8a23bb1cbc93a352f95",
+  "ruff.log": "d8893b1781ec7fae12648c17291c8ae7207b832f6c766f7920ebb3a38c74d493",
+  "SOURCE-INTAKE.json": "53b23c9893e3923d6de2b92ef53609590f334ff2cf088f2a3e0b03598f7790f9"
+}

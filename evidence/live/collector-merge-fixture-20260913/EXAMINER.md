@@ -1,0 +1,33 @@
+# Independent post-merge failure examination
+
+Examiner identity: /root/merge_failure_examiner. Role: separate expert witness and cross-examiner; no builder changes, no promotion verdict, no claim to independently administered credentials.
+
+## Finding and causal evidence
+
+The failing input is a fixture precondition error, not a demonstrated timeout implementation error. Both Windows CI jobs in run 34785092456 executed 1824 tests and reported exactly two failures (one skipped): test_collector_attributes_a_module_process_timeout_with_partial_streams and test_collector_records_bounded_focused_validation_timeout. Full log assertions say the collector rejected the candidate's parent count instead of producing the expected timeout message. Python 3.12 took 2376.888 seconds and Python 3.14 took 2619.805 seconds. These are existing provider results, not tests executed by this examiner.
+
+At the pinned subject, run_collector (test lines 202–222) always invokes the script located under ROOT, with cwd ROOT. The two timeout tests call it at lines 594 and 663. ROOT consequently supplies the repository commit under test. The collector obtains HEAD's actual parent list at lines 248–256 and rejects anything other than HEAD plus one parent before starting focused validation. Merged main 0d161d869a9a717b891872fc9b8203ae07eae51f has two parents: 4dc099e031a1bc7f5f787a9f82768fef5ffbe5ed and 4d6828386a1b3b73bb4377541eb635b8800b77ca. Thus rejection is required by the existing exact direct-child candidate contract.
+
+The Windows CI checkout selects pull_request.head.sha or github.sha. Linear PR heads therefore passed these tests, whereas push CI after a protected merge used the real two-parent main commit. Linux skips this Windows PowerShell class and cannot detect this defect. The workflow choice is evidence of why qualification missed the fixture error; changing the workflow to avoid merged code would hide it rather than repair it.
+
+## Same-pattern search and scope
+
+All calls to run_collector in the test tree were inspected. Only the two timeout cases require progression beyond candidate lineage validation. The remaining callers validate relative, inside-repository, equal-repository and junction output paths; these are rejected before parent validation and should remain direct ROOT tests. The existing full success/activation-disabled test already materializes frozen V4 candidate 1038b5a7d2eb49904c59957ad3e989af8bb2fcc5 and copies the current collector and process runner into that isolated tree. Its candidate tree is a41ed6f3b9a242857c06e9e53878ea60b1620a57 and sole parent is 59a5364501c5e49ceb28574aad7a4ac1512291b9. Reuse this fixture pattern for the two timeout cases.
+
+The parent-count test at lines 980–990 only asserts source strings. It does not execute the collector against a merge commit. Historical source-provenance test test_c78_pr_merge_checkout_failure_is_preserved_without_relaxing_the_collector retains an earlier analogous checkout failure and should remain intact. Search found no other current direct collector execution site with this exact later-stage/root-HEAD assumption. This statement is limited to searched collector call sites, not a proof that every repository fixture is topology-independent.
+
+## Recommended bounded adaptation and alternatives
+
+Adapt timeout fixture preparation to an isolated immutable one-parent candidate, overlaying the current collector and runner exactly as the existing success fixture does. Continue to retain all deadline, effective exit 124, module attribution, digest, partial-stream, activation-disabled and qualification-ineligible assertions. Add executable assertions that the selected fixture commit and sole parent are the intended immutable identities.
+
+Add a real two-parent candidate execution test built independently of checkout topology. It must reject before focused validation and must not produce a success/qualification receipt. Such a synthetic merge regression runs even on linear PR heads. Also run the timeout cases against the pinned merged main test harness before committing, because testing only after a new linear repair commit would fail to demonstrate the original trigger. Verify fixture HEAD/parent and copied script digests to ensure the fixture is running repaired/current collector bytes, not an old frozen implementation.
+
+Rejected alternatives: allowing merge candidates or treating first parent as sole parent weakens the production lineage contract; skipping timeout tests on merges leaves the contract untested; accepting any nonzero exit makes the test pass at the wrong gate; extending deadlines does not affect pre-validation rejection; changing push checkout to an arbitrary parent does not verify the delivered merge. A synthetic single-parent commit using the current source tree could isolate topology, but expands test dependence on mutable/current module counts and manifest lineage; the already pinned fixture is simpler and maintains compatibility.
+
+## Threat, compatibility, rollback and dissent
+
+No production policy, receipt schema, protected merge control or activation grant needs modification. Keep dirty-overlay mode visibly ineligible for qualification; copied current scripts are test inputs, not authenticated production receipts. Temporary worktrees must have unique external paths, preserve full history for the immutable candidate, and clean up only their own worktree registration/directory. Concurrency, cold historical objects, spaces/path length, Python 3.12/3.14 and cleanup failure remain fixture acceptance considerations. Do not broaden git deletion/pruning or mutate ROOT refs to make the test work.
+
+Migration: none for runtime data or historical receipts. Rollback: revert the fixture-only repair, preserving this failed CI evidence; rollback reintroduces merge-head test failures and is not qualification. Preserve prior C78 provenance and all existing negative assertions.
+
+Dissent/limits: pinning an older candidate means timeout execution samples that candidate's first modules, not every new main module. This is suitable for process-budget plumbing but must not replace the full current-main test matrix. A direct production requirement to collect a merged main candidate would be a separate contract change; this finding supplies no authority for that. A static source-string assertion alone is inadequate for the actual two-parent rejection behavior. I performed source/log/Git-object inspection only, no test execution and no claim that a proposed implementation has passed. Builder, independent verifier and final delivery checks must provide their own evidence.

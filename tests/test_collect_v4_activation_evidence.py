@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, cast
 
@@ -199,8 +201,41 @@ Get-V4UnittestTerminalResult `
         return json.loads(completed.stdout.strip().splitlines()[-1])
 
     @staticmethod
+    @contextmanager
+    def materialized_candidate(
+        directory: Path, *, source_root: Path = ROOT
+    ) -> Iterator[Path]:
+        """Exercise the collector against its pinned candidate, not ambient HEAD."""
+        directory.mkdir(parents=True, exist_ok=True)
+        candidate_root = directory / "candidate"
+        subprocess.run(
+            ["git", "worktree", "add", "--detach", str(candidate_root), V4_CANDIDATE_COMMIT],
+            cwd=source_root,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        try:
+            for script_name in (SCRIPT.name, PROCESS_RUNNER.name):
+                shutil.copyfile(
+                    source_root / "scripts" / script_name,
+                    candidate_root / "scripts" / script_name,
+                )
+            yield candidate_root
+        finally:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(candidate_root)],
+                cwd=source_root,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+
+    @staticmethod
     def run_collector(
-        output_directory: Path, *additional_arguments: str
+        output_directory: Path,
+        *additional_arguments: str,
+        repository_root: Path = ROOT,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
@@ -209,13 +244,13 @@ Get-V4UnittestTerminalResult `
                 "-ExecutionPolicy",
                 "Bypass",
                 "-File",
-                str(SCRIPT),
+                str(repository_root / "scripts" / SCRIPT.name),
                 "-OutputDirectory",
                 str(output_directory),
                 "-AllowDirty",
                 *additional_arguments,
             ],
-            cwd=ROOT,
+            cwd=repository_root,
             text=True,
             capture_output=True,
             check=False,
@@ -589,12 +624,16 @@ Get-V4UnittestTerminalResult `
             self.assertNotIn(TERMINAL_RESULT_MARKER, stdout.read_text(encoding="utf-8"))
 
     def test_collector_records_bounded_focused_validation_timeout(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with (
+            tempfile.TemporaryDirectory() as temporary_directory,
+            self.materialized_candidate(Path(temporary_directory)) as candidate_root,
+        ):
             output_directory = Path(temporary_directory) / "evidence"
             completed = self.run_collector(
                 output_directory,
                 "-FocusedTestTimeoutSeconds",
                 "1",
+                repository_root=candidate_root,
             )
 
             self.assertNotEqual(0, completed.returncode)
@@ -658,12 +697,16 @@ Get-V4UnittestTerminalResult `
                 )
 
     def test_collector_attributes_a_module_process_timeout_with_partial_streams(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with (
+            tempfile.TemporaryDirectory() as temporary_directory,
+            self.materialized_candidate(Path(temporary_directory)) as candidate_root,
+        ):
             output_directory = Path(temporary_directory) / "evidence"
             completed = self.run_collector(
                 output_directory,
                 "-MaximumFocusedModuleTimeoutMilliseconds",
                 "1",
+                repository_root=candidate_root,
             )
 
             self.assertNotEqual(0, completed.returncode)
@@ -987,6 +1030,80 @@ while True:
         self.assertIn("$parentTokens.Count -ne 2", script)
         self.assertIn("$parentTokens[0] -cne $head", script)
         self.assertIn("sole_parent_verified = $soleParentVerified", script)
+
+    def test_timeout_fixture_uses_pinned_candidate_under_a_merge_shaped_outer_head(self):
+        with (
+            tempfile.TemporaryDirectory() as temporary_directory,
+            self.materialized_candidate(Path(temporary_directory)) as outer_root,
+        ):
+            directory = Path(temporary_directory)
+
+            def git(*arguments: str) -> str:
+                return subprocess.run(
+                    ["git", *arguments],
+                    cwd=outer_root,
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                ).stdout.strip()
+
+            parent = git("rev-parse", f"{V4_CANDIDATE_COMMIT}^")
+            tree = git("rev-parse", f"{V4_CANDIDATE_COMMIT}^{{tree}}")
+            merge = git(
+                "-c", "user.name=Collector Fixture",
+                "-c", "user.email=collector-fixture@example.invalid",
+                "commit-tree", tree,
+                "-p", V4_CANDIDATE_COMMIT, "-p", parent,
+                "-m", "Synthetic outer merge for collector fixture regression",
+            )
+            git("checkout", "--detach", merge)
+            self.assertEqual(
+                [merge, V4_CANDIDATE_COMMIT, parent],
+                git("rev-list", "--parents", "-n", "1", "HEAD").split(),
+            )
+            rejected_output = directory / "merge-rejected"
+            rejected = self.run_collector(
+                rejected_output,
+                "-MaximumFocusedModuleTimeoutMilliseconds", "1",
+                repository_root=outer_root,
+            )
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("one sole parent", rejected.stdout + rejected.stderr)
+            self.assertFalse((rejected_output / "evidence.json").exists())
+
+            with self.materialized_candidate(
+                directory / "nested", source_root=outer_root
+            ) as candidate_root:
+                for script_name in (SCRIPT.name, PROCESS_RUNNER.name):
+                    self.assertEqual(
+                        (ROOT / "scripts" / script_name).read_bytes(),
+                        (candidate_root / "scripts" / script_name).read_bytes(),
+                    )
+                output_directory = directory / "timeout-evidence"
+                timed_out = self.run_collector(
+                    output_directory,
+                    "-MaximumFocusedModuleTimeoutMilliseconds", "1",
+                    repository_root=candidate_root,
+                )
+                self.assertNotEqual(0, timed_out.returncode)
+                self.assertIn(
+                    "exceeded a module deadline", timed_out.stdout + timed_out.stderr
+                )
+                receipt = json.loads(
+                    (output_directory / "evidence.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(V4_CANDIDATE_COMMIT, receipt["repository"]["head_commit"])
+                self.assertEqual(parent, receipt["repository"]["parent_commit"])
+                self.assertTrue(receipt["repository"]["sole_parent_verified"])
+                self.assertTrue(receipt["repository"]["candidate_base_matches_manifest"])
+                self.assertFalse(receipt["qualification_eligible"])
+                self.assertFalse(receipt["activation_authorized"])
+                self.assertTrue(receipt["validation"]["timed_out"])
+                self.assertEqual(124, receipt["validation"]["exit_code"])
+                self.assertEqual(
+                    1, receipt["validation"]["module_results"][0]["timeout_milliseconds"]
+                )
+            self.assertEqual(merge, git("rev-parse", "HEAD"))
 
 
 if __name__ == "__main__":
