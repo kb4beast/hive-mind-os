@@ -736,12 +736,26 @@ class WholeOSService:
         results: dict[str, PackageExecutionResult] = {}
         stale: set[str] = set()
         heartbeat_interval = max(0.01, min(10.0, self.scheduler.lease_seconds / 3.0))
+
+        # Renew immediately before handing jobs to worker threads.  On platforms
+        # with coarse timer resolution, the first timed wait can otherwise land at
+        # the original short lease boundary before a heartbeat is attempted.
+        # Starting from a freshly persisted lease keeps the first wait safely away
+        # from that boundary without changing the normal heartbeat cadence.
+        for job in jobs:
+            try:
+                self.scheduler.heartbeat(job.id, job.lease_token or "")
+            except StaleLeaseError:
+                stale.add(job.id)
+
         with ThreadPoolExecutor(
             max_workers=len(jobs),
             thread_name_prefix=f"whole-os-{self.config.campaign_id}",
         ) as pool:
             active: dict[Future[PackageExecutionResult], Job] = {
-                pool.submit(self._execute_claimed, job): job for job in jobs
+                pool.submit(self._execute_claimed, job): job
+                for job in jobs
+                if job.id not in stale
             }
             while active:
                 completed, _ = wait(
@@ -749,9 +763,11 @@ class WholeOSService:
                     timeout=heartbeat_interval,
                     return_when=FIRST_COMPLETED,
                 )
+                # A completed future can still be waiting for the coordinator to
+                # persist its result.  Renew it too: scheduling delays between
+                # wait() returning and the durable transition must not turn a
+                # successful host call into a stale lease and duplicate retry.
                 for future, job in tuple(active.items()):
-                    if future in completed:
-                        continue
                     try:
                         self.scheduler.heartbeat(job.id, job.lease_token or "")
                     except StaleLeaseError:

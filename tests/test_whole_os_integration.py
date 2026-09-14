@@ -366,10 +366,12 @@ class WholeOSIntegrationTests(unittest.TestCase):
             )
             scheduler = Scheduler(root / "queue", lease_seconds=0.03, backoff_seconds=0)
             service = WholeOSService(config, provider, host, scheduler=scheduler)
-            result = service.run_to_completion()
-            self.assertEqual(result.status, "complete")
-            self.assertEqual(host.calls, 2)
-            service.close()
+            try:
+                result = service.run_to_completion()
+                self.assertEqual(result.status, "complete")
+                self.assertEqual(host.calls, 2)
+            finally:
+                service.close()
 
     def test_strict_runner_does_not_claim_another_services_job(self):
         with TemporaryDirectory() as directory:
