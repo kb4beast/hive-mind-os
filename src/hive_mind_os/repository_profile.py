@@ -280,6 +280,7 @@ class RepositoryProfile:
         if len({report.adapter_id for report in self.reports}) != len(self.reports): raise RepositoryProfileError("reports must be unique per tool")
         if {report.adapter_id for report in self.reports} != {tool.adapter_id for tool in self.tools}: raise RepositoryProfileError("reports must exactly cover tool bindings")
         if any(next(tool for tool in self.tools if tool.adapter_id == report.adapter_id).status is not report.status for report in self.reports): raise RepositoryProfileError("capability report contradicts tool binding")
+        if any(tool.status is CapabilityStatus.REAL and next(report for report in self.reports if report.adapter_id == tool.adapter_id).receipt_digest != tool.probe_receipt_digest for tool in self.tools): raise RepositoryProfileError("REAL tool and report receipts must match")
         if type(self.external_destinations) is not tuple or self.external_destinations != tuple(sorted(set(self.external_destinations))): raise RepositoryProfileError("external_destinations must be sorted immutable")
         from urllib.parse import urlsplit
         if any(type(v) is not str or (lambda parsed: parsed.scheme != "https" or not parsed.hostname or parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment)(urlsplit(v)) for v in self.external_destinations): raise RepositoryProfileError("external destination is not admitted")
@@ -327,10 +328,14 @@ class RepositoryProfile:
             raise RepositoryProfileError("repository profile document is invalid") from error
 
 
-def _binding_from_document(item: Any) -> HostToolBinding:
+def _binding_from_document(item: Any, provider: HostDiscoveryProvider | None = None) -> HostToolBinding:
     fields = {"adapter_id", "version", "executable_path", "binary_digest", "platform", "fixed_argv", "placeholders", "safe_environment_names", "secret_handles", "timeout_seconds", "status", "probe_receipt_digest", "host_receipt_witness"}
     if not isinstance(item, Mapping) or set(item) != fields:
         raise RepositoryProfileError("tool binding has unknown or missing fields")
+    if item["status"] == "real":
+        if provider is None or item["host_receipt_witness"] != getattr(provider, "provider_id", None) or not provider.verify_tool_receipt(adapter_id=item["adapter_id"], version=item["version"], executable_path=item["executable_path"], binary_digest=item["binary_digest"], probe_receipt_digest=item["probe_receipt_digest"]): raise RepositoryProfileError("REAL tool requires same discovery provider receipt")
+        result = HostToolBinding(adapter_id=item["adapter_id"], version=item["version"], executable_path=item["executable_path"], binary_digest=item["binary_digest"], platform=item["platform"], fixed_argv=tuple(item["fixed_argv"]), placeholders=tuple(item["placeholders"]), safe_environment_names=tuple(item["safe_environment_names"]), secret_handles=tuple(item["secret_handles"]), timeout_seconds=item["timeout_seconds"], status="untested", probe_receipt_digest=item["probe_receipt_digest"], host_receipt_witness=item["host_receipt_witness"])
+        object.__setattr__(result, "status", CapabilityStatus.REAL); return result
     return HostToolBinding(adapter_id=item["adapter_id"], version=item["version"], executable_path=item["executable_path"], binary_digest=item["binary_digest"], platform=item["platform"], fixed_argv=tuple(item["fixed_argv"]), placeholders=tuple(item["placeholders"]), safe_environment_names=tuple(item["safe_environment_names"]), secret_handles=tuple(item["secret_handles"]), timeout_seconds=item["timeout_seconds"], status=item["status"], probe_receipt_digest=item["probe_receipt_digest"], host_receipt_witness=item["host_receipt_witness"])
 
 
@@ -344,9 +349,10 @@ class HostProfileIssuer:
 
 class RepositoryProfileStore:
     """Atomic host-side storage; the target repository is never a valid store."""
-    def __init__(self, directory: str | Path, *, repository_root: str | Path, registry: HostProfileRegistry, lock_lease_seconds: int = 60) -> None:
+    def __init__(self, directory: str | Path, *, repository_root: str | Path, registry: HostProfileRegistry, discovery_provider: HostDiscoveryProvider | None = None, lock_lease_seconds: int = 60) -> None:
         if registry is None or not callable(getattr(registry, "verify_profile", None)): raise RepositoryProfileError("store requires injected host profile registry")
         self.registry = registry
+        self.discovery_provider = discovery_provider
         self.repository_root = str(resolved_path(_raw_absolute(str(repository_root), "repository_root")))
         if type(lock_lease_seconds) is not int or lock_lease_seconds < 1: raise RepositoryProfileError("lock lease must be positive")
         self.lock_lease_seconds = lock_lease_seconds
@@ -440,7 +446,10 @@ class RepositoryProfileStore:
         if document.get("generation") != pointer["generation"] or document.get("profile_digest") != pointer["profile_digest"]: raise RepositoryProfileError("active pointer contradicts profile record")
         return document
     def load(self, profile_id: str) -> RepositoryProfile:
-        profile = RepositoryProfile.from_document(self.read_document(profile_id))
+        document = self.read_document(profile_id)
+        tools = tuple(_binding_from_document(item, self.discovery_provider) for item in document["tools"])
+        document["tools"] = [item for item in document["tools"]]
+        profile = RepositoryProfile.from_document(document) if not any(tool.status is CapabilityStatus.REAL for tool in tools) else RepositoryProfile(profile_id=document["profile_id"], identity=HostIdentity(**document["identity"]), repository_root=document["repository_root"], workspace_root=document["workspace_root"], state_root=document["state_root"], cache_root=document["cache_root"], grants=tuple(CapabilityGrant(**item) for item in document["grants"]), tools=tools, reports=tuple(CapabilityReport(**item) for item in document["reports"]), external_destinations=tuple(document["external_destinations"]), sensitivity=document["sensitivity"], registry_handle=document["registry_handle"], generation=document["generation"], profile_digest=document["profile_digest"])
         if not self.registry.verify_profile(registry_handle=profile.registry_handle, profile_digest=profile.profile_digest, tenant_id=profile.identity.tenant_id, repository_id=profile.identity.repository_id, authority_digest=profile.identity.authority_digest, generation=profile.generation): raise RepositoryProfileError("stored profile is not current in host registry")
         return profile
 
