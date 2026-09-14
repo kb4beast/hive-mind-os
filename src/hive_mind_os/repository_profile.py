@@ -245,10 +245,11 @@ class RepositoryProfile:
         if {report.adapter_id for report in self.reports} != {tool.adapter_id for tool in self.tools}: raise RepositoryProfileError("reports must exactly cover tool bindings")
         if any(next(tool for tool in self.tools if tool.adapter_id == report.adapter_id).status is not report.status for report in self.reports): raise RepositoryProfileError("capability report contradicts tool binding")
         if type(self.external_destinations) is not tuple or self.external_destinations != tuple(sorted(set(self.external_destinations))): raise RepositoryProfileError("external_destinations must be sorted immutable")
-        if any(type(v) is not str or not v.startswith("https://") or "?" in v or "#" in v for v in self.external_destinations): raise RepositoryProfileError("external destination is not admitted")
+        from urllib.parse import urlsplit
+        if any(type(v) is not str or (lambda parsed: parsed.scheme != "https" or not parsed.hostname or parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment)(urlsplit(v)) for v in self.external_destinations): raise RepositoryProfileError("external destination is not admitted")
         if self.sensitivity not in {"unknown", "private", "public"}: raise RepositoryProfileError("sensitivity is unknown, private, or public")
         if type(self.generation) is not int or isinstance(self.generation, bool) or self.generation < 1: raise RepositoryProfileError("generation must be positive")
-        sealed = self.to_document(include_digest=False); sealed.pop("registry_handle")
+        sealed = self.to_document(include_digest=False)
         expected = canonical_digest(sealed)
         if not self.profile_digest: object.__setattr__(self, "profile_digest", expected)
         elif self.profile_digest != expected: raise RepositoryProfileError("profile_digest does not seal profile fields")
@@ -261,7 +262,7 @@ class RepositoryProfile:
 
     def allows(self, capability: ProfileCapability, *, destination: str | None = None) -> bool:
         capability = ProfileCapability(capability)
-        if capability is ProfileCapability.READ_ONLY_PLAN: return True
+        if capability is ProfileCapability.READ_ONLY_PLAN: return destination is None
         grant = next((g for g in self.grants if g.capability is capability), None)
         if grant is None or grant.revoked: return False
         if capability in {ProfileCapability.CODE_PR, ProfileCapability.LEARNING_EXPORT, ProfileCapability.DEPLOYMENT} and (destination is None or self.sensitivity == "unknown" or destination not in self.external_destinations): return False
@@ -310,6 +311,7 @@ class RepositoryProfileStore:
     def __init__(self, directory: str | Path, *, repository_root: str | Path, registry: HostProfileRegistry) -> None:
         if registry is None or not callable(getattr(registry, "verify_profile", None)): raise RepositoryProfileError("store requires injected host profile registry")
         self.registry = registry
+        self.repository_root = str(resolved_path(_raw_absolute(str(repository_root), "repository_root")))
         try:
             self.directory = require_external_path(directory, repository_root, label="profile store")
         except ExternalPathRequired as error:
@@ -318,6 +320,7 @@ class RepositoryProfileStore:
     def write(self, profile: RepositoryProfile) -> Path:
         if type(profile) is not RepositoryProfile:
             raise RepositoryProfileError("profile store requires an exact issued RepositoryProfile")
+        if profile.repository_root != self.repository_root: raise RepositoryProfileError("store and profile repository roots differ")
         if not self.registry.verify_profile(registry_handle=profile.registry_handle, profile_digest=profile.profile_digest, tenant_id=profile.identity.tenant_id, repository_id=profile.identity.repository_id, authority_digest=profile.identity.authority_digest, generation=profile.generation): raise RepositoryProfileError("host registry did not authenticate profile")
         if is_within(self.directory, profile.repository_root): raise RepositoryProfileError("profile store overlaps target repository")
         target = self.directory / f"{profile.profile_id}.{profile.profile_digest[7:]}.json"
@@ -374,7 +377,9 @@ class RepositoryProfileStore:
         path = self.directory / f"{profile_id}.{pointer['profile_digest'][7:]}.json"
         if path.is_symlink() or path.stat().st_nlink != 1:
             raise RepositoryProfileError("profile record must not be linked or redirected")
-        return strict_json_object(path.read_bytes())
+        document = strict_json_object(path.read_bytes())
+        if document.get("generation") != pointer["generation"] or document.get("profile_digest") != pointer["profile_digest"]: raise RepositoryProfileError("active pointer contradicts profile record")
+        return document
     def load(self, profile_id: str) -> RepositoryProfile:
         profile = RepositoryProfile.from_document(self.read_document(profile_id))
         if not self.registry.verify_profile(registry_handle=profile.registry_handle, profile_digest=profile.profile_digest, tenant_id=profile.identity.tenant_id, repository_id=profile.identity.repository_id, authority_digest=profile.identity.authority_digest, generation=profile.generation): raise RepositoryProfileError("stored profile is not current in host registry")
