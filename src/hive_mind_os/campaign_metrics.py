@@ -8,10 +8,44 @@ from random import Random
 from statistics import mean
 from types import MappingProxyType
 from typing import Iterable, Mapping, Sequence
+import hmac
 
 BOOTSTRAP_RESAMPLES=10_000; CONFIDENCE=.95; NONINFERIORITY_MARGIN=-.05; SCREENING_FAMILIES=12; FINAL_FAMILIES=30
 RECIPE_FIELDS=("source_or_binary_digest","prompt_digest","model_digest","command_profile_digest","tool_digest","context_digest","check_policy_digest","learning_policy_digest")
 class CampaignMetricsError(ValueError): pass
+REQUIRED_STRATA=("small-bug","feature","absent-tests","multi-file","cross-language","self-runtime","ambiguous-backlog","provider-failure","restart","tenant-isolation","draft-export","endpoint-learning","roblox-runtime")
+
+@dataclass(frozen=True,slots=True)
+class SignedCustodyEnvelope:
+ """Verifier-bound evidence envelope; fixture HMAC is not a production key store."""
+ signer_id:str;role:str;payload_digest:str;signature:str;issued_at:int
+ def __post_init__(self):
+  _id(self.signer_id,"signer");_digest(self.payload_digest,"payload");
+  if self.role not in {"evaluator","custodian"} or type(self.issued_at)is not int or self.issued_at<0 or not isinstance(self.signature,str):raise CampaignMetricsError("invalid custody envelope")
+ def verify_fixture_hmac(self,key:bytes)->bool:
+  expected=hmac.new(key,(self.signer_id+"|"+self.role+"|"+self.payload_digest+"|"+str(self.issued_at)).encode(),"sha256").hexdigest()
+  return hmac.compare_digest(expected,self.signature)
+@dataclass(frozen=True,slots=True)
+class StageEvidence:
+ stage:str;block_digest:str;task_manifest_digest:str;family_manifest_digest:str;lease_digest:str;evaluator:SignedCustodyEnvelope;strata:tuple[str,...];families:int;repetitions:int;seed:int
+ def __post_init__(self):
+  if self.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("invalid stage evidence")
+  for n in ("block_digest","task_manifest_digest","family_manifest_digest","lease_digest"):_digest(getattr(self,n),n)
+  if set(self.strata)!=set(REQUIRED_STRATA) or len(self.strata)!=len(REQUIRED_STRATA):raise CampaignMetricsError("exact thirteen strata required")
+  required=(30,3) if self.stage=="final" else (12,1)
+  if (self.families,self.repetitions)!=required or type(self.seed)is not int:raise CampaignMetricsError("stage threshold/repetition mismatch")
+@dataclass(frozen=True,slots=True)
+class IssuedReceipt:
+ stage:str;round_number:int;left:str;right:str;block_digest:str;task_id:str;seed:int;evaluator_id:str;receipt_digest:str
+ def __post_init__(self):
+  for n in ("stage","left","right","task_id","evaluator_id"):_id(getattr(self,n),n)
+  for n in ("block_digest","receipt_digest"):_digest(getattr(self,n),n)
+  if self.left==self.right or type(self.round_number)is not int or self.round_number<1 or type(self.seed)is not int:raise CampaignMetricsError("invalid issued receipt")
+ @property
+ def identity(self):return (self.stage,self.round_number,self.left,self.right,self.block_digest,self.task_id,self.seed,self.evaluator_id,self.receipt_digest)
+def reject_receipt_replay(receipts:Iterable[IssuedReceipt])->None:
+ rows=tuple(receipts)
+ if len({x.identity for x in rows})!=len(rows):raise CampaignMetricsError("receipt replay")
 def canonical_digest(v:object)->str:
  def plain(x):
   if isinstance(x,Mapping):return {str(k):plain(y)for k,y in x.items()}
@@ -204,4 +238,4 @@ def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:Pai
  if(cost_ratio.upper<1 and time_ratio.upper<=1.1)or(time_ratio.upper<1 and cost_ratio.upper<=1.1):return"LEFT"
  if(cost_ratio.lower>1 and time_ratio.lower>=1/1.1)or(time_ratio.lower>1 and cost_ratio.lower>=1/1.1):return"RIGHT"
  return"DRAW"
-__all__=["AttemptMetric","BracketState","CampaignMetricsError","MatchProtocol","MatchProtocolInspection","PairedInterval","ScheduledPair","VariantSeal","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","schedule_round","summarize_attempts"]
+__all__=["AttemptMetric","BracketState","CampaignMetricsError","IssuedReceipt","MatchProtocol","MatchProtocolInspection","PairedInterval","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","summarize_attempts"]

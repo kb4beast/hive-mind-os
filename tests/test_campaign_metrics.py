@@ -33,4 +33,11 @@ class T(unittest.TestCase):
   with self.assertRaises(CampaignMetricsError):PairedInterval(None,None,None,1)
   p=load_match_protocol_for_inspection("docs/benchmarks/whole-os-match-protocol.json");m={"MB0":0};s=BracketState(p.protocol_digest,"original","builder-component",losses=m);m["MB0"]=3
   self.assertEqual(s.losses["MB0"],0)
+ def test_fixture_signed_stage_evidence_and_receipt_replay(self):
+  key=b"fixture-only"; payload=D; sig=__import__("hmac").new(key,("eval|evaluator|"+payload+"|1").encode(),"sha256").hexdigest()
+  envelope=SignedCustodyEnvelope("eval","evaluator",payload,sig,1);self.assertTrue(envelope.verify_fixture_hmac(key))
+  evidence=StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,30,3,7);self.assertEqual(evidence.repetitions,3)
+  receipt=IssuedReceipt("final",1,"MC0","MH1",D,"task",7,"eval",D)
+  with self.assertRaises(CampaignMetricsError):reject_receipt_replay((receipt,receipt))
+  with self.assertRaises(CampaignMetricsError):StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,12,1,7)
 if __name__=="__main__":unittest.main()
