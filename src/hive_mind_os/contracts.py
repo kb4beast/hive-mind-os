@@ -56,7 +56,16 @@ KERNEL_SCHEMA_NAMES = (
     "brain-kernel-historical-evidence-reference",
     "brain-kernel-technical-closeout-report",
 )
-SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES, *KERNEL_SCHEMA_NAMES)
+CAMPAIGN_SCHEMA_NAMES = (
+    "campaign-mission",
+    "work-package",
+)
+SCHEMA_NAMES = (
+    *LEGACY_SCHEMA_NAMES,
+    *EXTENSION_SCHEMA_NAMES,
+    *KERNEL_SCHEMA_NAMES,
+    *CAMPAIGN_SCHEMA_NAMES,
+)
 ROLE_NAMES = frozenset(
     {
         "orchestrator",
