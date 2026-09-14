@@ -35,6 +35,12 @@ class StageEvidence:
   required=(30,3) if self.stage=="final" else (12,1)
   if (self.families,self.repetitions)!=required or type(self.seed)is not int:raise CampaignMetricsError("stage threshold/repetition mismatch")
 @dataclass(frozen=True,slots=True)
+class LeaseRecord:
+ lease_digest:str;scope:str;expires_at:int;issued_by:str;active:bool=True
+ def __post_init__(self):
+  _digest(self.lease_digest,"lease");_id(self.scope,"lease scope");_id(self.issued_by,"lease issuer")
+  if type(self.expires_at)is not int or self.expires_at<0 or type(self.active)is not bool:raise CampaignMetricsError("invalid lease")
+@dataclass(frozen=True,slots=True)
 class IssuedReceipt:
  stage:str;round_number:int;left:str;right:str;block_digest:str;task_id:str;seed:int;evaluator_id:str;receipt_digest:str
  def __post_init__(self):
@@ -56,9 +62,10 @@ class AdmittedProtocol:
  def __setattr__(self,name,value):
   if hasattr(self,name):raise CampaignMetricsError("admission receipt is immutable")
   object.__setattr__(self,name,value)
-def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,fixture_hmac_key:bytes|None=None,builder_ids:Sequence[str]=())->AdmittedProtocol:
+def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,lease:LeaseRecord|None=None,fixture_hmac_key:bytes|None=None,builder_ids:Sequence[str]=())->AdmittedProtocol:
  """Only execution-facing gateway; OPEN/deferred or unverified evidence cannot pass."""
  if not isinstance(protocol,MatchProtocol):raise CampaignMetricsError("inspection is not executable")
+ if lease is None or not lease.active or lease.lease_digest!=stage_evidence.lease_digest or lease.scope!=protocol.protocol_id:raise CampaignMetricsError("missing or mismatched issued lease")
  if not stage_evidence.evaluator.verify_fixture_hmac(fixture_hmac_key or b""):raise CampaignMetricsError("unauthenticated evaluator signature")
  if stage_evidence.evaluator.signer_id in set(builder_ids):raise CampaignMetricsError("evaluator is not independent")
  manifest=protocol.experiment_manifest
@@ -271,4 +278,4 @@ def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:Pai
  if(cost_ratio.upper<1 and time_ratio.upper<=1.1)or(time_ratio.upper<1 and cost_ratio.upper<=1.1):return"LEFT"
  if(cost_ratio.lower>1 and time_ratio.lower>=1/1.1)or(time_ratio.lower>1 and cost_ratio.lower>=1/1.1):return"RIGHT"
  return"DRAW"
-__all__=["AdmittedProtocol","AttemptMetric","BracketState","CampaignMetricsError","IssuedReceipt","MatchProtocol","MatchProtocolInspection","PairedInterval","RECIPE_FIELDS","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","admit_protocol","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","summarize_attempts"]
+__all__=["AdmittedProtocol","AttemptMetric","BracketState","CampaignMetricsError","IssuedReceipt","LeaseRecord","MatchProtocol","MatchProtocolInspection","PairedInterval","RECIPE_FIELDS","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","admit_protocol","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","summarize_attempts"]

@@ -47,7 +47,7 @@ class T(unittest.TestCase):
   hybrids={f"MH{i}":recipe(i+6,"whole-campaign") for i in range(1,5)}
   manifest={"selection_seed":1,"bootstrap_seed":2,"retry_rule":"invalidated-only","holdout_manifest_digest":D,"task_manifest_status":"CLOSED","family_split_status":"CLOSED","custody_status":"ATTESTED","holdout_signature_status":"SIGNED"}
   p=MatchProtocol("fixture","1","fixture",entrants,{},"seal",tuple(f"t{i}" for i in range(12)),("development-screening","harder-hybrid-development","promotion_holdout"),"pair","decide",hybrids,manifest,3,"lease",24,("one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted"))
-  evidence=StageEvidence("original",D,D,D,D,env,REQUIRED_STRATA,12,1,1);admission=admit_protocol(p,evidence,fixture_hmac_key=key,builder_ids=("builder",))
+  evidence=StageEvidence("original",D,D,D,D,env,REQUIRED_STRATA,12,1,1);admission=admit_protocol(p,evidence,lease=LeaseRecord(D,p.protocol_id,99,"host"),fixture_hmac_key=key,builder_ids=("builder",))
   state=BracketState(p.protocol_digest,"original","builder-component");pairs=state.schedule(p,admission=admission);self.assertTrue(pairs)
   next_state=state.apply(p,pairs,{frozenset((pairs[0].left,pairs[0].right)):"LEFT"},admission=admission);self.assertEqual(next_state.losses[pairs[0].right],1)
   r=p.recipe("MB0");seal=VariantSeal(p.protocol_digest,"MB0",canonical_digest({f:r[f] for f in RECIPE_FIELDS}),D,"eval","original",D,"fixture", "1");p.validate_seals((seal,),admission=admission)
