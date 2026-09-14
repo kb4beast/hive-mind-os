@@ -24,7 +24,7 @@ class TestCampaign(unittest.TestCase):
  def test_kernel_adapter_and_historical_gate(self):
   self.assertEqual(campaign_state_event(CampaignState.READY),("mission.transition",{"status":"READY"}))
   self.assertEqual(package_state_event(PackageState.VERIFYING),("work.transition",{"status":"AWAITING_VERIFICATION"}))
- raw=b'{"schema_version":0,"historical_inert_plan":true,"fixture_id":"N04-HISTORICAL-V0","candidate":"candidate/app.txt"}'
+  raw=b'{"schema_version":0,"historical_inert_plan":true,"fixture_id":"N04-HISTORICAL-V0","candidate":"candidate/app.txt"}'
   self.assertEqual(parse_historical_inert_plan(raw,fixture_mode=True)["schema_version"],0)
   with self.assertRaises(CampaignContractError):parse_historical_inert_plan(raw)
   root=Path(__file__).parent/"fixtures"/"campaign_contracts"
