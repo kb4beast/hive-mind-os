@@ -20,6 +20,7 @@ class T(unittest.TestCase):
   self.assertEqual(decide_match(n,cheap,fast,left_hard_gates=True,right_hard_gates=True),"LEFT")
   self.assertEqual(decide_match(n,PairedInterval(1.2,1.15,1.3,30),PairedInterval(1.05,1.0,1.09,30),left_hard_gates=True,right_hard_gates=True),"RIGHT")
   self.assertEqual(decide_match(n,cheap,fast,left_hard_gates=False,right_hard_gates=True),"QUARANTINE_LEFT")
+  self.assertEqual(decide_match(n,cheap,fast,left_hard_gates=False,right_hard_gates=False),"QUARANTINE_BOTH")
  def test_bracket_track_bye_inconclusive_lease(self):
   pairs=schedule_round(("MB0","MB1"),{"MB0":0,"MB1":0},{},round_number=1,inconclusive_meetings={frozenset(("MB0","MB1")):2})
   self.assertEqual(pairs[0].right,None)
@@ -29,6 +30,7 @@ class T(unittest.TestCase):
  def test_negative_partial_and_state_mutations_reject(self):
   with self.assertRaises(CampaignMetricsError):AttemptMetric("f","t","v",D,D,D,D,"eligible","success",-1,0,0,None,"unknown",None,"unknown")
   with self.assertRaises(CampaignMetricsError):PairedInterval(None,None,1,0)
+  with self.assertRaises(CampaignMetricsError):PairedInterval(None,None,None,1)
   p=load_match_protocol_for_inspection("docs/benchmarks/whole-os-match-protocol.json");m={"MB0":0};s=BracketState(p.protocol_digest,"original","builder-component",losses=m);m["MB0"]=3
   self.assertEqual(s.losses["MB0"],0)
 if __name__=="__main__":unittest.main()

@@ -60,11 +60,11 @@ class PairedInterval:
   if (self.estimate is None) != (self.lower is None and self.upper is None):raise CampaignMetricsError("interval wholly known or unknown")
   for n in ("estimate","lower","upper"):_num(getattr(self,n),n,nonnegative=False)
   if self.lower is not None and not self.lower<=self.estimate<=self.upper:raise CampaignMetricsError("invalid interval ordering")
-  if type(self.family_count)is not int or self.family_count<0 or (self.estimate is not None and self.family_count<1) or self.resamples!=BOOTSTRAP_RESAMPLES or self.confidence!=CONFIDENCE:raise CampaignMetricsError("unfrozen interval")
-def paired_family_bootstrap(pairs:Mapping[str,Sequence[float]],*,seed:int,resamples:int=BOOTSTRAP_RESAMPLES,minimum_families:int=SCREENING_FAMILIES)->PairedInterval:
+  if type(self.family_count)is not int or self.family_count<0 or (self.estimate is not None and self.family_count<1) or (self.estimate is None and self.family_count!=0) or self.resamples!=BOOTSTRAP_RESAMPLES or self.confidence!=CONFIDENCE:raise CampaignMetricsError("unfrozen interval")
+def paired_family_bootstrap(pairs:Mapping[str,Sequence[float]],*,seed:int,resamples:int=BOOTSTRAP_RESAMPLES)->PairedInterval:
  if resamples!=BOOTSTRAP_RESAMPLES or type(seed)is not int:raise CampaignMetricsError("frozen bootstrap parameters")
  fs=sorted(pairs)
- if len(fs)<minimum_families:raise CampaignMetricsError("undersized family sample")
+ if len(fs)<SCREENING_FAMILIES:raise CampaignMetricsError("undersized family sample")
  if not fs:return PairedInterval(None,None,None,0)
  vals=[]
  for f in fs:
@@ -161,6 +161,8 @@ class BracketState:
   for n in ("protocol_digest","stage","track"):_id(getattr(self,n),n)
   if type(self.round_number)is not int or self.round_number<0 or self.round_number>24:raise CampaignMetricsError("invalid round")
   for n in ("losses","byes","inconclusive"):object.__setattr__(self,n,_freeze(getattr(self,n)))
+  for pair,count in self.inconclusive.items():
+   if not isinstance(pair,frozenset) or len(pair)!=2 or any(not isinstance(x,str) for x in pair) or type(count)is not int or count<0:raise CampaignMetricsError("invalid inconclusive matchup")
  def schedule(self,p:MatchProtocol,*,lease_active=True):
   if self.protocol_digest!=p.protocol_digest:raise CampaignMetricsError("foreign protocol")
   if self.terminal:return ()
@@ -175,9 +177,10 @@ class BracketState:
  def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,lease_active=True):
   if not lease_active:return BracketState(self.protocol_digest,self.stage,self.track,self.round_number,self.losses,self.byes,self.inconclusive,self.quarantined,"lease_exhausted")
   l=dict(self.losses);b=dict(self.byes);i=dict(self.inconclusive);q=set(self.quarantined)
-  allowed={x.left if x.right is None else frozenset((x.left,x.right)) for x in self.schedule(p,lease_active=True)}
+  issued=tuple(self.schedule(p,lease_active=True));allowed={x.left if x.right is None else (x.left,x.right,x.bye,x.block_id) for x in issued}
+  if len(pairs)!=len(set((x.left,x.right,x.bye,x.block_id) for x in pairs)):raise CampaignMetricsError("duplicate issued pair")
   for x in pairs:
-   if (x.left if x.right is None else frozenset((x.left,x.right))) not in allowed:raise CampaignMetricsError("pair was not issued")
+   if (x.left if x.right is None else (x.left,x.right,x.bye,x.block_id)) not in allowed:raise CampaignMetricsError("pair was not issued")
    if x.bye:b[x.left]=b.get(x.left,0)+1;continue
    if x.right is None:continue
    o=outcomes.get(frozenset((x.left,x.right)),"INCONCLUSIVE");k=frozenset((x.left,x.right))
@@ -190,6 +193,7 @@ class BracketState:
   n=self.round_number+1;terminal="max_rounds"if n>=p.max_rounds else None;return BracketState(self.protocol_digest,self.stage,self.track,n,l,b,i,frozenset(q),terminal)
 def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:PairedInterval,*,left_hard_gates:bool,right_hard_gates:bool)->str:
  if type(left_hard_gates)is not bool or type(right_hard_gates)is not bool:raise CampaignMetricsError("hard gates boolean")
+ if not left_hard_gates and not right_hard_gates:return"QUARANTINE_BOTH"
  if not left_hard_gates:return"QUARANTINE_LEFT"
  if not right_hard_gates:return"QUARANTINE_RIGHT"
  if success.lower is None:return"INCONCLUSIVE"
