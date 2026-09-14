@@ -12,6 +12,10 @@ class FixtureRegistry:
     def verify_profile(self, **kwargs): return kwargs["registry_handle"] == "fixture"
     def claim_identity(self, **kwargs): return kwargs["registry_handle"] == "fixture"
 REGISTRY = FixtureRegistry()
+class FixtureProvider:
+    provider_id = "fixture.provider"
+    def verify_tool_receipt(self, **kwargs): return kwargs["probe_receipt_digest"] == D
+PROVIDER = FixtureProvider()
 
 def profile(root, **changes):
     base = dict(profile_id="host.profile", identity=HostIdentity("tenant.one", "repo.one", "host.issuer", D), repository_root=str(root), workspace_root=str(root.parent / "work"), state_root=str(root.parent / "state"), cache_root=str(root.parent / "cache"), grants=(CapabilityGrant(ProfileCapability.LOCAL_BUILD, "grant.build", D),), tools=(HostToolBinding("oci.runner", "absent", None, None, "linux", ("oci", "{workspace}"), ("{workspace}",), status=CapabilityStatus.UNAVAILABLE), HostToolBinding("rojo.cli", "absent", None, None, "windows", ("rojo", "build"), (), status=CapabilityStatus.UNAVAILABLE), HostToolBinding("studio.vm", "absent", None, None, "windows", ("studio",), (), status=CapabilityStatus.UNAVAILABLE)), reports=(CapabilityReport("oci.runner", CapabilityStatus.UNAVAILABLE, "not installed"),CapabilityReport("rojo.cli", CapabilityStatus.UNAVAILABLE, "not installed"),CapabilityReport("studio.vm", CapabilityStatus.UNAVAILABLE, "not installed")), external_destinations=(), sensitivity="unknown", generation=1)
@@ -86,5 +90,13 @@ class RepositoryProfileTests(unittest.TestCase):
             document["grants"][0]["unexpected"] = True
             self.assertFalse(validate_contract("repository-profile", document).valid)
             with self.assertRaises(RepositoryProfileError): RepositoryProfile.from_document(document)
+    def test_real_tool_reload_requires_same_provider_and_matching_report_receipt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "target"; root.mkdir()
+            tool = HostToolBinding.admit_real(PROVIDER, adapter_id="oci.runner", version="v1", executable_path=str(Path(temp) / "runner.exe"), binary_digest=D, platform="windows", fixed_argv=("runner",), placeholders=(), safe_environment_names=(), secret_handles=(), timeout_seconds=1, probe_receipt_digest=D)
+            item = profile(root, tools=(tool,), reports=(CapabilityReport("oci.runner", CapabilityStatus.REAL, "verified", D),))
+            store = RepositoryProfileStore(Path(temp) / "host", repository_root=root, registry=REGISTRY, discovery_provider=PROVIDER); store.write(item)
+            self.assertEqual(store.load(item.profile_id).tools[0].status, CapabilityStatus.REAL)
+            with self.assertRaises(RepositoryProfileError): RepositoryProfileStore(Path(temp) / "host", repository_root=root, registry=REGISTRY).load(item.profile_id)
 
 if __name__ == "__main__": unittest.main()
