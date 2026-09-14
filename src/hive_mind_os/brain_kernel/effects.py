@@ -248,3 +248,11 @@ class EffectGateway:
         result = EffectResult(intent.intent_digest, canonical_digest({"intent": intent.intent_digest, "status": "SUCCEEDED"}), "SUCCEEDED")
         self._receipts[intent.idempotency_key] = result
         return result
+
+    def execute_profiled(self, intent: EffectIntent, token: CapabilityToken, *, projection: object, profile_store: object, capability: object, destination: str | None = None) -> EffectResult:
+        """Host-profile gate for profile-bound adapters; authorize before dispatch."""
+        from hive_mind_os.repository_profile import ProfileEffectAuthorizer
+        if self._authority is None:
+            raise AuthorityDenied("profiled execution requires live authority")
+        ProfileEffectAuthorizer().require(projection, store=profile_store, authority=self._authority, capability=capability, destination=destination)
+        return self.execute(intent, token)
