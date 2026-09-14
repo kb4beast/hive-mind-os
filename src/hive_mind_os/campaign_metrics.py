@@ -228,13 +228,14 @@ def schedule_round(entrants:Sequence[str],losses:Mapping[str,int],byes:Mapping[s
  return tuple(out)
 @dataclass(frozen=True,slots=True)
 class BracketState:
- protocol_digest:str;stage:str;track:str;round_number:int=0;losses:Mapping[str,int]=field(default_factory=dict);byes:Mapping[str,int]=field(default_factory=dict);inconclusive:Mapping[frozenset[str],int]=field(default_factory=dict);quarantined:frozenset[str]=frozenset();terminal:str|None=None
+ protocol_digest:str;stage:str;track:str;round_number:int=0;losses:Mapping[str,int]=field(default_factory=dict);byes:Mapping[str,int]=field(default_factory=dict);inconclusive:Mapping[frozenset[str],int]=field(default_factory=dict);quarantined:frozenset[str]=frozenset();terminal:str|None=None;applied_receipt_digests:frozenset[str]=frozenset()
  def __post_init__(self):
   for n in ("protocol_digest","stage","track"):_id(getattr(self,n),n)
   if type(self.round_number)is not int or self.round_number<0 or self.round_number>24:raise CampaignMetricsError("invalid round")
   for n in ("losses","byes","inconclusive"):object.__setattr__(self,n,_freeze(getattr(self,n)))
   for pair,count in self.inconclusive.items():
    if not isinstance(pair,frozenset) or len(pair)!=2 or any(not isinstance(x,str) for x in pair) or type(count)is not int or count<0:raise CampaignMetricsError("invalid inconclusive matchup")
+  for digest in self.applied_receipt_digests:_digest(digest,"applied receipt")
  def schedule(self,p:MatchProtocol,*,admission:AdmittedProtocol|None=None,lease_active=True):
   _require_admission(p,admission,stage=self.stage)
   if self.protocol_digest!=p.protocol_digest:raise CampaignMetricsError("foreign protocol")
