@@ -230,13 +230,12 @@ class WholeOSService:
 
     def run_once(self) -> ServiceObservation:
         """Execute one package using the original strict compatibility behavior."""
-        job = self.scheduler.claim(
-            f"whole-os:{self.config.campaign_id}:strict",
-            kind=self.JOB_KIND,
-            mission_id=self.config.campaign_id,
+        jobs = self._claim_cohort(
+            f"whole-os:{self.config.campaign_id}:strict", maximum=1
         )
-        if job is None:
+        if not jobs:
             return self.observe()
+        job = jobs[0]
         package_id = str(job.payload.get("package_id", ""))
         package = self.by_id.get(package_id)
         if package is None:
@@ -288,12 +287,33 @@ class WholeOSService:
             return tuple(WholeOSService._freeze(item) for item in value)
         return value
 
-    def _claim_cohort(self, owner: str) -> tuple[Job, ...]:
+    def _resource_ids(self, package: OutcomeWorkPackage) -> tuple[str, ...]:
+        """Return subject-bound identities for durable scheduler arbitration."""
+        subject = {
+            "tenant_id": self.config.tenant_id,
+            "repository_id": self.config.repository_id,
+        }
+        resources = (
+            *(
+                canonical_digest({**subject, "kind": "write-path", "value": path})
+                for path in package.allowed_paths
+            ),
+            *(
+                canonical_digest({**subject, "kind": "semantic-lock", "value": lock})
+                for lock in package.semantic_locks
+            ),
+        )
+        return tuple(sorted(set(resources)))
+
+    def _claim_cohort(
+        self, owner: str, *, maximum: int | None = None
+    ) -> tuple[Job, ...]:
         claimed: list[Job] = []
         paths: set[str] = set()
         locks: set[str] = set()
+        capacity = maximum or self.config.graph.maximum_concurrent
         for candidate in self._jobs():
-            if len(claimed) >= self.config.graph.maximum_concurrent:
+            if len(claimed) >= capacity:
                 break
             if candidate.state not in {"ready", "leased"}:
                 continue
@@ -308,6 +328,7 @@ class WholeOSService:
                 kind=self.JOB_KIND,
                 mission_id=self.config.campaign_id,
                 job_id=candidate.id,
+                resource_ids=() if package is None else self._resource_ids(package),
             )
             if job is None:
                 continue
@@ -352,9 +373,7 @@ class WholeOSService:
     def _persist_result(self, job: Job, result: PackageExecutionResult) -> None:
         token = job.lease_token or ""
         if result.status in {PackageStatus.COMPLETED, PackageStatus.NO_CHANGE}:
-            self.scheduler.complete(
-                job.id, token, mission_id=self.config.campaign_id
-            )
+            self.scheduler.complete(job.id, token, mission_id=self.config.campaign_id)
         elif result.status in {
             PackageStatus.BLOCKED_AUTHORITY,
             PackageStatus.BLOCKED_CAPABILITY,
@@ -388,9 +407,7 @@ class WholeOSService:
 
         results: dict[str, PackageExecutionResult] = {}
         stale: set[str] = set()
-        heartbeat_interval = max(
-            0.01, min(10.0, self.scheduler.lease_seconds / 3.0)
-        )
+        heartbeat_interval = max(0.01, min(10.0, self.scheduler.lease_seconds / 3.0))
         with ThreadPoolExecutor(
             max_workers=len(jobs),
             thread_name_prefix=f"whole-os-{self.config.campaign_id}",
@@ -497,9 +514,7 @@ class WholeOSService:
             )
         )
         blocked_set = {
-            str(job.payload["package_id"])
-            for job in jobs
-            if job.state == "dead-letter"
+            str(job.payload["package_id"]) for job in jobs if job.state == "dead-letter"
         }
         changed = True
         while changed:
@@ -549,10 +564,7 @@ def graph_from_document(document: Mapping[str, object]) -> OutcomeGraphSpec:
         raise ServiceError("graph document has an unknown shape")
     contract_version = document["contract_version"]
     maximum_concurrent = document["maximum_concurrent"]
-    if (
-        type(contract_version) is not int
-        or type(maximum_concurrent) is not int
-    ):
+    if type(contract_version) is not int or type(maximum_concurrent) is not int:
         raise ServiceError("graph contract version and concurrency must be integers")
     packages = []
     for raw in document["packages"]:

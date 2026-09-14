@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Barrier, Lock
+from threading import Barrier, Event, Lock, Thread
 from time import sleep
 
 from hive_mind_os.cortex.repository.mission_bindings import (
@@ -28,7 +28,16 @@ class FakeHost:
 
 
 class WholeOSIntegrationTests(unittest.TestCase):
-    def _components(self, root, packages, *, capacity=2, attempts=3, host=None):
+    def _components(
+        self,
+        root,
+        packages,
+        *,
+        capacity=2,
+        attempts=3,
+        host=None,
+        campaign="campaign",
+    ):
         descriptor = MissionBindingDescriptor(
             "configuration",
             D,
@@ -51,7 +60,7 @@ class WholeOSIntegrationTests(unittest.TestCase):
             court_receipt=D,
         )
         config = WholeOSServiceConfig(
-            "campaign", "tenant", "repository", root, descriptor, graph, attempts
+            campaign, "tenant", "repository", root, descriptor, graph, attempts
         )
         return config, provider, host or FakeHost()
 
@@ -244,9 +253,7 @@ class WholeOSIntegrationTests(unittest.TestCase):
                 (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
                 host=host,
             )
-            scheduler = Scheduler(
-                root / "queue", lease_seconds=0.03, backoff_seconds=0
-            )
+            scheduler = Scheduler(root / "queue", lease_seconds=0.03, backoff_seconds=0)
             service = WholeOSService(config, provider, host, scheduler=scheduler)
             result = service.run_to_completion()
             self.assertEqual(result.status, "complete")
@@ -267,6 +274,120 @@ class WholeOSIntegrationTests(unittest.TestCase):
             foreign = next(job for job in scheduler.jobs() if job.kind == "other")
             self.assertEqual(foreign.state, "ready")
             service.close()
+
+    def test_two_services_atomically_lease_write_paths_and_semantic_locks(self):
+        class ContentionHost(FakeHost):
+            def __init__(self):
+                self.entered = Event()
+                self.release = Event()
+                self.lock = Lock()
+                self.active = 0
+                self.maximum_active = 0
+                self.calls = 0
+
+            def execute_package(self, package, bindings, payload):
+                with self.lock:
+                    self.calls += 1
+                    self.active += 1
+                    self.maximum_active = max(self.maximum_active, self.active)
+                    self.entered.set()
+                self.assert_released()
+                with self.lock:
+                    self.active -= 1
+                return super().execute_package(package, bindings, payload)
+
+            def assert_released(self):
+                if not self.release.wait(timeout=2):
+                    raise AssertionError("test did not release executing package")
+
+        cases = (
+            (
+                OutcomeWorkPackage("A", ("R1",), allowed_paths=("src/shared.py",)),
+                OutcomeWorkPackage("B", ("R2",), allowed_paths=("src/shared.py",)),
+            ),
+            (
+                OutcomeWorkPackage(
+                    "A",
+                    ("R1",),
+                    allowed_paths=("src/a.py",),
+                    semantic_locks=("schema-migration",),
+                ),
+                OutcomeWorkPackage(
+                    "B",
+                    ("R2",),
+                    allowed_paths=("src/b.py",),
+                    semantic_locks=("schema-migration",),
+                ),
+            ),
+        )
+        for first_package, second_package in cases:
+            with self.subTest(
+                resources=first_package.semantic_locks or first_package.allowed_paths
+            ):
+                with TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    host = ContentionHost()
+                    first_config, first_provider, _ = self._components(
+                        root,
+                        (first_package,),
+                        host=host,
+                        campaign="campaign-a",
+                    )
+                    second_config, second_provider, _ = self._components(
+                        root,
+                        (second_package,),
+                        host=host,
+                        campaign="campaign-b",
+                    )
+                    first_scheduler = Scheduler(root / "shared-queue")
+                    second_scheduler = Scheduler(root / "shared-queue")
+                    first = WholeOSService(
+                        first_config,
+                        first_provider,
+                        host,
+                        scheduler=first_scheduler,
+                    )
+                    second = WholeOSService(
+                        second_config,
+                        second_provider,
+                        host,
+                        scheduler=second_scheduler,
+                    )
+                    start = Barrier(3)
+                    one_returned = Event()
+                    observations = []
+
+                    def run(service):
+                        start.wait(timeout=2)
+                        observations.append(service.run_cohort())
+                        one_returned.set()
+
+                    threads = (
+                        Thread(target=run, args=(first,)),
+                        Thread(target=run, args=(second,)),
+                    )
+                    for thread in threads:
+                        thread.start()
+                    start.wait(timeout=2)
+                    self.assertTrue(host.entered.wait(timeout=2))
+                    self.assertTrue(one_returned.wait(timeout=2))
+                    host.release.set()
+                    for thread in threads:
+                        thread.join(timeout=2)
+                        self.assertFalse(thread.is_alive())
+
+                    self.assertEqual(host.calls, 1)
+                    self.assertEqual(host.maximum_active, 1)
+                    self.assertEqual(len(observations), 2)
+                    self.assertEqual(
+                        sum(bool(item.completed_packages) for item in observations), 1
+                    )
+
+                    self.assertEqual(first.run_to_completion().status, "complete")
+                    self.assertEqual(second.run_to_completion().status, "complete")
+                    self.assertEqual(host.calls, 2)
+                    first.close()
+                    second.close()
 
 
 if __name__ == "__main__":
