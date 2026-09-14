@@ -54,8 +54,7 @@ class RepositoryContext:
                 "stderr": self.failing_test_stderr,
             },
             "named_files": [
-                {"path": path, "content": content}
-                for path, content in self.named_files
+                {"path": path, "content": content} for path, content in self.named_files
             ],
             "file_tree": list(self.file_tree),
             "current_diff": self.current_diff,
@@ -203,7 +202,12 @@ class ModelBackend:
         context_envelope: ContextEnvelope | None = None,
     ) -> AgentResult:
         system, user, truncated, prompt_artifact_digest = self._prompt(
-            contract, work_item, objective, context, repository_context, context_envelope
+            contract,
+            work_item,
+            objective,
+            context,
+            repository_context,
+            context_envelope,
         )
         corrective: str | None = None
         last_error = "model did not return a valid turn"
@@ -214,9 +218,7 @@ class ModelBackend:
             provider=provider,
             context_envelope=context_envelope,
         )
-        allowance = self.budget.issue_allowance()
-        used_calls = 0
-        used_compute = 0.0
+        reservation = self.budget.reserve_episode()
         retry_index = 0
         ordinary_failures = 0
         builder_correction_used = False
@@ -230,17 +232,18 @@ class ModelBackend:
                 request_compute = (
                     estimated_tokens + provider.config.max_output_tokens
                 ) / 1000.0
-                if (
-                    used_calls + 1 > allowance.tool_calls
-                    or used_compute + request_compute > allowance.compute_units
-                ):
-                    raise BudgetExceeded("role-turn allowance exhausted before model request")
-                used_calls += 1
-                used_compute += request_compute
                 try:
-                    response = await asyncio.to_thread(
-                        provider.complete_once, request
+                    self.budget.reserve_consumption(
+                        reservation,
+                        tool_calls=1,
+                        compute_units=request_compute,
                     )
+                except BudgetExceeded:
+                    raise BudgetExceeded(
+                        "role-turn allowance exhausted before model request"
+                    ) from None
+                try:
+                    response = await asyncio.to_thread(provider.complete_once, request)
                     turn = self._parse_turn(response.content, contract)
                     result = self._to_result(turn, contract, work_item)
                     if result_validator is not None:
@@ -266,9 +269,17 @@ class ModelBackend:
                 except BuilderActionProtocolError as error:
                     last_error = str(error)
                     self._record_call(
-                        objective, contract, work_item, body, response, retry_index,
-                        time.monotonic() - started, "invalid_output", truncated,
-                        provider, context_manifest,
+                        objective,
+                        contract,
+                        work_item,
+                        body,
+                        response,
+                        retry_index,
+                        time.monotonic() - started,
+                        "invalid_output",
+                        truncated,
+                        provider,
+                        context_manifest,
                         prompt_artifact_digest,
                         error=last_error,
                     )
@@ -287,9 +298,17 @@ class ModelBackend:
                 except ModelTurnError as error:
                     last_error = str(error)
                     self._record_call(
-                        objective, contract, work_item, body, response, retry_index,
-                        time.monotonic() - started, "invalid_output", truncated,
-                        provider, context_manifest,
+                        objective,
+                        contract,
+                        work_item,
+                        body,
+                        response,
+                        retry_index,
+                        time.monotonic() - started,
+                        "invalid_output",
+                        truncated,
+                        provider,
+                        context_manifest,
                         prompt_artifact_digest,
                         error=last_error,
                     )
@@ -298,7 +317,10 @@ class ModelBackend:
                         f"required contract. Validation error: {last_error}"
                     )
                     ordinary_failures += 1
-                    if builder_correction_used or ordinary_failures > provider.config.max_retries:
+                    if (
+                        builder_correction_used
+                        or ordinary_failures > provider.config.max_retries
+                    ):
                         raise ModelTurnError(
                             f"model output remained invalid after {retry_index + 1} attempts: "
                             + last_error
@@ -308,20 +330,28 @@ class ModelBackend:
                         response = ModelResponse("", error.raw_body, None, None)
                     last_error = redact(str(error))
                     self._record_call(
-                        objective, contract, work_item, body, response, retry_index,
-                        time.monotonic() - started, "provider_failure", truncated,
-                        provider, context_manifest,
+                        objective,
+                        contract,
+                        work_item,
+                        body,
+                        response,
+                        retry_index,
+                        time.monotonic() - started,
+                        "provider_failure",
+                        truncated,
+                        provider,
+                        context_manifest,
                         prompt_artifact_digest,
                         error=last_error,
                     )
-                    if builder_correction_used or retry_index >= provider.config.max_retries:
+                    if (
+                        builder_correction_used
+                        or retry_index >= provider.config.max_retries
+                    ):
                         raise
                 retry_index += 1
         finally:
-            if used_calls:
-                self.budget.consume(
-                    allowance, tool_calls=used_calls, compute_units=used_compute
-                )
+            self.budget.settle_reservation(reservation)
 
     def _prompt(
         self,
@@ -389,7 +419,9 @@ class ModelBackend:
                 "prior_context_json": rendered,
                 "context_truncated": truncated,
                 "repository_context": (
-                    None if repository_context is None else repository_context.to_prompt()
+                    None
+                    if repository_context is None
+                    else repository_context.to_prompt()
                 ),
             },
             ensure_ascii=False,
@@ -465,9 +497,7 @@ class ModelBackend:
             "base_url_host": urlsplit(provider.config.base_url).hostname,
             "model_id": provider.config.model,
             "provider_configuration": (
-                "shared"
-                if provider.config == self.provider.config
-                else "role-override"
+                "shared" if provider.config == self.provider.config else "role-override"
             ),
             "role": contract.role.value,
             "work_item_id": work_item.id,
@@ -512,9 +542,7 @@ class ModelBackend:
             "provider_kind": provider.kind.value,
             "model_id": provider.config.model,
             "configuration": (
-                "shared"
-                if provider.config == self.provider.config
-                else "role-override"
+                "shared" if provider.config == self.provider.config else "role-override"
             ),
         }
 
@@ -540,9 +568,7 @@ class ModelBackend:
             "provider_kind": provider.kind.value,
             "model_id": provider.config.model,
             "provider_configuration": (
-                "shared"
-                if provider.config == self.provider.config
-                else "role-override"
+                "shared" if provider.config == self.provider.config else "role-override"
             ),
         }
         if context_envelope is not None:
