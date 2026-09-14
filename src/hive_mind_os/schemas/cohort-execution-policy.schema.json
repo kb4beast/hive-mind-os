@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hive-mind-os/cohort-execution-policy/v1",
+  "title": "Cohort execution scheduling policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "execution_mode",
+    "max_parallel_packages",
+    "convergence_gate"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "execution_mode": {"enum": ["strict", "cohort"]},
+    "max_parallel_packages": {"type": "integer", "minimum": 1},
+    "convergence_gate": {"const": "all_runnable_packages_terminal"}
+  }
+}
