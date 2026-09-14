@@ -248,8 +248,10 @@ class BracketState:
   if len(ids)==1:object.__setattr__(self,"terminal","one_survivor");return ()
   blocks=("development-screening",) if self.stage=="original" else (("harder-hybrid-development",) if self.stage=="hybrid" else ())
   return schedule_round(ids,self.losses,self.byes,round_number=self.round_number+1,inconclusive_meetings=self.inconclusive,blocks=blocks)
- def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,admission:AdmittedProtocol|None=None,lease_active=True):
+ def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,receipt:IssuedReceipt|None=None,admission:AdmittedProtocol|None=None,lease_active=True):
   _require_admission(p,admission,stage=self.stage)
+  if receipt is None or receipt.stage!=self.stage or receipt.round_number!=self.round_number+1 or receipt.evaluator_id!=admission.stage_evidence.evaluator.signer_id or receipt.block_digest!=admission.stage_evidence.block_digest:raise CampaignMetricsError("missing or mismatched issued receipt")
+  if receipt.receipt_digest in self.applied_receipt_digests:raise CampaignMetricsError("receipt replay")
   if not lease_active:return BracketState(self.protocol_digest,self.stage,self.track,self.round_number,self.losses,self.byes,self.inconclusive,self.quarantined,"lease_exhausted")
   l=dict(self.losses);b=dict(self.byes);i=dict(self.inconclusive);q=set(self.quarantined)
   issued=tuple(self.schedule(p,admission=admission,lease_active=True));allowed={x.left if x.right is None else (x.left,x.right,x.bye,x.block_id) for x in issued}
@@ -265,7 +267,7 @@ class BracketState:
    elif o=="QUARANTINE_LEFT":q.add(x.left)
    elif o=="QUARANTINE_RIGHT":q.add(x.right)
    else:i[k]=i.get(k,0)+1
-  n=self.round_number+1;terminal="max_rounds"if n>=p.max_rounds else None;return BracketState(self.protocol_digest,self.stage,self.track,n,l,b,i,frozenset(q),terminal)
+  n=self.round_number+1;terminal="max_rounds"if n>=p.max_rounds else None;return BracketState(self.protocol_digest,self.stage,self.track,n,l,b,i,frozenset(q),terminal,self.applied_receipt_digests|frozenset((receipt.receipt_digest,)))
 def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:PairedInterval,*,left_hard_gates:bool,right_hard_gates:bool)->str:
  if type(left_hard_gates)is not bool or type(right_hard_gates)is not bool:raise CampaignMetricsError("hard gates boolean")
  if not left_hard_gates and not right_hard_gates:return"QUARANTINE_BOTH"
