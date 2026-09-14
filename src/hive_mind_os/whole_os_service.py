@@ -7,7 +7,9 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
-from .cortex.repository.mission_bindings import ConfiguredMissionBindingsProvider, MissionBindingDescriptor
+from .cortex.repository.mission_bindings import (
+    ConfiguredMissionBindingsProvider, MissionBindingDescriptor, MissionBindingError,
+)
 from .outcome_graph import OutcomeGraphSpec, OutcomeWorkPackage, compile_outcome_graph, ready_packages
 from .scheduler import Job, Scheduler
 
@@ -57,6 +59,35 @@ class WholeOSServiceConfig:
             raise ServiceError("binding descriptor targets another subject")
         if self.maximum_attempts < 1:
             raise ServiceError("maximum attempts must be positive")
+
+    @classmethod
+    def from_document(cls, document: Mapping[str, object], *, base_dir: Path) -> "WholeOSServiceConfig":
+        """Construct configuration from the closed JSON service contract.
+
+        Only inert descriptor and graph data are accepted.  In particular, the
+        document has no import paths, commands, callbacks, or credential fields.
+        """
+        required = {"schema_version", "campaign_id", "tenant_id", "repository_id",
+                    "state_dir", "binding_descriptor", "graph", "maximum_attempts"}
+        if set(document) != required or document.get("schema_version") != 1:
+            raise ServiceError("service configuration has an unknown shape or schema")
+        descriptor = document.get("binding_descriptor")
+        graph = document.get("graph")
+        if not isinstance(descriptor, Mapping) or not isinstance(graph, Mapping):
+            raise ServiceError("binding_descriptor and graph must be objects")
+        state_value = document["state_dir"]
+        if not isinstance(state_value, str) or not state_value:
+            raise ServiceError("state_dir must be a non-empty path")
+        if not isinstance(document["maximum_attempts"], int) or isinstance(document["maximum_attempts"], bool):
+            raise ServiceError("maximum_attempts must be an integer")
+        try:
+            binding = MissionBindingDescriptor.from_document(descriptor)
+            graph_spec = graph_from_document(graph)
+            return cls(str(document["campaign_id"]), str(document["tenant_id"]),
+                       str(document["repository_id"]), (base_dir / state_value).resolve(),
+                       binding, graph_spec, document["maximum_attempts"])
+        except (KeyError, TypeError, ValueError, MissionBindingError) as exc:
+            raise ServiceError("service configuration is invalid") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,3 +225,23 @@ def load_graph(path: str | Path) -> OutcomeGraphSpec:
     if not isinstance(value, dict):
         raise ServiceError("graph root must be an object")
     return graph_from_document(value)
+
+
+def load_service_config(path: str | Path) -> WholeOSServiceConfig:
+    """Load and validate an inert service configuration from strict JSON."""
+    config_path = Path(path)
+    try:
+        from .runtime_contracts import strict_json_object
+        value = strict_json_object(config_path.read_bytes())
+        return WholeOSServiceConfig.from_document(value, base_dir=config_path.parent)
+    except ServiceError:
+        raise
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        raise ServiceError("service configuration cannot be loaded") from exc
+
+
+__all__ = [
+    "PackageExecutionResult", "PackageStatus", "ServiceError", "ServiceObservation",
+    "WholeOSHost", "WholeOSService", "WholeOSServiceConfig", "graph_from_document",
+    "load_graph", "load_service_config",
+]

@@ -59,6 +59,7 @@ KERNEL_SCHEMA_NAMES = (
 CAMPAIGN_SCHEMA_NAMES = (
     "campaign-mission",
     "work-package",
+    "whole-os-service-config",
 )
 SCHEMA_NAMES = (
     *LEGACY_SCHEMA_NAMES,
