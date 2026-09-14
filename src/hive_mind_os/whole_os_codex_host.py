@@ -378,7 +378,7 @@ def build_deployment_bundle(
             "sandbox": "trusted-local-process-only",
             "tests": [
                 "tests/test_whole_os_bootstrap.py",
-                "tests/test_whole_os_codex_host.py",
+                "tests/test_whole_os_powershell_pipeline.py",
             ],
         }
     )
@@ -838,7 +838,7 @@ def _focused_verification(bundle: DeploymentBundle, attempt_id: str) -> tuple[di
         evidence_directory=directory,
         selected_paths=(
             "tests/test_whole_os_bootstrap.py",
-            "tests/test_whole_os_codex_host.py",
+            "tests/test_whole_os_powershell_pipeline.py",
         ),
         adapter_id="python-unittest",
         sandbox=LocalProcessSandbox(),
