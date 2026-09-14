@@ -36,7 +36,7 @@ from hive_mind_os.models import (
     WorkStatus,
 )
 from hive_mind_os.roles import ROLE_CONTRACTS
-from hive_mind_os.runtime import HiveKernel
+from hive_mind_os.runtime import ExecutionStrategy, HiveKernel
 
 
 def valid_turn(role: Role) -> str:
@@ -318,7 +318,12 @@ class ModelBackendTests(unittest.TestCase):
 
     def test_offline_backend_completes_all_roles(self) -> None:
         provider = FakeProvider([valid_turn(role) for role in HiveKernel().lifecycle])
-        report = asyncio.run(HiveKernel(backend=ModelBackend(provider)).run_objective(Objective("full")))
+        report = asyncio.run(
+            HiveKernel(
+                backend=ModelBackend(provider),
+                execution_strategy=ExecutionStrategy.SEQUENTIAL,
+            ).run_objective(Objective("full"))
+        )
         self.assertIs(report.status, WorkStatus.SUCCEEDED)
         self.assertEqual(len(report.results), 8)
 

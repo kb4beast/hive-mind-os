@@ -47,6 +47,14 @@ from .brain_kernel.planner import (
     persist_plan,
 )
 from .brain_kernel.store import KernelIntegrityError, KernelStore
+from .cohort_policy import CohortExecutionMode, CohortExecutionPolicy, EffectClass
+from .cohort_runtime import (
+    CohortRuntime,
+    ConvergenceResult,
+    PackageRunResult,
+    PackageRunState,
+    VerificationResult,
+)
 from .continuation import (
     ContinuationPacketError,
     export_packet,
@@ -89,7 +97,7 @@ from .repository_compatibility import (
     resolve_runtime_route,
     runtime_identity,
 )
-from .runtime import HiveKernel
+from .runtime import ExecutionStrategy, HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
 from .verify import VerificationError, verify_repository
@@ -120,6 +128,15 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("deterministic", "model"),
         default="deterministic",
         help="Agent backend (default: deterministic offline backend)",
+    )
+    parser.add_argument(
+        "--execution-mode",
+        choices=("cohort", "strict"),
+        default="cohort",
+        help=(
+            "cohort runs specialists together with one convergence pass; "
+            "strict preserves the legacy sequential lifecycle"
+        ),
     )
     return parser
 
@@ -859,8 +876,61 @@ def build_whole_os_parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--config", required=True, help="Closed JSON service configuration"
         )
+        command.add_argument(
+            "--execution-mode",
+            choices=("strict", "cohort"),
+            default="cohort",
+            help=(
+                "Execution topology: strict preserves package-at-a-time behavior; "
+                "cohort groups dependency-ready work behind shared checkpoints"
+            ),
+        )
+        command.add_argument(
+            "--max-parallel-packages",
+            "--cohort-size",
+            dest="max_parallel_packages",
+            type=_positive_integer,
+            help=(
+                "Maximum packages in a cohort (defaults to the graph limit; "
+                "only valid with --execution-mode cohort)"
+            ),
+        )
         command.add_argument("--json", action="store_true", dest="json_output")
     return parser
+
+
+def _positive_integer(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def _whole_os_execution_document(
+    args: argparse.Namespace, *, graph_maximum: int
+) -> dict[str, object]:
+    mode = str(args.execution_mode)
+    requested = args.max_parallel_packages
+    if mode == "strict":
+        if requested is not None:
+            raise ServiceError(
+                "--max-parallel-packages requires --execution-mode cohort"
+            )
+        maximum = 1
+        checkpoint = "per_package"
+    else:
+        maximum = graph_maximum if requested is None else min(requested, graph_maximum)
+        checkpoint = "cohort_boundary"
+    policy = CohortExecutionPolicy(CohortExecutionMode(mode), maximum)
+    return {
+        "mode": mode,
+        "max_parallel_packages": maximum,
+        "checkpoint": checkpoint,
+        "policy_digest": policy.digest,
+    }
 
 
 class _UnconfiguredHost:
@@ -896,9 +966,85 @@ def _observation_document(observation) -> dict[str, object]:
     }
 
 
+def _run_unconfigured_cohort(config, execution: dict[str, object]) -> dict[str, object]:
+    """Exercise the real cohort route while retaining the CLI capability boundary."""
+
+    maximum = execution["max_parallel_packages"]
+    if not isinstance(maximum, int):
+        raise ServiceError("cohort parallelism must be an integer")
+    policy = CohortExecutionPolicy(CohortExecutionMode.COHORT, maximum)
+    runtime = CohortRuntime(policy)
+
+    def execute_package(package, kickoff, dependencies):
+        return PackageRunResult(
+            package.package_id,
+            PackageRunState.BLOCKED_POLICY,
+            {},
+            message="no host executor is configured for this process",
+        )
+
+    result = runtime.execute(
+        graph=config.graph,
+        run_id=f"{config.campaign_id}:cli",
+        kickoff_context={
+            "campaign_id": config.campaign_id,
+            "tenant_id": config.tenant_id,
+            "repository_id": config.repository_id,
+            "binding_descriptor_digest": config.binding_descriptor.digest,
+        },
+        execute_package=execute_package,
+        converge=lambda kickoff, packages: ConvergenceResult(
+            True,
+            {
+                "blocked_packages": [
+                    package.package_id
+                    for package in packages
+                    if package.state is PackageRunState.BLOCKED_POLICY
+                ]
+            },
+            "capability blockers retained at cohort convergence",
+        ),
+        verify=lambda kickoff, packages, convergence: VerificationResult(
+            True,
+            ("typed-capability-blockers-recorded",),
+            "no implementation was claimed without a configured host",
+        ),
+        effect_classes={
+            package.package_id: EffectClass.MISSING_AUTHORITY
+            for package in config.graph.packages
+        },
+    )
+    blocked_packages = [
+        package.package_id
+        for package in result.package_results
+        if package.state is PackageRunState.BLOCKED_POLICY
+    ]
+    return {
+        "campaign_id": config.campaign_id,
+        "status": result.status.value,
+        "completed_packages": [],
+        "pending_packages": blocked_packages,
+        "blocked_packages": blocked_packages,
+        "blocker": "blocked_capability",
+        "last_result": None,
+        "execution": execution,
+        "cohort": {
+            "run_id": result.run_id,
+            "kickoff_digest": result.kickoff.context_digest,
+            "dispatch_batches": [list(batch) for batch in result.dispatch_batches],
+            "max_parallelism": result.max_parallelism,
+            "convergence_rounds": 1,
+            "verification_rounds": 1,
+        },
+    }
+
+
 def _run_whole_os(args: argparse.Namespace) -> int:
     try:
         config = load_service_config(args.config)
+        execution = _whole_os_execution_document(
+            args, graph_maximum=config.graph.maximum_concurrent
+        )
         if args.whole_os_command == "inspect":
             document = {
                 "campaign_id": config.campaign_id,
@@ -910,11 +1056,26 @@ def _run_whole_os(args: argparse.Namespace) -> int:
                 "package_ids": [
                     package.package_id for package in config.graph.packages
                 ],
+                "execution": execution,
             }
             print(
                 json.dumps(document, indent=2, sort_keys=True)
                 if args.json_output
-                else f"{config.campaign_id}: {len(config.graph.packages)} packages"
+                else (
+                    f"{config.campaign_id}: {len(config.graph.packages)} packages "
+                    f"[{execution['mode']}, parallel={execution['max_parallel_packages']}]"
+                )
+            )
+            return 0
+        if execution["mode"] == "cohort" and args.whole_os_command != "status":
+            document = _run_unconfigured_cohort(config, execution)
+            print(
+                json.dumps(document, indent=2, sort_keys=True)
+                if args.json_output
+                else (
+                    f"{config.campaign_id}: {document['status']} "
+                    f"[cohort, parallel={execution['max_parallel_packages']}]"
+                )
             )
             return 0
         provider = ConfiguredMissionBindingsProvider(
@@ -930,10 +1091,14 @@ def _run_whole_os(args: argparse.Namespace) -> int:
         finally:
             service.close()
         document = _observation_document(observation)
+        document["execution"] = execution
         print(
             json.dumps(document, indent=2, sort_keys=True)
             if args.json_output
-            else f"{observation.campaign_id}: {observation.status}"
+            else (
+                f"{observation.campaign_id}: {observation.status} "
+                f"[{execution['mode']}, parallel={execution['max_parallel_packages']}]"
+            )
         )
         return 0
     except (ServiceError, OSError, ValueError, TypeError) as error:
@@ -964,12 +1129,22 @@ async def _run(args: argparse.Namespace) -> int:
             )
         except (ModelProviderError, ValueError) as error:
             raise SystemExit(f"model backend configuration failed: {error}") from None
-    report = await HiveKernel(backend=backend, ledger=ledger).run_objective(objective)
+    execution_strategy = (
+        ExecutionStrategy.COHORT
+        if args.execution_mode == "cohort"
+        else ExecutionStrategy.SEQUENTIAL
+    )
+    report = await HiveKernel(
+        backend=backend,
+        ledger=ledger,
+        execution_strategy=execution_strategy,
+    ).run_objective(objective)
     print(
         json.dumps(
             {
                 "run_id": report.run_id,
                 "status": report.status.value,
+                "execution_mode": args.execution_mode,
                 "roles_completed": [result.role.value for result in report.results],
                 "evidence_count": report.evidence_count,
             },

@@ -5,6 +5,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from hashlib import sha256
 from statistics import fmean
+from threading import RLock
 from typing import Iterable, Protocol
 from uuid import uuid4
 
@@ -44,7 +45,11 @@ class MissionCharter:
     @property
     def fingerprint(self) -> str:
         canonical = "\n".join(
-            (self.goal, *sorted(self.allowed_repositories), *sorted(self.forbidden_capabilities))
+            (
+                self.goal,
+                *sorted(self.allowed_repositories),
+                *sorted(self.forbidden_capabilities),
+            )
         )
         return sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -53,6 +58,21 @@ class MissionCharter:
 class EpisodeAllowance:
     tool_calls: int
     compute_units: float
+
+
+@dataclass(frozen=True, slots=True)
+class BudgetReservation:
+    """Opaque claim on one episode whose resources can be reserved incrementally."""
+
+    id: str
+    allowance: EpisodeAllowance
+
+
+@dataclass(slots=True)
+class _ReservationState:
+    allowance: EpisodeAllowance
+    tool_calls: int = 0
+    compute_units: float = 0.0
 
 
 @dataclass(slots=True)
@@ -67,6 +87,14 @@ class AutonomyBudget:
     episodes_used: int = 0
     tool_calls_used: int = 0
     compute_units_used: float = 0.0
+    _lock: RLock = field(default_factory=RLock, init=False, repr=False, compare=False)
+    _reservations: dict[str, _ReservationState] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
+    _reserved_tool_calls: int = field(default=0, init=False, repr=False, compare=False)
+    _reserved_compute_units: float = field(
+        default=0.0, init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         values = (
@@ -80,34 +108,128 @@ class AutonomyBudget:
             raise ValueError("budget limits cannot be negative")
 
     def issue_allowance(self) -> EpisodeAllowance:
-        if self.exhausted:
-            raise BudgetExceeded("resource budget exhausted")
+        with self._lock:
+            if self._resource_exhausted(include_reservations=True):
+                raise BudgetExceeded("resource budget exhausted")
+            return self._available_allowance()
+
+    def consume(
+        self, allowance: EpisodeAllowance, *, tool_calls: int, compute_units: float
+    ) -> None:
+        with self._lock:
+            if tool_calls < 0 or compute_units < 0:
+                raise ValueError("resource consumption cannot be negative")
+            if (
+                tool_calls > allowance.tool_calls
+                or compute_units > allowance.compute_units
+            ):
+                raise BudgetExceeded("episode exceeded its issued allowance")
+            if self.episodes_used + len(self._reservations) + 1 > self.max_episodes:
+                raise BudgetExceeded("episode budget exhausted")
+            if (
+                self.tool_calls_used + self._reserved_tool_calls + tool_calls
+                > self.max_tool_calls
+                or self.compute_units_used
+                + self._reserved_compute_units
+                + compute_units
+                > self.max_compute_units
+            ):
+                raise BudgetExceeded("resource budget exhausted")
+            self.episodes_used += 1
+            self.tool_calls_used += tool_calls
+            self.compute_units_used += compute_units
+
+    def reserve_episode(self) -> BudgetReservation:
+        """Atomically reserve an episode slot without pre-claiming its full allowance."""
+
+        with self._lock:
+            if self._resource_exhausted(include_reservations=True):
+                raise BudgetExceeded("resource budget exhausted")
+            reservation_id = str(uuid4())
+            allowance = self._available_allowance()
+            self._reservations[reservation_id] = _ReservationState(allowance)
+            return BudgetReservation(reservation_id, allowance)
+
+    def reserve_consumption(
+        self,
+        reservation: BudgetReservation,
+        *,
+        tool_calls: int,
+        compute_units: float,
+    ) -> None:
+        """Atomically claim resources before an external operation starts."""
+
+        with self._lock:
+            if tool_calls < 0 or compute_units < 0:
+                raise ValueError("resource reservation cannot be negative")
+            state = self._reservations.get(reservation.id)
+            if state is None or state.allowance != reservation.allowance:
+                raise ValueError("budget reservation is not active")
+            if (
+                state.tool_calls + tool_calls > state.allowance.tool_calls
+                or state.compute_units + compute_units > state.allowance.compute_units
+            ):
+                raise BudgetExceeded("episode exceeded its issued allowance")
+            if (
+                self.tool_calls_used + self._reserved_tool_calls + tool_calls
+                > self.max_tool_calls
+                or self.compute_units_used
+                + self._reserved_compute_units
+                + compute_units
+                > self.max_compute_units
+            ):
+                raise BudgetExceeded("resource budget exhausted")
+            state.tool_calls += tool_calls
+            state.compute_units += compute_units
+            self._reserved_tool_calls += tool_calls
+            self._reserved_compute_units += compute_units
+
+    def settle_reservation(self, reservation: BudgetReservation) -> None:
+        """Commit claimed usage and release the active episode reservation."""
+
+        with self._lock:
+            state = self._reservations.pop(reservation.id, None)
+            if state is None or state.allowance != reservation.allowance:
+                raise ValueError("budget reservation is not active")
+            self._reserved_tool_calls -= state.tool_calls
+            self._reserved_compute_units -= state.compute_units
+            if state.tool_calls or state.compute_units:
+                self.episodes_used += 1
+                self.tool_calls_used += state.tool_calls
+                self.compute_units_used += state.compute_units
+
+    def _available_allowance(self) -> EpisodeAllowance:
         return EpisodeAllowance(
-            tool_calls=min(self.max_tool_calls_per_episode, self.max_tool_calls - self.tool_calls_used),
+            tool_calls=min(
+                self.max_tool_calls_per_episode,
+                self.max_tool_calls - self.tool_calls_used - self._reserved_tool_calls,
+            ),
             compute_units=min(
                 self.max_compute_units_per_episode,
-                self.max_compute_units - self.compute_units_used,
+                self.max_compute_units
+                - self.compute_units_used
+                - self._reserved_compute_units,
             ),
         )
 
-    def consume(self, allowance: EpisodeAllowance, *, tool_calls: int, compute_units: float) -> None:
-        if tool_calls < 0 or compute_units < 0:
-            raise ValueError("resource consumption cannot be negative")
-        if tool_calls > allowance.tool_calls or compute_units > allowance.compute_units:
-            raise BudgetExceeded("episode exceeded its issued allowance")
-        if self.episodes_used + 1 > self.max_episodes:
-            raise BudgetExceeded("episode budget exhausted")
-        self.episodes_used += 1
-        self.tool_calls_used += tool_calls
-        self.compute_units_used += compute_units
+    def _resource_exhausted(self, *, include_reservations: bool) -> bool:
+        episode_count = self.episodes_used
+        tool_calls = self.tool_calls_used
+        compute_units = self.compute_units_used
+        if include_reservations:
+            episode_count += len(self._reservations)
+            tool_calls += self._reserved_tool_calls
+            compute_units += self._reserved_compute_units
+        return (
+            episode_count >= self.max_episodes
+            or tool_calls >= self.max_tool_calls
+            or compute_units >= self.max_compute_units
+        )
 
     @property
     def exhausted(self) -> bool:
-        return (
-            self.episodes_used >= self.max_episodes
-            or self.tool_calls_used >= self.max_tool_calls
-            or self.compute_units_used >= self.max_compute_units
-        )
+        with self._lock:
+            return self._resource_exhausted(include_reservations=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +268,13 @@ class EpisodeOutcome:
     lessons: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        for name in ("customer_value", "quality", "trust", "cooperation", "cost_efficiency"):
+        for name in (
+            "customer_value",
+            "quality",
+            "trust",
+            "cooperation",
+            "cost_efficiency",
+        ):
             _bounded(name, getattr(self, name))
         if self.evidence_count < 0 or self.tool_calls < 0 or self.compute_units < 0:
             raise ValueError("counts and costs cannot be negative")
@@ -165,13 +293,19 @@ class FitnessEvaluator:
     def __init__(self, minimum_evidence: int = 1) -> None:
         self.minimum_evidence = minimum_evidence
 
-    def evaluate(self, outcome: EpisodeOutcome, charter: MissionCharter) -> FitnessScore:
+    def evaluate(
+        self, outcome: EpisodeOutcome, charter: MissionCharter
+    ) -> FitnessScore:
         reasons: list[str] = []
         if outcome.policy_violations:
             reasons.append("policy violation")
-        forbidden = set(outcome.attempted_capabilities) & set(charter.forbidden_capabilities)
+        forbidden = set(outcome.attempted_capabilities) & set(
+            charter.forbidden_capabilities
+        )
         if forbidden:
-            reasons.append(f"forbidden capability attempted: {', '.join(sorted(forbidden))}")
+            reasons.append(
+                f"forbidden capability attempted: {', '.join(sorted(forbidden))}"
+            )
         if outcome.charter_fingerprint != charter.fingerprint:
             reasons.append("mission charter changed")
         if outcome.evidence_count < self.minimum_evidence:
@@ -278,7 +412,11 @@ class EvolutionArena:
             raise RuntimeError("no eligible variants remain")
         selected = min(
             eligible,
-            key=lambda state: (len(state.outcomes), -state.mean_fitness, state.variant.id),
+            key=lambda state: (
+                len(state.outcomes),
+                -state.mean_fitness,
+                state.variant.id,
+            ),
         )
         return selected.variant
 
@@ -303,7 +441,9 @@ class EvolutionArena:
             champion.evaluation_summary,
         )
         if decision.promote and candidate.mean_fitness <= champion.mean_fitness:
-            decision = PromotionDecision(False, "candidate did not beat champion fitness")
+            decision = PromotionDecision(
+                False, "candidate did not beat champion fitness"
+            )
         return ArenaDecision(candidate.variant.id, decision)
 
     def build_teaching_packet(self, minimum_support: int = 2) -> TeachingPacket:
@@ -319,7 +459,9 @@ class EvolutionArena:
         )
         supported = tuple(
             lesson
-            for lesson, count in sorted(lessons.items(), key=lambda item: (-item[1], item[0]))
+            for lesson, count in sorted(
+                lessons.items(), key=lambda item: (-item[1], item[0])
+            )
             if count >= minimum_support
         )
         return TeachingPacket(
@@ -350,12 +492,16 @@ class AutonomousRunReport:
 class AutonomousMissionLoop:
     """Runs queued work without supervision until evidence, policy, or budget stops it."""
 
-    def __init__(self, arena: EvolutionArena, budget: AutonomyBudget, champion_id: str) -> None:
+    def __init__(
+        self, arena: EvolutionArena, budget: AutonomyBudget, champion_id: str
+    ) -> None:
         self.arena = arena
         self.budget = budget
         self.champion_id = champion_id
 
-    async def run(self, task_ids: Iterable[str], executor: EpisodeExecutor) -> AutonomousRunReport:
+    async def run(
+        self, task_ids: Iterable[str], executor: EpisodeExecutor
+    ) -> AutonomousRunReport:
         completed: list[str] = []
         stopped_reason = "work queue completed"
 
@@ -363,7 +509,9 @@ class AutonomousMissionLoop:
             try:
                 allowance = self.budget.issue_allowance()
                 variant = self.arena.select_for_task()
-                outcome = await executor(variant, task_id, self.arena.charter, allowance)
+                outcome = await executor(
+                    variant, task_id, self.arena.charter, allowance
+                )
                 self.budget.consume(
                     allowance,
                     tool_calls=outcome.tool_calls,

@@ -58,6 +58,7 @@ KERNEL_SCHEMA_NAMES = (
 )
 CAMPAIGN_SCHEMA_NAMES = (
     "campaign-mission",
+    "cohort-execution-policy",
     "work-package",
     "whole-os-service-config",
 )

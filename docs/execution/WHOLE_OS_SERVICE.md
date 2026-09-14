@@ -16,12 +16,31 @@ hive-mind whole-os inspect --config path/to/service.json --json
 hive-mind whole-os status --config path/to/service.json --json
 hive-mind whole-os run-once --config path/to/service.json --json
 hive-mind whole-os resume --config path/to/service.json --json
+hive-mind whole-os status --config path/to/service.json --execution-mode cohort --cohort-size 8 --json
 ```
 
 `inspect` is read-only. `status` projects durable queue state. `run-once` and
 `resume` execute one bounded step. The stock CLI has no host executor and
 reports `BLOCKED_CAPABILITY`; a configured host must construct `WholeOSService`
 with its own `WholeOSHost` and credential broker.
+
+`cohort` is the default execution mode. `strict` is an explicit compatibility
+mode that preserves the existing package-at-a-time behavior. In cohort mode, all
+dependency-ready packages receive one shared kickoff context, execute concurrently
+up to `--max-parallel-packages` (also spelled `--cohort-size`), then converge at one
+cohort checkpoint. The effective limit never exceeds the sealed graph's
+`maximum_concurrent`. CLI inspection and status JSON always report the selected
+mode, effective parallelism, and checkpoint topology so an operator can verify the
+selection without starting work.
+
+The CLI's stock host boundary remains intentionally inert in either mode. Run and
+resume still route through `CohortRuntime` and report typed blockers rather than
+claiming unavailable effects. Embedded hosts construct `CohortRuntime` with a
+`CohortExecutionPolicy`; strict
+hosts may continue using `WholeOSService` unchanged. This keeps existing automation
+compatible while allowing a host to replace repeated role-by-role exchanges with a
+single kickoff, parallel implementation wave, one convergence pass, and one final
+verification checkpoint.
 
 The host supplies `ConfiguredMissionBindingsProvider` and `WholeOSHost`; Hive never
 loads credential values from graph payloads. `WholeOSService` enqueues only
