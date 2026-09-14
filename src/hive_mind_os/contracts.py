@@ -40,6 +40,7 @@ EXTENSION_SCHEMA_NAMES = (
     "hive-cortex-consultation",
     "ooda-state",
     "war-room-event",
+    "repository-profile",
 )
 KERNEL_SCHEMA_NAMES = (
     "brain-kernel-event",
@@ -55,7 +56,16 @@ KERNEL_SCHEMA_NAMES = (
     "brain-kernel-historical-evidence-reference",
     "brain-kernel-technical-closeout-report",
 )
-SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES, *KERNEL_SCHEMA_NAMES)
+CAMPAIGN_SCHEMA_NAMES = (
+    "campaign-mission",
+    "work-package",
+)
+SCHEMA_NAMES = (
+    *LEGACY_SCHEMA_NAMES,
+    *EXTENSION_SCHEMA_NAMES,
+    *KERNEL_SCHEMA_NAMES,
+    *CAMPAIGN_SCHEMA_NAMES,
+)
 ROLE_NAMES = frozenset(
     {
         "orchestrator",
@@ -274,6 +284,12 @@ def validate_contract(name: str, document: Any) -> ContractValidation:
     except (KeyError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         return ContractValidation(False, (f"schema unavailable: {type(error).__name__}: {error}",))
     _validate_node(document, schema, "$", issues)
+    if name == "repository-profile" and not issues:
+        try:
+            from .repository_profile import RepositoryProfile
+            RepositoryProfile.from_document(document)
+        except (TypeError, ValueError) as error:
+            issues.append(f"$: repository profile runtime validation: {error}")
     return ContractValidation(not issues, tuple(dict.fromkeys(issues)))
 
 

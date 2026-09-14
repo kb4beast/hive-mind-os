@@ -53,6 +53,7 @@ class AdapterRegistration:
     privilege_rank: int = 0
     vendor: str | None = None
     independently_validated: bool = False
+    host_versions: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if (
@@ -95,6 +96,8 @@ class AdapterRegistration:
             raise AdapterRegistryError(
                 "independently_validated must be a strict boolean"
             )
+        if type(self.host_versions) is not tuple or self.host_versions != tuple(sorted(set(self.host_versions))) or any(type(item) is not str or not item.strip() for item in self.host_versions):
+            raise AdapterRegistryError("host_versions must be a sorted immutable tuple")
 
     @property
     def registration_digest(self) -> str:
@@ -109,6 +112,7 @@ class AdapterRegistration:
                 "privilege_rank": self.privilege_rank,
                 "vendor": self.vendor,
                 "independently_validated": self.independently_validated,
+                "host_versions": self.host_versions,
             }
         )
 
@@ -295,6 +299,23 @@ class AdapterRegistry:
         )
 
     resolve = select
+
+    def require_host_tool(self, adapter_id: str, *, version: str, implementation_digest: str) -> AdapterRegistration:
+        """Bridge host profile admission to the existing independently-validated registry."""
+        if not isinstance(adapter_id, str) or _NAME.fullmatch(adapter_id) is None:
+            raise AdapterRegistryError("host tool adapter_id must be canonical")
+        if not isinstance(version, str) or not version.strip():
+            raise AdapterRegistryError("host tool version is required")
+        if not isinstance(implementation_digest, str) or _DIGEST.fullmatch(implementation_digest) is None:
+            raise AdapterRegistryError("host tool implementation_digest must be sealed")
+        registration = self._registrations.get(adapter_id)
+        if registration is None or not registration.independently_validated:
+            raise AdapterRegistryError("host tool is not independently admitted")
+        if registration.implementation_digest != implementation_digest:
+            raise AdapterRegistryError("host tool digest contradicts admitted adapter")
+        if version not in registration.host_versions:
+            raise AdapterRegistryError("host tool version is not independently admitted")
+        return registration
 
 
 AuthorityGrant = CapabilityAuthority

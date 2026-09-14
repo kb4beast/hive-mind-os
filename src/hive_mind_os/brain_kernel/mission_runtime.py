@@ -241,7 +241,7 @@ class MissionRuntime:
             item = WorkItem(
                 work_id, config.mission_id, None, 0, f"{role} lifecycle work",
                 config.objective, role, "R1", () if previous is None else (previous,),
-                (), (), (config.acceptance_spec,), ("candidate/app.txt",) if role == "builder" else (),
+                (), (), (config.acceptance_spec,), (),
                 (), {"role": role}, 2, WorkState.PROPOSED, _Z,
                 canonical_digest({"work_id": work_id}),
             )

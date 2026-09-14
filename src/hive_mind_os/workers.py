@@ -155,6 +155,17 @@ _CANONICAL_PAYLOAD_FIELDS = (
 _canonical_bindings_provider: CanonicalMissionBindingsProvider | None = None
 
 
+def configured_mission_bindings_provider(
+    descriptor_path: Path, resolver: Callable[[Any, Mapping[str, Any], Path], tuple[Any, Any]]
+) -> CanonicalMissionBindingsProvider:
+    """Build an explicit N08 provider during host startup, never from target files."""
+    from .cortex.repository.mission_bindings import (
+        ConfiguredMissionBindingsProvider,
+        load_descriptor,
+    )
+    return ConfiguredMissionBindingsProvider(load_descriptor(Path(descriptor_path)), resolver)
+
+
 def set_canonical_mission_bindings_provider(
     provider: CanonicalMissionBindingsProvider | None,
 ) -> CanonicalMissionBindingsProvider | None:
