@@ -340,18 +340,19 @@ class DurableLearningRecorder:
             )
             + "\n"
         ).encode("utf-8")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists():
-            if path.read_bytes() != body:
+        target = filesystem_path(path)
+        filesystem_path(path.parent).mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            if target.read_bytes() != body:
                 raise CompositionError("learning route conflicts with retained receipt")
             return digest
-        temporary = path.with_name(f".{path.name}.{uuid4()}.tmp")
+        temporary = filesystem_path(path.with_name(f".{path.name}.{uuid4()}.tmp"))
         try:
             with temporary.open("xb") as handle:
                 handle.write(body)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, path)
+            os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
         return digest
