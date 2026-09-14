@@ -1,1 +1,58 @@
-{"kind":"hive-mind-closed-match-protocol","status":"CLOSED_NOT_EXECUTABLE_EXTERNAL_EVIDENCE_BLOCKED","protocol_id":"WOS-N02-MATCH-01","version":"1.2.0","track_id":"whole-os-tournament","entrant_recipes":{},"variant_digest_rules":{"complete_behavior":"eight digest dimensions","unavailable":"DEFERRED"},"candidate_seal_rule":"independent-evaluator-stage-seal","scenario_task_ids":["f01","f02","f03","f04","f05","f06","f07","f08","f09","f10","f11","f12"],"dataset_block_ids":["development-screening","harder-hybrid-development","promotion_holdout"],"pairing_rule":"loss-id-rotate-odd-bye-two-inconclusive","decision_rule":"paired-bootstrap-hard-gates","hybrid_recipes":{},"experiment_manifest":{"selection_seed":271828,"bootstrap_seed":314159,"screening_families":12,"final_families":30,"repetitions":3,"retry_rule":"invalidated-only","task_manifest_status":"OPEN_EXTERNAL_N30_BLOCKER","family_split_status":"OPEN_EXTERNAL_N30_BLOCKER","holdout_manifest_digest":null,"custody_status":"OPEN_EXTERNAL_N30_BLOCKER","holdout_signature_status":"OPEN_EXTERNAL_N30_BLOCKER","evaluator_signature":null},"elimination_losses":3,"resource_lease_ref":"N30-bounded-lease-required","max_rounds":24,"terminal_rules":["one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted"],"recipe_seed":"WOS-N02-closed-deferred-recipes-v1"}
+{
+  "kind": "hive-mind-closed-match-protocol",
+  "status": "OPEN_EXTERNAL_EVIDENCE_BLOCKED",
+  "protocol_id": "WOS-N02-MATCH-01",
+  "version": "2.0.0",
+  "track_id": "whole-os-tournament",
+  "entrant_recipes": {
+    "MB0": {"track": "builder-component", "regime_id": "component-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MB1": {"track": "builder-component", "regime_id": "component-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MB2": {"track": "builder-component", "regime_id": "component-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MB3": {"track": "builder-component", "regime_id": "component-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MC0": {"track": "whole-campaign", "regime_id": "whole-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MC1": {"track": "whole-campaign", "regime_id": "whole-default", "availability": "DEFERRED", "provenance_digest": null}
+  },
+  "variant_digest_rules": {
+    "complete_behavior": ["source_or_binary_digest", "prompt_digest", "model_digest", "command_profile_digest", "tool_digest", "context_digest", "check_policy_digest", "learning_policy_digest"],
+    "unavailable": "DEFERRED",
+    "duplicate_complete_behavior": "ONE_ENTRANT"
+  },
+  "candidate_seal_rule": "registry-authenticated-append-only-stage-seal",
+  "scenario_task_ids": [],
+  "dataset_block_ids": ["development-screening", "harder-hybrid-development", "promotion_holdout"],
+  "pairing_rule": "loss-id-rotate-odd-bye-two-inconclusive",
+  "decision_rule": "registry-bound-paired-bootstrap-hard-gates",
+  "hybrid_recipes": {
+    "MH1": {"track": "whole-campaign", "regime_id": "whole-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MH2": {"track": "whole-campaign", "regime_id": "whole-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MH3": {"track": "whole-campaign", "regime_id": "whole-default", "availability": "DEFERRED", "provenance_digest": null},
+    "MH4": {"track": "whole-campaign", "regime_id": "roblox-production", "availability": "DEFERRED", "provenance_digest": null}
+  },
+  "experiment_manifest": {
+    "selection_seed": 271828,
+    "bootstrap_seed": 314159,
+    "retry_rule": "invalidated-only",
+    "screening_families": 12,
+    "final_families": 30,
+    "final_repetitions": 3,
+    "recipe_manifest_digest": null,
+    "block_manifest_digests": {"original": null, "hybrid": null, "final": null},
+    "task_manifest_digests": {"original": null, "hybrid": null, "final": null},
+    "family_manifest_digests": {"original": null, "hybrid": null, "final": null},
+    "manifest_signature_refs": {"original": null, "hybrid": null, "final": null},
+    "custody_receipt_ref": null
+  },
+  "closure_receipt_ref": null,
+  "elimination_losses": 3,
+  "resource_lease_ref": "N30-bounded-lease-required",
+  "max_rounds": 24,
+  "terminal_rules": ["one_survivor", "no_schedulable_pairs", "max_rounds", "lease_exhausted"],
+  "external_evidence_obligations": [
+    "EO-EXT-SOURCE-ARCHIVES",
+    "EO-COMPARATOR-RIGHTS",
+    "EO-CONCRETE-RECIPE-MANIFEST",
+    "EO-DISJOINT-TASK-FAMILY-MANIFESTS",
+    "EO-INDEPENDENT-EVALUATOR-CUSTODY",
+    "EO-AUTHENTICATED-N30-LEASE"
+  ]
+}

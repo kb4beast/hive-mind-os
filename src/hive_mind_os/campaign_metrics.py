@@ -1,298 +1,853 @@
-"""Closed inert N02 metrics/bracket contract; it executes no comparators."""
+"""Inert N02 protocol primitives behind a host-owned admission registry.
+
+This module validates data and computes deterministic bracket/statistical results.
+It deliberately contains no verifier, signing key, admission constructor, default
+registry, or executable fallback. A host registry owns opaque handles, principal
+authentication, lease/revocation state, append-only seals, receipt issuance and
+replay custody.
+"""
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from hashlib import sha256
-import json, math
+import json
+import math
 from pathlib import Path
 from random import Random
 from statistics import mean
 from types import MappingProxyType
-from typing import Iterable, Mapping, Sequence, Protocol
-import hmac
+from typing import Iterable, Mapping, Protocol, Sequence
 
-BOOTSTRAP_RESAMPLES=10_000; CONFIDENCE=.95; NONINFERIORITY_MARGIN=-.05; SCREENING_FAMILIES=12; FINAL_FAMILIES=30
-RECIPE_FIELDS=("source_or_binary_digest","prompt_digest","model_digest","command_profile_digest","tool_digest","context_digest","check_policy_digest","learning_policy_digest")
-class CampaignMetricsError(ValueError): pass
-class EvidenceVerifier(Protocol):
- def verify(self,envelope:"SignedCustodyEnvelope",payload:object)->bool: ...
-REQUIRED_STRATA=("small-bug","feature","absent-tests","multi-file","cross-language","self-runtime","ambiguous-backlog","provider-failure","restart","tenant-isolation","draft-export","endpoint-learning","roblox-runtime")
 
-@dataclass(frozen=True,slots=True)
-class SignedCustodyEnvelope:
- """Verifier-bound evidence envelope; fixture HMAC is not a production key store."""
- signer_id:str;role:str;payload_digest:str;signature:str;issued_at:int
- def __post_init__(self):
-  _id(self.signer_id,"signer");_digest(self.payload_digest,"payload");
-  if self.role not in {"evaluator","custodian"} or type(self.issued_at)is not int or self.issued_at<0 or not isinstance(self.signature,str):raise CampaignMetricsError("invalid custody envelope")
- def verify_fixture_hmac(self,key:bytes)->bool:
-  expected=hmac.new(key,(self.signer_id+"|"+self.role+"|"+self.payload_digest+"|"+str(self.issued_at)).encode(),"sha256").hexdigest()
-  return hmac.compare_digest(expected,self.signature)
-@dataclass(frozen=True,slots=True)
-class StageEvidence:
- stage:str;block_digest:str;task_manifest_digest:str;family_manifest_digest:str;lease_digest:str;evaluator:SignedCustodyEnvelope;strata:tuple[str,...];families:int;repetitions:int;seed:int;final_pair:tuple[str,str]=()
- def __post_init__(self):
-  if self.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("invalid stage evidence")
-  for n in ("block_digest","task_manifest_digest","family_manifest_digest","lease_digest"):_digest(getattr(self,n),n)
-  if set(self.strata)!=set(REQUIRED_STRATA) or len(self.strata)!=len(REQUIRED_STRATA):raise CampaignMetricsError("exact thirteen strata required")
-  required=(30,3) if self.stage=="final" else (12,1)
-  if (self.families,self.repetitions)!=required or type(self.seed)is not int:raise CampaignMetricsError("stage threshold/repetition mismatch")
-  if self.stage=="final" and (len(self.final_pair)!=2 or self.final_pair[0]==self.final_pair[1]):raise CampaignMetricsError("final requires distinct frozen pair")
-  if self.stage!="final" and self.final_pair:raise CampaignMetricsError("only final carries final pair")
-@dataclass(frozen=True,slots=True)
-class LeaseRecord:
- lease_digest:str;scope:str;expires_at:int;issued_by:str;active:bool=True
- def __post_init__(self):
-  _digest(self.lease_digest,"lease");_id(self.scope,"lease scope");_id(self.issued_by,"lease issuer")
-  if type(self.expires_at)is not int or self.expires_at<0 or type(self.active)is not bool:raise CampaignMetricsError("invalid lease")
-@dataclass(frozen=True,slots=True)
-class IssuedReceipt:
- stage:str;round_number:int;left:str;right:str;block_digest:str;task_id:str;seed:int;evaluator_id:str;receipt_digest:str
- def __post_init__(self):
-  for n in ("stage","left","right","task_id","evaluator_id"):_id(getattr(self,n),n)
-  for n in ("block_digest","receipt_digest"):_digest(getattr(self,n),n)
-  if self.left==self.right or type(self.round_number)is not int or self.round_number<1 or type(self.seed)is not int:raise CampaignMetricsError("invalid issued receipt")
- @property
- def identity(self):return (self.stage,self.round_number,self.left,self.right,self.block_digest,self.task_id,self.seed,self.evaluator_id,self.receipt_digest)
-def reject_receipt_replay(receipts:Iterable[IssuedReceipt])->None:
- rows=tuple(receipts)
- if len({x.identity for x in rows})!=len(rows):raise CampaignMetricsError("receipt replay")
-_ADMISSION_TOKEN=object()
-class AdmittedProtocol:
- """Host-issued opaque capability; public construction is refused."""
- __slots__=("protocol","stage_evidence","admission_digest","_token")
- def __init__(self,protocol,stage_evidence,admission_digest,*,_token=None):
-  if _token is not _ADMISSION_TOKEN:raise CampaignMetricsError("admission receipts are host-issued")
-  self.protocol=protocol;self.stage_evidence=stage_evidence;self.admission_digest=admission_digest;self._token=_token
- def __setattr__(self,name,value):
-  if hasattr(self,name):raise CampaignMetricsError("admission receipt is immutable")
-  object.__setattr__(self,name,value)
-def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,lease:LeaseRecord|None=None,verifier:EvidenceVerifier|None=None,builder_ids:Sequence[str]=())->AdmittedProtocol:
- """Only execution-facing gateway; OPEN/deferred or unverified evidence cannot pass."""
- if not isinstance(protocol,MatchProtocol):raise CampaignMetricsError("inspection is not executable")
- if lease is None or not lease.active or lease.lease_digest!=stage_evidence.lease_digest or lease.scope!=protocol.protocol_id:raise CampaignMetricsError("missing or mismatched issued lease")
- payload={"protocol_digest":protocol.protocol_digest,"stage":stage_evidence.stage,"block_digest":stage_evidence.block_digest,"task_manifest_digest":stage_evidence.task_manifest_digest,"family_manifest_digest":stage_evidence.family_manifest_digest,"lease_digest":stage_evidence.lease_digest,"seed":stage_evidence.seed,"families":stage_evidence.families,"repetitions":stage_evidence.repetitions}
- if verifier is None or not verifier.verify(stage_evidence.evaluator,payload):raise CampaignMetricsError("unauthenticated evaluator signature")
- if stage_evidence.evaluator.signer_id in set(builder_ids):raise CampaignMetricsError("evaluator is not independent")
- manifest=protocol.experiment_manifest
- for key in ("selection_seed","bootstrap_seed","retry_rule"):
-  if key not in manifest:raise CampaignMetricsError("missing frozen experiment field")
- if manifest.get("holdout_manifest_digest") is None or any(str(manifest.get(k,"" )).startswith("OPEN_") for k in ("task_manifest_status","family_split_status","custody_status","holdout_signature_status")):raise CampaignMetricsError("open external evidence")
- _digest(manifest["holdout_manifest_digest"],"holdout manifest")
- if stage_evidence.stage=="final" and stage_evidence.block_digest!=manifest["holdout_manifest_digest"]:raise CampaignMetricsError("final holdout mismatch")
- for recipe in (*protocol.entrant_recipes.values(),*protocol.hybrid_recipes.values()):
-  if recipe.get("availability")!="available" or "provenance_digest" not in recipe:raise CampaignMetricsError("recipe is deferred or lacks provenance")
-  _digest(recipe["provenance_digest"],"recipe provenance")
- return AdmittedProtocol(protocol,stage_evidence,canonical_digest([protocol.protocol_digest,stage_evidence.block_digest,stage_evidence.evaluator.payload_digest]),_token=_ADMISSION_TOKEN)
-def _require_admission(protocol:object,admission:AdmittedProtocol|None,*,stage:str|None)->None:
- if not isinstance(admission,AdmittedProtocol) or admission._token is not _ADMISSION_TOKEN or admission.protocol is not protocol:raise CampaignMetricsError("missing or foreign admission receipt")
- if admission.admission_digest!=canonical_digest([protocol.protocol_digest,admission.stage_evidence.block_digest,admission.stage_evidence.evaluator.payload_digest]):raise CampaignMetricsError("stale admission receipt")
- if stage is not None and admission.stage_evidence.stage!=stage:raise CampaignMetricsError("admission stage mismatch")
-def canonical_digest(v:object)->str:
- def plain(x):
-  if isinstance(x,Mapping):return {str(k):plain(y)for k,y in x.items()}
-  if isinstance(x,(tuple,list)):return [plain(y)for y in x]
-  return x
- return "sha256:"+sha256(json.dumps(plain(v),sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
-def _id(v:object,n:str)->None:
- if not isinstance(v,str) or not v or any(c.isspace() for c in v):raise CampaignMetricsError(f"{n} must be a stable identifier")
-def _digest(v:object,n:str)->None:
- if not isinstance(v,str) or len(v)!=71 or not v.startswith("sha256:") or any(c not in "0123456789abcdef" for c in v[7:]):raise CampaignMetricsError(f"{n} must be lowercase sha256")
-def _num(v:object,n:str,nullable=True,nonnegative=True)->None:
- if v is None and nullable:return
- if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or (nonnegative and v<0):raise CampaignMetricsError(f"{n} must be finite" + (" and nonnegative" if nonnegative else ""))
-def _freeze(v:object)->object:
- if isinstance(v,Mapping):return MappingProxyType({k:_freeze(x) for k,x in v.items()})
- if isinstance(v,(list,tuple)):return tuple(_freeze(x) for x in v)
- return v
+BOOTSTRAP_RESAMPLES = 10_000
+CONFIDENCE = 0.95
+NONINFERIORITY_MARGIN = -0.05
+SCREENING_FAMILIES = 12
+FINAL_FAMILIES = 30
+RECIPE_FIELDS = (
+    "source_or_binary_digest", "prompt_digest", "model_digest",
+    "command_profile_digest", "tool_digest", "context_digest",
+    "check_policy_digest", "learning_policy_digest",
+)
+REQUIRED_STRATA = (
+    "small-bug", "feature", "absent-tests", "multi-file", "cross-language",
+    "self-runtime", "ambiguous-backlog", "provider-failure", "restart",
+    "tenant-isolation", "draft-export", "endpoint-learning", "roblox-runtime",
+)
+STAGES = ("original", "hybrid", "final")
+TERMINALS = ("one_survivor", "no_schedulable_pairs", "max_rounds", "lease_exhausted")
+OPERATIONS = ("schedule", "apply", "seal", "aggregate", "decide")
 
-@dataclass(frozen=True,slots=True)
+
+class CampaignMetricsError(ValueError):
+    pass
+
+
+class LeaseExhausted(CampaignMetricsError):
+    """Typed stop used when a revalidated lease is expired or revoked."""
+
+
+def canonical_digest(value: object) -> str:
+    def plain(item: object) -> object:
+        if hasattr(item, "to_document"):
+            return plain(item.to_document())  # type: ignore[union-attr]
+        if isinstance(item, Mapping):
+            return {str(key): plain(val) for key, val in item.items()}
+        if isinstance(item, (tuple, list, set, frozenset)):
+            values = [plain(val) for val in item]
+            return sorted(values, key=lambda val: json.dumps(val, sort_keys=True)) if isinstance(item, (set, frozenset)) else values
+        return item
+
+    encoded = json.dumps(plain(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return "sha256:" + sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _id(value: object, name: str) -> None:
+    if not isinstance(value, str) or not value or any(char.isspace() for char in value):
+        raise CampaignMetricsError(f"{name} must be a stable identifier")
+
+
+def _digest(value: object, name: str) -> None:
+    if not isinstance(value, str) or len(value) != 71 or not value.startswith("sha256:") or any(char not in "0123456789abcdef" for char in value[7:]):
+        raise CampaignMetricsError(f"{name} must be lowercase sha256")
+
+
+def _num(value: object, name: str, *, nullable: bool = True, nonnegative: bool = True) -> None:
+    if value is None and nullable:
+        return
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or (nonnegative and value < 0):
+        suffix = " and nonnegative" if nonnegative else ""
+        raise CampaignMetricsError(f"{name} must be finite{suffix}")
+
+
+def _freeze(value: object) -> object:
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze(val) for key, val in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(val) for val in value)
+    if isinstance(value, set):
+        return frozenset(_freeze(val) for val in value)
+    return value
+
+
+def _timestamp(value: object, name: str) -> int:
+    if type(value) is not int or value < 0:
+        raise CampaignMetricsError(f"{name} must be a nonnegative epoch second")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class AttemptMetric:
- subject_family:str;task_id:str;variant_id:str;candidate_digest:str;configuration_digest:str;model_digest:str;environment_digest:str;eligibility:str;result:str;active_seconds:float|None;queue_seconds:float|None;wall_seconds:float|None;usage_units:float|None;usage_basis:str;provider_cost:float|None;provider_cost_basis:str
- usage_unit:str="tokens";currency:str|None=None;provider_available:str="unknown";input_usage:float|None=None;output_usage:float|None=None;cache_read_usage:float|None=None;cache_write_usage:float|None=None;reasoning_usage:float|None=None;checks:tuple[str,...]=();defects:tuple[str,...]=();recovery_events:tuple[str,...]=();disclosure_events:tuple[str,...]=();context_retransmissions:int|None=None;redundant_checks:int|None=None;model_calls:int|None=None;avoided_work_units:float|None=None
- def __post_init__(self):
-  for n in ("subject_family","task_id","variant_id"):_id(getattr(self,n),n)
-  for n in ("candidate_digest","configuration_digest","model_digest","environment_digest"):_digest(getattr(self,n),n)
-  if self.eligibility not in {"eligible","ineligible","unknown"} or self.result not in {"success","failure","inconclusive","unknown","not_attempted"}:raise CampaignMetricsError("invalid eligibility/result")
-  for n in ("active_seconds","queue_seconds","wall_seconds","usage_units","provider_cost","input_usage","output_usage","cache_read_usage","cache_write_usage","reasoning_usage","avoided_work_units"):_num(getattr(self,n),n)
-  if self.usage_basis not in {"measured","estimated","unknown"} or self.provider_cost_basis not in {"billed","estimated","unknown"}:raise CampaignMetricsError("invalid measurement basis")
-  if (self.usage_basis=="unknown") != (self.usage_units is None) or (self.provider_cost_basis=="unknown") != (self.provider_cost is None):raise CampaignMetricsError("unknown must be null and known must have basis")
-  if self.usage_units is None and any(x is not None for x in (self.input_usage,self.output_usage,self.cache_read_usage,self.cache_write_usage,self.reasoning_usage)):raise CampaignMetricsError("unknown total usage cannot contain detailed usage")
-  if self.provider_available not in {"available","unavailable","unknown"}:raise CampaignMetricsError("invalid availability")
-  for n in ("context_retransmissions","redundant_checks","model_calls"):
-   v=getattr(self,n)
-   if v is not None and(type(v)is not int or v<0):raise CampaignMetricsError(f"{n} must be nonnegative integer")
-  for n in ("checks","defects","recovery_events","disclosure_events"):object.__setattr__(self,n,tuple(getattr(self,n)))
-def summarize_attempts(rows:Iterable[AttemptMetric])->dict[str,int]:
- rows=tuple(rows);out={"records":len(rows)}
- for e in ("eligible","ineligible","unknown"):
-  out[f"eligibility_{e}"]=sum(r.eligibility==e for r in rows)
-  for r in ("success","failure","inconclusive","unknown","not_attempted"):out[f"{e}_{r}"]=sum(x.eligibility==e and x.result==r for x in rows)
- out["eligible_attempted"]=out["eligibility_eligible"]-out["eligible_not_attempted"];return out
-@dataclass(frozen=True,slots=True)
-class PairedInterval:
- estimate:float|None;lower:float|None;upper:float|None;family_count:int;resamples:int=BOOTSTRAP_RESAMPLES;confidence:float=CONFIDENCE
- def __post_init__(self):
-  if (self.estimate is None) != (self.lower is None and self.upper is None):raise CampaignMetricsError("interval wholly known or unknown")
-  for n in ("estimate","lower","upper"):_num(getattr(self,n),n,nonnegative=False)
-  if self.lower is not None and not self.lower<=self.estimate<=self.upper:raise CampaignMetricsError("invalid interval ordering")
-  if type(self.family_count)is not int or self.family_count<0 or (self.estimate is not None and self.family_count<1) or (self.estimate is None and self.family_count!=0) or self.resamples!=BOOTSTRAP_RESAMPLES or self.confidence!=CONFIDENCE:raise CampaignMetricsError("unfrozen interval")
-def paired_family_bootstrap(pairs:Mapping[str,Sequence[float]],*,seed:int,resamples:int=BOOTSTRAP_RESAMPLES)->PairedInterval:
- if resamples!=BOOTSTRAP_RESAMPLES or type(seed)is not int:raise CampaignMetricsError("frozen bootstrap parameters")
- fs=sorted(pairs)
- if len(fs)<SCREENING_FAMILIES:raise CampaignMetricsError("undersized family sample")
- if not fs:return PairedInterval(None,None,None,0)
- vals=[]
- for f in fs:
-  _id(f,"family");xs=tuple(pairs[f])
-  if not xs:raise CampaignMetricsError("unpaired family")
-  for x in xs:_num(x,"paired observation",False,False)
-  vals.append(mean(xs))
- rng=Random(seed);s=sorted(mean(vals[rng.randrange(len(vals))]for _ in vals)for _ in range(BOOTSTRAP_RESAMPLES));return PairedInterval(mean(vals),s[249],s[9749],len(vals))
-def noninferior(i:PairedInterval,*,hard_gates_pass:bool)->bool:
- if type(hard_gates_pass)is not bool:raise CampaignMetricsError("hard gates must be boolean")
- return hard_gates_pass and i.lower is not None and i.lower>NONINFERIORITY_MARGIN
-def stage_paired_bootstrap(admission:AdmittedProtocol,pairs:Mapping[str,Sequence[float]])->PairedInterval:
- """Only aggregation gateway for admitted stage evidence."""
- if not isinstance(admission,AdmittedProtocol) or admission._token is not _ADMISSION_TOKEN:raise CampaignMetricsError("unadmitted calculation")
- evidence=admission.stage_evidence
- if set(pairs)!=set(pairs):raise CampaignMetricsError("invalid family mapping")
- if len(pairs)!=evidence.families or any(len(tuple(v))!=evidence.repetitions for v in pairs.values()):raise CampaignMetricsError("stage family/repetition mismatch")
- return paired_family_bootstrap(pairs,seed=evidence.seed)
-@dataclass(frozen=True,slots=True)
+    subject_family: str; task_id: str; variant_id: str
+    candidate_digest: str; configuration_digest: str; model_digest: str; environment_digest: str
+    eligibility: str; result: str
+    active_seconds: float | None; queue_seconds: float | None; wall_seconds: float | None
+    usage_units: float | None; usage_basis: str; provider_cost: float | None; provider_cost_basis: str
+    usage_unit: str = "tokens"; currency: str | None = None; provider_available: str = "unknown"
+    input_usage: float | None = None; output_usage: float | None = None
+    cache_read_usage: float | None = None; cache_write_usage: float | None = None; reasoning_usage: float | None = None
+    checks: tuple[str, ...] = (); defects: tuple[str, ...] = (); recovery_events: tuple[str, ...] = (); disclosure_events: tuple[str, ...] = ()
+    context_retransmissions: int | None = None; redundant_checks: int | None = None; model_calls: int | None = None
+    avoided_work_units: float | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("subject_family", "task_id", "variant_id", "usage_unit"):
+            _id(getattr(self, name), name)
+        for name in ("candidate_digest", "configuration_digest", "model_digest", "environment_digest"):
+            _digest(getattr(self, name), name)
+        if self.eligibility not in {"eligible", "ineligible", "unknown"} or self.result not in {"success", "failure", "inconclusive", "unknown", "not_attempted"}:
+            raise CampaignMetricsError("invalid eligibility/result")
+        for name in ("active_seconds", "queue_seconds", "wall_seconds", "usage_units", "provider_cost", "input_usage", "output_usage", "cache_read_usage", "cache_write_usage", "reasoning_usage", "avoided_work_units"):
+            _num(getattr(self, name), name)
+        if self.usage_basis not in {"measured", "estimated", "unknown"} or self.provider_cost_basis not in {"billed", "estimated", "unknown"}:
+            raise CampaignMetricsError("invalid measurement basis")
+        if (self.usage_basis == "unknown") != (self.usage_units is None) or (self.provider_cost_basis == "unknown") != (self.provider_cost is None):
+            raise CampaignMetricsError("unknown must be null and known must have a basis")
+        details = (self.input_usage, self.output_usage, self.cache_read_usage, self.cache_write_usage, self.reasoning_usage)
+        if self.usage_units is None and any(value is not None for value in details):
+            raise CampaignMetricsError("unknown total usage cannot contain detailed usage")
+        if self.provider_cost is not None:
+            if self.currency is None:
+                raise CampaignMetricsError("known cost requires currency")
+            _id(self.currency, "currency")
+        elif self.currency is not None:
+            raise CampaignMetricsError("unknown cost cannot carry currency")
+        if self.provider_available not in {"available", "unavailable", "unknown"}:
+            raise CampaignMetricsError("invalid provider availability")
+        for name in ("context_retransmissions", "redundant_checks", "model_calls"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 0):
+                raise CampaignMetricsError(f"{name} must be nonnegative integer")
+        for name in ("checks", "defects", "recovery_events", "disclosure_events"):
+            values = tuple(getattr(self, name))
+            for value in values:
+                _id(value, name)
+            object.__setattr__(self, name, values)
+
+
+def summarize_attempts(rows: Iterable[AttemptMetric]) -> dict[str, int]:
+    records = tuple(rows); result = {"records": len(records)}
+    for eligibility in ("eligible", "ineligible", "unknown"):
+        result[f"eligibility_{eligibility}"] = sum(row.eligibility == eligibility for row in records)
+        for outcome in ("success", "failure", "inconclusive", "unknown", "not_attempted"):
+            result[f"{eligibility}_{outcome}"] = sum(row.eligibility == eligibility and row.result == outcome for row in records)
+    result["eligible_attempted"] = result["eligibility_eligible"] - result["eligible_not_attempted"]
+    return result
+
+
+@dataclass(frozen=True, slots=True)
+class DescriptiveInterval:
+    """A statistical description with no qualification authority."""
+    estimate: float | None; lower: float | None; upper: float | None; family_count: int
+    resamples: int = BOOTSTRAP_RESAMPLES; confidence: float = CONFIDENCE
+
+    def __post_init__(self) -> None:
+        known = (self.estimate is not None, self.lower is not None, self.upper is not None)
+        if any(known) and not all(known):
+            raise CampaignMetricsError("interval must be wholly known or wholly unknown")
+        for name in ("estimate", "lower", "upper"):
+            _num(getattr(self, name), name, nonnegative=False)
+        if self.lower is not None and not self.lower <= self.estimate <= self.upper:  # type: ignore[operator]
+            raise CampaignMetricsError("invalid interval ordering")
+        if type(self.family_count) is not int or self.family_count < 0 or all(known) != (self.family_count > 0):
+            raise CampaignMetricsError("interval/family count mismatch")
+        if self.resamples != BOOTSTRAP_RESAMPLES or self.confidence != CONFIDENCE:
+            raise CampaignMetricsError("unfrozen interval parameters")
+
+    def to_document(self) -> Mapping[str, object]:
+        return {"estimate": self.estimate, "lower": self.lower, "upper": self.upper, "family_count": self.family_count, "resamples": self.resamples, "confidence": self.confidence}
+
+
+def paired_family_bootstrap(pairs: Mapping[str, Sequence[float]], *, seed: int) -> DescriptiveInterval:
+    """Return an inert description; raw output is never qualification-capable."""
+    if type(seed) is not int:
+        raise CampaignMetricsError("seed must be integer")
+    families = sorted(pairs)
+    if not families:
+        return DescriptiveInterval(None, None, None, 0)
+    values = []
+    for family in families:
+        _id(family, "family"); observations = tuple(pairs[family])
+        if not observations:
+            raise CampaignMetricsError("unpaired family")
+        for observation in observations:
+            _num(observation, "paired observation", nullable=False, nonnegative=False)
+        values.append(mean(observations))
+    rng = Random(seed)
+    samples = sorted(mean(values[rng.randrange(len(values))] for _ in values) for _ in range(BOOTSTRAP_RESAMPLES))
+    return DescriptiveInterval(mean(values), samples[249], samples[9749], len(values))
+
+
+@dataclass(frozen=True, slots=True)
+class TaskBinding:
+    task_id: str; family_id: str; strata: tuple[str, ...]; repetition_seeds: tuple[int, ...]
+    def __post_init__(self) -> None:
+        _id(self.task_id, "task"); _id(self.family_id, "family")
+        if not self.strata or any(value not in REQUIRED_STRATA for value in self.strata) or len(set(self.strata)) != len(self.strata):
+            raise CampaignMetricsError("task has invalid strata")
+        if not self.repetition_seeds or any(type(seed) is not int for seed in self.repetition_seeds):
+            raise CampaignMetricsError("task requires integer repetition seeds")
+    def to_document(self) -> Mapping[str, object]:
+        return {"task_id": self.task_id, "family_id": self.family_id, "strata": self.strata, "repetition_seeds": self.repetition_seeds}
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorityBinding:
+    evaluator_id: str; custodian_id: str; builder_ids: tuple[str, ...]; affected_champion_ids: tuple[str, ...]
+    evaluator_signature_ref: str; custody_signature_ref: str
+    def __post_init__(self) -> None:
+        for name in ("evaluator_id", "custodian_id", "evaluator_signature_ref", "custody_signature_ref"):
+            _id(getattr(self, name), name)
+        for name in ("builder_ids", "affected_champion_ids"):
+            values = tuple(getattr(self, name))
+            if len(values) != len(set(values)):
+                raise CampaignMetricsError(f"duplicate {name}")
+            for value in values:
+                _id(value, name)
+            object.__setattr__(self, name, values)
+        excluded = set(self.builder_ids) | set(self.affected_champion_ids)
+        if self.evaluator_id in excluded or self.custodian_id in excluded or self.evaluator_id == self.custodian_id:
+            raise CampaignMetricsError("evaluator/custodian independence violated")
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
+class FinalistBinding:
+    variant_id: str; candidate_digest: str; recipe_digest: str; regime_id: str
+    qualification_stage: str; qualification_seal_digest: str
+    def __post_init__(self) -> None:
+        for name in ("variant_id", "regime_id"):
+            _id(getattr(self, name), name)
+        for name in ("candidate_digest", "recipe_digest", "qualification_seal_digest"):
+            _digest(getattr(self, name), name)
+        if self.qualification_stage not in {"original", "hybrid"}:
+            raise CampaignMetricsError("invalid qualification stage")
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
+class StageEvidence:
+    protocol_document_digest: str; recipe_manifest_digest: str; stage: str; block_id: str; block_digest: str
+    task_manifest_digest: str; family_manifest_digest: str; manifest_signature_ref: str
+    tasks: tuple[TaskBinding, ...]; principals: AuthorityBinding; seed: int; repetitions: int; stage_opened_at: int
+    final_pair: tuple[FinalistBinding, ...] = (); holdout_opened_at: int | None = None
+    def __post_init__(self) -> None:
+        if self.stage not in STAGES:
+            raise CampaignMetricsError("invalid stage")
+        for name in ("protocol_document_digest", "recipe_manifest_digest", "block_digest", "task_manifest_digest", "family_manifest_digest"):
+            _digest(getattr(self, name), name)
+        for name in ("block_id", "manifest_signature_ref"):
+            _id(getattr(self, name), name)
+        if type(self.seed) is not int:
+            raise CampaignMetricsError("stage seed must be integer")
+        _timestamp(self.stage_opened_at, "stage_opened_at")
+        tasks = tuple(self.tasks); object.__setattr__(self, "tasks", tasks)
+        expected = FINAL_FAMILIES if self.stage == "final" else SCREENING_FAMILIES
+        repetitions = 3 if self.stage == "final" else 1
+        if len(tasks) != expected or self.repetitions != repetitions:
+            raise CampaignMetricsError("stage family/repetition threshold mismatch")
+        if len({task.task_id for task in tasks}) != len(tasks) or len({task.family_id for task in tasks}) != len(tasks):
+            raise CampaignMetricsError("stage task/family membership must be unique")
+        if any(len(task.repetition_seeds) != repetitions for task in tasks):
+            raise CampaignMetricsError("task repetition declaration mismatch")
+        if {stratum for task in tasks for stratum in task.strata} != set(REQUIRED_STRATA):
+            raise CampaignMetricsError("exact thirteen-strata coverage required")
+        if self.stage == "final":
+            if len(self.final_pair) != 2 or self.holdout_opened_at is None:
+                raise CampaignMetricsError("final requires pair and holdout-open time")
+            _timestamp(self.holdout_opened_at, "holdout_opened_at")
+            if self.holdout_opened_at < self.stage_opened_at:
+                raise CampaignMetricsError("holdout opened before final admission")
+        elif self.final_pair or self.holdout_opened_at is not None:
+            raise CampaignMetricsError("development stage has final custody fields")
+    @property
+    def evidence_digest(self) -> str:
+        return canonical_digest(self.to_document())
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
+class LeaseRecord:
+    lease_digest: str; protocol_id: str; stage: str; budget_digest: str; issued_by: str
+    issued_at: int; expires_at: int; revoked_at: int | None; operations: frozenset[str]
+    def __post_init__(self) -> None:
+        for name in ("lease_digest", "budget_digest"):
+            _digest(getattr(self, name), name)
+        _id(self.protocol_id, "protocol_id"); _id(self.issued_by, "lease issuer")
+        if self.stage not in STAGES:
+            raise CampaignMetricsError("invalid lease stage")
+        _timestamp(self.issued_at, "issued_at"); _timestamp(self.expires_at, "expires_at")
+        if self.expires_at <= self.issued_at:
+            raise CampaignMetricsError("lease expiry must follow issuance")
+        if self.revoked_at is not None:
+            _timestamp(self.revoked_at, "revoked_at")
+        operations = frozenset(self.operations)
+        if not operations or not operations <= set(OPERATIONS):
+            raise CampaignMetricsError("invalid lease operations")
+        object.__setattr__(self, "operations", operations)
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
 class VariantSeal:
- protocol_digest:str;variant_id:str;recipe_digest:str;candidate_digest:str;evaluator_id:str;stage:str;block_digest:str;regime_id:str;sealed_at:str
- def __post_init__(self):
-  for n in ("protocol_digest","recipe_digest","candidate_digest","block_digest"):_digest(getattr(self,n),n)
-  for n in ("variant_id","evaluator_id","stage","regime_id","sealed_at"):_id(getattr(self,n),n)
-@dataclass(frozen=True,slots=True)
+    protocol_digest: str; stage_evidence_digest: str; sequence: int; variant_id: str
+    recipe_digest: str; candidate_digest: str; evaluator_id: str; custodian_id: str
+    stage: str; block_digest: str; task_manifest_digest: str; family_manifest_digest: str
+    regime_id: str; sealed_at: int; signature_ref: str
+    def __post_init__(self) -> None:
+        for name in ("protocol_digest", "stage_evidence_digest", "recipe_digest", "candidate_digest", "block_digest", "task_manifest_digest", "family_manifest_digest"):
+            _digest(getattr(self, name), name)
+        for name in ("variant_id", "evaluator_id", "custodian_id", "regime_id", "signature_ref"):
+            _id(getattr(self, name), name)
+        if self.stage not in STAGES or type(self.sequence) is not int or self.sequence < 1:
+            raise CampaignMetricsError("invalid seal stage/sequence")
+        _timestamp(self.sealed_at, "sealed_at")
+    @property
+    def seal_digest(self) -> str:
+        return canonical_digest(self.to_document())
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
 class MatchProtocol:
- protocol_id:str;version:str;track_id:str;entrant_recipes:Mapping[str,Mapping[str,object]];variant_digest_rules:Mapping[str,object];candidate_seal_rule:str;scenario_task_ids:tuple[str,...];dataset_block_ids:tuple[str,...];pairing_rule:str;decision_rule:str;hybrid_recipes:Mapping[str,Mapping[str,object]];experiment_manifest:Mapping[str,object];elimination_losses:int=3;resource_lease_ref:str="lease-required";max_rounds:int=24;terminal_rules:tuple[str,...]=( "one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted")
- def __post_init__(self):
-  for n in ("protocol_id","version","track_id","resource_lease_ref"):_id(getattr(self,n),n)
-  if self.elimination_losses!=3 or self.max_rounds!=24 or set(self.terminal_rules)!={"one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted"}:raise CampaignMetricsError("closed tournament rules required")
-  er=_freeze(self.entrant_recipes);hr=_freeze(self.hybrid_recipes);object.__setattr__(self,"entrant_recipes",er);object.__setattr__(self,"hybrid_recipes",hr);object.__setattr__(self,"variant_digest_rules",_freeze(self.variant_digest_rules));object.__setattr__(self,"experiment_manifest",_freeze(self.experiment_manifest));object.__setattr__(self,"scenario_task_ids",tuple(self.scenario_task_ids));object.__setattr__(self,"dataset_block_ids",tuple(self.dataset_block_ids))
-  req={"MB0":"builder-component","MB1":"builder-component","MB2":"builder-component","MB3":"builder-component","MC0":"whole-campaign","MC1":"whole-campaign"}
-  if set(er)!=set(req) or set(hr)!={"MH1","MH2","MH3","MH4"}:raise CampaignMetricsError("exact MB/MC/MH recipes required")
-  seen=set()
-  for k,r in {**er,**hr}.items():
-   if not isinstance(r,Mapping)or r.get("track")!=req.get(k,"whole-campaign")or set(RECIPE_FIELDS)-set(r):raise CampaignMetricsError("incomplete recipe")
-   for f in RECIPE_FIELDS:_digest(r[f],f)
-   d=canonical_digest({f:r[f]for f in RECIPE_FIELDS})
-   if d in seen:raise CampaignMetricsError("duplicate complete behavior digest")
-   seen.add(d)
-  if len(self.scenario_task_ids)<SCREENING_FAMILIES or set(self.dataset_block_ids)!={"development-screening","harder-hybrid-development","promotion_holdout"}:raise CampaignMetricsError("frozen task/block metadata required")
- @property
- def protocol_digest(self):return canonical_digest(self.to_document())
- def to_document(self):return {n:getattr(self,n)for n in self.__dataclass_fields__}
- def recipe(self,v):return ({**dict(self.entrant_recipes),**dict(self.hybrid_recipes)}).get(v)
- def validate_seals(self,seals:Iterable[VariantSeal],*,admission:AdmittedProtocol|None=None,final=False,evaluator_id:str|None=None)->None:
-  _require_admission(self,admission,stage="final" if final else None)
-  prior={};finals=[]
-  for s in seals:
-   if s.protocol_digest!=self.protocol_digest or self.recipe(s.variant_id)is None or s.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("unknown variant/protocol/stage")
-   if s.evaluator_id!=admission.stage_evidence.evaluator.signer_id or (evaluator_id is not None and s.evaluator_id!=evaluator_id):raise CampaignMetricsError("wrong evaluator")
-   if s.stage!=admission.stage_evidence.stage or s.block_digest!=admission.stage_evidence.block_digest:raise CampaignMetricsError("seal stage/block mismatch")
-   expected=canonical_digest({f:self.recipe(s.variant_id)[f]for f in RECIPE_FIELDS})
-   if s.recipe_digest!=expected:raise CampaignMetricsError("seal recipe mismatch")
-   if(s.variant_id,s.stage)in prior:raise CampaignMetricsError("stage rebinding")
-   prior[s.variant_id,s.stage]=s
-   if s.stage=="final":finals.append(s)
-  if final:
-   if len(finals)!=2 or len({x.regime_id for x in finals})!=1 or any(x.block_digest!=canonical_digest("promotion_holdout")for x in finals):raise CampaignMetricsError("invalid final custody")
-   ids={x.variant_id for x in finals}
-   if not(ids&set(self.entrant_recipes)and ids&set(self.hybrid_recipes)):raise CampaignMetricsError("final needs original/hybrid")
-   for x in finals:
-    before=prior.get((x.variant_id,"original"if x.variant_id in self.entrant_recipes else"hybrid"))
-    if before is None or before.candidate_digest!=x.candidate_digest:raise CampaignMetricsError("final changed/unqualified")
-def load_match_protocol(path:str|Path)->MatchProtocol:
- return _load_match_protocol(path,allow_unsealed=False)
-def _load_match_protocol(path:str|Path,*,allow_unsealed:bool)->MatchProtocol:
- d=json.loads(Path(path).read_text(encoding="utf-8"));seed=d.pop("recipe_seed",None);manifest=d.get("experiment_manifest",{});d.pop("kind",None);d.pop("status",None);d.pop("protocol_digest",None)
- if not allow_unsealed and (manifest.get("holdout_signature_status")!="SIGNED" or manifest.get("custody_status")!="ATTESTED" or seed):raise CampaignMetricsError("external N30 blocker: concrete recipes, signed holdout custody required")
- if seed and not d["entrant_recipes"]:
-  def recipe(ident,track):
-   return {"track":track,**{f:canonical_digest([seed,ident,f]) for f in RECIPE_FIELDS}}
-  d["entrant_recipes"]={x:recipe(x,"builder-component") for x in ("MB0","MB1","MB2","MB3")}|{x:recipe(x,"whole-campaign") for x in ("MC0","MC1")}
-  d["hybrid_recipes"]={x:recipe(x,"whole-campaign") for x in ("MH1","MH2","MH3","MH4")}
- return MatchProtocol(**d)
-@dataclass(frozen=True,slots=True)
+    protocol_id: str; version: str; track_id: str; entrant_recipes: Mapping[str, Mapping[str, object]]
+    variant_digest_rules: Mapping[str, object]; candidate_seal_rule: str; scenario_task_ids: tuple[str, ...]
+    dataset_block_ids: tuple[str, ...]; pairing_rule: str; decision_rule: str
+    hybrid_recipes: Mapping[str, Mapping[str, object]]; experiment_manifest: Mapping[str, object]
+    closure_receipt_ref: str; elimination_losses: int = 3; resource_lease_ref: str = "N30-bounded-lease-required"
+    max_rounds: int = 24; terminal_rules: tuple[str, ...] = TERMINALS
+    def __post_init__(self) -> None:
+        for name in ("protocol_id", "version", "track_id", "candidate_seal_rule", "pairing_rule", "decision_rule", "closure_receipt_ref", "resource_lease_ref"):
+            _id(getattr(self, name), name)
+        if self.elimination_losses != 3 or self.max_rounds != 24 or set(self.terminal_rules) != set(TERMINALS):
+            raise CampaignMetricsError("closed tournament rules required")
+        entrants = _freeze(self.entrant_recipes); hybrids = _freeze(self.hybrid_recipes)
+        object.__setattr__(self, "entrant_recipes", entrants); object.__setattr__(self, "hybrid_recipes", hybrids)
+        object.__setattr__(self, "variant_digest_rules", _freeze(self.variant_digest_rules)); object.__setattr__(self, "experiment_manifest", _freeze(self.experiment_manifest))
+        object.__setattr__(self, "scenario_task_ids", tuple(self.scenario_task_ids)); object.__setattr__(self, "dataset_block_ids", tuple(self.dataset_block_ids)); object.__setattr__(self, "terminal_rules", tuple(self.terminal_rules))
+        required = {"MB0":"builder-component", "MB1":"builder-component", "MB2":"builder-component", "MB3":"builder-component", "MC0":"whole-campaign", "MC1":"whole-campaign"}
+        if set(entrants) != set(required) or set(hybrids) != {"MH1", "MH2", "MH3", "MH4"}:
+            raise CampaignMetricsError("exact MB/MC/MH recipes required")
+        behaviors: set[str] = set()
+        for variant_id, recipe in {**dict(entrants), **dict(hybrids)}.items():
+            if recipe.get("track") != required.get(variant_id, "whole-campaign") or recipe.get("availability") != "available":
+                raise CampaignMetricsError("only available, correctly tracked recipes may close")
+            _id(recipe.get("regime_id"), "recipe regime"); _digest(recipe.get("provenance_digest"), "recipe provenance")
+            for recipe_field in RECIPE_FIELDS:
+                _digest(recipe.get(recipe_field), recipe_field)
+            behavior = self.recipe_digest(variant_id, recipe)
+            if behavior in behaviors:
+                raise CampaignMetricsError("duplicate complete behavior digest")
+            behaviors.add(behavior)
+        if len(set(self.scenario_task_ids)) != len(self.scenario_task_ids) or len(self.scenario_task_ids) < FINAL_FAMILIES:
+            raise CampaignMetricsError("closed protocol needs thirty unique task IDs")
+        for task_id in self.scenario_task_ids:
+            _id(task_id, "scenario task")
+        if set(self.dataset_block_ids) != {"development-screening", "harder-hybrid-development", "promotion_holdout"}:
+            raise CampaignMetricsError("closed block IDs required")
+        manifest = self.experiment_manifest
+        required_manifest = {"selection_seed", "bootstrap_seed", "retry_rule", "screening_families", "final_families", "final_repetitions", "recipe_manifest_digest", "block_manifest_digests", "task_manifest_digests", "family_manifest_digests", "manifest_signature_refs", "custody_receipt_ref"}
+        if set(manifest) != required_manifest:
+            raise CampaignMetricsError("closed experiment manifest has missing/extra fields")
+        if type(manifest["selection_seed"]) is not int or type(manifest["bootstrap_seed"]) is not int or manifest["retry_rule"] != "invalidated-only" or manifest["screening_families"] != SCREENING_FAMILIES or manifest["final_families"] != FINAL_FAMILIES or manifest["final_repetitions"] != 3:
+            raise CampaignMetricsError("unfrozen experiment parameters")
+        _digest(manifest["recipe_manifest_digest"], "recipe manifest")
+        for key in ("block_manifest_digests", "task_manifest_digests", "family_manifest_digests", "manifest_signature_refs"):
+            mapping = manifest[key]
+            if not isinstance(mapping, Mapping) or set(mapping) != set(STAGES):
+                raise CampaignMetricsError(f"{key} must bind every stage")
+            for value in mapping.values():
+                _id(value, key) if key == "manifest_signature_refs" else _digest(value, key)
+        _id(manifest["custody_receipt_ref"], "custody receipt")
+    @staticmethod
+    def recipe_digest(variant_id: str, recipe: Mapping[str, object]) -> str:
+        _id(variant_id, "variant")
+        return canonical_digest({field: recipe[field] for field in RECIPE_FIELDS})
+    @property
+    def protocol_digest(self) -> str:
+        return canonical_digest(self.to_document())
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+    def recipe(self, variant_id: str) -> Mapping[str, object] | None:
+        return self.entrant_recipes.get(variant_id) or self.hybrid_recipes.get(variant_id)
+
+
+@dataclass(frozen=True, slots=True)
 class MatchProtocolInspection:
- """Opaque audit projection; deliberately has no schedule, seal, or recipe API."""
- protocol_digest:str
- status:str
- blockers:tuple[str,...]
- document_digest:str
-def load_match_protocol_for_inspection(path:str|Path)->MatchProtocolInspection:
- """Parse only enough deferred metadata to audit blockers; never returns a protocol."""
- raw=Path(path).read_bytes();d=json.loads(raw)
- manifest=d.get("experiment_manifest",{})
- return MatchProtocolInspection(canonical_digest(d),str(d.get("status","UNKNOWN")),tuple(sorted(k for k,v in manifest.items() if v is None or (isinstance(v,str) and v.startswith("OPEN_")))),canonical_digest(raw.decode("utf-8")))
-@dataclass(frozen=True,slots=True)
-class ScheduledPair:left:str;right:str|None;bye:bool=False;block_id:str|None=None
-def schedule_round(entrants:Sequence[str],losses:Mapping[str,int],byes:Mapping[str,int],*,round_number:int,inconclusive_meetings:Mapping[frozenset[str],int]|None=None,blocks:Sequence[str]=())->tuple[ScheduledPair,...]:
- if round_number<1 or round_number>24:raise CampaignMetricsError("round outside bound")
- if len(set(entrants))!=len(entrants):raise CampaignMetricsError("duplicate entrant")
- a=sorted(set(entrants),key=lambda x:(losses.get(x,0),x));r=(round_number-1)%len(a)if a else 0;a=a[r:]+a[:r];out=[]
- if len(a)%2:b=min(a,key=lambda x:(byes.get(x,0),x));a.remove(b);out.append(ScheduledPair(b,None,True))
- prior=inconclusive_meetings or {}
- while a:
-  x=a.pop(0);i=next((i for i,y in enumerate(a)if prior.get(frozenset((x,y)),0)<2),None);out.append(ScheduledPair(x,a.pop(i)if i is not None else None,False,blocks[(round_number+len(out)-2)%len(blocks)]if blocks else None))
- return tuple(out)
-@dataclass(frozen=True,slots=True)
+    document_digest: str; protocol_id: str; status: str; blockers: tuple[str, ...]
+
+
+def _read_protocol_document(path: str | Path) -> Mapping[str, object]:
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise CampaignMetricsError("protocol document unreadable") from error
+    if not isinstance(document, dict):
+        raise CampaignMetricsError("protocol document must be object")
+    return document
+
+
+def load_match_protocol_for_inspection(path: str | Path) -> MatchProtocolInspection:
+    document = _read_protocol_document(path)
+    blockers = tuple(sorted(str(value) for value in document.get("external_evidence_obligations", ())))
+    return MatchProtocolInspection(canonical_digest(document), str(document.get("protocol_id", "UNKNOWN")), str(document.get("status", "UNKNOWN")), blockers)
+
+
+def load_match_protocol(path: str | Path) -> MatchProtocol:
+    """Pure validation only; a returned document is not execution authority."""
+    document = dict(_read_protocol_document(path))
+    if document.pop("kind", None) != "hive-mind-closed-match-protocol":
+        raise CampaignMetricsError("wrong protocol kind")
+    if document.pop("status", None) != "CLOSED_ADMISSION_CANDIDATE":
+        raise CampaignMetricsError("OPEN or relabelled protocol is not closed")
+    if document.pop("external_evidence_obligations", None):
+        raise CampaignMetricsError("closed candidate retains open obligations")
+    declared = document.pop("protocol_digest", None)
+    protocol = MatchProtocol(**document)
+    if declared is not None and declared != protocol.protocol_digest:
+        raise CampaignMetricsError("protocol digest mismatch")
+    return protocol
+
+
+@dataclass(frozen=True, slots=True)
+class AdmissionUse:
+    protocol_digest: str; stage: str; operation: str; state_admission_digest: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AdmissionSnapshot:
+    """Registry assertion returned after authenticating one opaque handle."""
+    admission_digest: str; protocol_digest: str; stage_evidence: StageEvidence; lease: LeaseRecord
+    trusted_lease_issuers: frozenset[str]; observed_at: int; seal_history: tuple[VariantSeal, ...] = ()
+    def __post_init__(self) -> None:
+        _digest(self.admission_digest, "admission"); _digest(self.protocol_digest, "protocol"); _timestamp(self.observed_at, "observed_at")
+        issuers = frozenset(self.trusted_lease_issuers)
+        if not issuers:
+            raise CampaignMetricsError("registry supplied no trusted issuer")
+        for issuer in issuers:
+            _id(issuer, "trusted lease issuer")
+        object.__setattr__(self, "trusted_lease_issuers", issuers); object.__setattr__(self, "seal_history", tuple(self.seal_history))
+
+
+@dataclass(frozen=True, slots=True)
+class RoundPlanEntry:
+    admission_digest: str; protocol_digest: str; stage: str; round_number: int; pair_index: int
+    left: str; right: str | None; bye: bool; track: str; regime_id: str; block_id: str; block_digest: str
+    task_id: str; family_id: str; repetition: int; seed: int; evaluator_id: str; custodian_id: str
+    def __post_init__(self) -> None:
+        if self.bye != (self.right is None) or self.right == self.left:
+            raise CampaignMetricsError("invalid pair/bye")
+        for name in ("admission_digest", "protocol_digest", "block_digest"):
+            _digest(getattr(self, name), name)
+        for name in ("left", "track", "regime_id", "block_id", "task_id", "family_id", "evaluator_id", "custodian_id"):
+            _id(getattr(self, name), name)
+        if self.right is not None:
+            _id(self.right, "right")
+        if self.stage not in STAGES or type(self.round_number) is not int or self.round_number < 1 or type(self.pair_index) is not int or self.pair_index < 0 or type(self.repetition) is not int or self.repetition < 0 or type(self.seed) is not int:
+            raise CampaignMetricsError("invalid round plan counters/stage")
+    @property
+    def plan_digest(self) -> str:
+        return canonical_digest(self.to_document())
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
+class IssuedReceipt:
+    """Registry-bound receipt; ``opaque_handle`` is never interpreted here."""
+    opaque_handle: object = field(repr=False, compare=False); plan: RoundPlanEntry; issued_at: int
+    def __post_init__(self) -> None:
+        if self.opaque_handle is None:
+            raise CampaignMetricsError("receipt requires opaque handle")
+        _timestamp(self.issued_at, "receipt issued_at")
+    @property
+    def receipt_digest(self) -> str:
+        return canonical_digest({"plan": self.plan, "issued_at": self.issued_at})
+
+
+@dataclass(frozen=True, slots=True)
+class ReceiptOutcome:
+    receipt: IssuedReceipt; outcome: str
+    def __post_init__(self) -> None:
+        allowed = {"LEFT", "RIGHT", "DRAW", "INCONCLUSIVE", "QUARANTINE_LEFT", "QUARANTINE_RIGHT", "QUARANTINE_BOTH", "BYE"}
+        if self.outcome not in allowed or self.receipt.plan.bye != (self.outcome == "BYE"):
+            raise CampaignMetricsError("invalid outcome for issued receipt")
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumeRoundRequest:
+    admission_digest: str; protocol_digest: str; stage: str; round_number: int; results: tuple[ReceiptOutcome, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyObservation:
+    family_id: str; task_id: str; repetition: int; receipt_digest: str; value: float
+    def __post_init__(self) -> None:
+        _id(self.family_id, "family"); _id(self.task_id, "task")
+        if type(self.repetition) is not int or self.repetition < 0:
+            raise CampaignMetricsError("invalid repetition")
+        _digest(self.receipt_digest, "receipt"); _num(self.value, "observation", nullable=False, nonnegative=False)
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
+class AggregateEvidence:
+    admission_digest: str; protocol_digest: str; stage: str; metric: str; left: str; right: str
+    observation_digest: str; interval: DescriptiveInterval; left_hard_gates: bool; right_hard_gates: bool
+    def __post_init__(self) -> None:
+        for name in ("admission_digest", "protocol_digest", "observation_digest"):
+            _digest(getattr(self, name), name)
+        for name in ("metric", "left", "right"):
+            _id(getattr(self, name), name)
+        if self.stage not in STAGES or self.left == self.right or type(self.left_hard_gates) is not bool or type(self.right_hard_gates) is not bool:
+            raise CampaignMetricsError("invalid aggregate binding")
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
+class AggregateReceipt:
+    opaque_handle: object = field(repr=False, compare=False); aggregate_digest: str
+    def __post_init__(self) -> None:
+        if self.opaque_handle is None:
+            raise CampaignMetricsError("aggregate requires opaque handle")
+        _digest(self.aggregate_digest, "aggregate")
+
+
+class AdmissionRegistry(Protocol):
+    """Host-owned authority boundary; implementations are outside this module."""
+    def resolve(self, handle: object, use: AdmissionUse) -> AdmissionSnapshot: ...
+    def issue_round(self, handle: object, plans: tuple[RoundPlanEntry, ...]) -> tuple[IssuedReceipt, ...]: ...
+    def consume_round(self, handle: object, request: ConsumeRoundRequest) -> None: ...
+    def append_seals(self, handle: object, expected_history_digest: str, seals: tuple[VariantSeal, ...]) -> None: ...
+    def record_aggregate(self, handle: object, evidence: AggregateEvidence, observations: tuple[FamilyObservation, ...]) -> AggregateReceipt: ...
+    def resolve_aggregate(self, handle: object, receipt: AggregateReceipt) -> AggregateEvidence: ...
+
+
+def _expected_admission_digest(protocol: MatchProtocol, evidence: StageEvidence, lease: LeaseRecord) -> str:
+    return canonical_digest({"protocol_digest": protocol.protocol_digest, "stage_evidence": evidence, "lease": lease})
+
+
+def _resolve(registry: AdmissionRegistry, handle: object, protocol: MatchProtocol, stage: str, operation: str, state_admission_digest: str | None = None) -> AdmissionSnapshot:
+    if registry is None or handle is None:
+        raise CampaignMetricsError("host registry and opaque admission handle required")
+    snapshot = registry.resolve(handle, AdmissionUse(protocol.protocol_digest, stage, operation, state_admission_digest))
+    if not isinstance(snapshot, AdmissionSnapshot):
+        raise CampaignMetricsError("registry returned invalid admission")
+    evidence = snapshot.stage_evidence; lease = snapshot.lease; manifest = protocol.experiment_manifest
+    if snapshot.protocol_digest != protocol.protocol_digest or evidence.stage != stage or evidence.protocol_document_digest != protocol.protocol_digest:
+        raise CampaignMetricsError("foreign protocol/stage admission")
+    if snapshot.admission_digest != _expected_admission_digest(protocol, evidence, lease):
+        raise CampaignMetricsError("incomplete or stale admission identity")
+    if state_admission_digest is not None and snapshot.admission_digest != state_admission_digest:
+        raise CampaignMetricsError("state admission binding changed")
+    expected = {
+        "recipe_manifest_digest": manifest["recipe_manifest_digest"],
+        "block_digest": manifest["block_manifest_digests"][stage],
+        "task_manifest_digest": manifest["task_manifest_digests"][stage],
+        "family_manifest_digest": manifest["family_manifest_digests"][stage],
+        "manifest_signature_ref": manifest["manifest_signature_refs"][stage],
+    }
+    if any(getattr(evidence, name) != value for name, value in expected.items()):
+        raise CampaignMetricsError("admitted manifests/signature do not match protocol")
+    if evidence.block_id != {"original":"development-screening", "hybrid":"harder-hybrid-development", "final":"promotion_holdout"}[stage]:
+        raise CampaignMetricsError("stage block label mismatch")
+    if lease.protocol_id != protocol.protocol_id or lease.stage != stage:
+        raise CampaignMetricsError("lease scope mismatch")
+    if lease.issued_by not in snapshot.trusted_lease_issuers:
+        raise CampaignMetricsError("untrusted lease issuer")
+    if lease.revoked_at is not None and lease.revoked_at <= snapshot.observed_at:
+        raise LeaseExhausted("lease revoked")
+    if snapshot.observed_at < lease.issued_at or snapshot.observed_at >= lease.expires_at:
+        raise LeaseExhausted("lease expired or not active")
+    if operation not in lease.operations:
+        raise CampaignMetricsError("lease does not allow operation")
+    if not {task.task_id for task in evidence.tasks} <= set(protocol.scenario_task_ids):
+        raise CampaignMetricsError("stage task membership outside protocol")
+    if evidence.stage_opened_at > snapshot.observed_at:
+        raise CampaignMetricsError("stage has not opened at trusted registry time")
+    if evidence.stage == "final" and operation != "seal" and snapshot.observed_at < evidence.holdout_opened_at:  # type: ignore[operator]
+        raise CampaignMetricsError("promotion holdout has not opened")
+    _validate_final_binding(protocol, evidence, snapshot.seal_history, require_final_seals=operation != "seal")
+    return snapshot
+
+
+def _validate_final_binding(protocol: MatchProtocol, evidence: StageEvidence, history: Sequence[VariantSeal], *, require_final_seals: bool) -> None:
+    if evidence.stage != "final":
+        return
+    finalists = evidence.final_pair
+    if finalists[0].variant_id == finalists[1].variant_id:
+        raise CampaignMetricsError("finalists must be distinct")
+    original = [entry for entry in finalists if entry.variant_id in protocol.entrant_recipes]
+    hybrid = [entry for entry in finalists if entry.variant_id in protocol.hybrid_recipes]
+    if len(original) != 1 or len(hybrid) != 1:
+        raise CampaignMetricsError("final requires original and hybrid")
+    recipes = [protocol.recipe(entry.variant_id) for entry in finalists]
+    if any(recipe is None or recipe["track"] != "whole-campaign" for recipe in recipes) or len({entry.regime_id for entry in finalists}) != 1:
+        raise CampaignMetricsError("finalists must share whole-campaign regime")
+    for entry, recipe in zip(finalists, recipes):
+        assert recipe is not None
+        expected_stage = "hybrid" if entry.variant_id in protocol.hybrid_recipes else "original"
+        prior = next((seal for seal in history if seal.seal_digest == entry.qualification_seal_digest), None)
+        if entry.qualification_stage != expected_stage or entry.recipe_digest != protocol.recipe_digest(entry.variant_id, recipe) or entry.regime_id != recipe["regime_id"]:
+            raise CampaignMetricsError("finalist recipe/stage/regime mismatch")
+        if prior is None or prior.protocol_digest != protocol.protocol_digest or prior.variant_id != entry.variant_id or prior.stage != expected_stage or prior.candidate_digest != entry.candidate_digest or prior.recipe_digest != entry.recipe_digest or prior.regime_id != entry.regime_id or prior.block_digest != protocol.experiment_manifest["block_manifest_digests"][expected_stage] or prior.task_manifest_digest != protocol.experiment_manifest["task_manifest_digests"][expected_stage] or prior.family_manifest_digest != protocol.experiment_manifest["family_manifest_digests"][expected_stage] or prior.evaluator_id != evidence.principals.evaluator_id or prior.custodian_id != evidence.principals.custodian_id or prior.sealed_at >= evidence.stage_opened_at:
+            raise CampaignMetricsError("finalist lacks prior qualification seal")
+    finals = [seal for seal in history if seal.stage == "final"]
+    if not require_final_seals and not finals:
+        return
+    if len(finals) != 2:
+        raise CampaignMetricsError("final admission requires two pre-open final seals")
+    if [seal.sequence for seal in history] != list(range(1, len(history) + 1)) or any(a.sealed_at >= b.sealed_at for a, b in zip(history, history[1:])) or any(seal.sealed_at > evidence.holdout_opened_at for seal in history):  # type: ignore[operator]
+        raise CampaignMetricsError("seal registry history is out of order")
+    for entry in finalists:
+        final = next((seal for seal in finals if seal.variant_id == entry.variant_id), None)
+        if final is None or final.protocol_digest != protocol.protocol_digest or final.stage_evidence_digest != evidence.evidence_digest or final.recipe_digest != entry.recipe_digest or final.candidate_digest != entry.candidate_digest or final.regime_id != entry.regime_id or final.block_digest != evidence.block_digest or final.task_manifest_digest != evidence.task_manifest_digest or final.family_manifest_digest != evidence.family_manifest_digest or final.evaluator_id != evidence.principals.evaluator_id or final.custodian_id != evidence.principals.custodian_id or final.sealed_at < evidence.stage_opened_at or final.sealed_at >= evidence.holdout_opened_at:  # type: ignore[operator]
+            raise CampaignMetricsError("final pair changed, late, or outside custody")
+
+
+def _active_variants(protocol: MatchProtocol, evidence: StageEvidence, track: str) -> tuple[str, ...]:
+    source = protocol.entrant_recipes if evidence.stage == "original" else protocol.hybrid_recipes if evidence.stage == "hybrid" else {entry.variant_id: protocol.recipe(entry.variant_id) for entry in evidence.final_pair}
+    return tuple(sorted(variant for variant, recipe in source.items() if recipe is not None and recipe["track"] == track))
+
+
+def _compatible(protocol: MatchProtocol, left: str, right: str) -> bool:
+    a = protocol.recipe(left); b = protocol.recipe(right)
+    return bool(a and b and a["track"] == b["track"] and a["regime_id"] == b["regime_id"])
+
+
+def _maximum_pairs(protocol: MatchProtocol, ordered: tuple[str, ...], inconclusive: Mapping[frozenset[str], int]) -> tuple[tuple[str, str], ...]:
+    if len(ordered) < 2:
+        return ()
+    left = ordered[0]; best = _maximum_pairs(protocol, ordered[1:], inconclusive)
+    for index, right in enumerate(ordered[1:], 1):
+        if inconclusive.get(frozenset((left, right)), 0) >= 2 or not _compatible(protocol, left, right):
+            continue
+        candidate = ((left, right),) + _maximum_pairs(protocol, ordered[1:index] + ordered[index + 1:], inconclusive)
+        if len(candidate) > len(best):
+            best = candidate
+    return best
+
+
+@dataclass(frozen=True, slots=True)
+class BracketSchedule:
+    receipts: tuple[IssuedReceipt, ...]; terminal: str | None = None
+    def __post_init__(self) -> None:
+        if self.terminal is not None and (self.terminal not in TERMINALS or self.receipts):
+            raise CampaignMetricsError("invalid terminal schedule")
+
+
+@dataclass(frozen=True, slots=True)
 class BracketState:
- protocol_digest:str;stage:str;track:str;round_number:int=0;losses:Mapping[str,int]=field(default_factory=dict);byes:Mapping[str,int]=field(default_factory=dict);inconclusive:Mapping[frozenset[str],int]=field(default_factory=dict);quarantined:frozenset[str]=frozenset();terminal:str|None=None;applied_receipt_digests:frozenset[str]=frozenset()
- def __post_init__(self):
-  for n in ("protocol_digest","stage","track"):_id(getattr(self,n),n)
-  if type(self.round_number)is not int or self.round_number<0 or self.round_number>24:raise CampaignMetricsError("invalid round")
-  for n in ("losses","byes","inconclusive"):object.__setattr__(self,n,_freeze(getattr(self,n)))
-  for pair,count in self.inconclusive.items():
-   if not isinstance(pair,frozenset) or len(pair)!=2 or any(not isinstance(x,str) for x in pair) or type(count)is not int or count<0:raise CampaignMetricsError("invalid inconclusive matchup")
-  for digest in self.applied_receipt_digests:_digest(digest,"applied receipt")
- def schedule(self,p:MatchProtocol,*,admission:AdmittedProtocol|None=None,lease_active=True):
-  _require_admission(p,admission,stage=self.stage)
-  if self.protocol_digest!=p.protocol_digest:raise CampaignMetricsError("foreign protocol")
-  if self.terminal:return ()
-  if not lease_active:object.__setattr__(self,"terminal","lease_exhausted");return ()
-  if self.round_number>=p.max_rounds:object.__setattr__(self,"terminal","max_rounds");return ()
-  if self.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("unknown stage")
-  if self.stage=="final" and (set(admission.stage_evidence.final_pair)&set(p.entrant_recipes)==set() or set(admission.stage_evidence.final_pair)&set(p.hybrid_recipes)==set()):raise CampaignMetricsError("final pair must be original and hybrid")
-  source=dict(p.entrant_recipes) if self.stage=="original" else (dict(p.hybrid_recipes) if self.stage=="hybrid" else {x:p.recipe(x) for x in admission.stage_evidence.final_pair})
-  ids=[x for x,r in source.items()if r["track"]==self.track and x not in self.quarantined and self.losses.get(x,0)<3]
-  if len(ids)==1:object.__setattr__(self,"terminal","one_survivor");return ()
-  blocks=("development-screening",) if self.stage=="original" else (("harder-hybrid-development",) if self.stage=="hybrid" else (admission.stage_evidence.block_digest,))
-  return schedule_round(ids,self.losses,self.byes,round_number=self.round_number+1,inconclusive_meetings=self.inconclusive,blocks=blocks)
- def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,receipt:IssuedReceipt|None=None,admission:AdmittedProtocol|None=None,lease_active=True):
-  _require_admission(p,admission,stage=self.stage)
-  if receipt is None or receipt.stage!=self.stage or receipt.round_number!=self.round_number+1 or receipt.evaluator_id!=admission.stage_evidence.evaluator.signer_id or receipt.block_digest!=admission.stage_evidence.block_digest:raise CampaignMetricsError("missing or mismatched issued receipt")
-  if receipt.receipt_digest in self.applied_receipt_digests:raise CampaignMetricsError("receipt replay")
-  if not lease_active:return BracketState(self.protocol_digest,self.stage,self.track,self.round_number,self.losses,self.byes,self.inconclusive,self.quarantined,"lease_exhausted")
-  l=dict(self.losses);b=dict(self.byes);i=dict(self.inconclusive);q=set(self.quarantined)
-  issued=tuple(self.schedule(p,admission=admission,lease_active=True));allowed={x.left if x.right is None else (x.left,x.right,x.bye,x.block_id) for x in issued}
-  if not issued or issued[0].right is None or (receipt.left,receipt.right)!=(issued[0].left,issued[0].right) or receipt.seed!=admission.stage_evidence.seed or receipt.task_id not in p.scenario_task_ids:raise CampaignMetricsError("receipt does not bind issued task/orientation/seed")
-  if len(pairs)!=len(set((x.left,x.right,x.bye,x.block_id) for x in pairs)):raise CampaignMetricsError("duplicate issued pair")
-  for x in pairs:
-   if (x.left if x.right is None else (x.left,x.right,x.bye,x.block_id)) not in allowed:raise CampaignMetricsError("pair was not issued")
-   if x.bye:b[x.left]=b.get(x.left,0)+1;continue
-   if x.right is None:continue
-   o=outcomes.get(frozenset((x.left,x.right)),"INCONCLUSIVE");k=frozenset((x.left,x.right))
-   if o not in {"LEFT","RIGHT","DRAW","INCONCLUSIVE","QUARANTINE_LEFT","QUARANTINE_RIGHT"}:raise CampaignMetricsError("unknown outcome")
-   if o=="LEFT":l[x.right]=l.get(x.right,0)+1
-   elif o=="RIGHT":l[x.left]=l.get(x.left,0)+1
-   elif o=="QUARANTINE_LEFT":q.add(x.left)
-   elif o=="QUARANTINE_RIGHT":q.add(x.right)
-   else:i[k]=i.get(k,0)+1
-  n=self.round_number+1;terminal="max_rounds"if n>=p.max_rounds else None;return BracketState(self.protocol_digest,self.stage,self.track,n,l,b,i,frozenset(q),terminal,self.applied_receipt_digests|frozenset((receipt.receipt_digest,)))
-def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:PairedInterval,*,left_hard_gates:bool,right_hard_gates:bool)->str:
- if type(left_hard_gates)is not bool or type(right_hard_gates)is not bool:raise CampaignMetricsError("hard gates boolean")
- if not left_hard_gates and not right_hard_gates:return"QUARANTINE_BOTH"
- if not left_hard_gates:return"QUARANTINE_LEFT"
- if not right_hard_gates:return"QUARANTINE_RIGHT"
- if success.lower is None:return"INCONCLUSIVE"
- if success.lower>0:return"LEFT"
- if success.upper<0:return"RIGHT"
- ln=noninferior(success,hard_gates_pass=True);rn=-success.upper>NONINFERIORITY_MARGIN
- if not(ln and rn)or None in(cost_ratio.lower,cost_ratio.upper,time_ratio.lower,time_ratio.upper):return"DRAW"
- if(cost_ratio.upper<1 and time_ratio.upper<=1.1)or(time_ratio.upper<1 and cost_ratio.upper<=1.1):return"LEFT"
- if(cost_ratio.lower>1 and time_ratio.lower>=1/1.1)or(time_ratio.lower>1 and cost_ratio.lower>=1/1.1):return"RIGHT"
- return"DRAW"
-__all__=["AdmittedProtocol","AttemptMetric","BracketState","CampaignMetricsError","EvidenceVerifier","IssuedReceipt","LeaseRecord","MatchProtocol","MatchProtocolInspection","PairedInterval","RECIPE_FIELDS","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","admit_protocol","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","stage_paired_bootstrap","summarize_attempts"]
+    protocol_digest: str; admission_digest: str; stage: str; track: str; round_number: int = 0
+    losses: Mapping[str, int] = field(default_factory=dict); byes: Mapping[str, int] = field(default_factory=dict)
+    inconclusive: Mapping[frozenset[str], int] = field(default_factory=dict); quarantined: frozenset[str] = frozenset()
+    terminal: str | None = None; applied_receipt_digests: frozenset[str] = frozenset()
+    def __post_init__(self) -> None:
+        _digest(self.protocol_digest, "protocol"); _digest(self.admission_digest, "admission")
+        if self.stage not in STAGES:
+            raise CampaignMetricsError("invalid stage")
+        _id(self.track, "track")
+        if type(self.round_number) is not int or not 0 <= self.round_number <= 24 or self.terminal is not None and self.terminal not in TERMINALS:
+            raise CampaignMetricsError("invalid round/terminal")
+        for name in ("losses", "byes"):
+            mapping = dict(getattr(self, name))
+            for variant, count in mapping.items():
+                _id(variant, name)
+                if type(count) is not int or count < 0:
+                    raise CampaignMetricsError(f"invalid {name} count")
+            object.__setattr__(self, name, MappingProxyType(mapping))
+        meetings = dict(self.inconclusive)
+        for pair, count in meetings.items():
+            if not isinstance(pair, frozenset) or len(pair) != 2 or any(not isinstance(value, str) for value in pair) or type(count) is not int or count < 0:
+                raise CampaignMetricsError("invalid inconclusive matchup")
+        object.__setattr__(self, "inconclusive", MappingProxyType(meetings)); object.__setattr__(self, "quarantined", frozenset(self.quarantined))
+        digests = frozenset(self.applied_receipt_digests)
+        for digest in digests:
+            _digest(digest, "applied receipt")
+        object.__setattr__(self, "applied_receipt_digests", digests)
+    def _snapshot(self, registry: AdmissionRegistry, handle: object, protocol: MatchProtocol, operation: str) -> AdmissionSnapshot:
+        if self.protocol_digest != protocol.protocol_digest:
+            raise CampaignMetricsError("foreign protocol")
+        return _resolve(registry, handle, protocol, self.stage, operation, self.admission_digest)
+    def schedule(self, protocol: MatchProtocol, *, registry: AdmissionRegistry, admission_handle: object) -> BracketSchedule:
+        try:
+            snapshot = self._snapshot(registry, admission_handle, protocol, "schedule")
+        except LeaseExhausted:
+            return BracketSchedule((), "lease_exhausted")
+        if self.terminal:
+            return BracketSchedule((), self.terminal)
+        if self.round_number >= protocol.max_rounds:
+            return BracketSchedule((), "max_rounds")
+        evidence = snapshot.stage_evidence
+        eligible = [variant for variant in _active_variants(protocol, evidence, self.track) if variant not in self.quarantined and self.losses.get(variant, 0) < protocol.elimination_losses]
+        if len(eligible) == 1:
+            return BracketSchedule((), "one_survivor")
+        if not eligible:
+            return BracketSchedule((), "no_schedulable_pairs")
+        ordered = sorted(eligible, key=lambda variant: (self.losses.get(variant, 0), variant)); rotation = self.round_number % len(ordered); ordered = ordered[rotation:] + ordered[:rotation]
+        bye = None
+        if len(ordered) % 2:
+            bye = min(ordered, key=lambda variant: (self.byes.get(variant, 0), variant)); ordered.remove(bye)
+        pairs = _maximum_pairs(protocol, tuple(ordered), self.inconclusive)
+        if not pairs:
+            return BracketSchedule((), "no_schedulable_pairs")
+        items: tuple[tuple[str, str | None], ...] = (((bye, None),) + pairs) if bye is not None else pairs
+        entries = []
+        for pair_index, (left, right) in enumerate(items):
+            task = evidence.tasks[(self.round_number + pair_index) % len(evidence.tasks)]; repetition = self.round_number % evidence.repetitions; recipe = protocol.recipe(left); assert recipe is not None
+            entries.append(RoundPlanEntry(snapshot.admission_digest, protocol.protocol_digest, self.stage, self.round_number + 1, pair_index, left, right, right is None, self.track, str(recipe["regime_id"]), evidence.block_id, evidence.block_digest, task.task_id, task.family_id, repetition, task.repetition_seeds[repetition], evidence.principals.evaluator_id, evidence.principals.custodian_id))
+        receipts = tuple(registry.issue_round(admission_handle, tuple(entries)))
+        if len(receipts) != len(entries) or any(not isinstance(receipt, IssuedReceipt) or receipt.plan != entry or not snapshot.observed_at <= receipt.issued_at < snapshot.lease.expires_at for receipt, entry in zip(receipts, entries)) or len({id(receipt.opaque_handle) for receipt in receipts}) != len(receipts):
+            raise CampaignMetricsError("registry did not issue one exact unique receipt per pair/bye")
+        return BracketSchedule(receipts)
+    def apply(self, protocol: MatchProtocol, results: Sequence[ReceiptOutcome], *, registry: AdmissionRegistry, admission_handle: object) -> "BracketState":
+        try:
+            self._snapshot(registry, admission_handle, protocol, "apply")
+        except LeaseExhausted:
+            if results:
+                raise CampaignMetricsError("expired lease cannot consume results")
+            return BracketState(self.protocol_digest, self.admission_digest, self.stage, self.track, self.round_number, self.losses, self.byes, self.inconclusive, self.quarantined, "lease_exhausted", self.applied_receipt_digests)
+        scheduled = self.schedule(protocol, registry=registry, admission_handle=admission_handle)
+        if scheduled.terminal is not None:
+            if results:
+                raise CampaignMetricsError("terminal schedule cannot accept results")
+            return BracketState(self.protocol_digest, self.admission_digest, self.stage, self.track, self.round_number, self.losses, self.byes, self.inconclusive, self.quarantined, scheduled.terminal, self.applied_receipt_digests)
+        submitted = tuple(results); expected = {id(receipt.opaque_handle): receipt for receipt in scheduled.receipts}
+        if len(submitted) != len(scheduled.receipts) or len({id(result.receipt.opaque_handle) for result in submitted}) != len(submitted) or {id(result.receipt.opaque_handle) for result in submitted} != set(expected):
+            raise CampaignMetricsError("results must exactly cover every unique issued receipt")
+        for result in submitted:
+            issued = expected[id(result.receipt.opaque_handle)]
+            if result.receipt.plan != issued.plan or result.receipt.receipt_digest != issued.receipt_digest:
+                raise CampaignMetricsError("receipt mutated or substituted")
+        registry.consume_round(admission_handle, ConsumeRoundRequest(self.admission_digest, self.protocol_digest, self.stage, self.round_number + 1, submitted))
+        losses = dict(self.losses); byes = dict(self.byes); inconclusive = dict(self.inconclusive); quarantined = set(self.quarantined)
+        for result in submitted:
+            plan = result.receipt.plan
+            if result.outcome == "BYE":
+                byes[plan.left] = byes.get(plan.left, 0) + 1; continue
+            assert plan.right is not None; key = frozenset((plan.left, plan.right))
+            if result.outcome == "LEFT": losses[plan.right] = losses.get(plan.right, 0) + 1
+            elif result.outcome == "RIGHT": losses[plan.left] = losses.get(plan.left, 0) + 1
+            elif result.outcome == "QUARANTINE_LEFT": quarantined.add(plan.left)
+            elif result.outcome == "QUARANTINE_RIGHT": quarantined.add(plan.right)
+            elif result.outcome == "QUARANTINE_BOTH": quarantined.update((plan.left, plan.right))
+            else: inconclusive[key] = inconclusive.get(key, 0) + 1
+        next_round = self.round_number + 1; terminal = "max_rounds" if next_round >= protocol.max_rounds else None
+        return BracketState(self.protocol_digest, self.admission_digest, self.stage, self.track, next_round, losses, byes, inconclusive, frozenset(quarantined), terminal, self.applied_receipt_digests | frozenset(result.receipt.receipt_digest for result in submitted))
+
+
+def validate_and_append_seals(protocol: MatchProtocol, seals: Sequence[VariantSeal], *, registry: AdmissionRegistry, admission_handle: object) -> None:
+    rows = tuple(seals)
+    if not rows:
+        raise CampaignMetricsError("no seals supplied")
+    snapshot = _resolve(registry, admission_handle, protocol, rows[0].stage, "seal"); evidence = snapshot.stage_evidence; history = tuple(snapshot.seal_history)
+    if history and ([seal.sequence for seal in history] != list(range(1, len(history) + 1)) or any(a.sealed_at >= b.sealed_at for a, b in zip(history, history[1:]))):
+        raise CampaignMetricsError("registry seal history is not append-only")
+    last_sequence = history[-1].sequence if history else 0; last_time = history[-1].sealed_at if history else -1
+    for offset, seal in enumerate(rows, 1):
+        recipe = protocol.recipe(seal.variant_id)
+        if recipe is None or seal.sequence != last_sequence + offset or seal.sealed_at <= last_time:
+            raise CampaignMetricsError("seal history/variant invalid")
+        last_time = seal.sealed_at
+        if seal.protocol_digest != protocol.protocol_digest or seal.stage_evidence_digest != evidence.evidence_digest or seal.stage != evidence.stage or seal.block_digest != evidence.block_digest or seal.task_manifest_digest != evidence.task_manifest_digest or seal.family_manifest_digest != evidence.family_manifest_digest or seal.evaluator_id != evidence.principals.evaluator_id or seal.custodian_id != evidence.principals.custodian_id or seal.recipe_digest != protocol.recipe_digest(seal.variant_id, recipe) or seal.regime_id != recipe["regime_id"] or seal.sealed_at < evidence.stage_opened_at or seal.sealed_at > snapshot.observed_at:
+            raise CampaignMetricsError("seal outside admitted stage/custody")
+        if evidence.stage == "original" and seal.variant_id not in protocol.entrant_recipes or evidence.stage == "hybrid" and seal.variant_id not in protocol.hybrid_recipes:
+            raise CampaignMetricsError("seal variant/stage mismatch")
+        if evidence.stage == "final":
+            finalists = {entry.variant_id: entry for entry in evidence.final_pair}; entry = finalists.get(seal.variant_id)
+            if entry is None or seal.candidate_digest != entry.candidate_digest or seal.recipe_digest != entry.recipe_digest or seal.sealed_at >= evidence.holdout_opened_at:  # type: ignore[operator]
+                raise CampaignMetricsError("final seal changed pair or followed holdout open")
+    if evidence.stage == "final" and {seal.variant_id for seal in rows} != {entry.variant_id for entry in evidence.final_pair}:
+        raise CampaignMetricsError("final seals must append exact pair together")
+    registry.append_seals(admission_handle, canonical_digest(history), rows)
+
+
+def _stage_from_handle(registry: AdmissionRegistry, handle: object, protocol: MatchProtocol, operation: str) -> str:
+    for stage in STAGES:
+        try:
+            snapshot = registry.resolve(handle, AdmissionUse(protocol.protocol_digest, stage, operation))
+        except CampaignMetricsError:
+            continue
+        if isinstance(snapshot, AdmissionSnapshot) and snapshot.stage_evidence.stage == stage:
+            return stage
+    raise CampaignMetricsError("opaque admission handle does not resolve")
+
+
+def stage_paired_bootstrap(protocol: MatchProtocol, metric: str, left: str, right: str, observations: Sequence[FamilyObservation], *, left_hard_gates: bool, right_hard_gates: bool, registry: AdmissionRegistry, admission_handle: object) -> AggregateReceipt:
+    stage = _stage_from_handle(registry, admission_handle, protocol, "aggregate"); snapshot = _resolve(registry, admission_handle, protocol, stage, "aggregate"); evidence = snapshot.stage_evidence
+    if type(left_hard_gates) is not bool or type(right_hard_gates) is not bool:
+        raise CampaignMetricsError("hard gates must be booleans")
+    _id(metric, "metric")
+    if left == right or protocol.recipe(left) is None or protocol.recipe(right) is None:
+        raise CampaignMetricsError("invalid aggregate pair")
+    rows = tuple(observations); expected = {(task.family_id, task.task_id, repetition) for task in evidence.tasks for repetition in range(evidence.repetitions)}; actual = {(row.family_id, row.task_id, row.repetition) for row in rows}
+    if len(actual) != len(rows) or actual != expected or len({row.receipt_digest for row in rows}) != len(rows):
+        raise CampaignMetricsError("observations do not exactly match admitted family/task repetitions")
+    grouped: dict[str, list[float]] = {}
+    for row in rows: grouped.setdefault(row.family_id, []).append(row.value)
+    interval = paired_family_bootstrap(grouped, seed=evidence.seed)
+    record = AggregateEvidence(snapshot.admission_digest, protocol.protocol_digest, stage, metric, left, right, canonical_digest(rows), interval, left_hard_gates, right_hard_gates)
+    receipt = registry.record_aggregate(admission_handle, record, rows)
+    if not isinstance(receipt, AggregateReceipt) or receipt.aggregate_digest != canonical_digest(record):
+        raise CampaignMetricsError("registry returned invalid aggregate receipt")
+    return receipt
+
+
+def decide_match(protocol: MatchProtocol, success: AggregateReceipt, cost_ratio: AggregateReceipt, time_ratio: AggregateReceipt, *, registry: AdmissionRegistry, admission_handle: object) -> str:
+    if not all(isinstance(receipt, AggregateReceipt) for receipt in (success, cost_ratio, time_ratio)):
+        raise CampaignMetricsError("qualification decisions require registry aggregate receipts")
+    stage = _stage_from_handle(registry, admission_handle, protocol, "decide"); snapshot = _resolve(registry, admission_handle, protocol, stage, "decide")
+    aggregates = tuple(registry.resolve_aggregate(admission_handle, receipt) for receipt in (success, cost_ratio, time_ratio)); expected_metrics = ("success_difference", "cost_ratio", "time_ratio"); first = aggregates[0]
+    for aggregate, metric in zip(aggregates, expected_metrics):
+        if not isinstance(aggregate, AggregateEvidence) or aggregate.metric != metric or aggregate.admission_digest != snapshot.admission_digest or aggregate.protocol_digest != protocol.protocol_digest or aggregate.stage != stage or (aggregate.left, aggregate.right) != (first.left, first.right) or aggregate.left_hard_gates != first.left_hard_gates or aggregate.right_hard_gates != first.right_hard_gates:
+            raise CampaignMetricsError("qualification aggregates are not co-bound")
+    if not first.left_hard_gates and not first.right_hard_gates: return "QUARANTINE_BOTH"
+    if not first.left_hard_gates: return "QUARANTINE_LEFT"
+    if not first.right_hard_gates: return "QUARANTINE_RIGHT"
+    success_i, cost_i, time_i = (item.interval for item in aggregates)
+    if success_i.lower is None: return "INCONCLUSIVE"
+    if success_i.lower > 0: return "LEFT"
+    if success_i.upper < 0: return "RIGHT"  # type: ignore[operator]
+    if not (success_i.lower > NONINFERIORITY_MARGIN and -success_i.upper > NONINFERIORITY_MARGIN): return "DRAW"  # type: ignore[operator]
+    if None in (cost_i.lower, cost_i.upper, time_i.lower, time_i.upper): return "INCONCLUSIVE"
+    if (cost_i.upper < 1 and time_i.upper <= 1.10) or (time_i.upper < 1 and cost_i.upper <= 1.10): return "LEFT"
+    if (cost_i.lower > 1 and time_i.lower >= 1 / 1.10) or (time_i.lower > 1 and cost_i.lower >= 1 / 1.10): return "RIGHT"
+    return "DRAW"
+
+
+__all__ = [
+    "AdmissionRegistry", "AdmissionSnapshot", "AdmissionUse", "AggregateEvidence", "AggregateReceipt",
+    "AttemptMetric", "AuthorityBinding", "BracketSchedule", "BracketState", "CampaignMetricsError",
+    "ConsumeRoundRequest", "DescriptiveInterval", "FamilyObservation", "FinalistBinding", "IssuedReceipt",
+    "LeaseExhausted", "LeaseRecord", "MatchProtocol", "MatchProtocolInspection", "RECIPE_FIELDS", "REQUIRED_STRATA",
+    "ReceiptOutcome", "RoundPlanEntry", "StageEvidence", "TaskBinding", "VariantSeal", "canonical_digest",
+    "decide_match", "load_match_protocol", "load_match_protocol_for_inspection", "paired_family_bootstrap",
+    "stage_paired_bootstrap", "summarize_attempts", "validate_and_append_seals",
+]
