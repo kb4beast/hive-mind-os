@@ -43,6 +43,7 @@ class T(unittest.TestCase):
   receipt=IssuedReceipt("final",1,"MC0","MH1",D,"task",7,"eval",D)
   with self.assertRaises(CampaignMetricsError):reject_receipt_replay((receipt,receipt))
   with self.assertRaises(CampaignMetricsError):StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,12,1,7)
+  with self.assertRaises(CampaignMetricsError):StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,30,3,7,("MC0","MC0"))
  def test_admitted_fixture_controls_schedule_apply_and_seals(self):
   key=b"fixture-only";sig=__import__("hmac").new(key,("eval|evaluator|"+D+"|1").encode(),"sha256").hexdigest();env=SignedCustodyEnvelope("eval","evaluator",D,sig,1)
   def recipe(n,track):return {"track":track,"availability":"available","provenance_digest":D,**{f:("sha256:"+(format(n,"x")*64)) if f=="source_or_binary_digest" else D for f in RECIPE_FIELDS}}

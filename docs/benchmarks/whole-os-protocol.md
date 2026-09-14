@@ -6,6 +6,16 @@ receipts, concrete recipe digests, private task/family manifests, evaluator sign
 holdout custody and provider authority remain typed external N30 blockers. The normal
 parser rejects the artifact while these fields are OPEN; inspection does not admit runs.
 
+Execution admission additionally requires a host-injected `EvidenceVerifier`, an
+active scoped lease matching the stage evidence, a signed evaluator/custody envelope,
+concrete available recipe provenance, and closed task/family/holdout manifests. No
+production verifier or key is stored here. Fixture HMAC verification is test-only.
+Each applied match carries a stage/round/orientation/task/seed/evaluator/block receipt
+and its digest cannot be replayed. Original and hybrid use their separate development
+blocks; final scheduling uses only the admitted distinct original/hybrid pair and the
+actual custodied promotion-holdout digest. Aggregation is stage-bound: screening is
+12 families × 1 repetition and final is 30 families × 3 repetitions.
+
 `whole-os-match-protocol.json` is the closed scheduling artifact. It requires the
 same immutable source/binary, prompt, model, command/profile, tool, context,
 check-policy and learning-policy digest for every recipe. Different labels with the
