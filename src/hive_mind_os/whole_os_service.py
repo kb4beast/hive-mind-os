@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping, Protocol
+from uuid import uuid4
 
 from .cortex.repository.mission_bindings import (
     ConfiguredMissionBindingsProvider,
@@ -19,7 +22,8 @@ from .outcome_graph import (
     compile_outcome_graph,
     ready_packages,
 )
-from .scheduler import Job, Scheduler
+from .runtime_contracts import canonical_digest
+from .scheduler import Job, Scheduler, StaleLeaseError
 
 
 class ServiceError(RuntimeError):
@@ -142,6 +146,7 @@ class ServiceObservation:
     pending_packages: tuple[str, ...]
     blocked_packages: tuple[str, ...]
     last_result: PackageExecutionResult | None = None
+    recent_results: tuple[PackageExecutionResult, ...] = ()
 
 
 class WholeOSService:
@@ -162,7 +167,23 @@ class WholeOSService:
         self.host = host
         self.scheduler = scheduler or Scheduler(config.state_dir / "queue")
         self.by_id = {package.package_id: package for package in config.graph.packages}
+        self._kickoff = self._build_kickoff()
         self._enqueue_ready()
+
+    def _build_kickoff(self) -> dict[str, object]:
+        context: dict[str, object] = {
+            "campaign_id": self.config.campaign_id,
+            "tenant_id": self.config.tenant_id,
+            "repository_id": self.config.repository_id,
+            "configuration_digest": self.config.binding_descriptor.digest,
+            "graph_digest": self.config.graph.digest,
+            "base_snapshot": self.config.graph.base_snapshot,
+        }
+        return {
+            "schema_version": 1,
+            "context_digest": canonical_digest(context),
+            "context": context,
+        }
 
     def _jobs(self) -> tuple[Job, ...]:
         return tuple(
@@ -193,6 +214,7 @@ class WholeOSService:
             "acceptance_ids": list(package.acceptance_ids),
             "allowed_paths": list(package.allowed_paths),
             "semantic_locks": list(package.semantic_locks),
+            "cohort_kickoff": self._kickoff,
         }
 
     def _enqueue_ready(self) -> None:
@@ -207,7 +229,12 @@ class WholeOSService:
                 )
 
     def run_once(self) -> ServiceObservation:
-        job = self.scheduler.claim(f"whole-os:{self.config.campaign_id}")
+        """Execute one package using the original strict compatibility behavior."""
+        job = self.scheduler.claim(
+            f"whole-os:{self.config.campaign_id}:strict",
+            kind=self.JOB_KIND,
+            mission_id=self.config.campaign_id,
+        )
         if job is None:
             return self.observe()
         package_id = str(job.payload.get("package_id", ""))
@@ -251,8 +278,217 @@ class WholeOSService:
                 )
             )
 
+    @staticmethod
+    def _freeze(value: Any) -> Any:
+        if isinstance(value, dict):
+            return MappingProxyType(
+                {key: WholeOSService._freeze(item) for key, item in value.items()}
+            )
+        if isinstance(value, list):
+            return tuple(WholeOSService._freeze(item) for item in value)
+        return value
+
+    def _claim_cohort(self, owner: str) -> tuple[Job, ...]:
+        claimed: list[Job] = []
+        paths: set[str] = set()
+        locks: set[str] = set()
+        for candidate in self._jobs():
+            if len(claimed) >= self.config.graph.maximum_concurrent:
+                break
+            if candidate.state not in {"ready", "leased"}:
+                continue
+            package = self.by_id.get(str(candidate.payload.get("package_id", "")))
+            if package is not None and (
+                paths.intersection(package.allowed_paths)
+                or locks.intersection(package.semantic_locks)
+            ):
+                continue
+            job = self.scheduler.claim(
+                owner,
+                kind=self.JOB_KIND,
+                mission_id=self.config.campaign_id,
+                job_id=candidate.id,
+            )
+            if job is None:
+                continue
+            claimed.append(job)
+            if package is not None:
+                paths.update(package.allowed_paths)
+                locks.update(package.semantic_locks)
+        return tuple(claimed)
+
+    def _execute_claimed(self, job: Job) -> PackageExecutionResult:
+        package_id = str(job.payload.get("package_id", ""))
+        package = self.by_id.get(package_id)
+        if package is None:
+            return PackageExecutionResult(
+                package_id or "unknown",
+                PackageStatus.FAILED,
+                None,
+                (),
+                "queued package is absent from the sealed graph",
+            )
+        try:
+            payload = dict(job.payload)
+            # Jobs created before cohort support remain resumable. The kickoff is
+            # deterministic for the sealed campaign and is supplied at execution.
+            payload.setdefault("cohort_kickoff", self._kickoff)
+            if payload != self._payload(package):
+                raise ServiceError("queued package payload differs from sealed graph")
+            frozen_payload = self._freeze(payload)
+            assert isinstance(frozen_payload, Mapping)
+            resolved = self.bindings.resolve(frozen_payload, self.config.state_dir)
+            result = self.host.execute_package(package, resolved, frozen_payload)
+            if not isinstance(result, PackageExecutionResult):
+                raise ServiceError("host returned an untyped package result")
+            if result.package_id != package_id:
+                raise ServiceError("host returned a cross-package result")
+            return result
+        except Exception as exc:
+            return PackageExecutionResult(
+                package_id, PackageStatus.FAILED, None, (), str(exc)
+            )
+
+    def _persist_result(self, job: Job, result: PackageExecutionResult) -> None:
+        token = job.lease_token or ""
+        if result.status in {PackageStatus.COMPLETED, PackageStatus.NO_CHANGE}:
+            self.scheduler.complete(
+                job.id, token, mission_id=self.config.campaign_id
+            )
+        elif result.status in {
+            PackageStatus.BLOCKED_AUTHORITY,
+            PackageStatus.BLOCKED_CAPABILITY,
+        }:
+            self.scheduler.dead_letter(
+                job.id,
+                token,
+                result.status.value + ": " + result.message,
+                mission_id=self.config.campaign_id,
+            )
+        else:
+            self.scheduler.fail(
+                job.id,
+                token,
+                result.status.value + ": " + result.message,
+                mission_id=self.config.campaign_id,
+            )
+
+    def run_cohort(self) -> ServiceObservation:
+        """Run one durable, capacity-bounded dependency-ready package wave.
+
+        Every host receives the same digest-bound immutable kickoff in its payload.
+        Scheduler leases are heartbeated while host work is active, and all queue
+        transitions occur on the coordinating thread after execution completes.
+        """
+        self._enqueue_ready()
+        owner = f"whole-os:{self.config.campaign_id}:cohort:{uuid4()}"
+        jobs = self._claim_cohort(owner)
+        if not jobs:
+            return self.observe()
+
+        results: dict[str, PackageExecutionResult] = {}
+        stale: set[str] = set()
+        heartbeat_interval = max(
+            0.01, min(10.0, self.scheduler.lease_seconds / 3.0)
+        )
+        with ThreadPoolExecutor(
+            max_workers=len(jobs),
+            thread_name_prefix=f"whole-os-{self.config.campaign_id}",
+        ) as pool:
+            active: dict[Future[PackageExecutionResult], Job] = {
+                pool.submit(self._execute_claimed, job): job for job in jobs
+            }
+            while active:
+                completed, _ = wait(
+                    tuple(active),
+                    timeout=heartbeat_interval,
+                    return_when=FIRST_COMPLETED,
+                )
+                for future, job in tuple(active.items()):
+                    if future in completed:
+                        continue
+                    try:
+                        self.scheduler.heartbeat(job.id, job.lease_token or "")
+                    except StaleLeaseError:
+                        stale.add(job.id)
+                for future in completed:
+                    job = active.pop(future)
+                    result = future.result()
+                    if job.id in stale:
+                        result = PackageExecutionResult(
+                            result.package_id,
+                            PackageStatus.FAILED,
+                            None,
+                            result.evidence_refs,
+                            "scheduler lease expired before result persistence",
+                        )
+                    else:
+                        try:
+                            self._persist_result(job, result)
+                        except StaleLeaseError:
+                            result = PackageExecutionResult(
+                                result.package_id,
+                                PackageStatus.FAILED,
+                                None,
+                                result.evidence_refs,
+                                "scheduler lease expired before result persistence",
+                            )
+                    results[result.package_id] = result
+
+        self._enqueue_ready()
+        ordered = tuple(
+            results[package.package_id]
+            for package in self.config.graph.packages
+            if package.package_id in results
+        )
+        return self.observe(
+            last_result=ordered[-1] if ordered else None,
+            recent_results=ordered,
+        )
+
+    def run_to_completion(
+        self, *, maximum_cohorts: int | None = None
+    ) -> ServiceObservation:
+        """Run bounded cohort waves until terminal or no immediate progress exists.
+
+        The default bound covers every configured package attempt once. Backoff,
+        active foreign leases, and an explicit lower bound return durable status to
+        the caller instead of spinning or sleeping indefinitely.
+        """
+        if maximum_cohorts is not None and (
+            type(maximum_cohorts) is not int or maximum_cohorts < 1
+        ):
+            raise ServiceError("maximum_cohorts must be a positive integer")
+        limit = maximum_cohorts or max(
+            1, len(self.by_id) * self.config.maximum_attempts
+        )
+        all_results: list[PackageExecutionResult] = []
+        observation = self.observe()
+        for _ in range(limit):
+            before = tuple(
+                (job.id, job.state, job.attempts, job.last_error)
+                for job in self._jobs()
+            )
+            observation = self.run_cohort()
+            all_results.extend(observation.recent_results)
+            if observation.status in {"complete", "blocked"}:
+                break
+            after = tuple(
+                (job.id, job.state, job.attempts, job.last_error)
+                for job in self._jobs()
+            )
+            if before == after:
+                break
+        return self.observe(
+            last_result=all_results[-1] if all_results else observation.last_result,
+            recent_results=tuple(all_results),
+        )
+
     def observe(
-        self, *, last_result: PackageExecutionResult | None = None
+        self,
+        *,
+        last_result: PackageExecutionResult | None = None,
+        recent_results: tuple[PackageExecutionResult, ...] = (),
     ) -> ServiceObservation:
         jobs = self._jobs()
         completed = tuple(
@@ -260,27 +496,41 @@ class WholeOSService:
                 str(job.payload["package_id"]) for job in jobs if job.state == "done"
             )
         )
-        blocked = tuple(
-            sorted(
-                str(job.payload["package_id"])
-                for job in jobs
-                if job.state == "dead-letter"
-            )
-        )
+        blocked_set = {
+            str(job.payload["package_id"])
+            for job in jobs
+            if job.state == "dead-letter"
+        }
+        changed = True
+        while changed:
+            changed = False
+            for package in self.config.graph.packages:
+                if package.package_id not in blocked_set and blocked_set.intersection(
+                    package.dependencies
+                ):
+                    blocked_set.add(package.package_id)
+                    changed = True
+        blocked = tuple(sorted(blocked_set))
         enqueued = {str(job.payload["package_id"]) for job in jobs}
         pending = tuple(sorted(set(self.by_id) - set(completed)))
-        if blocked:
-            status = "blocked"
-        elif len(completed) == len(self.by_id):
+        if len(completed) == len(self.by_id):
             status = "complete"
         elif any(job.state in {"ready", "leased"} for job in jobs):
             status = "ready"
+        elif blocked:
+            status = "blocked"
         elif set(self.by_id) - enqueued:
             status = "dependency_wait"
         else:
             status = "idle"
         return ServiceObservation(
-            self.config.campaign_id, status, completed, pending, blocked, last_result
+            self.config.campaign_id,
+            status,
+            completed,
+            pending,
+            blocked,
+            last_result,
+            recent_results,
         )
 
     def close(self) -> None:

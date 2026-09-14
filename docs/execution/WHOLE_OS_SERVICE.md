@@ -24,6 +24,13 @@ hive-mind whole-os status --config path/to/service.json --execution-mode cohort 
 reports `BLOCKED_CAPABILITY`; a configured host must construct `WholeOSService`
 with its own `WholeOSHost` and credential broker.
 
+Configured hosts use `run_cohort()` for one capacity-bounded wave or
+`run_to_completion()` for bounded dependency-aware fanout until the graph is
+terminal or no work is immediately claimable. `run_to_completion()` never sleeps
+through retry backoff or steals an active lease; it returns the durable observation
+so an operator or supervisor can resume later. Its optional `maximum_cohorts` limit
+provides a smaller explicit work budget.
+
 `cohort` is the default execution mode. `strict` is an explicit compatibility
 mode that preserves the existing package-at-a-time behavior. In cohort mode, all
 dependency-ready packages receive one shared kickoff context, execute concurrently
@@ -32,6 +39,15 @@ cohort checkpoint. The effective limit never exceeds the sealed graph's
 `maximum_concurrent`. CLI inspection and status JSON always report the selected
 mode, effective parallelism, and checkpoint topology so an operator can verify the
 selection without starting work.
+
+The service kickoff is deterministic and digest-bound to the campaign, tenant,
+repository, admitted binding descriptor, graph, and base snapshot. Host callbacks
+receive it through an immutable payload. Scheduler leases are scoped to the service's
+job kind and campaign, heartbeated while a host callback runs, and transitioned only
+after the typed result returns. Successful jobs remain done across process restarts;
+typed authority and capability blockers dead-letter immediately; transient failures
+retain the configured retry policy. A blocked branch does not prevent independent
+ready branches from completing.
 
 The CLI's stock host boundary remains intentionally inert in either mode. Run and
 resume still route through `CohortRuntime` and report typed blockers rather than

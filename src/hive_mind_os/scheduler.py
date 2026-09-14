@@ -169,7 +169,20 @@ class Scheduler:
         assert row is not None
         return self._job(row)
 
-    def claim(self, owner: str) -> Job | None:
+    def claim(
+        self,
+        owner: str,
+        *,
+        kind: str | None = None,
+        mission_id: str | None = None,
+        job_id: str | None = None,
+    ) -> Job | None:
+        """Claim one eligible job, optionally within a sealed service scope.
+
+        The optional selectors let multiple durable services safely share one
+        scheduler without one service consuming another service's work. Existing
+        callers retain the queue-wide claim behavior by omitting them.
+        """
         if not owner.strip():
             raise ValueError("worker owner is required")
         now = self.clock.now()
@@ -190,8 +203,20 @@ class Scheduler:
                         updated_at=?
                     WHERE state='leased' AND lease_expiry<?
                       AND attempts>=max_attempts
+                      AND (? IS NULL OR kind=?)
+                      AND (? IS NULL OR mission_id=?)
+                      AND (? IS NULL OR id=?)
                     """,
-                    (now, now),
+                    (
+                        now,
+                        now,
+                        kind,
+                        kind,
+                        mission_id,
+                        mission_id,
+                        job_id,
+                        job_id,
+                    ),
                 )
                 row = self._connection.execute(
                     """
@@ -201,10 +226,22 @@ class Scheduler:
                         (state='ready' AND not_before<=?)
                         OR (state='leased' AND lease_expiry<?)
                       )
+                      AND (? IS NULL OR kind=?)
+                      AND (? IS NULL OR mission_id=?)
+                      AND (? IS NULL OR id=?)
                     ORDER BY created_at,id
                     LIMIT 1
                     """,
-                    (now, now),
+                    (
+                        now,
+                        now,
+                        kind,
+                        kind,
+                        mission_id,
+                        mission_id,
+                        job_id,
+                        job_id,
+                    ),
                 ).fetchone()
                 if row is None:
                     self._connection.execute("COMMIT")
@@ -228,6 +265,32 @@ class Scheduler:
                 self._connection.execute("ROLLBACK")
                 raise
         return None if claimed is None else self._job(claimed)
+
+    def dead_letter(
+        self,
+        job_id: str,
+        lease_token: str,
+        error: str,
+        *,
+        mission_id: str | None = None,
+    ) -> Job:
+        """Persist a non-retryable typed blocker while retaining lease safety."""
+        now = self.clock.now()
+        with self._lock:
+            row = self._connection.execute(
+                """
+                UPDATE jobs
+                SET state='dead-letter',mission_id=COALESCE(?,mission_id),
+                    last_error=?,lease_owner=NULL,lease_token=NULL,
+                    lease_expiry=NULL,updated_at=?
+                WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
+                RETURNING *
+                """,
+                (mission_id, error, now, job_id, lease_token, now),
+            ).fetchone()
+        if row is None:
+            raise StaleLeaseError("dead-letter rejected for stale lease")
+        return self._job(row)
 
     def heartbeat(self, job_id: str, lease_token: str) -> Job:
         now = self.clock.now()
