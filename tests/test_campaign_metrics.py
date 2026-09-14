@@ -40,4 +40,17 @@ class T(unittest.TestCase):
   receipt=IssuedReceipt("final",1,"MC0","MH1",D,"task",7,"eval",D)
   with self.assertRaises(CampaignMetricsError):reject_receipt_replay((receipt,receipt))
   with self.assertRaises(CampaignMetricsError):StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,12,1,7)
+ def test_admitted_fixture_controls_schedule_apply_and_seals(self):
+  key=b"fixture-only";sig=__import__("hmac").new(key,("eval|evaluator|"+D+"|1").encode(),"sha256").hexdigest();env=SignedCustodyEnvelope("eval","evaluator",D,sig,1)
+  def recipe(n,track):return {"track":track,"availability":"available","provenance_digest":D,**{f:("sha256:"+(format(n,"x")*64)) if f=="source_or_binary_digest" else D for f in RECIPE_FIELDS}}
+  entrants={f"MB{i}":recipe(i,"builder-component") for i in range(4)}|{f"MC{i}":recipe(i+4,"whole-campaign") for i in range(2)}
+  hybrids={f"MH{i}":recipe(i+6,"whole-campaign") for i in range(1,5)}
+  manifest={"selection_seed":1,"bootstrap_seed":2,"retry_rule":"invalidated-only","holdout_manifest_digest":D,"task_manifest_status":"CLOSED","family_split_status":"CLOSED","custody_status":"ATTESTED","holdout_signature_status":"SIGNED"}
+  p=MatchProtocol("fixture","1","fixture",entrants,{},"seal",tuple(f"t{i}" for i in range(12)),("development-screening","harder-hybrid-development","promotion_holdout"),"pair","decide",hybrids,manifest,3,"lease",24,("one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted"))
+  evidence=StageEvidence("original",D,D,D,D,env,REQUIRED_STRATA,12,1,1);admission=admit_protocol(p,evidence,fixture_hmac_key=key,builder_ids=("builder",))
+  state=BracketState(p.protocol_digest,"original","builder-component");pairs=state.schedule(p,admission=admission);self.assertTrue(pairs)
+  next_state=state.apply(p,pairs,{frozenset((pairs[0].left,pairs[0].right)):"LEFT"},admission=admission);self.assertEqual(next_state.losses[pairs[0].right],1)
+  r=p.recipe("MB0");seal=VariantSeal(p.protocol_digest,"MB0",canonical_digest({f:r[f] for f in RECIPE_FIELDS}),D,"eval","original",D,"fixture", "1");p.validate_seals((seal,),admission=admission)
+  with self.assertRaises(CampaignMetricsError):state.schedule(p)
+  with self.assertRaises(CampaignMetricsError):p.validate_seals((seal,),admission=AdmittedProtocol(p,evidence,"sha256:"+"0"*64))
 if __name__=="__main__":unittest.main()
