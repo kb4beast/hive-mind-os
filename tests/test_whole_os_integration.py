@@ -343,9 +343,15 @@ class WholeOSIntegrationTests(unittest.TestCase):
             service.close()
 
     def test_cohort_heartbeats_short_leases_and_retries_failures(self):
+        class SlowReceiptService(WholeOSService):
+            def _persist_package_result(self, result):
+                sleep(0.05)
+                return super()._persist_package_result(result)
+
         class RetryHost(FakeHost):
             def __init__(self):
                 self.calls = 0
+                self.assessment_calls = 0
 
             def execute_package(self, package, bindings, payload):
                 self.calls += 1
@@ -356,6 +362,11 @@ class WholeOSIntegrationTests(unittest.TestCase):
                     )
                 return super().execute_package(package, bindings, payload)
 
+            def assess_terminal_candidate(self, candidate, payload):
+                self.assessment_calls += 1
+                sleep(0.05)
+                return super().assess_terminal_candidate(candidate, payload)
+
         with TemporaryDirectory() as directory:
             root = Path(directory)
             host = RetryHost()
@@ -365,11 +376,12 @@ class WholeOSIntegrationTests(unittest.TestCase):
                 host=host,
             )
             scheduler = Scheduler(root / "queue", lease_seconds=0.03, backoff_seconds=0)
-            service = WholeOSService(config, provider, host, scheduler=scheduler)
+            service = SlowReceiptService(config, provider, host, scheduler=scheduler)
             try:
                 result = service.run_to_completion()
                 self.assertEqual(result.status, "complete")
                 self.assertEqual(host.calls, 2)
+                self.assertEqual(host.assessment_calls, 1)
             finally:
                 service.close()
 
