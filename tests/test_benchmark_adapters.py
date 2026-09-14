@@ -256,6 +256,26 @@ class BenchmarkAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(CampaignMetricsError, "does not allow"):
                 runner.plan(stage="original", variant_id="MB0", task_id="task-00")
 
+    def test_runner_revalidates_lease_after_planning_before_broker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, manifest, protocol_path, registry = admitted_fixture(root)
+            broker = RecordingBroker()
+            runner = AdmittedBenchmarkRunner(
+                protocol_path, manifest, registry, registry.handle, broker
+            )
+            invocation = runner.plan(
+                stage="original", variant_id="MB0", task_id="task-00"
+            )
+            replace_registry_lease(
+                registry, replace(registry.snapshot.lease, revoked_at=19)
+            )
+
+            with self.assertRaises(LeaseExhausted):
+                runner.execute(invocation)
+            self.assertEqual([], broker.inspected)
+            self.assertEqual([], broker.executed)
+
 
 if __name__ == "__main__":
     unittest.main()

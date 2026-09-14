@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
+from enum import StrEnum
 from pathlib import Path
 from threading import RLock
 from typing import Iterable
@@ -15,7 +16,110 @@ from .whole_os_qualification import (
     ExternalObligation,
     PilotAttempt,
     PilotReport,
+    PilotRuntimeEvidence,
 )
+
+
+class PilotBlockerCode(StrEnum):
+    MISSING_WHOLE_OS_HOST = "missing-whole-os-host"
+    MISSING_SUPERVISOR = "missing-supervisor"
+    MISSING_TARGETS = "missing-targets"
+    MISSING_RUNTIME = "missing-runtime-evidence"
+    MISSING_AUTHORITY = "missing-delivery-authority"
+    MISSING_BENCHMARK = "missing-benchmark-candidate"
+
+
+@dataclass(frozen=True, slots=True)
+class PilotPrerequisites:
+    whole_os_host: EvidenceRef | None = None
+    supervisor: EvidenceRef | None = None
+    delivery_authority: EvidenceRef | None = None
+    benchmark_candidate: EvidenceRef | None = None
+    targets: tuple[EvidenceRef, ...] = ()
+    runtime: tuple[EvidenceRef, ...] = ()
+
+    def __post_init__(self) -> None:
+        values = tuple(
+            item
+            for item in (
+                self.whole_os_host,
+                self.supervisor,
+                self.delivery_authority,
+                self.benchmark_candidate,
+                *self.targets,
+                *self.runtime,
+            )
+            if item is not None
+        )
+        if any(type(item) is not EvidenceRef for item in values):
+            raise ValueError("pilot prerequisites must be typed evidence receipts")
+        if len(self.targets) != len(set(self.targets)) or len(self.runtime) != len(
+            set(self.runtime)
+        ):
+            raise ValueError("pilot prerequisite evidence must be unique")
+
+    @staticmethod
+    def _usable(evidence: EvidenceRef | None) -> bool:
+        return evidence is not None and evidence.kind in {
+            EvidenceKind.ATTESTED_REAL,
+            EvidenceKind.EXTERNAL_RECEIPT,
+        }
+
+    def blockers(self, mode: str) -> tuple[ExternalObligation, ...]:
+        rows: list[ExternalObligation] = []
+
+        def block(
+            code: PilotBlockerCode, kind: Disposition, detail: str, claims: tuple[str, ...]
+        ) -> None:
+            rows.append(ExternalObligation(code.value, kind, detail, claims))
+
+        if not self._usable(self.whole_os_host):
+            block(
+                PilotBlockerCode.MISSING_WHOLE_OS_HOST,
+                Disposition.BLOCKED_CAPABILITY,
+                "A separately attested configured Whole-OS host is required.",
+                ("N31" if mode == "self" else "N32",),
+            )
+        if mode == "self" and not self._usable(self.supervisor):
+            block(
+                PilotBlockerCode.MISSING_SUPERVISOR,
+                Disposition.BLOCKED_AUTHORITY,
+                "An external supervisor receipt with a rollback pointer is required.",
+                ("N31",),
+            )
+        if not self._usable(self.delivery_authority):
+            block(
+                PilotBlockerCode.MISSING_AUTHORITY,
+                Disposition.BLOCKED_AUTHORITY,
+                "A target-scoped pilot delivery grant is required.",
+                ("N31" if mode == "self" else "N32",),
+            )
+        if not self._usable(self.benchmark_candidate):
+            block(
+                PilotBlockerCode.MISSING_BENCHMARK,
+                Disposition.BLOCKED_SOURCE,
+                "An independently admitted N30 candidate receipt is required.",
+                ("N31" if mode == "self" else "N32",),
+            )
+        target_minimum = 0 if mode == "self" else (2 if mode == "external" else 1)
+        usable_targets = tuple(item for item in self.targets if self._usable(item))
+        if len({item.subject_id for item in usable_targets}) < target_minimum:
+            block(
+                PilotBlockerCode.MISSING_TARGETS,
+                Disposition.BLOCKED_SOURCE,
+                f"The pilot requires {target_minimum} distinct admitted real target(s).",
+                ("N32",),
+            )
+        if mode in {"external", "roblox"} and not any(
+            self._usable(item) for item in self.runtime
+        ):
+            block(
+                PilotBlockerCode.MISSING_RUNTIME,
+                Disposition.BLOCKED_CAPABILITY,
+                "Attested target runtime capability evidence is required.",
+                ("N32", "R14"),
+            )
+        return tuple(rows)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +134,7 @@ class PilotPlan:
     daily_resource_limit: int
     delivery_rate_limit: int
     authority_digest: str
+    prerequisites: PilotPrerequisites = PilotPrerequisites()
 
     def __post_init__(self) -> None:
         for name in ("pilot_id", "candidate_digest", "authority_digest"):
@@ -40,6 +145,8 @@ class PilotPlan:
                 raise ValueError(f"{name} is required")
         if self.mode not in {"self", "external", "roblox"}:
             raise ValueError("invalid pilot mode")
+        if type(self.prerequisites) is not PilotPrerequisites:
+            raise ValueError("pilot prerequisites must be typed")
         if not self.subject_ids or len(set(self.subject_ids)) != len(self.subject_ids):
             raise ValueError("pilot subjects must be unique and nonempty")
         if self.ends_at <= self.starts_at:
@@ -53,6 +160,58 @@ class PilotPlan:
                 raise ValueError("pilot limits must be positive integers")
         if self.ends_at - self.starts_at < 72 * 60 * 60:
             raise ValueError("pilot window must cover the required 72-hour observation")
+        prerequisite_evidence = tuple(
+            item
+            for item in (
+                self.prerequisites.whole_os_host,
+                self.prerequisites.supervisor,
+                self.prerequisites.delivery_authority,
+                self.prerequisites.benchmark_candidate,
+                *self.prerequisites.targets,
+                *self.prerequisites.runtime,
+            )
+            if item is not None
+        )
+        if any(item.observed_at > self.starts_at for item in prerequisite_evidence):
+            raise ValueError("pilot prerequisite evidence cannot come from the future")
+        benchmark = self.prerequisites.benchmark_candidate
+        if benchmark is not None and benchmark.subject_id != self.candidate_digest:
+            raise ValueError("benchmark receipt targets another candidate")
+        if any(
+            item.subject_id not in self.subject_ids
+            for item in (*self.prerequisites.targets, *self.prerequisites.runtime)
+        ):
+            raise ValueError("target prerequisite evidence is outside the pilot subjects")
+
+
+@dataclass(frozen=True, slots=True)
+class ActivePilotAttempt:
+    attempt_id: str
+    subject_id: str
+    family_id: str
+    candidate_digest: str
+    started_at: int
+    resource_units: int
+    domain: str | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("attempt_id", "subject_id", "family_id", "candidate_digest"):
+            value = getattr(self, name)
+            if (
+                type(value) is not str
+                or not value
+                or value != value.strip()
+                or any(character.isspace() for character in value)
+            ):
+                raise ValueError(f"{name} must be an exact nonempty identifier")
+        if type(self.started_at) is not int or self.started_at < 0:
+            raise ValueError("active pilot timestamp must be a nonnegative integer")
+        if type(self.resource_units) is not int or self.resource_units < 1:
+            raise ValueError("active pilot resource units must be positive")
+        if self.domain is not None and (
+            not self.domain or any(character.isspace() for character in self.domain)
+        ):
+            raise ValueError("active pilot domain must be an exact identifier")
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +225,9 @@ class PilotState:
     obligations: tuple[ExternalObligation, ...] = ()
     revision: int = 0
     observed_through: int | None = None
+    active_attempts: tuple[ActivePilotAttempt, ...] = ()
+    restart_evidence: EvidenceRef | None = None
+    observation_evidence: EvidenceRef | None = None
 
     def __post_init__(self) -> None:
         observed = (
@@ -77,6 +239,16 @@ class PilotState:
             raise ValueError("pilot observation must stay inside the planned window")
         if type(self.revision) is not int or self.revision < 0:
             raise ValueError("pilot revision must be a nonnegative integer")
+        if type(self.restart_exercised) is not bool:
+            raise ValueError("pilot restart flag must be boolean")
+        for value in (self.duplicate_effects, self.avoidable_owner_questions):
+            if type(value) is not int or value < 0:
+                raise ValueError("pilot counters must be nonnegative integers")
+        active_ids = tuple(item.attempt_id for item in self.active_attempts)
+        if len(active_ids) != len(set(active_ids)):
+            raise ValueError("active pilot attempt identities must be unique")
+        if len(self.active_attempts) > self.plan.maximum_concurrent:
+            raise ValueError("active pilot attempts exceed maximum concurrency")
 
 
 class PilotStore:
@@ -111,7 +283,6 @@ class PilotStore:
 
     def load(self) -> PilotState:
         raw = json.loads(self.current.read_text(encoding="utf-8"))
-        plan = PilotPlan(**raw["plan"])
 
         def evidence(value):
             if value is None:
@@ -124,6 +295,32 @@ class PilotStore:
                 value["observed_at"],
             )
 
+        def required_evidence(value) -> EvidenceRef:
+            result = evidence(value)
+            if result is None:
+                raise ValueError("required pilot evidence is missing")
+            return result
+
+        plan_raw = dict(raw["plan"])
+        plan_raw["subject_ids"] = tuple(plan_raw["subject_ids"])
+        prerequisites_raw = plan_raw.pop("prerequisites", None)
+        if prerequisites_raw is None:
+            prerequisites = PilotPrerequisites()
+        else:
+            prerequisites = PilotPrerequisites(
+                evidence(prerequisites_raw["whole_os_host"]),
+                evidence(prerequisites_raw["supervisor"]),
+                evidence(prerequisites_raw["delivery_authority"]),
+                evidence(prerequisites_raw["benchmark_candidate"]),
+                tuple(
+                    required_evidence(item) for item in prerequisites_raw["targets"]
+                ),
+                tuple(
+                    required_evidence(item) for item in prerequisites_raw["runtime"]
+                ),
+            )
+        plan = PilotPlan(**plan_raw, prerequisites=prerequisites)
+
         attempts = tuple(
             PilotAttempt(
                 item["attempt_id"],
@@ -132,6 +329,18 @@ class PilotStore:
                 item["candidate_digest"],
                 item["status"],
                 evidence(item["delivery_receipt"]),
+                item.get("started_at"),
+                item.get("ended_at"),
+                item.get("resource_units", 1),
+                item.get("domain"),
+                tuple(
+                    PilotRuntimeEvidence(
+                        runtime_item["check_class"],
+                        required_evidence(runtime_item["receipt"]),
+                    )
+                    for runtime_item in item.get("runtime_evidence", ())
+                ),
+                item.get("target_runs_without_hive"),
             )
             for item in raw["attempts"]
         )
@@ -145,16 +354,22 @@ class PilotStore:
             )
             for item in raw["obligations"]
         )
+        active_attempts = tuple(
+            ActivePilotAttempt(**item) for item in raw.get("active_attempts", ())
+        )
         return PilotState(
-            plan,
-            attempts,
-            raw["restart_exercised"],
-            raw["duplicate_effects"],
-            raw["avoidable_owner_questions"],
-            rollback,
-            obligations,
-            raw["revision"],
-            raw.get("observed_through"),
+            plan=plan,
+            attempts=attempts,
+            restart_exercised=raw["restart_exercised"],
+            duplicate_effects=raw["duplicate_effects"],
+            avoidable_owner_questions=raw["avoidable_owner_questions"],
+            rollback_evidence=rollback,
+            obligations=obligations,
+            revision=raw["revision"],
+            observed_through=raw.get("observed_through"),
+            active_attempts=active_attempts,
+            restart_evidence=evidence(raw.get("restart_evidence")),
+            observation_evidence=evidence(raw.get("observation_evidence")),
         )
 
 
@@ -166,7 +381,10 @@ class PilotController:
             if state.plan != plan:
                 raise ValueError("existing pilot state belongs to another plan")
         else:
-            store.save(PilotState(plan), expected_revision=None)
+            store.save(
+                PilotState(plan, obligations=plan.prerequisites.blockers(plan.mode)),
+                expected_revision=None,
+            )
 
     def _update(self, transform) -> PilotState:
         state = self.store.load()
@@ -176,52 +394,171 @@ class PilotController:
         self.store.save(successor, expected_revision=state.revision)
         return successor
 
-    def record_attempt(self, attempt: PilotAttempt) -> PilotState:
+    @staticmethod
+    def _day(timestamp: int) -> int:
+        return timestamp // (24 * 60 * 60)
+
+    def _validate_attempt_scope(self, attempt: PilotAttempt) -> None:
         if (
             attempt.subject_id not in self.plan.subject_ids
             or attempt.candidate_digest != self.plan.candidate_digest
         ):
             raise ValueError("attempt is outside the pilot subject/candidate")
+        if attempt.started_at is None or attempt.ended_at is None:
+            raise ValueError("attempt requires observed start and end timestamps")
+        if not (
+            self.plan.starts_at
+            <= attempt.started_at
+            <= attempt.ended_at
+            <= self.plan.ends_at
+        ):
+            raise ValueError("attempt is outside the planned pilot window")
 
-        def apply(state: PilotState) -> PilotState:
-            if any(row.attempt_id == attempt.attempt_id for row in state.attempts):
-                existing = next(
-                    row
-                    for row in state.attempts
-                    if row.attempt_id == attempt.attempt_id
-                )
-                if existing != attempt:
-                    raise ValueError("attempt identity already has different content")
-                return state
-            if len(state.attempts) >= state.plan.daily_resource_limit:
-                raise ValueError("pilot daily resource limit exhausted")
-            if (
-                attempt.status == "accepted"
-                and sum(row.status == "accepted" for row in state.attempts)
-                >= state.plan.delivery_rate_limit
-            ):
-                raise ValueError("pilot delivery rate limit exhausted")
-            return PilotState(
-                state.plan,
-                (*state.attempts, attempt),
-                state.restart_exercised,
-                state.duplicate_effects,
-                state.avoidable_owner_questions,
-                state.rollback_evidence,
-                state.obligations,
-                state.revision + 1,
-                state.observed_through,
-            )
+    def begin_attempt(
+        self,
+        *,
+        attempt_id: str,
+        subject_id: str,
+        family_id: str,
+        started_at: int,
+        resource_units: int = 1,
+        domain: str | None = None,
+    ) -> PilotState:
+        active = ActivePilotAttempt(
+            attempt_id,
+            subject_id,
+            family_id,
+            self.plan.candidate_digest,
+            started_at,
+            resource_units,
+            domain,
+        )
+        if subject_id not in self.plan.subject_ids:
+            raise ValueError("attempt is outside the pilot subject")
+        if not self.plan.starts_at <= started_at <= self.plan.ends_at:
+            raise ValueError("attempt is outside the planned pilot window")
 
         state = self.store.load()
-        if any(row.attempt_id == attempt.attempt_id for row in state.attempts):
-            existing = next(
-                row for row in state.attempts if row.attempt_id == attempt.attempt_id
+        existing = next(
+            (item for item in state.active_attempts if item.attempt_id == attempt_id),
+            None,
+        )
+        if existing is not None:
+            if existing != active:
+                raise ValueError("attempt identity already has different content")
+            return state
+        if any(item.attempt_id == attempt_id for item in state.attempts):
+            raise ValueError("attempt identity is already complete")
+
+        def apply(current: PilotState) -> PilotState:
+            if len(current.active_attempts) >= current.plan.maximum_concurrent:
+                raise ValueError("pilot maximum concurrency exhausted")
+            day = self._day(started_at)
+            consumed = sum(
+                item.resource_units
+                for item in current.attempts
+                if item.started_at is not None and self._day(item.started_at) == day
+            ) + sum(
+                item.resource_units
+                for item in current.active_attempts
+                if self._day(item.started_at) == day
             )
+            if consumed + resource_units > current.plan.daily_resource_limit:
+                raise ValueError("pilot daily resource limit exhausted")
+            return replace(
+                current,
+                active_attempts=(*current.active_attempts, active),
+                revision=current.revision + 1,
+            )
+
+        return self._update(apply)
+
+    def complete_attempt(self, attempt: PilotAttempt) -> PilotState:
+        self._validate_attempt_scope(attempt)
+        assert attempt.started_at is not None and attempt.ended_at is not None
+        ended_at = attempt.ended_at
+        state = self.store.load()
+        completed = next(
+            (item for item in state.attempts if item.attempt_id == attempt.attempt_id),
+            None,
+        )
+        if completed is not None:
+            if completed != attempt:
+                raise ValueError("attempt identity already has different content")
+            return state
+        active = next(
+            (
+                item
+                for item in state.active_attempts
+                if item.attempt_id == attempt.attempt_id
+            ),
+            None,
+        )
+        if active is None:
+            raise ValueError("attempt has no durable active lease")
+        if (
+            active.subject_id != attempt.subject_id
+            or active.family_id != attempt.family_id
+            or active.candidate_digest != attempt.candidate_digest
+            or active.started_at != attempt.started_at
+            or active.resource_units != attempt.resource_units
+            or active.domain != attempt.domain
+        ):
+            raise ValueError("completed attempt does not match its active lease")
+
+        def apply(current: PilotState) -> PilotState:
+            if (
+                attempt.status == "accepted"
+                and sum(
+                    row.status == "accepted"
+                    and row.ended_at is not None
+                    and self._day(row.ended_at) == self._day(ended_at)
+                    for row in current.attempts
+                )
+                >= current.plan.delivery_rate_limit
+            ):
+                raise ValueError("pilot delivery rate limit exhausted")
+            return replace(
+                current,
+                attempts=(*current.attempts, attempt),
+                active_attempts=tuple(
+                    item
+                    for item in current.active_attempts
+                    if item.attempt_id != attempt.attempt_id
+                ),
+                observed_through=max(
+                    current.plan.starts_at
+                    if current.observed_through is None
+                    else current.observed_through,
+                    ended_at,
+                ),
+                revision=current.revision + 1,
+            )
+
+        return self._update(apply)
+
+    def record_attempt(self, attempt: PilotAttempt) -> PilotState:
+        """Durably begin and complete an observed attempt, safely resumable between steps."""
+        self._validate_attempt_scope(attempt)
+        assert attempt.started_at is not None
+        state = self.store.load()
+        existing = next(
+            (item for item in state.attempts if item.attempt_id == attempt.attempt_id),
+            None,
+        )
+        if existing is not None:
             if existing != attempt:
                 raise ValueError("attempt identity already has different content")
             return state
-        return self._update(apply)
+        self.begin_attempt(
+            attempt_id=attempt.attempt_id,
+            subject_id=attempt.subject_id,
+            family_id=attempt.family_id,
+            started_at=attempt.started_at,
+            resource_units=attempt.resource_units,
+            domain=attempt.domain,
+        )
+        return self.complete_attempt(attempt)
 
     def record_controls(
         self,
@@ -230,10 +567,21 @@ class PilotController:
         duplicate_effects: int = 0,
         avoidable_owner_questions: int = 0,
         rollback_evidence: EvidenceRef | None = None,
+        restart_evidence: EvidenceRef | None = None,
         obligations: Iterable[ExternalObligation] = (),
     ) -> PilotState:
-        if duplicate_effects < 0 or avoidable_owner_questions < 0:
-            raise ValueError("pilot control counters cannot decrease")
+        if restart_exercised is not None and type(restart_exercised) is not bool:
+            raise ValueError("pilot restart flag must be boolean")
+        if any(
+            type(value) is not int or value < 0
+            for value in (duplicate_effects, avoidable_owner_questions)
+        ):
+            raise ValueError("pilot control counters must be nonnegative integers")
+        if rollback_evidence is not None and (
+            rollback_evidence.kind is EvidenceKind.SYNTHETIC
+            or rollback_evidence.subject_id != self.plan.pilot_id
+        ):
+            raise ValueError("pilot rollback evidence is not externally bound")
         supplied_obligations = tuple(obligations)
 
         def apply(state: PilotState) -> PilotState:
@@ -245,26 +593,45 @@ class PilotController:
                         "obligation identity already has different content"
                     )
                 reconciled[obligation.obligation_id] = obligation
-            return PilotState(
-                state.plan,
-                state.attempts,
-                state.restart_exercised
+            if state.restart_exercised and restart_exercised is False:
+                raise ValueError("pilot restart evidence cannot be cleared")
+            effective_restart_evidence = restart_evidence or state.restart_evidence
+            if restart_exercised is True and effective_restart_evidence is None:
+                raise ValueError("pilot restart requires an external evidence receipt")
+            if restart_evidence is not None and (
+                restart_evidence.kind is EvidenceKind.SYNTHETIC
+                or restart_evidence.subject_id != state.plan.pilot_id
+            ):
+                raise ValueError("pilot restart evidence is not externally bound")
+            return replace(
+                state,
+                restart_exercised=state.restart_exercised
                 if restart_exercised is None
                 else restart_exercised,
-                state.duplicate_effects + duplicate_effects,
-                state.avoidable_owner_questions + avoidable_owner_questions,
-                rollback_evidence or state.rollback_evidence,
-                tuple(reconciled.values()),
-                state.revision + 1,
-                state.observed_through,
+                duplicate_effects=state.duplicate_effects + duplicate_effects,
+                avoidable_owner_questions=(
+                    state.avoidable_owner_questions + avoidable_owner_questions
+                ),
+                rollback_evidence=rollback_evidence or state.rollback_evidence,
+                restart_evidence=effective_restart_evidence,
+                obligations=tuple(reconciled.values()),
+                revision=state.revision + 1,
             )
 
         return self._update(apply)
 
-    def record_observation(self, observed_at: int) -> PilotState:
+    def record_observation(
+        self, observed_at: int, *, evidence: EvidenceRef | None = None
+    ) -> PilotState:
         """Advance the durable observation watermark without fabricating elapsed time."""
         if type(observed_at) is not int:
             raise ValueError("pilot observation timestamp must be an integer")
+        if evidence is not None and (
+            evidence.kind is EvidenceKind.SYNTHETIC
+            or evidence.subject_id != self.plan.pilot_id
+            or evidence.observed_at != observed_at
+        ):
+            raise ValueError("pilot observation evidence is not externally bound")
 
         def apply(state: PilotState) -> PilotState:
             prior = (
@@ -274,16 +641,11 @@ class PilotController:
             )
             if observed_at < prior:
                 raise ValueError("pilot observation timestamp cannot move backward")
-            return PilotState(
-                state.plan,
-                state.attempts,
-                state.restart_exercised,
-                state.duplicate_effects,
-                state.avoidable_owner_questions,
-                state.rollback_evidence,
-                state.obligations,
-                state.revision + 1,
-                observed_at,
+            return replace(
+                state,
+                revision=state.revision + 1,
+                observed_through=observed_at,
+                observation_evidence=evidence or state.observation_evidence,
             )
 
         return self._update(apply)
@@ -307,4 +669,7 @@ class PilotController:
             state.avoidable_owner_questions,
             state.rollback_evidence,
             state.obligations,
+            tuple(item.attempt_id for item in state.active_attempts),
+            state.restart_evidence,
+            state.observation_evidence,
         )

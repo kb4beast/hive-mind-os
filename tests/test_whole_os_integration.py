@@ -385,6 +385,34 @@ class WholeOSIntegrationTests(unittest.TestCase):
             finally:
                 service.close()
 
+    def test_retained_package_receipt_reconciles_without_reexecuting_host(self):
+        class NoReplayHost(FakeHost):
+            def __init__(self):
+                self.calls = 0
+
+            def execute_package(self, package, bindings, payload):
+                self.calls += 1
+                raise AssertionError("a retained effect must be inspected, not replayed")
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = NoReplayHost()
+            config, provider, _ = self._components(
+                root,
+                (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
+                host=host,
+            )
+            service = WholeOSService(config, provider, host)
+            try:
+                service._persist_package_result(
+                    PackageExecutionResult("A", PackageStatus.COMPLETED, D, (D,))
+                )
+                result = service.run_to_completion()
+                self.assertEqual(result.status, "complete")
+                self.assertEqual(host.calls, 0)
+            finally:
+                service.close()
+
     def test_strict_runner_does_not_claim_another_services_job(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

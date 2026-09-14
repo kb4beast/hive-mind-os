@@ -1,12 +1,13 @@
 # Whole-OS N00-N33 status DAG
 
-Observed on 2026-09-14. The implementation candidate is PR #186, based directly on
-`main@428af931342820d8f7350bf0f7664115b6257302`.
+Observed on 2026-09-14. PR #186 is merged at
+`main@4a0120a3a564723358f29adb60e34ab34bec5964`. The current successor candidate
+repairs the remaining local CLI, tournament, pilot, and closeout enforcement gaps.
 
-Legend: green = repository implementation and deterministic checks complete; blue =
-candidate-wide CI required/in progress; amber = implementation exists but real external
-qualification evidence is unavailable; red = cannot begin or finish without the
-listed external input; gray = dependent observation/closeout has not started.
+Legend: green = repository implementation and exact-candidate checks complete; blue =
+successor validation/integration in progress; amber = implementation exists but a
+production-strength claim lacks real qualification; red = execution cannot begin or
+finish without listed external input; gray = dependent outcome closeout has not begun.
 
 ```mermaid
 flowchart LR
@@ -50,7 +51,10 @@ flowchart LR
   N30 --> N32
   N31 --> N33["N33 outcome closeout"]
   N32 --> N33
-  N28 --> QCI["PR #186 full CI"]
+  N28 --> QMAIN["PR #186 merged + full CI"]
+  N30 --> QLOCAL["successor integration + full CI"]
+  N31 --> QLOCAL
+  N32 --> QLOCAL
 
   classDef done fill:#1f883d,color:#fff,stroke:#116329,stroke-width:2px;
   classDef running fill:#0969da,color:#fff,stroke:#0550ae,stroke-width:2px;
@@ -58,8 +62,8 @@ flowchart LR
   classDef blocked fill:#cf222e,color:#fff,stroke:#a40e26,stroke-width:2px;
   classDef pending fill:#6e7781,color:#fff,stroke:#57606a,stroke-width:2px;
 
-  class N00,N01,N02,N04,N05,N06,N07,N08,N09,N10,N11,N12,N13,N14,N15,N16,N17,N19,N20,N21,N22,N24,N25,N26,N28 done;
-  class QCI running;
+  class N00,N01,N02,N04,N05,N06,N07,N08,N09,N10,N11,N12,N13,N14,N15,N16,N17,N19,N20,N21,N22,N24,N25,N26,N28,QMAIN done;
+  class QLOCAL running;
   class N03,N18,N23,N27,N29 partial;
   class N30,N31,N32 blocked;
   class N33 pending;

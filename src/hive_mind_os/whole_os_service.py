@@ -451,6 +451,14 @@ class WholeOSService:
             raise ServiceError(f"package receipt {package_id} is not successful")
         return result
 
+    def _retained_package_result(
+        self, package_id: str
+    ) -> PackageExecutionResult | None:
+        """Inspect the durable effect receipt before any retryable host call."""
+        if not self._package_receipt_path(package_id).exists():
+            return None
+        return self._load_package_result(package_id)
+
     def _terminal_candidate(self) -> ConvergenceResult:
         if len(self._completed()) != len(self.by_id):
             raise ServiceError("terminal candidate requires all packages to complete")
@@ -685,6 +693,12 @@ class WholeOSService:
             )
             raise ServiceError("queued package is absent from the sealed graph")
         try:
+            retained = self._retained_package_result(package_id)
+            if retained is not None:
+                self._persist_result(job, retained)
+                self._enqueue_ready()
+                self._run_terminal_assessment_if_ready()
+                return self.observe(last_result=retained)
             resolved = self.bindings.resolve(job.payload, self.config.state_dir)
             result = self.host.execute_package(package, resolved, job.payload)
             if result.package_id != package_id:
@@ -793,6 +807,9 @@ class WholeOSService:
             payload.setdefault("cohort_kickoff", self._kickoff)
             if payload != self._payload(package):
                 raise ServiceError("queued package payload differs from sealed graph")
+            retained = self._retained_package_result(package_id)
+            if retained is not None:
+                return retained
             frozen_payload = self._freeze(payload)
             assert isinstance(frozen_payload, Mapping)
             resolved = self.bindings.resolve(frozen_payload, self.config.state_dir)

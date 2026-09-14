@@ -338,6 +338,13 @@ class BenchmarkRequest:
             raise BenchmarkAdapterError("invalid benchmark stage")
         if not self.argv:
             raise BenchmarkAdapterError("empty benchmark command")
+        if any(type(part) is not str or not part or "\x00" in part for part in self.argv):
+            raise BenchmarkAdapterError("benchmark command contains an invalid argument")
+        environment = dict(self.environment)
+        if any(type(key) is not str or type(value) is not str for key, value in environment.items()):
+            raise BenchmarkAdapterError("benchmark environment must contain strings")
+        object.__setattr__(self, "argv", tuple(self.argv))
+        object.__setattr__(self, "environment", MappingProxyType(environment))
         if self.execution_binding_digest is not None:
             _sha(self.execution_binding_digest, "execution binding")
 
@@ -588,36 +595,22 @@ class AdmittedBenchmarkRunner:
         )
 
     def execute(self, invocation: AdmittedBenchmarkInvocation) -> BenchmarkResponse:
-        snapshot = resolve_execution_admission(
-            self.protocol,
-            registry=self.registry,
-            admission_handle=self.admission_handle,
+        # Re-plan the *entire* lane from the live registry immediately before the
+        # broker boundary.  Checking only the seal leaves task/family, seed,
+        # budget, environment and operation-id fields forgeable on a manually
+        # constructed invocation.
+        expected = self.plan(
             stage=invocation.request.stage,
-            state_admission_digest=invocation.admission_digest,
+            variant_id=invocation.variant_id,
+            task_id=invocation.request.task_id,
+            repetition=invocation.repetition,
         )
-        self.manifest.validate_for(self.protocol, snapshot.stage_evidence)
-        if (
-            snapshot.stage_evidence.evidence_digest
-            != invocation.stage_evidence_digest
-            or snapshot.lease.lease_digest != invocation.lease_digest
-            or invocation.request.execution_binding_digest
-            != invocation.execution_binding_digest
-        ):
-            raise BenchmarkAdapterError("execution admission changed after planning")
-        seal = self._variant_seal(
-            snapshot.stage_evidence,
-            snapshot.seal_history,
-            invocation.variant_id,
-        )
-        recipe = self.manifest.recipes.get(invocation.variant_id)
-        if (
-            seal.seal_digest != invocation.variant_seal_digest
-            or seal.candidate_digest != invocation.request.candidate_digest
-            or recipe is None
-            or recipe.digest != invocation.request.recipe_digest
-        ):
-            raise BenchmarkAdapterError("candidate seal changed after planning")
-        return PinnedRecipeAdapter(recipe).run(invocation.request, self.broker)
+        if invocation != expected:
+            raise BenchmarkAdapterError(
+                "execution request differs from the live admitted lane"
+            )
+        recipe = self.manifest.recipes[invocation.variant_id]
+        return PinnedRecipeAdapter(recipe).run(expected.request, self.broker)
 
     def run(
         self,
