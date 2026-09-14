@@ -6,8 +6,9 @@ benchmark adapters. `hive_mind_os.whole_os_service.WholeOSService` is the public
 durable scheduling root. A configured installation supplies
 `hive_mind_os.whole_os_composition.WholeOSCompositionHost` to explicitly compose
 discovery, bounded building, qualification, idempotent delivery, PR feedback,
-and scoped learning inside each package. The stock CLI remains inert because it
-does not own those host capabilities.
+and scoped learning inside each package. The CLI resolves those capabilities only
+from the sealed, process-local host-factory registry populated by trusted launcher
+code; target configuration cannot name imports, commands, credentials, or secrets.
 
 ## Operator CLI
 
@@ -18,15 +19,26 @@ imports, callbacks, and credential values are rejected or unsupported.
 ```text
 hive-mind whole-os inspect --config path/to/service.json --json
 hive-mind whole-os status --config path/to/service.json --json
+hive-mind whole-os start --config path/to/service.json --json
 hive-mind whole-os run-once --config path/to/service.json --json
 hive-mind whole-os resume --config path/to/service.json --json
 hive-mind whole-os status --config path/to/service.json --execution-mode cohort --cohort-size 8 --json
 ```
 
-`inspect` is read-only. `status` projects durable queue state. `run-once` and
-`resume` execute one bounded step. The stock CLI has no host executor and
-reports `BLOCKED_CAPABILITY`; a configured host must construct `WholeOSService`
-with its own `WholeOSHost` and credential broker.
+`inspect` and `status` are read-only and do not initialize the queue or resolve an
+executable host. `run-once` runs one dependency-ready cohort (one package in strict
+mode). `start` and `resume` boundedly run cohorts until the campaign is terminal or
+cannot make immediate progress. A trusted launcher registers an independently
+validated `WholeOSHostFactoryRegistration` before invoking the CLI. If no factory
+matches the descriptor's provider version, configuration digest, and authority
+reference, execution returns `blocked_capability` without initializing the service.
+
+The standalone stock `hive-mind` shell starts with an empty process-local registry;
+therefore its executable commands block unless trusted launcher code registered a
+factory in that same process. A deployment console script should call
+`run_registered_whole_os(argv, registration=..., factory=...)`. This is intentional:
+the stock shell cannot infer adapters or credentials from a repository or service
+JSON document. `inspect` and `status` remain directly usable from the stock shell.
 
 Configured hosts use `run_cohort()` for one capacity-bounded wave or
 `run_to_completion()` for bounded dependency-aware fanout until the graph is
@@ -53,13 +65,12 @@ typed authority and capability blockers dead-letter immediately; transient failu
 retain the configured retry policy. A blocked branch does not prevent independent
 ready branches from completing.
 
-The CLI's stock host boundary remains intentionally inert in either mode. Run and
-resume still route through `CohortRuntime` and report typed blockers rather than
-claiming unavailable effects. Embedded hosts construct `CohortRuntime` with a
-`CohortExecutionPolicy`; strict
-hosts may continue using `WholeOSService` unchanged. This keeps existing automation
-compatible while allowing a host to replace repeated role-by-role exchanges with a
-single kickoff, parallel implementation wave, one convergence pass, and one final
+Executable CLI routes now construct `WholeOSService` from the admitted host factory;
+there is no unconfigured or synthetic execution fallback. Cohort mode calls the
+service's durable `run_cohort()`/`run_to_completion()` paths. Strict mode preserves
+the package-at-a-time compatibility path. This keeps existing automation compatible
+while allowing a host to replace repeated role-by-role exchanges with a single
+kickoff, parallel implementation wave, one convergence pass, and one final
 verification checkpoint.
 
 The host supplies `ConfiguredMissionBindingsProvider` and `WholeOSHost`; Hive never

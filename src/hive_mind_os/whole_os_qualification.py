@@ -254,6 +254,28 @@ class ExternalObligation:
 
 
 @dataclass(frozen=True, slots=True)
+class PilotRuntimeEvidence:
+    check_class: str
+    receipt: EvidenceRef
+
+    def __post_init__(self) -> None:
+        _id(self.check_class, "runtime check class")
+
+
+REQUIRED_ROBLOX_RUNTIME_CHECKS = frozenset(
+    {
+        "core-loop",
+        "multiplayer",
+        "exploit-abuse",
+        "persistence-rejoin",
+        "network-degradation",
+        "asset-provenance",
+        "target-device-performance",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
 class PilotAttempt:
     attempt_id: str
     subject_id: str
@@ -261,6 +283,12 @@ class PilotAttempt:
     candidate_digest: str
     status: str
     delivery_receipt: EvidenceRef | None = None
+    started_at: int | None = None
+    ended_at: int | None = None
+    resource_units: int = 1
+    domain: str | None = None
+    runtime_evidence: tuple[PilotRuntimeEvidence, ...] = ()
+    target_runs_without_hive: bool | None = None
 
     def __post_init__(self) -> None:
         for name in ("attempt_id", "subject_id", "family_id"):
@@ -278,6 +306,39 @@ class PilotAttempt:
             raise QualificationError(
                 "accepted pilot attempt requires a delivery receipt"
             )
+        if self.status == "accepted" and (
+            self.delivery_receipt is None
+            or self.delivery_receipt.kind is not EvidenceKind.EXTERNAL_RECEIPT
+        ):
+            raise QualificationError(
+                "accepted pilot attempt requires an external delivery receipt"
+            )
+        if (self.started_at is None) != (self.ended_at is None):
+            raise QualificationError("pilot attempt timestamps must be paired")
+        if self.started_at is not None and (
+            type(self.started_at) is not int
+            or type(self.ended_at) is not int
+            or self.started_at < 0
+            or self.ended_at < self.started_at
+        ):
+            raise QualificationError("pilot attempt timestamps are invalid")
+        if type(self.resource_units) is not int or self.resource_units < 1:
+            raise QualificationError("pilot resource units must be a positive integer")
+        if self.domain is not None:
+            _id(self.domain, "pilot domain")
+        if len(set(self.runtime_evidence)) != len(self.runtime_evidence):
+            raise QualificationError("pilot runtime evidence must be unique")
+        if self.target_runs_without_hive is not None and (
+            type(self.target_runs_without_hive) is not bool
+        ):
+            raise QualificationError("target runtime independence must be boolean")
+        for evidence in self.runtime_evidence:
+            if evidence.receipt.subject_id != self.subject_id:
+                raise QualificationError("runtime evidence targets another subject")
+        if self.delivery_receipt is not None and (
+            self.delivery_receipt.subject_id != self.subject_id
+        ):
+            raise QualificationError("delivery receipt targets another subject")
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,6 +354,9 @@ class PilotReport:
     avoidable_owner_questions: int
     rollback_evidence: EvidenceRef | None
     obligations: tuple[ExternalObligation, ...] = ()
+    active_attempt_ids: tuple[str, ...] = ()
+    restart_evidence: EvidenceRef | None = None
+    observation_evidence: EvidenceRef | None = None
 
     def __post_init__(self) -> None:
         _id(self.pilot_id, "pilot")
@@ -313,6 +377,23 @@ class PilotReport:
                 raise QualificationError("pilot counters must be nonnegative integers")
         if any(row.candidate_digest != self.candidate_digest for row in self.attempts):
             raise QualificationError("pilot attempts target another candidate")
+        attempt_ids = tuple(row.attempt_id for row in self.attempts)
+        if len(attempt_ids) != len(set(attempt_ids)):
+            raise QualificationError("pilot attempt identities must be unique")
+        accepted_receipts = tuple(
+            row.delivery_receipt
+            for row in self.attempts
+            if row.status == "accepted"
+        )
+        if len(accepted_receipts) != len(set(accepted_receipts)):
+            raise QualificationError("accepted delivery receipts must be unique")
+        if len(self.active_attempt_ids) != len(set(self.active_attempt_ids)):
+            raise QualificationError("active pilot attempt identities must be unique")
+        for attempt_id in self.active_attempt_ids:
+            _id(attempt_id, "active pilot attempt")
+        for evidence in (self.restart_evidence, self.observation_evidence):
+            if evidence is not None and evidence.subject_id != self.pilot_id:
+                raise QualificationError("pilot control evidence targets another pilot")
 
     @property
     def elapsed_seconds(self) -> int:
@@ -326,22 +407,144 @@ class PilotReport:
             if Disposition.BLOCKED_SOURCE in kinds:
                 return Disposition.BLOCKED_SOURCE
             return Disposition.BLOCKED_CAPABILITY
+        if self.active_attempt_ids:
+            return Disposition.DEFER
         accepted = [row for row in self.attempts if row.status == "accepted"]
-        needed = 3 if self.mode == "self" else 2
-        if self.elapsed_seconds < 72 * 60 * 60 or len(accepted) < needed:
+        needed = {"self": 3, "external": 3, "roblox": 1}[self.mode]
+        accepted_families = {row.family_id for row in accepted}
+        if (
+            self.elapsed_seconds < 72 * 60 * 60
+            or len(accepted) < needed
+            or len(accepted_families) < needed
+            or any(
+                row.started_at is None
+                or row.ended_at is None
+                or row.started_at < self.started_at
+                or row.ended_at > self.ended_at
+                for row in accepted
+            )
+        ):
+            return Disposition.DEFER
+        if self.mode == "external":
+            subjects = {row.subject_id for row in accepted}
+            ordinary = [row for row in accepted if row.domain == "ordinary"]
+            roblox = [row for row in accepted if row.domain == "roblox"]
+            if (
+                len(subjects) < 2
+                or len(ordinary) < 2
+                or not roblox
+                or any(row.target_runs_without_hive is not True for row in ordinary)
+                or any(not _roblox_runtime_complete(row) for row in roblox)
+            ):
+                return Disposition.DEFER
+        if self.mode == "roblox" and any(
+            row.domain != "roblox" or not _roblox_runtime_complete(row)
+            for row in accepted
+        ):
+            return Disposition.DEFER
+        if (
+            self.restart_evidence is None
+            or self.restart_evidence.kind
+            not in {EvidenceKind.ATTESTED_REAL, EvidenceKind.EXTERNAL_RECEIPT}
+            or self.observation_evidence is None
+            or self.observation_evidence.kind
+            not in {EvidenceKind.ATTESTED_REAL, EvidenceKind.EXTERNAL_RECEIPT}
+            or self.observation_evidence.observed_at < self.ended_at
+            or self.rollback_evidence is None
+            or self.rollback_evidence.kind
+            not in {EvidenceKind.ATTESTED_REAL, EvidenceKind.EXTERNAL_RECEIPT}
+        ):
             return Disposition.DEFER
         if (
             not self.restart_exercised
             or self.duplicate_effects
             or self.avoidable_owner_questions
-            or self.rollback_evidence is None
         ):
             return Disposition.REJECT
         return Disposition.ADOPT
 
 
+def _roblox_runtime_complete(attempt: PilotAttempt) -> bool:
+    checks = {item.check_class for item in attempt.runtime_evidence}
+    return checks == REQUIRED_ROBLOX_RUNTIME_CHECKS and all(
+        item.receipt.kind
+        in {EvidenceKind.ATTESTED_REAL, EvidenceKind.EXTERNAL_RECEIPT}
+        for item in attempt.runtime_evidence
+    )
+
+
 REQUIREMENT_IDS = tuple(f"R{number:02d}" for number in range(1, 19))
 NODE_IDS = tuple(f"N{number:02d}" for number in range(34))
+SPECIALIST_ROLE_IDS = frozenset(
+    {
+        "orchestrator",
+        "explorer",
+        "architect",
+        "builder",
+        "curator",
+        "integrator",
+        "steward",
+        "optimizer",
+    }
+)
+LIFECYCLE_STAGE_IDS = frozenset(
+    {"discover", "design", "build", "validate", "grow", "maintain", "integrate"}
+)
+
+
+@dataclass(frozen=True, slots=True)
+class CloseoutAssessment:
+    """Evidence-bearing disposition for one requirement or campaign node."""
+
+    subject_id: str
+    disposition: Disposition
+    evidence: tuple[EvidenceRef, ...] = ()
+    obligation_ids: tuple[str, ...] = ()
+    rationale: str = ""
+
+    def __post_init__(self) -> None:
+        _id(self.subject_id, "closeout subject")
+        if type(self.disposition) is not Disposition:
+            raise QualificationError("closeout disposition must be typed")
+        if len(set(self.evidence)) != len(self.evidence):
+            raise QualificationError("closeout evidence must be unique")
+        if len(set(self.obligation_ids)) != len(self.obligation_ids):
+            raise QualificationError("closeout obligations must be unique")
+        for obligation_id in self.obligation_ids:
+            _id(obligation_id, "closeout obligation")
+        blocked = self.disposition.name.startswith("BLOCKED")
+        if self.disposition in {Disposition.ADOPT, Disposition.ADAPT} and not self.evidence:
+            raise QualificationError("adopted or adapted closeout requires evidence")
+        if blocked and not self.obligation_ids:
+            raise QualificationError("blocked closeout requires an explicit obligation")
+        if not blocked and self.obligation_ids:
+            raise QualificationError("only blocked closeout may reference obligations")
+        if self.disposition not in {Disposition.ADOPT, Disposition.ADAPT}:
+            if type(self.rationale) is not str or not self.rationale.strip():
+                raise QualificationError("unresolved closeout requires a rationale")
+
+
+@dataclass(frozen=True, slots=True)
+class OperationalReceipt:
+    """Attested successful execution of an operator command on exact candidate bytes."""
+
+    argv: tuple[str, ...]
+    candidate_digest: str
+    exit_code: int
+    evidence: EvidenceRef
+
+    def __post_init__(self) -> None:
+        if not self.argv or any(
+            type(part) is not str or not part or "\x00" in part for part in self.argv
+        ):
+            raise QualificationError("operational command must be direct arguments")
+        _digest(self.candidate_digest, "operational candidate digest")
+        if type(self.exit_code) is not int or self.exit_code != 0:
+            raise QualificationError("operational receipt must record a successful exit")
+        if self.evidence.kind is EvidenceKind.SYNTHETIC:
+            raise QualificationError("operational receipt must be attested real evidence")
+        if self.evidence.subject_id != self.candidate_digest:
+            raise QualificationError("operational receipt targets another candidate")
 
 
 @dataclass(frozen=True, slots=True)
@@ -349,46 +552,84 @@ class CloseoutManifest:
     release_id: str
     candidate_digest: str
     previous_release_digest: str
-    requirement_evidence: Mapping[str, tuple[EvidenceRef, ...]]
-    node_dispositions: Mapping[str, Disposition]
+    requirement_assessments: Mapping[str, CloseoutAssessment]
+    node_assessments: Mapping[str, CloseoutAssessment]
     obligations: tuple[ExternalObligation, ...]
-    startup_command: tuple[str, ...]
-    rollback_command: tuple[str, ...]
+    role_evidence: Mapping[str, tuple[EvidenceRef, ...]]
+    lifecycle_evidence: Mapping[str, tuple[EvidenceRef, ...]]
+    startup_receipt: OperationalReceipt
+    rollback_receipt: OperationalReceipt
+    builder_id: str
     independent_judge_id: str
+    final_disposition: Disposition
+    final_rationale: str
     sealed_at: int
 
     def __post_init__(self) -> None:
         _id(self.release_id, "release")
         _digest(self.candidate_digest, "candidate digest")
         _digest(self.previous_release_digest, "previous release digest")
-        if set(self.requirement_evidence) != set(REQUIREMENT_IDS):
+        if set(self.requirement_assessments) != set(REQUIREMENT_IDS):
             raise QualificationError("closeout must map every R01-R18 requirement")
-        if set(self.node_dispositions) != set(NODE_IDS):
+        if any(
+            key != assessment.subject_id
+            for key, assessment in self.requirement_assessments.items()
+        ):
+            raise QualificationError("requirement closeout keys must match subjects")
+        if set(self.node_assessments) != set(NODE_IDS):
             raise QualificationError("closeout must disposition every N00-N33 node")
         if any(
-            not isinstance(value, Disposition)
-            for value in self.node_dispositions.values()
+            key != assessment.subject_id
+            for key, assessment in self.node_assessments.items()
         ):
-            raise QualificationError("node dispositions must be typed")
-        if (
-            not self.startup_command
-            or not self.rollback_command
-            or any(not part for part in (*self.startup_command, *self.rollback_command))
+            raise QualificationError("node closeout keys must match subjects")
+        obligation_by_id = {item.obligation_id: item for item in self.obligations}
+        if len(obligation_by_id) != len(self.obligations):
+            raise QualificationError("closeout obligation identities must be unique")
+        for assessment in (
+            *self.requirement_assessments.values(),
+            *self.node_assessments.values(),
         ):
-            raise QualificationError(
-                "verified startup and rollback commands are required"
-            )
+            for obligation_id in assessment.obligation_ids:
+                obligation = obligation_by_id.get(obligation_id)
+                if obligation is None:
+                    raise QualificationError("closeout references an unknown obligation")
+                if obligation.kind is not assessment.disposition:
+                    raise QualificationError("closeout obligation kind does not match")
+                if assessment.subject_id not in obligation.blocks_claims:
+                    raise QualificationError("obligation does not block its closeout subject")
+        if set(self.role_evidence) != SPECIALIST_ROLE_IDS:
+            raise QualificationError("closeout must evidence all eight specialist roles")
+        if set(self.lifecycle_evidence) != LIFECYCLE_STAGE_IDS:
+            raise QualificationError("closeout must evidence every lifecycle stage")
+        for values in (*self.role_evidence.values(), *self.lifecycle_evidence.values()):
+            if not values or any(item.kind is EvidenceKind.SYNTHETIC for item in values):
+                raise QualificationError("role and lifecycle evidence must be attested")
+            if len(set(values)) != len(values):
+                raise QualificationError("role and lifecycle evidence must be unique")
+        if self.startup_receipt.candidate_digest != self.candidate_digest:
+            raise QualificationError("startup receipt targets another candidate")
+        if self.rollback_receipt.candidate_digest != self.candidate_digest:
+            raise QualificationError("rollback receipt targets another candidate")
+        _id(self.builder_id, "builder")
         _id(self.independent_judge_id, "judge")
+        if self.builder_id == self.independent_judge_id:
+            raise QualificationError("closeout judge must be independent of the builder")
+        if type(self.final_disposition) is not Disposition:
+            raise QualificationError("final release disposition must be typed")
+        if type(self.final_rationale) is not str or not self.final_rationale.strip():
+            raise QualificationError("final release disposition requires a rationale")
+        if self.final_disposition in {Disposition.ADOPT, Disposition.ADAPT}:
+            for node_id in ("N30", "N31", "N32", "N33"):
+                if self.node_assessments[node_id].disposition not in {
+                    Disposition.ADOPT,
+                    Disposition.ADAPT,
+                }:
+                    raise QualificationError(
+                        "positive release requires measured tournament and pilot closeout"
+                    )
         if type(self.sealed_at) is not int or self.sealed_at < 0:
             raise QualificationError("seal timestamp is invalid")
-        if not self.obligations:
-            unresolved = [
-                key
-                for key, value in self.node_dispositions.items()
-                if value.name.startswith("BLOCKED")
-            ]
-            if unresolved:
-                raise QualificationError("blocked nodes require explicit obligations")
 
 
 @dataclass(frozen=True, slots=True)

@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from .benchmark_adapters import (
-    BenchmarkExecutionBroker,
+    AdmittedBenchmarkInvocation,
+    AdmittedBenchmarkRunner,
     BenchmarkResponse,
-    PinnedRecipeAdapter,
 )
 from .campaign_metrics import AttemptMetric, canonical_digest, summarize_attempts
 
@@ -109,31 +109,42 @@ class RecordedAttempt:
     operation_id: str
     receipt_digest: str
     failure_category: str | None
+    admission_digest: str
+    lease_digest: str
+    variant_seal_digest: str
+    execution_binding_digest: str
 
 
 class WholeOSTournament:
-    """Records every eligible execution result; no result is silently dropped."""
+    """Durably execute only exact lanes admitted by the closed N02 protocol.
+
+    An execution intent is persisted before the broker is reached.  A retry
+    re-plans from live registry state and uses the broker's inspect-first
+    contract, so an uncertain write can be reconciled without executing twice
+    or fabricating a failure receipt.
+    """
 
     def __init__(
         self,
-        experiment: FrozenExperiment,
-        lease: ExperimentLease,
-        broker: BenchmarkExecutionBroker,
+        runner: AdmittedBenchmarkRunner,
         *,
         state_path: str | Path | None = None,
     ) -> None:
-        if (
-            lease.experiment_id != experiment.experiment_id
-            or lease.admission_digest != experiment.digest
-        ):
-            raise TournamentError("lease is not bound to the frozen experiment")
-        self.experiment = experiment
-        self.lease = lease
-        self.broker = broker
+        self.runner = runner
         self.state_path = Path(state_path) if state_path is not None else None
         self._attempts: list[RecordedAttempt] = []
+        self._pending: Mapping[str, object] | None = None
         if self.state_path is not None and self.state_path.exists():
             self._load()
+
+    @property
+    def tournament_digest(self) -> str:
+        return canonical_digest(
+            {
+                "protocol_digest": self.runner.protocol.protocol_digest,
+                "adapter_manifest_digest": self.runner.manifest.digest,
+            }
+        )
 
     @property
     def attempts(self) -> tuple[RecordedAttempt, ...]:
@@ -142,47 +153,83 @@ class WholeOSTournament:
     def run(
         self,
         *,
-        now: int,
         stage: str,
         variant_id: str,
         task_id: str,
-        family_id: str,
-        adapter: PinnedRecipeAdapter,
+        repetition: int = 0,
     ) -> RecordedAttempt:
-        self.lease.check(
-            now=now,
-            attempts=len(self._attempts),
-            admission_digest=self.experiment.digest,
-        )
-        if variant_id not in self.experiment.candidate_digests:
-            raise TournamentError("variant was not sealed in the experiment")
-        candidate = self.experiment.candidate_digests[variant_id]
-        request = adapter.request(
-            experiment_id=self.experiment.experiment_id,
-            stage=stage,
-            task_id=task_id,
-            family_id=family_id,
-            candidate_digest=candidate,
-            budget_digest=self.experiment.budget_digest,
-            environment_digest=self.experiment.environment_digest,
-            lease_handle=self.lease.lease_handle,
-        )
-        try:
-            response = adapter.run(request, self.broker)
-        except Exception as exc:
-            response = BenchmarkResponse(
-                operation_id=request.operation_id,
-                status="failure",
-                result_digest=canonical_digest({"exception_type": type(exc).__name__}),
-                receipt_digest=canonical_digest(
-                    {"operation": request.operation_id, "observed": "adapter_exception"}
-                ),
-                active_seconds=None,
-                wall_seconds=None,
-                usage_units=None,
-                provider_cost=None,
-                failure_category="adapter_exception",
+        if self.state_path is None:
+            raise TournamentError(
+                "RESULT_STORE_REQUIRED: tournament execution requires durable state"
             )
+        invocation = self.runner.plan(
+            stage=stage,
+            variant_id=variant_id,
+            task_id=task_id,
+            repetition=repetition,
+        )
+        existing = next(
+            (
+                item
+                for item in self._attempts
+                if item.operation_id == invocation.request.operation_id
+            ),
+            None,
+        )
+        if existing is not None:
+            return existing
+
+        intent = self._intent(invocation)
+        if self._pending is not None and self._pending != intent:
+            raise TournamentError(
+                "RECONCILIATION_REQUIRED: another benchmark result is pending"
+            )
+        self._pending = intent
+        self._persist()
+
+        # Exceptions are evidence gaps, not benchmark failures.  Preserve the
+        # pending intent and propagate them; never synthesize a receipt.
+        response = self.runner.execute(invocation)
+        recorded = self._record(
+            invocation,
+            response,
+            model_digest=self.runner.manifest.recipes[variant_id].model_digest,
+        )
+        self._attempts.append(recorded)
+        self._pending = None
+        try:
+            self._persist()
+        except Exception:
+            self._attempts.pop()
+            self._pending = intent
+            raise
+        return recorded
+
+    @staticmethod
+    def _intent(invocation: AdmittedBenchmarkInvocation) -> Mapping[str, object]:
+        request = invocation.request
+        return {
+            "operation_id": request.operation_id,
+            "stage": request.stage,
+            "variant_id": invocation.variant_id,
+            "task_id": request.task_id,
+            "family_id": request.family_id,
+            "repetition": invocation.repetition,
+            "seed": invocation.seed,
+            "admission_digest": invocation.admission_digest,
+            "lease_digest": invocation.lease_digest,
+            "variant_seal_digest": invocation.variant_seal_digest,
+            "execution_binding_digest": invocation.execution_binding_digest,
+        }
+
+    @staticmethod
+    def _record(
+        invocation: AdmittedBenchmarkInvocation,
+        response: BenchmarkResponse,
+        *,
+        model_digest: str,
+    ) -> RecordedAttempt:
+        request = invocation.request
         status_to_result = {
             "success": "success",
             "failure": "failure",
@@ -193,13 +240,13 @@ class WholeOSTournament:
             "inconclusive": "inconclusive",
         }
         metric = AttemptMetric(
-            subject_family=family_id,
-            task_id=task_id,
-            variant_id=variant_id,
-            candidate_digest=candidate,
-            configuration_digest=adapter.manifest.digest,
-            model_digest=adapter.manifest.model_digest,
-            environment_digest=self.experiment.environment_digest,
+            subject_family=request.family_id,
+            task_id=request.task_id,
+            variant_id=invocation.variant_id,
+            candidate_digest=request.candidate_digest,
+            configuration_digest=request.recipe_digest,
+            model_digest=model_digest,
+            environment_digest=request.environment_digest,
             eligibility="eligible",
             result=status_to_result[response.status],
             active_seconds=response.active_seconds,
@@ -220,9 +267,11 @@ class WholeOSTournament:
             response.operation_id,
             response.receipt_digest,
             response.failure_category,
+            invocation.admission_digest,
+            invocation.lease_digest,
+            invocation.variant_seal_digest,
+            invocation.execution_binding_digest,
         )
-        self._attempts.append(recorded)
-        self._persist()
         return recorded
 
     def _persist(self) -> None:
@@ -230,7 +279,9 @@ class WholeOSTournament:
             return
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         document = {
-            "experiment_digest": self.experiment.digest,
+            "schema_version": 2,
+            "tournament_digest": self.tournament_digest,
+            "pending": self._pending,
             "attempts": [asdict(item) for item in self._attempts],
         }
         encoded = (
@@ -238,20 +289,37 @@ class WholeOSTournament:
             + "\n"
         )
         temporary = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
-        temporary.write_text(encoded, encoding="utf-8")
-        temporary.replace(self.state_path)
+        try:
+            temporary.write_text(encoded, encoding="utf-8")
+            temporary.replace(self.state_path)
+        except (OSError, UnicodeError) as exc:
+            raise TournamentError(
+                "RESULT_STORE_UNAVAILABLE: benchmark state was not durably written"
+            ) from exc
 
     def _load(self) -> None:
         if self.state_path is None:
             raise TournamentError("cannot load tournament state without a state path")
         try:
             raw = json.loads(self.state_path.read_text(encoding="utf-8"))
-            if raw.get("experiment_digest") != self.experiment.digest or not isinstance(
-                raw.get("attempts"), list
+            if (
+                not isinstance(raw, dict)
+                or set(raw) != {
+                    "schema_version",
+                    "tournament_digest",
+                    "pending",
+                    "attempts",
+                }
+                or raw["schema_version"] != 2
+                or raw["tournament_digest"] != self.tournament_digest
+                or not isinstance(raw["attempts"], list)
+                or raw["pending"] is not None
+                and not isinstance(raw["pending"], dict)
             ):
                 raise TournamentError(
-                    "persisted tournament state is bound to another experiment"
+                    "persisted tournament state is invalid or bound elsewhere"
                 )
+            self._pending = raw["pending"]
             for item in raw["attempts"]:
                 metric = AttemptMetric(**item["metric"])
                 recorded = RecordedAttempt(
@@ -259,14 +327,31 @@ class WholeOSTournament:
                     item["operation_id"],
                     item["receipt_digest"],
                     item.get("failure_category"),
+                    item["admission_digest"],
+                    item["lease_digest"],
+                    item["variant_seal_digest"],
+                    item["execution_binding_digest"],
                 )
-                if (
-                    recorded.metric.variant_id not in self.experiment.candidate_digests
-                    or recorded.metric.candidate_digest
-                    != self.experiment.candidate_digests[recorded.metric.variant_id]
+                for digest in (
+                    recorded.operation_id,
+                    recorded.receipt_digest,
+                    recorded.admission_digest,
+                    recorded.lease_digest,
+                    recorded.variant_seal_digest,
+                    recorded.execution_binding_digest,
+                ):
+                    if (
+                        type(digest) is not str
+                        or len(digest) != 71
+                        or not digest.startswith("sha256:")
+                    ):
+                        raise TournamentError("persisted attempt has an invalid digest")
+                if any(
+                    prior.operation_id == recorded.operation_id
+                    for prior in self._attempts
                 ):
                     raise TournamentError(
-                        "persisted attempt targets an unsealed candidate"
+                        "persisted tournament contains duplicate operations"
                     )
                 self._attempts.append(recorded)
         except (
@@ -297,13 +382,42 @@ class PromotionDecision:
     dissent: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if type(self.disposition) is not PromotionDisposition or any(
+            type(value) is not bool
+            for value in (
+                self.hard_gates_passed,
+                self.noninferiority_passed,
+                self.measurable_benefit,
+            )
+        ):
+            raise TournamentError("promotion disposition and gates must be typed")
+        for digest in (self.candidate_digest, self.prior_champion_digest):
+            if not _is_digest(digest):
+                raise TournamentError("promotion candidate digests are invalid")
         if self.disposition is PromotionDisposition.ADOPT and (
             not self.hard_gates_passed
             or not self.noninferiority_passed
             or not self.measurable_benefit
-            or not self.independent_receipt_digests
+            or not _has_independent_receipts(self.independent_receipt_digests)
         ):
             raise TournamentError("promotion exceeds measured evidence")
+
+
+def _is_digest(value: object) -> bool:
+    return (
+        type(value) is str
+        and len(value) == 71
+        and value.startswith("sha256:")
+        and not set(value[7:]) - set("0123456789abcdef")
+    )
+
+
+def _has_independent_receipts(receipts: tuple[str, ...]) -> bool:
+    return (
+        len(receipts) >= 2
+        and len(receipts) == len(set(receipts))
+        and all(_is_digest(receipt) for receipt in receipts)
+    )
 
 
 def decide_promotion(
@@ -321,7 +435,11 @@ def decide_promotion(
         disposition = PromotionDisposition.QUARANTINE
     elif not hard_gates_passed:
         disposition = PromotionDisposition.REJECT
-    elif not noninferiority_passed or not measurable_benefit or not receipts:
+    elif (
+        not noninferiority_passed
+        or not measurable_benefit
+        or not _has_independent_receipts(receipts)
+    ):
         disposition = PromotionDisposition.DEFER
     else:
         disposition = PromotionDisposition.ADOPT

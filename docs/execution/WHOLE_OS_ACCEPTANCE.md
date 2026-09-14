@@ -1,21 +1,21 @@
 # Whole-OS acceptance status
 
-Campaign disposition: `DEFER` -- all currently available repository implementation
-work is present on PR #186, but external qualification and observation remain open.
-This is not a production, superiority, or full-autonomy verdict.
+Campaign disposition: `DEFER` -- the repository implementation is integrated on
+`main` and the remaining local execution gaps are repaired by the current successor
+candidate. External qualification and elapsed observation remain open. This is not a
+production, superiority, or full-autonomy verdict.
 
 ## Integrated candidate
 
-- PR #185 was merged to `main` at
-  `428af931342820d8f7350bf0f7664115b6257302`.
-- Its immutable Linux test matrices, static/type checks, CodeQL, secret scan,
-  Autopilot control-room check, SBOM, and build provenance passed. Windows matrices
-  were still executing when this successor qualification packet was prepared.
-- PR #186 is the successor candidate. It adds the concrete configured-host lifecycle
-  composition, durable campaign/delivery/feedback recovery, mandatory lessons-only
-  delivery, sealed benchmark invocation, missing boundary test surfaces, and a
-  hardened Roblox evidence adapter. Its final immutable CI result is required before
-  merge; branch-local checks do not replace that gate.
+- PR #186 was merged to `main` at
+  `4a0120a3a564723358f29adb60e34ab34bec5964`. Its Linux and Windows Python matrices,
+  static/type checks, CodeQL, secret scan, Autopilot check, SBOM, and build provenance
+  all passed on the exact PR candidate.
+- The current successor candidate removes four post-merge local gaps: it routes the
+  `whole-os start`/`resume` CLI through a sealed host-owned factory, executes N30 only
+  through the admitted protocol with durable intent/reconciliation, enforces N31/N32
+  concurrency and time/resource/subject/domain evidence, and prevents N33 from
+  sealing empty or self-judged evidence.
 - The configured composition now joins discovery, bounded building, independent
   qualification, idempotent PR delivery/reconciliation, head-bound feedback, and
   scoped learning. Synthetic two-subject fixtures prove protocol behavior and target
@@ -36,24 +36,30 @@ This is not a production, superiority, or full-autonomy verdict.
 - N27: `BLOCKED_SOURCE`, `BLOCKED_CAPABILITY`, and `BLOCKED_AUTHORITY` for real Roblox
   qualification. The adapter is implemented, but there is no admitted game, brokered
   runtime/test universe, multi-client/device harness, or external verifier set.
-- N30: `DEFER`. The successor now has a fail-closed admitted benchmark runner, but the
-  frozen protocol remains `OPEN_EXTERNAL_EVIDENCE_BLOCKED`; no matched lane ran and no
-  challenger was promoted. The historical admission receipt remains
-  `docs/benchmarks/whole-os-results-20260914-428af93.md`.
-- N31: `BLOCKED_AUTHORITY` and `BLOCKED_EVIDENCE`. No sealed Whole-OS host binding,
-  self-delivery grant, supervisor rollback pointer, or measured candidate exists.
+- N30: `BLOCKED_SOURCE` and `BLOCKED_AUTHORITY` for execution. The runner is now
+  closed over `AdmittedBenchmarkRunner`, revalidates the live admission immediately
+  before each effect, persists intent first, and reconciles uncertain writes without
+  duplicate execution. The protocol remains `OPEN_EXTERNAL_EVIDENCE_BLOCKED`; no
+  matched real lane ran and no challenger was promoted.
+- N31: `BLOCKED_AUTHORITY` and `BLOCKED_EVIDENCE`. The durable controller now enforces
+  leases, concurrency, daily budgets, distinct accepted families, restart and rollback
+  evidence. No sealed real host, self-delivery grant, supervisor rollback pointer, or
+  measured candidate receipt exists.
 - N32: `BLOCKED_SOURCE`, `BLOCKED_CAPABILITY`, `BLOCKED_AUTHORITY`, and
   `BLOCKED_EVIDENCE`. No admitted ordinary target or rights-cleared Roblox subject,
   runtime/test universe, device matrix, target grants, or N30 candidate exists.
-- N33: `DEFER`. Its 72-hour self/external outcome windows and final requirement-to-
-  receipt closeout cannot start while N31 and N32 are blocked.
+- N33: `DEFER`. The closeout schema now requires evidence-bearing R01-R18 and N00-N33
+  assessments, all roles/stages, attested successful startup/rollback receipts, and a
+  judge distinct from the builder. A positive verdict is structurally impossible
+  while N30/N31/N32 are incomplete.
 
 Complete source ingestion and comparator reuse rights, production host/adapters,
 signed evaluator custody, scoped pilot delivery authority, real comparator receipts,
-and Roblox Studio/game/device evidence remain open. `CloseoutManifest` still requires
-dispositions for N00–N33 and evidence mappings for R01–R18. This is therefore a
+and Roblox Studio/game/device evidence remain open. This is therefore a
 candidate-bound status receipt, not a production, superiority, or full-autonomy
-release verdict.
+release verdict. A host-owned launcher must register the exact admitted executable
+factory before `hive-mind whole-os start`; configuration cannot name imports, commands,
+credentials, callbacks, or secret values.
 
 The color-coded dependency view and deterministic resume boundary are recorded in
 `docs/execution/WHOLE_OS_STATUS_DAG.md`.

@@ -141,6 +141,21 @@ from .model_action_adapter import (
     ProviderAction,
 )
 from .models import AutonomyLevel, Objective, RiskTier, Role
+from .pilot_orchestration import (
+    PilotExecutionBlocker,
+    PilotExecutionError,
+    PilotRunResult,
+    WholeOSPilotRunner,
+)
+from .pilot_runtime import (
+    ActivePilotAttempt,
+    PilotBlockerCode,
+    PilotController,
+    PilotPlan,
+    PilotPrerequisites,
+    PilotState,
+    PilotStore,
+)
 from .projection import (
     DEFAULT_PROJECTION_SCHEMA_VERSION,
     WAR_ROOM_PROJECTION_SCHEMA_VERSION,
@@ -217,6 +232,16 @@ from .source_docket import (
     FoundingSourceDocket,
     load_default_source_docket,
     load_source_docket,
+)
+from .whole_os_bootstrap import (
+    DEFAULT_WHOLE_OS_HOST_FACTORIES,
+    WholeOSBootstrapError,
+    WholeOSHostBootstrap,
+    WholeOSHostFactoryRegistration,
+    WholeOSHostFactoryRegistry,
+    WholeOSHostUnavailable,
+    register_whole_os_host_factory,
+    run_registered_whole_os,
 )
 from .whole_os_composition import (
     BacklogDiscoveryAdapter,
@@ -390,6 +415,16 @@ __all__ = [
     "FileCohortJournalStore",
     "PackageRunResult",
     "PackageRunState",
+    "PilotBlockerCode",
+    "PilotController",
+    "PilotExecutionBlocker",
+    "PilotExecutionError",
+    "PilotPlan",
+    "PilotPrerequisites",
+    "PilotRunResult",
+    "PilotState",
+    "PilotStore",
+    "ActivePilotAttempt",
     "RepairDirective",
     "TerminalAssessment",
     "TerminalEvidence",
@@ -405,11 +440,20 @@ __all__ = [
     "WholeOSService",
     "WholeOSServiceConfig",
     "WholeOSCompositionHost",
+    "WholeOSBootstrapError",
+    "WholeOSHostBootstrap",
+    "WholeOSHostFactoryRegistration",
+    "WholeOSHostFactoryRegistry",
+    "WholeOSHostUnavailable",
+    "WholeOSPilotRunner",
+    "DEFAULT_WHOLE_OS_HOST_FACTORIES",
     "BacklogDiscoveryAdapter",
     "BoundedBuilderAdapter",
     "CompositionReadiness",
     "DeliveryPolicy",
     "DurableLearningRecorder",
+    "register_whole_os_host_factory",
+    "run_registered_whole_os",
     "WAR_ROOM_PROJECTION_SCHEMA_VERSION",
     "WorkflowManifest",
     "WorkflowTransition",

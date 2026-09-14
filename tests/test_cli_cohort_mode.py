@@ -5,12 +5,17 @@ import asyncio
 import io
 import json
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from hive_mind_os import cli
 from hive_mind_os.outcome_graph import OutcomeGraphSpec, OutcomeWorkPackage
-from hive_mind_os.whole_os_service import ServiceError
+from hive_mind_os.scheduler import Scheduler
+from hive_mind_os.whole_os_bootstrap import WholeOSHostUnavailable
+from hive_mind_os.whole_os_service import ServiceError, WholeOSService
 
 
 class WholeOSCohortCLITests(unittest.TestCase):
@@ -99,7 +104,7 @@ class WholeOSCohortCLITests(unittest.TestCase):
         with self.assertRaisesRegex(ServiceError, "requires --execution-mode cohort"):
             cli._whole_os_execution_document(args, graph_maximum=8)
 
-    def test_cohort_run_routes_through_one_kickoff_and_terminal_round(self) -> None:
+    def test_cohort_start_routes_through_real_service_to_completion(self) -> None:
         graph = OutcomeGraphSpec(
             (
                 OutcomeWorkPackage("a", ("outcome-a",)),
@@ -115,42 +120,186 @@ class WholeOSCohortCLITests(unittest.TestCase):
             binding_descriptor=SimpleNamespace(digest="sha256:" + "2" * 64),
             graph=graph,
         )
-        args = argparse.Namespace(execution_mode="cohort", max_parallel_packages=None)
-        execution = cli._whole_os_execution_document(args, graph_maximum=2)
+        args = cli.build_whole_os_parser().parse_args(
+            ["start", "--config", "service.json", "--json"]
+        )
+        observation = SimpleNamespace(
+            campaign_id="campaign",
+            status="complete",
+            completed_packages=("a", "b"),
+            pending_packages=(),
+            blocked_packages=(),
+            last_result=None,
+        )
+        service = Mock()
+        service.run_to_completion.return_value = observation
+        registry = Mock()
+        registry.resolve.return_value = SimpleNamespace(
+            bindings="bindings", host="host"
+        )
+        output = io.StringIO()
 
-        document = cli._run_unconfigured_cohort(config, execution)
+        with (
+            patch.object(cli, "load_service_config", return_value=config),
+            patch.object(cli, "WholeOSService", return_value=service) as service_type,
+            redirect_stdout(output),
+        ):
+            exit_code = cli._run_whole_os(args, host_factories=registry)
 
+        self.assertEqual(exit_code, 0)
+        registry.resolve.assert_called_once_with(config)
+        service_type.assert_called_once_with(config, "bindings", "host")
+        service.run_to_completion.assert_called_once_with()
+        service.run_cohort.assert_not_called()
+        service.close.assert_called_once_with()
+        self.assertEqual(json.loads(output.getvalue())["status"], "complete")
+
+    def test_cohort_run_once_routes_through_real_service_cohort(self) -> None:
+        graph = OutcomeGraphSpec(
+            (OutcomeWorkPackage("a", ("outcome-a",)),),
+            "sha256:" + "1" * 64,
+        )
+        config = SimpleNamespace(
+            campaign_id="campaign",
+            tenant_id="tenant",
+            repository_id="repository",
+            binding_descriptor=SimpleNamespace(digest="sha256:" + "2" * 64),
+            graph=graph,
+        )
+        args = cli.build_whole_os_parser().parse_args(
+            ["run-once", "--config", "service.json", "--json"]
+        )
+        observation = SimpleNamespace(
+            campaign_id="campaign",
+            status="ready",
+            completed_packages=("a",),
+            pending_packages=(),
+            blocked_packages=(),
+            last_result=None,
+        )
+        service = Mock()
+        service.run_cohort.return_value = observation
+        registry = Mock()
+        registry.resolve.return_value = SimpleNamespace(
+            bindings="bindings", host="host"
+        )
+
+        with (
+            patch.object(cli, "load_service_config", return_value=config),
+            patch.object(cli, "WholeOSService", return_value=service),
+            redirect_stdout(io.StringIO()),
+        ):
+            exit_code = cli._run_whole_os(args, host_factories=registry)
+
+        self.assertEqual(exit_code, 0)
+        service.run_cohort.assert_called_once_with()
+        service.run_to_completion.assert_not_called()
+
+    def test_status_is_read_only_and_does_not_resolve_a_host(self) -> None:
+        with TemporaryDirectory() as directory:
+            graph = OutcomeGraphSpec(
+                (OutcomeWorkPackage("a", ("outcome-a",)),),
+                "sha256:" + "1" * 64,
+            )
+            config = SimpleNamespace(
+                campaign_id="campaign",
+                tenant_id="tenant",
+                repository_id="repository",
+                state_dir=Path(directory) / "absent-state",
+                binding_descriptor=SimpleNamespace(digest="sha256:" + "2" * 64),
+                graph=graph,
+            )
+            args = cli.build_whole_os_parser().parse_args(
+                ["status", "--config", "service.json", "--json"]
+            )
+            registry = Mock()
+            output = io.StringIO()
+
+            with (
+                patch.object(cli, "load_service_config", return_value=config),
+                patch.object(cli, "WholeOSService") as service_type,
+                redirect_stdout(output),
+            ):
+                exit_code = cli._run_whole_os(args, host_factories=registry)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(output.getvalue())["status"], "idle")
+            registry.resolve.assert_not_called()
+            service_type.assert_not_called()
+            self.assertFalse(config.state_dir.exists())
+
+    def test_status_reads_existing_queue_without_changing_database_bytes(self) -> None:
+        with TemporaryDirectory() as directory:
+            state_dir = Path(directory) / "state"
+            graph = OutcomeGraphSpec(
+                (OutcomeWorkPackage("a", ("outcome-a",)),),
+                "sha256:" + "1" * 64,
+            )
+            config = SimpleNamespace(
+                campaign_id="campaign",
+                tenant_id="tenant",
+                repository_id="repository",
+                state_dir=state_dir,
+                binding_descriptor=SimpleNamespace(digest="sha256:" + "2" * 64),
+                graph=graph,
+            )
+            scheduler = Scheduler(state_dir / "queue")
+            scheduler.enqueue(
+                WholeOSService.JOB_KIND,
+                {"package_id": "a"},
+                mission_id="campaign",
+            )
+            scheduler.close()
+            database = state_dir / "queue" / "scheduler.sqlite3"
+            before = database.read_bytes()
+            args = cli.build_whole_os_parser().parse_args(
+                ["status", "--config", "service.json", "--json"]
+            )
+            output = io.StringIO()
+
+            with (
+                patch.object(cli, "load_service_config", return_value=config),
+                redirect_stdout(output),
+            ):
+                exit_code = cli._run_whole_os(args)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(output.getvalue())["status"], "ready")
+            self.assertEqual(database.read_bytes(), before)
+
+    def test_unknown_host_provider_returns_typed_capability_blocker(self) -> None:
+        graph = OutcomeGraphSpec(
+            (OutcomeWorkPackage("a", ("outcome-a",)),),
+            "sha256:" + "1" * 64,
+        )
+        config = SimpleNamespace(
+            campaign_id="campaign",
+            tenant_id="tenant",
+            repository_id="repository",
+            binding_descriptor=SimpleNamespace(digest="sha256:" + "2" * 64),
+            graph=graph,
+        )
+        args = cli.build_whole_os_parser().parse_args(
+            ["start", "--config", "service.json", "--json"]
+        )
+        registry = Mock()
+        registry.resolve.side_effect = WholeOSHostUnavailable(
+            "no independently admitted host factory matches the sealed descriptor"
+        )
+        error = io.StringIO()
+
+        with (
+            patch.object(cli, "load_service_config", return_value=config),
+            patch.object(cli, "WholeOSService") as service_type,
+            redirect_stderr(error),
+        ):
+            exit_code = cli._run_whole_os(args, host_factories=registry)
+
+        self.assertEqual(exit_code, 2)
+        document = json.loads(error.getvalue())
         self.assertEqual(document["status"], "blocked")
-        blocked = document["blocked_packages"]
-        cohort = document["cohort"]
-        self.assertIsInstance(blocked, list)
-        self.assertIsInstance(cohort, dict)
-        assert isinstance(blocked, list) and isinstance(cohort, dict)
-        self.assertEqual(set(blocked), {"a", "b"})
-        self.assertEqual(cohort["convergence_rounds"], 1)
-        self.assertEqual(cohort["verification_rounds"], 1)
-        assurance = document["terminal_assurance"]
-        self.assertIsInstance(assurance, dict)
-        assert isinstance(assurance, dict)
-        self.assertRegex(str(assurance["candidate_digest"]), r"^sha256:[0-9a-f]{64}$")
-        self.assertEqual(
-            assurance["producer_identity"], "whole-os-cli-unconfigured-host"
-        )
-        self.assertEqual(
-            assurance["reviewer_identity"], "whole-os-cli-terminal-curator"
-        )
-        self.assertNotEqual(
-            assurance["producer_identity"], assurance["reviewer_identity"]
-        )
-        self.assertTrue(assurance["review_refs"])
-        self.assertTrue(assurance["aggregate_refs"])
-        self.assertTrue(assurance["verification_refs"])
-        repair = assurance["repair"]
-        self.assertIsInstance(repair, dict)
-        assert isinstance(repair, dict)
-        self.assertFalse(repair["attempted"])
-        self.assertIsNone(repair["directive"])
-        self.assertIn("hard-gated", str(repair["reason"]))
+        self.assertEqual(document["blocker"], "blocked_capability")
+        service_type.assert_not_called()
 
     def test_help_exposes_mode_and_concurrency_selection(self) -> None:
         parser = cli.build_whole_os_parser()
@@ -162,6 +311,11 @@ class WholeOSCohortCLITests(unittest.TestCase):
         self.assertIn("--execution-mode", help_text)
         self.assertIn("--max-parallel-packages", help_text)
         self.assertIn("--cohort-size", help_text)
+
+    def test_help_exposes_one_command_start(self) -> None:
+        help_text = cli.build_whole_os_parser().format_help()
+
+        self.assertIn("start", help_text)
 
 
 if __name__ == "__main__":

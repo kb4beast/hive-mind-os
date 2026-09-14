@@ -47,26 +47,13 @@ from .brain_kernel.planner import (
     persist_plan,
 )
 from .brain_kernel.store import KernelIntegrityError, KernelStore
-from .cohort_assurance import (
-    CohortAssuranceRuntime,
-    TerminalAssessment,
-    TerminalEvidence,
-    convergence_candidate_digest,
-)
-from .cohort_policy import CohortExecutionMode, CohortExecutionPolicy, EffectClass
-from .cohort_runtime import (
-    ConvergenceResult,
-    PackageRunResult,
-    PackageRunState,
-    VerificationResult,
-)
+from .cohort_policy import CohortExecutionMode, CohortExecutionPolicy
 from .continuation import (
     ContinuationPacketError,
     export_packet,
     validate_packet,
     write_packet,
 )
-from .cortex.repository.mission_bindings import ConfiguredMissionBindingsProvider
 from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
@@ -106,9 +93,12 @@ from .runtime import ExecutionStrategy, HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
 from .verify import VerificationError, verify_repository
+from .whole_os_bootstrap import (
+    DEFAULT_WHOLE_OS_HOST_FACTORIES,
+    WholeOSBootstrapError,
+    WholeOSHostFactoryRegistry,
+)
 from .whole_os_service import (
-    PackageExecutionResult,
-    PackageStatus,
     ServiceError,
     WholeOSService,
     load_service_config,
@@ -874,8 +864,9 @@ def build_whole_os_parser() -> argparse.ArgumentParser:
     for name, help_text in (
         ("inspect", "Inspect the inert configuration and sealed graph"),
         ("status", "Read durable campaign status"),
+        ("start", "Start and boundedly run the configured campaign"),
         ("run-once", "Run one queued package using the configured host boundary"),
-        ("resume", "Resume the campaign by running one queued package"),
+        ("resume", "Resume and boundedly run the configured campaign"),
     ):
         command = commands.add_parser(name, help=help_text)
         command.add_argument(
@@ -938,19 +929,6 @@ def _whole_os_execution_document(
     }
 
 
-class _UnconfiguredHost:
-    """Explicitly incomplete CLI host; credentials and adapters stay host-owned."""
-
-    def execute_package(self, package, bindings, payload):
-        return PackageExecutionResult(
-            package.package_id,
-            PackageStatus.BLOCKED_CAPABILITY,
-            None,
-            (),
-            "no host executor is configured for this process",
-        )
-
-
 def _observation_document(observation) -> dict[str, object]:
     result = observation.last_result
     return {
@@ -971,138 +949,173 @@ def _observation_document(observation) -> dict[str, object]:
     }
 
 
-def _run_unconfigured_cohort(config, execution: dict[str, object]) -> dict[str, object]:
-    """Exercise the real cohort route while retaining the CLI capability boundary."""
+def _read_only_whole_os_status(config) -> dict[str, object]:
+    """Project durable service state without initializing or mutating its queue."""
 
-    maximum = execution["max_parallel_packages"]
-    if not isinstance(maximum, int):
-        raise ServiceError("cohort parallelism must be an integer")
-    policy = CohortExecutionPolicy(CohortExecutionMode.COHORT, maximum)
-    runtime = CohortAssuranceRuntime(policy)
-
-    def execute_package(package, kickoff, dependencies):
-        return PackageRunResult(
-            package.package_id,
-            PackageRunState.BLOCKED_POLICY,
-            {},
-            message="no host executor is configured for this process",
-        )
-
-    def assess(kickoff, packages, convergence):
-        candidate_digest = convergence_candidate_digest(convergence)
-        evidence = TerminalEvidence(
-            candidate_digest=candidate_digest,
-            producer_identity="whole-os-cli-unconfigured-host",
-            reviewer_identity="whole-os-cli-terminal-curator",
-            review_refs=(f"review:blocked-capability:{candidate_digest}",),
-            aggregate_refs=(f"aggregate:{kickoff.context_digest}:{candidate_digest}",),
-            verification_refs=(
-                f"verification:typed-capability-blockers:{candidate_digest}",
-            ),
-        )
-        return TerminalAssessment(
-            VerificationResult(
-                True,
-                ("typed-capability-blockers-recorded",),
-                "no implementation was claimed without a configured host",
-            ),
-            evidence,
-        )
-
-    result = runtime.execute(
-        graph=config.graph,
-        run_id=f"{config.campaign_id}:cli",
-        kickoff_context={
+    package_ids = {package.package_id for package in config.graph.packages}
+    path = config.state_dir / "queue" / "scheduler.sqlite3"
+    if not path.is_file():
+        return {
             "campaign_id": config.campaign_id,
-            "tenant_id": config.tenant_id,
-            "repository_id": config.repository_id,
-            "binding_descriptor_digest": config.binding_descriptor.digest,
-        },
-        execute_package=execute_package,
-        converge=lambda kickoff, packages: ConvergenceResult(
-            True,
-            {
-                "blocked_packages": [
-                    package.package_id
-                    for package in packages
-                    if package.state is PackageRunState.BLOCKED_POLICY
-                ]
-            },
-            "capability blockers retained at cohort convergence",
-        ),
-        assess=assess,
-        plan_repair=lambda initial: None,
-        execute_repair=lambda package, kickoff, dependencies, directive: (
-            PackageRunResult(
-                package.package_id,
-                PackageRunState.FAILED,
-                {},
-                message="unreachable: missing authority cannot be repaired",
+            "status": "idle",
+            "completed_packages": [],
+            "pending_packages": sorted(package_ids),
+            "blocked_packages": [],
+            "last_result": None,
+        }
+    uri = path.resolve().as_uri() + "?mode=ro"
+    try:
+        connection = sqlite3.connect(uri, uri=True, timeout=5.0)
+        connection.row_factory = sqlite3.Row
+        try:
+            rows = connection.execute(
+                """
+                SELECT kind,payload_json,state,last_error
+                FROM jobs
+                WHERE mission_id=? AND kind IN (?,?)
+                ORDER BY created_at,id
+                """,
+                (
+                    config.campaign_id,
+                    WholeOSService.JOB_KIND,
+                    WholeOSService.TERMINAL_JOB_KIND,
+                ),
+            ).fetchall()
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        raise ServiceError("durable Whole-OS state cannot be read") from exc
+
+    package_rows: list[tuple[str, str, str | None]] = []
+    terminal_rows: list[tuple[dict[str, object], str, str | None]] = []
+    for row in rows:
+        try:
+            payload = json.loads(str(row["payload_json"]))
+        except json.JSONDecodeError as exc:
+            raise ServiceError("durable Whole-OS state contains invalid JSON") from exc
+        if not isinstance(payload, dict):
+            raise ServiceError("durable Whole-OS state contains an invalid payload")
+        if row["kind"] == WholeOSService.JOB_KIND:
+            package_id = payload.get("package_id")
+            if not isinstance(package_id, str) or package_id not in package_ids:
+                raise ServiceError("durable Whole-OS state contradicts the sealed graph")
+            package_rows.append((package_id, str(row["state"]), row["last_error"]))
+        else:
+            terminal_rows.append((payload, str(row["state"]), row["last_error"]))
+
+    completed = {item[0] for item in package_rows if item[1] == "done"}
+    blocked = {item[0] for item in package_rows if item[1] == "dead-letter"}
+    changed = True
+    while changed:
+        changed = False
+        for package in config.graph.packages:
+            if package.package_id not in blocked and blocked.intersection(
+                package.dependencies
+            ):
+                blocked.add(package.package_id)
+                changed = True
+    enqueued = {item[0] for item in package_rows}
+    terminal_message = ""
+    if completed == package_ids:
+        done_terminal = next(
+            (item for item in terminal_rows if item[1] == "done"), None
+        )
+        dead_terminal = next(
+            (item for item in terminal_rows if item[1] == "dead-letter"), None
+        )
+        if done_terminal is not None:
+            candidate_digest = done_terminal[0].get("candidate_digest")
+            if not isinstance(candidate_digest, str):
+                raise ServiceError("terminal job has no candidate digest")
+            from .runtime_contracts import canonical_digest
+
+            campaign_key = canonical_digest(
+                {
+                    "campaign_id": config.campaign_id,
+                    "tenant_id": config.tenant_id,
+                    "repository_id": config.repository_id,
+                }
+            ).removeprefix("sha256:")
+            receipt_path = (
+                config.state_dir
+                / "whole-os-receipts"
+                / campaign_key
+                / f"terminal-{candidate_digest.removeprefix('sha256:')}.json"
             )
-        ),
-        effect_classes={
-            package.package_id: EffectClass.MISSING_AUTHORITY
-            for package in config.graph.packages
-        },
-    )
-    blocked_packages = [
-        package.package_id
-        for package in result.package_results
-        if package.state is PackageRunState.BLOCKED_POLICY
-    ]
+            try:
+                from .cohort_assurance import TerminalEvidence
+
+                receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                verification = receipt["verification"]
+                if (
+                    not isinstance(receipt, dict)
+                    or set(receipt)
+                    != {
+                        "schema_version",
+                        "kind",
+                        "campaign_id",
+                        "tenant_id",
+                        "repository_id",
+                        "graph_digest",
+                        "candidate_digest",
+                        "verification",
+                        "evidence",
+                    }
+                    or receipt.get("schema_version") != 1
+                    or receipt.get("kind") != "whole-os-terminal-assessment-v1"
+                    or receipt.get("campaign_id") != config.campaign_id
+                    or receipt.get("tenant_id") != config.tenant_id
+                    or receipt.get("repository_id") != config.repository_id
+                    or receipt.get("graph_digest") != config.graph.digest
+                    or receipt.get("candidate_digest") != candidate_digest
+                    or not isinstance(verification, dict)
+                    or set(verification) != {"passed", "checks", "message"}
+                    or type(verification.get("passed")) is not bool
+                    or not isinstance(verification.get("checks"), list)
+                    or any(
+                        type(item) is not str for item in verification.get("checks", [])
+                    )
+                    or not isinstance(verification.get("message"), str)
+                    or not isinstance(receipt.get("evidence"), dict)
+                ):
+                    raise ValueError
+                evidence = TerminalEvidence.from_document(receipt["evidence"])
+                if evidence.candidate_digest != candidate_digest:
+                    raise ValueError
+            except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise ServiceError("terminal assessment receipt is invalid") from exc
+            status = "complete" if verification["passed"] else "blocked"
+            terminal_message = str(verification["message"])
+        elif dead_terminal is not None:
+            status = "blocked"
+            terminal_message = dead_terminal[2] or "terminal assessment failed"
+        else:
+            status = "terminal_assessment_pending"
+            terminal_message = "candidate-bound terminal assessment is pending"
+    elif any(item[1] in {"ready", "leased"} for item in package_rows):
+        status = "ready"
+    elif blocked:
+        status = "blocked"
+    elif package_ids - enqueued:
+        status = "dependency_wait" if enqueued else "idle"
+    else:
+        status = "idle"
     return {
         "campaign_id": config.campaign_id,
-        "status": result.status.value,
-        "completed_packages": [],
-        "pending_packages": blocked_packages,
-        "blocked_packages": blocked_packages,
-        "blocker": "blocked_capability",
+        "status": status,
+        "completed_packages": sorted(completed),
+        "pending_packages": sorted(package_ids - completed),
+        "blocked_packages": sorted(blocked),
         "last_result": None,
-        "execution": execution,
-        "cohort": {
-            "run_id": result.initial.run_id,
-            "kickoff_digest": result.initial.kickoff.context_digest,
-            "dispatch_batches": [
-                list(batch) for batch in result.initial.dispatch_batches
-            ],
-            "max_parallelism": result.initial.max_parallelism,
-            "convergence_rounds": 1,
-            "verification_rounds": 1,
-        },
-        "terminal_assurance": {
-            "candidate_digest": (
-                None if result.evidence is None else result.evidence.candidate_digest
-            ),
-            "producer_identity": (
-                None if result.evidence is None else result.evidence.producer_identity
-            ),
-            "reviewer_identity": (
-                None if result.evidence is None else result.evidence.reviewer_identity
-            ),
-            "review_refs": (
-                [] if result.evidence is None else list(result.evidence.review_refs)
-            ),
-            "aggregate_refs": (
-                [] if result.evidence is None else list(result.evidence.aggregate_refs)
-            ),
-            "verification_refs": (
-                []
-                if result.evidence is None
-                else list(result.evidence.verification_refs)
-            ),
-            "repair": {
-                "attempted": result.repair_attempted,
-                "directive": None,
-                "reason": (
-                    "missing host authority is hard-gated and cannot be repaired "
-                    "inside this process"
-                ),
-            },
-        },
+        "terminal_message": terminal_message,
     }
 
 
-def _run_whole_os(args: argparse.Namespace) -> int:
+def _run_whole_os(
+    args: argparse.Namespace,
+    *,
+    host_factories: WholeOSHostFactoryRegistry | None = None,
+) -> int:
     try:
         config = load_service_config(args.config)
         execution = _whole_os_execution_document(
@@ -1130,27 +1143,35 @@ def _run_whole_os(args: argparse.Namespace) -> int:
                 )
             )
             return 0
-        if execution["mode"] == "cohort" and args.whole_os_command != "status":
-            document = _run_unconfigured_cohort(config, execution)
+        if args.whole_os_command == "status":
+            document = _read_only_whole_os_status(config)
+            document["execution"] = execution
             print(
                 json.dumps(document, indent=2, sort_keys=True)
                 if args.json_output
                 else (
                     f"{config.campaign_id}: {document['status']} "
-                    f"[cohort, parallel={execution['max_parallel_packages']}]"
+                    f"[{execution['mode']}, "
+                    f"parallel={execution['max_parallel_packages']}]"
                 )
             )
             return 0
-        provider = ConfiguredMissionBindingsProvider(
-            config.binding_descriptor, lambda descriptor, payload, root: (None, None)
-        )
-        service = WholeOSService(config, provider, _UnconfiguredHost())
+        registry = host_factories or DEFAULT_WHOLE_OS_HOST_FACTORIES
+        bootstrap = registry.resolve(config)
+        service = WholeOSService(config, bootstrap.bindings, bootstrap.host)
         try:
-            observation = (
-                service.observe()
-                if args.whole_os_command == "status"
-                else service.run_once()
-            )
+            if args.whole_os_command == "run-once":
+                observation = (
+                    service.run_once()
+                    if execution["mode"] == "strict"
+                    else service.run_cohort()
+                )
+            elif execution["mode"] == "strict":
+                # Compatibility mode deliberately retains package-at-a-time
+                # execution. Repeated resume calls remain durable and idempotent.
+                observation = service.run_once()
+            else:
+                observation = service.run_to_completion()
         finally:
             service.close()
         document = _observation_document(observation)
@@ -1164,6 +1185,19 @@ def _run_whole_os(args: argparse.Namespace) -> int:
             )
         )
         return 0
+    except WholeOSBootstrapError as error:
+        print(
+            json.dumps(
+                {
+                    "status": "blocked",
+                    "blocker": error.blocker,
+                    "error": f"{type(error).__name__}: {error}",
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 2
     except (ServiceError, OSError, ValueError, TypeError) as error:
         print(
             json.dumps(
