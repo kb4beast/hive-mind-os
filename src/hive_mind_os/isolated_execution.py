@@ -37,6 +37,8 @@ class IsolationAttestation:
     expires_at: str
 
     def __post_init__(self):
+        if not isinstance(self.probe_result, ProbeResult):
+            object.__setattr__(self, "probe_result", ProbeResult(self.probe_result))
         for n, v in (
             ("backend_id", self.backend_id),
             ("backend_version", self.backend_version),
@@ -47,11 +49,13 @@ class IsolationAttestation:
         ):
             if type(v) is not str or not v.strip():
                 raise IsolationError(f"{n} is required")
-        if (
-            self.probe_result != ProbeResult.ENFORCED
-            and self.probe_result not in ProbeResult
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or value < 0
+            for value in self.resource_limits.values()
         ):
-            raise IsolationError("invalid probe result")
+            raise IsolationError("resource limits must be nonnegative numbers")
 
     @property
     def digest(self):

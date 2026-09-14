@@ -1,5 +1,6 @@
 """Observable behavior evaluation contracts (N24)."""
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -50,6 +51,20 @@ class FunctionalEvaluation:
             and self.verdict is EvaluationVerdict.PASS
         ):
             raise ValueError("unavailable reference cannot pass")
+        if self.verdict is EvaluationVerdict.PASS:
+            if not self.required_checks:
+                raise ValueError("an empty rubric cannot pass")
+            observed = {**self.capability_results, **self.security_results}
+            if any(observed.get(name) is not CheckOutcome.PASS for name in self.required_checks):
+                raise ValueError("every required check must have a passing receipt")
+        for values in (self.quality_metrics, self.resource_use):
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                for value in values.values()
+            ):
+                raise ValueError("evaluation metrics must be finite numbers")
 
     @property
     def digest(self):
@@ -129,6 +144,8 @@ def verdict_for(checks, *, contaminated=False):
     if contaminated:
         return EvaluationVerdict.CONTAMINATED
     vals = list(checks.values())
+    if not vals:
+        return EvaluationVerdict.INCONCLUSIVE
     if any(v is CheckOutcome.FAIL for v in vals):
         return EvaluationVerdict.FAIL
     if any(v is CheckOutcome.UNAVAILABLE for v in vals):
