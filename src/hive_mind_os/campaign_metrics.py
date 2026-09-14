@@ -29,13 +29,15 @@ class SignedCustodyEnvelope:
   return hmac.compare_digest(expected,self.signature)
 @dataclass(frozen=True,slots=True)
 class StageEvidence:
- stage:str;block_digest:str;task_manifest_digest:str;family_manifest_digest:str;lease_digest:str;evaluator:SignedCustodyEnvelope;strata:tuple[str,...];families:int;repetitions:int;seed:int
+ stage:str;block_digest:str;task_manifest_digest:str;family_manifest_digest:str;lease_digest:str;evaluator:SignedCustodyEnvelope;strata:tuple[str,...];families:int;repetitions:int;seed:int;final_pair:tuple[str,str]=()
  def __post_init__(self):
   if self.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("invalid stage evidence")
   for n in ("block_digest","task_manifest_digest","family_manifest_digest","lease_digest"):_digest(getattr(self,n),n)
   if set(self.strata)!=set(REQUIRED_STRATA) or len(self.strata)!=len(REQUIRED_STRATA):raise CampaignMetricsError("exact thirteen strata required")
   required=(30,3) if self.stage=="final" else (12,1)
   if (self.families,self.repetitions)!=required or type(self.seed)is not int:raise CampaignMetricsError("stage threshold/repetition mismatch")
+  if self.stage=="final" and (len(self.final_pair)!=2 or self.final_pair[0]==self.final_pair[1]):raise CampaignMetricsError("final requires distinct frozen pair")
+  if self.stage!="final" and self.final_pair:raise CampaignMetricsError("only final carries final pair")
 @dataclass(frozen=True,slots=True)
 class LeaseRecord:
  lease_digest:str;scope:str;expires_at:int;issued_by:str;active:bool=True
@@ -253,10 +255,11 @@ class BracketState:
   if not lease_active:object.__setattr__(self,"terminal","lease_exhausted");return ()
   if self.round_number>=p.max_rounds:object.__setattr__(self,"terminal","max_rounds");return ()
   if self.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("unknown stage")
-  source=dict(p.entrant_recipes) if self.stage=="original" else (dict(p.hybrid_recipes) if self.stage=="hybrid" else {})
+  if self.stage=="final" and (set(admission.stage_evidence.final_pair)&set(p.entrant_recipes)==set() or set(admission.stage_evidence.final_pair)&set(p.hybrid_recipes)==set()):raise CampaignMetricsError("final pair must be original and hybrid")
+  source=dict(p.entrant_recipes) if self.stage=="original" else (dict(p.hybrid_recipes) if self.stage=="hybrid" else {x:p.recipe(x) for x in admission.stage_evidence.final_pair})
   ids=[x for x,r in source.items()if r["track"]==self.track and x not in self.quarantined and self.losses.get(x,0)<3]
   if len(ids)==1:object.__setattr__(self,"terminal","one_survivor");return ()
-  blocks=("development-screening",) if self.stage=="original" else (("harder-hybrid-development",) if self.stage=="hybrid" else ())
+  blocks=("development-screening",) if self.stage=="original" else (("harder-hybrid-development",) if self.stage=="hybrid" else (admission.stage_evidence.block_digest,))
   return schedule_round(ids,self.losses,self.byes,round_number=self.round_number+1,inconclusive_meetings=self.inconclusive,blocks=blocks)
  def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,receipt:IssuedReceipt|None=None,admission:AdmittedProtocol|None=None,lease_active=True):
   _require_admission(p,admission,stage=self.stage)

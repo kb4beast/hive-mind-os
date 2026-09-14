@@ -39,7 +39,7 @@ class T(unittest.TestCase):
  def test_fixture_signed_stage_evidence_and_receipt_replay(self):
   key=b"fixture-only"; payload=D; sig=__import__("hmac").new(key,("eval|evaluator|"+payload+"|1").encode(),"sha256").hexdigest()
   envelope=SignedCustodyEnvelope("eval","evaluator",payload,sig,1);self.assertTrue(envelope.verify_fixture_hmac(key))
-  evidence=StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,30,3,7);self.assertEqual(evidence.repetitions,3)
+  evidence=StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,30,3,7,("MC0","MH1"));self.assertEqual(evidence.repetitions,3)
   receipt=IssuedReceipt("final",1,"MC0","MH1",D,"task",7,"eval",D)
   with self.assertRaises(CampaignMetricsError):reject_receipt_replay((receipt,receipt))
   with self.assertRaises(CampaignMetricsError):StageEvidence("final",D,D,D,D,envelope,REQUIRED_STRATA,12,1,7)
