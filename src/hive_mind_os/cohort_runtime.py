@@ -209,6 +209,7 @@ class CohortRuntime:
         verify: TerminalVerifier,
         effect_classes: Mapping[str, EffectClass] | None = None,
         resume: bool = True,
+        finalize: bool = True,
     ) -> CohortRunResult:
         graph = compile_outcome_graph(graph)
         kickoff = _kickoff(graph, self.policy, run_id, kickoff_context)
@@ -241,11 +242,11 @@ class CohortRuntime:
                     "cohort journal already exists and resume was disabled"
                 )
             if retained:
-                if (
-                    retained[0].kind is not CohortJournalEventKind.KICKOFF
-                    or canonical_bytes(_thaw(retained[0].payload))
-                    != canonical_bytes(kickoff_record)
-                ):
+                if retained[
+                    0
+                ].kind is not CohortJournalEventKind.KICKOFF or canonical_bytes(
+                    _thaw(retained[0].payload)
+                ) != canonical_bytes(kickoff_record):
                     raise CohortRuntimeError(
                         "retained cohort kickoff does not match this execution"
                     )
@@ -331,9 +332,7 @@ class CohortRuntime:
                         {},
                         message=f"dependency {dependency} did not succeed",
                     )
-                    result = self._record_package_result(
-                        run_id, result, "dependency"
-                    )
+                    result = self._record_package_result(run_id, result, "dependency")
                     results[package_id] = result
                     pending.remove(package_id)
 
@@ -471,18 +470,30 @@ class CohortRuntime:
             tuple(batches),
             max_parallelism,
         )
-        if self.journal is not None:
-            self.journal.append(
-                run_id,
-                CohortJournalEventKind.RUN_COMPLETED,
-                {
-                    "status": status.value,
-                    "package_count": len(ordered),
-                    "dispatch_batch_count": len(batches),
-                    "max_parallelism": max_parallelism,
-                },
-            )
+        if finalize:
+            self.record_completion(completed)
         return completed
+
+    def record_completion(self, result: CohortRunResult) -> None:
+        """Seal a journal lifecycle after a composing assurance layer finishes."""
+
+        if not isinstance(result, CohortRunResult):
+            raise CohortRuntimeError("cohort completion result must be typed")
+        if self.journal is None:
+            return
+        retained = self.journal.events(result.run_id)
+        if retained and retained[-1].kind is CohortJournalEventKind.RUN_COMPLETED:
+            return
+        self.journal.append(
+            result.run_id,
+            CohortJournalEventKind.RUN_COMPLETED,
+            {
+                "status": result.status.value,
+                "package_count": len(result.package_results),
+                "dispatch_batch_count": len(result.dispatch_batches),
+                "max_parallelism": result.max_parallelism,
+            },
+        )
 
     def _record_package_result(
         self, run_id: str, result: PackageRunResult, source: str
@@ -572,7 +583,10 @@ class CohortRuntime:
                 if (
                     not isinstance(package_ids, tuple)
                     or not package_ids
-                    or any(type(item) is not str or item not in by_id for item in package_ids)
+                    or any(
+                        type(item) is not str or item not in by_id
+                        for item in package_ids
+                    )
                     or type(active_count) is not int
                     or active_count < 1
                 ):
@@ -583,9 +597,7 @@ class CohortRuntime:
             elif event.kind is CohortJournalEventKind.PACKAGE_RESULT:
                 result = cls._package_result_from_document(payload)
                 if result.package_id not in by_id:
-                    raise CohortRuntimeError(
-                        "retained result names an unknown package"
-                    )
+                    raise CohortRuntimeError("retained result names an unknown package")
                 if result.package_id in results:
                     raise CohortRuntimeError("retained package result is duplicated")
                 source = payload.get("source")
@@ -594,7 +606,9 @@ class CohortRuntime:
                         "retained package result has no dispatch evidence"
                     )
                 if source not in {"executor", "policy", "dependency"}:
-                    raise CohortRuntimeError("retained package result source is invalid")
+                    raise CohortRuntimeError(
+                        "retained package result source is invalid"
+                    )
                 if (
                     source == "policy"
                     and result.state is not PackageRunState.BLOCKED_POLICY
@@ -630,6 +644,24 @@ class CohortRuntime:
                         "retained completion status is invalid"
                     ) from error
             elif event.kind is CohortJournalEventKind.REPAIR_ATTEMPT:
+                convergence = None
+                verification = None
+            elif event.kind is CohortJournalEventKind.REPAIR_RESULT:
+                documents = payload.get("package_results")
+                if not isinstance(documents, tuple) or not documents:
+                    raise CohortRuntimeError("retained repair result is invalid")
+                for document in documents:
+                    if not isinstance(document, Mapping):
+                        raise CohortRuntimeError("retained repair result is invalid")
+                    result = cls._package_result_from_document(document)
+                    if result.package_id not in by_id:
+                        raise CohortRuntimeError(
+                            "retained repair result names an unknown package"
+                        )
+                    results[result.package_id] = result
+                convergence = None
+                verification = None
+            elif event.kind is CohortJournalEventKind.TERMINAL_EVIDENCE:
                 continue
         if completion is not None and set(results) != set(by_id):
             raise CohortRuntimeError("retained completed cohort is missing results")

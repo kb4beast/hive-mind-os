@@ -33,6 +33,8 @@ class CohortJournalEventKind(StrEnum):
     CONVERGENCE = "convergence"
     VERIFICATION = "verification"
     REPAIR_ATTEMPT = "repair_attempt"
+    REPAIR_RESULT = "repair_result"
+    TERMINAL_EVIDENCE = "terminal_evidence"
     RUN_COMPLETED = "run_completed"
 
 
@@ -175,10 +177,18 @@ class FileCohortJournalStore:
                 self._validate_transition(records, kind, document["payload"])
                 records.append(record)
                 previous = document["event_digest"]
-        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+        except (
+            OSError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as error:
             if isinstance(error, CohortJournalError):
                 raise
-            raise CohortJournalError("cohort journal cannot be safely replayed") from error
+            raise CohortJournalError(
+                "cohort journal cannot be safely replayed"
+            ) from error
         seen = self._seen.get(run_id)
         if seen is not None:
             count, digest = seen
@@ -206,6 +216,21 @@ class FileCohortJournalStore:
             item.kind is CohortJournalEventKind.RUN_COMPLETED for item in records
         ):
             raise CohortJournalError("cohort completion may be recorded only once")
+        if kind is CohortJournalEventKind.REPAIR_ATTEMPT and any(
+            item.kind is CohortJournalEventKind.REPAIR_ATTEMPT for item in records
+        ):
+            raise CohortJournalError("cohort repair may be attempted only once")
+        if kind is CohortJournalEventKind.REPAIR_RESULT:
+            if not any(
+                item.kind is CohortJournalEventKind.REPAIR_ATTEMPT for item in records
+            ):
+                raise CohortJournalError("repair result requires a repair attempt")
+            if any(
+                item.kind is CohortJournalEventKind.REPAIR_RESULT for item in records
+            ):
+                raise CohortJournalError(
+                    "cohort repair result may be recorded only once"
+                )
         if kind is CohortJournalEventKind.PACKAGE_RESULT:
             package_id = payload.get("package_id")
             if type(package_id) is not str or not package_id:

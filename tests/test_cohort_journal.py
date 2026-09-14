@@ -43,9 +43,7 @@ class CohortJournalTests(unittest.TestCase):
         )
 
     def runtime(self) -> CohortRuntime:
-        return CohortRuntime(
-            CohortExecutionPolicy(), FileCohortJournalStore(self.root)
-        )
+        return CohortRuntime(CohortExecutionPolicy(), FileCohortJournalStore(self.root))
 
     def test_interrupted_run_resumes_completed_packages(self) -> None:
         executions: list[str] = []
@@ -89,9 +87,7 @@ class CohortJournalTests(unittest.TestCase):
 
     def test_digest_chain_detects_retained_event_tamper(self) -> None:
         self.runtime().execute(
-            graph=OutcomeGraphSpec(
-                (package("only"),), "sha256:" + "8" * 64
-            ),
+            graph=OutcomeGraphSpec((package("only"),), "sha256:" + "8" * 64),
             run_id="RUN-tamper",
             kickoff_context={},
             execute_package=lambda item, *_: PackageRunResult(
@@ -153,16 +149,12 @@ class CohortJournalTests(unittest.TestCase):
         events = FileCohortJournalStore(self.root).events("RUN-once")
         self.assertEqual(
             1,
-            sum(
-                event.kind is CohortJournalEventKind.RUN_COMPLETED
-                for event in events
-            ),
+            sum(event.kind is CohortJournalEventKind.RUN_COMPLETED for event in events),
         )
         self.assertEqual(
             2,
             sum(
-                event.kind is CohortJournalEventKind.PACKAGE_RESULT
-                for event in events
+                event.kind is CohortJournalEventKind.PACKAGE_RESULT for event in events
             ),
         )
 
