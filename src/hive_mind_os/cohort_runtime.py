@@ -137,9 +137,19 @@ def _freeze(value: Any) -> Any:
 def _thaw(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {key: _thaw(item) for key, item in value.items()}
-    if isinstance(value, tuple):
+    if isinstance(value, (list, tuple)):
         return [_thaw(item) for item in value]
     return value
+
+
+def _canonical_output(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    try:
+        document = json.loads(canonical_bytes(dict(value)))
+    except (TypeError, ValueError) as error:
+        raise CohortRuntimeError("cohort output must be canonical JSON") from error
+    if type(document) is not dict:
+        raise CohortRuntimeError("cohort output must be a JSON object")
+    return document
 
 
 def _kickoff(
@@ -262,7 +272,7 @@ class CohortRuntime:
                     {},
                     message=decision.reason,
                 )
-                self._record_package_result(run_id, result, "policy")
+                result = self._record_package_result(run_id, result, "policy")
                 results[package_id] = result
         pending.difference_update(results)
 
@@ -321,7 +331,9 @@ class CohortRuntime:
                         {},
                         message=f"dependency {dependency} did not succeed",
                     )
-                    self._record_package_result(run_id, result, "dependency")
+                    result = self._record_package_result(
+                        run_id, result, "dependency"
+                    )
                     results[package_id] = result
                     pending.remove(package_id)
 
@@ -402,7 +414,7 @@ class CohortRuntime:
                             {},
                             message=f"{type(error).__name__}: {error}",
                         )
-                    self._record_package_result(run_id, result, "executor")
+                    result = self._record_package_result(run_id, result, "executor")
                     results[package_id] = result
 
         ordered = tuple(results[package.package_id] for package in graph.packages)
@@ -416,6 +428,11 @@ class CohortRuntime:
                     False, {}, f"{type(error).__name__}: {error}"
                 )
             if self.journal is not None:
+                convergence = ConvergenceResult(
+                    convergence.accepted,
+                    _canonical_output(convergence.output),
+                    convergence.message,
+                )
                 self.journal.append(
                     run_id,
                     CohortJournalEventKind.CONVERGENCE,
@@ -469,21 +486,29 @@ class CohortRuntime:
 
     def _record_package_result(
         self, run_id: str, result: PackageRunResult, source: str
-    ) -> None:
+    ) -> PackageRunResult:
         if self.journal is None:
-            return
+            return result
+        normalized = PackageRunResult(
+            result.package_id,
+            result.state,
+            _canonical_output(result.output),
+            result.evidence_refs,
+            result.message,
+        )
         self.journal.append(
             run_id,
             CohortJournalEventKind.PACKAGE_RESULT,
             {
-                "package_id": result.package_id,
-                "state": result.state.value,
-                "output": _thaw(result.output),
-                "evidence_refs": list(result.evidence_refs),
-                "message": result.message,
+                "package_id": normalized.package_id,
+                "state": normalized.state.value,
+                "output": normalized.output,
+                "evidence_refs": list(normalized.evidence_refs),
+                "message": normalized.message,
                 "source": source,
             },
         )
+        return normalized
 
     @staticmethod
     def _convergence_document(result: ConvergenceResult) -> dict[str, Any]:
@@ -637,7 +662,9 @@ class CohortRuntime:
             or type(message) is not str
         ):
             raise CohortRuntimeError("retained package result is invalid")
-        return PackageRunResult(package_id, state, output, evidence_refs, message)
+        return PackageRunResult(
+            package_id, state, _thaw(output), evidence_refs, message
+        )
 
     @staticmethod
     def _convergence_from_document(
@@ -652,7 +679,7 @@ class CohortRuntime:
             or type(message) is not str
         ):
             raise CohortRuntimeError("retained convergence is invalid")
-        return ConvergenceResult(accepted, output, message)
+        return ConvergenceResult(accepted, _thaw(output), message)
 
     @staticmethod
     def _verification_from_document(

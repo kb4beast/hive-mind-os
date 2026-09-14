@@ -122,12 +122,16 @@ class CohortJournalTests(unittest.TestCase):
         def execute(item: OutcomeWorkPackage, *_: Any) -> PackageRunResult:
             calls["package"] += 1
             return PackageRunResult(
-                item.package_id, PackageRunState.SUCCEEDED, {"stable": True}
+                item.package_id,
+                PackageRunState.SUCCEEDED,
+                {"stable": True, "nested": [{"package": item.package_id}]},
             )
 
         def converge(*_: Any) -> ConvergenceResult:
             calls["converge"] += 1
-            return ConvergenceResult(True, {"candidate": "sealed"})
+            return ConvergenceResult(
+                True, {"candidate": "sealed", "packages": ["foundation", "delivery"]}
+            )
 
         def verify(*_: Any) -> VerificationResult:
             calls["verify"] += 1
