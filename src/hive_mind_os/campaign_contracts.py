@@ -1,373 +1,144 @@
-"""Closed, inert campaign mission and work-package contracts (N04).
-
-These records are planning/evidence bindings only.  They neither issue authority
-nor execute a worker.  They deliberately reuse the portable runtime validators so
-the boundary is stable across hosts and JSON readers.
-"""
-
+"""N04 closed inert campaign contracts; no record grants authority or effects."""
 from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Mapping
-
-from .runtime_contracts import (
-    ContractViolation,
-    canonical_digest,
-    portable_path,
-    require_digest,
-    require_identifier,
-    require_time,
-    strict_json_object,
-)
-
-_SHA = re.compile(r"[0-9a-f]{40}\Z")
-
-
+from .runtime_contracts import ContractViolation, canonical_digest, portable_path, require_digest, require_identifier, require_time, strict_json_object
+from .brain_kernel.contracts import MissionState, WorkState
+_SHA=re.compile(r"[0-9a-f]{40}\Z")
 class CampaignContractErrorCode(StrEnum):
-    INVALID = "N04-INVALID"
-    UNKNOWN_FIELD = "N04-UNKNOWN-FIELD"
-    UNKNOWN_STATE = "N04-UNKNOWN-STATE"
-    ORPHAN_REQUIREMENT = "N04-ORPHAN-REQUIREMENT"
-    ORPHAN_DEPENDENCY = "N04-ORPHAN-DEPENDENCY"
-    AUTHORITY_CHANGED = "N04-AUTHORITY-CHANGED"
-    RECEIPT_INCONSISTENT = "N04-RECEIPT-INCONSISTENT"
-    HISTORICAL_NOT_ALLOWED = "N04-HISTORICAL-NOT-ALLOWED"
-
-
-# Stable machine-readable vocabulary for downstream N08–N27 adapters.
-ERROR_CODES = tuple(item.value for item in CampaignContractErrorCode)
-
-
-def _fail(code: CampaignContractErrorCode, message: str) -> None:
-    raise ContractViolation(f"{code.value}: {message}")
-
-
-def _nonempty(value: str, label: str) -> None:
-    if type(value) is not str or not value.strip():
-        _fail(CampaignContractErrorCode.INVALID, f"{label} is required")
-
-
-def _ids(values: tuple[str, ...], label: str) -> None:
-    if type(values) is not tuple or not values or len(values) != len(set(values)):
-        _fail(CampaignContractErrorCode.INVALID, f"{label} must be non-empty and unique")
-    for value in values:
-        try:
-            require_identifier(value, label)
-        except ContractViolation as error:
-            _fail(CampaignContractErrorCode.INVALID, str(error))
-
-
-def _sha(value: str, label: str) -> None:
-    if type(value) is not str or _SHA.fullmatch(value) is None:
-        _fail(CampaignContractErrorCode.INVALID, f"{label} must be a lowercase 40-hex SHA")
-
-
-class ClaimLevel(StrEnum):
-    STATIC = "static"
-    RUNTIME = "runtime"
-    PRODUCTION_CANDIDATE = "production-candidate"
-    DEPLOYED_OBSERVED = "deployed-observed"
-
-
-class CampaignState(StrEnum):
-    DRAFT = "DRAFT"
-    READY = "READY"
-    RUNNING = "RUNNING"
-    VERIFYING = "VERIFYING"
-    COMPLETED = "COMPLETED"
-    NO_CHANGE = "NO_CHANGE"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
-
-
-class PackageState(StrEnum):
-    PROPOSED = "PROPOSED"
-    READY = "READY"
-    RUNNING = "RUNNING"
-    VERIFYING = "VERIFYING"
-    COMPLETED = "COMPLETED"
-    NO_CHANGE = "NO_CHANGE"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
-    SUPERSEDED = "SUPERSEDED"
-
-
-def campaign_state_event(state: CampaignState) -> str:
-    """Map only known N04 states to existing kernel event vocabulary."""
-    if not isinstance(state, CampaignState):
-        _fail(CampaignContractErrorCode.UNKNOWN_STATE, "campaign state is unknown")
-    return {
-        CampaignState.DRAFT: "MISSION_CREATED",
-        CampaignState.READY: "MISSION_READY",
-        CampaignState.RUNNING: "MISSION_STARTED",
-        CampaignState.VERIFYING: "MISSION_VERIFYING",
-        CampaignState.COMPLETED: "MISSION_COMPLETED",
-        CampaignState.NO_CHANGE: "MISSION_COMPLETED",
-        CampaignState.FAILED: "MISSION_FAILED",
-        CampaignState.CANCELLED: "MISSION_CANCELLED",
-    }[state]
-
-
-def package_state_event(state: PackageState) -> str:
-    if not isinstance(state, PackageState):
-        _fail(CampaignContractErrorCode.UNKNOWN_STATE, "package state is unknown")
-    return {
-        PackageState.PROPOSED: "WORK_PROPOSED", PackageState.READY: "WORK_READY",
-        PackageState.RUNNING: "WORK_STARTED", PackageState.VERIFYING: "WORK_VERIFYING",
-        PackageState.COMPLETED: "WORK_COMPLETED", PackageState.NO_CHANGE: "WORK_COMPLETED",
-        PackageState.FAILED: "WORK_FAILED", PackageState.CANCELLED: "WORK_CANCELLED",
-        PackageState.SUPERSEDED: "WORK_SUPERSEDED",
-    }[state]
-
-
-@dataclass(frozen=True, slots=True)
+ INVALID="N04-INVALID"; UNKNOWN_FIELD="N04-UNKNOWN-FIELD"; UNKNOWN_STATE="N04-UNKNOWN-STATE"; ORPHAN_REQUIREMENT="N04-ORPHAN-REQUIREMENT"; ORPHAN_DEPENDENCY="N04-ORPHAN-DEPENDENCY"; AUTHORITY_CHANGED="N04-AUTHORITY-CHANGED"; RECEIPT_INCONSISTENT="N04-RECEIPT-INCONSISTENT"; HISTORICAL_NOT_ALLOWED="N04-HISTORICAL-NOT-ALLOWED"
+ERROR_CODES=tuple(x.value for x in CampaignContractErrorCode)
+class CampaignContractError(ContractViolation):
+ def __init__(self,code:CampaignContractErrorCode,msg:str): self.code=code;super().__init__(f"{code.value}: {msg}")
+def _fail(c,m):raise CampaignContractError(c,m)
+def _id(v,l):
+ try:require_identifier(v,l)
+ except ContractViolation as e:_fail(CampaignContractErrorCode.INVALID,str(e))
+def _dg(v,l):
+ try:require_digest(v,l)
+ except ContractViolation as e:_fail(CampaignContractErrorCode.INVALID,str(e))
+def _tm(v,l):
+ try:require_time(v,l)
+ except ContractViolation as e:_fail(CampaignContractErrorCode.INVALID,str(e))
+def _path(v):
+ try:return portable_path(v)
+ except ContractViolation as e:_fail(CampaignContractErrorCode.INVALID,str(e))
+def _ids(v,l,req=True):
+ if type(v)is not tuple or (req and not v) or len(v)!=len(set(v)):_fail(CampaignContractErrorCode.INVALID,f"{l} unique/nonempty")
+ for x in v:_id(x,l)
+def _sha(v,l):
+ if type(v)is not str or _SHA.fullmatch(v)is None:_fail(CampaignContractErrorCode.INVALID,f"{l} sha")
+class ClaimLevel(StrEnum): STATIC="static";RUNTIME="runtime";PRODUCTION_CANDIDATE="production-candidate";DEPLOYED_OBSERVED="deployed-observed"
+class CampaignState(StrEnum): DRAFT="DRAFT";READY="READY";RUNNING="RUNNING";VERIFYING="VERIFYING";COMPLETED="COMPLETED";NO_CHANGE="NO_CHANGE";FAILED="FAILED";CANCELLED="CANCELLED"
+class PackageState(StrEnum): PROPOSED="PROPOSED";READY="READY";RUNNING="RUNNING";VERIFYING="VERIFYING";COMPLETED="COMPLETED";NO_CHANGE="NO_CHANGE";FAILED="FAILED";CANCELLED="CANCELLED";SUPERSEDED="SUPERSEDED"
+def campaign_state_event(s):
+ if not isinstance(s,CampaignState):_fail(CampaignContractErrorCode.UNKNOWN_STATE,"campaign")
+ if s is CampaignState.DRAFT:return "mission.created",{}
+ return "mission.transition",{"status":{CampaignState.READY:MissionState.READY,CampaignState.RUNNING:MissionState.RUNNING,CampaignState.VERIFYING:MissionState.VERIFYING,CampaignState.COMPLETED:MissionState.COMPLETED,CampaignState.NO_CHANGE:MissionState.COMPLETED,CampaignState.FAILED:MissionState.FAILED,CampaignState.CANCELLED:MissionState.CANCELLED}[s].value}
+def package_state_event(s):
+ if not isinstance(s,PackageState):_fail(CampaignContractErrorCode.UNKNOWN_STATE,"package")
+ if s is PackageState.PROPOSED:return "work.created",{}
+ return "work.transition",{"status":{PackageState.READY:WorkState.READY,PackageState.RUNNING:WorkState.RUNNING,PackageState.VERIFYING:WorkState.AWAITING_VERIFICATION,PackageState.COMPLETED:WorkState.INTEGRATED,PackageState.NO_CHANGE:WorkState.INTEGRATED,PackageState.FAILED:WorkState.TERMINAL_FAILED,PackageState.CANCELLED:WorkState.CANCELLED,PackageState.SUPERSEDED:WorkState.SUPERSEDED}[s].value}
+@dataclass(frozen=True,slots=True)
 class ResourceAllocation:
-    max_wall_seconds: int
-    max_model_calls: int
-    max_cost_microunits: int
-
-    def __post_init__(self) -> None:
-        for name in self.__dataclass_fields__:
-            value = getattr(self, name)
-            if type(value) is not int or value < 0:
-                _fail(CampaignContractErrorCode.INVALID, f"{name} must be a non-negative integer")
-
-    def to_document(self) -> dict[str, int]:
-        return {name: getattr(self, name) for name in self.__dataclass_fields__}
-
-
-@dataclass(frozen=True, slots=True)
+ max_wall_seconds:int;max_model_calls:int;max_cost_microunits:int
+ def __post_init__(self):
+  for n in self.__dataclass_fields__:
+   if type(getattr(self,n))is not int or getattr(self,n)<0:_fail(CampaignContractErrorCode.INVALID,n)
+ def to_document(self):return {n:getattr(self,n) for n in self.__dataclass_fields__}
+@dataclass(frozen=True,slots=True)
 class AcceptanceBinding:
-    acceptance_id: str
-    capability: str
-    artifact_ref: str
-    result: str
-    owner: str
-    claim_level: ClaimLevel
-
-    def __post_init__(self) -> None:
-        for value, label in ((self.acceptance_id, "acceptance_id"), (self.capability, "capability"), (self.owner, "owner")):
-            try:
-                require_identifier(value, label)
-            except ContractViolation as error:
-                _fail(CampaignContractErrorCode.INVALID, str(error))
-        _nonempty(self.artifact_ref, "artifact_ref")
-        _nonempty(self.result, "result")
-        if not isinstance(self.claim_level, ClaimLevel):
-            _fail(CampaignContractErrorCode.INVALID, "claim_level is unknown")
-
-    def to_document(self) -> dict[str, str]:
-        return {"acceptance_id": self.acceptance_id, "capability": self.capability,
-                "artifact_ref": self.artifact_ref, "result": self.result,
-                "owner": self.owner, "claim_level": self.claim_level.value}
-
-
-@dataclass(frozen=True, slots=True)
+ acceptance_id:str;capability:str;artifact_ref:str;result:str;owner:str;claim_level:ClaimLevel;evidence_digest:str|None=None
+ def __post_init__(self):
+  for x,n in ((self.acceptance_id,"acceptance_id"),(self.capability,"capability"),(self.owner,"owner")):_id(x,n)
+  if type(self.artifact_ref)is not str or not self.artifact_ref or self.result not in {"passed","failed","observed"} or not isinstance(self.claim_level,ClaimLevel):_fail(CampaignContractErrorCode.INVALID,"acceptance")
+  if self.evidence_digest is not None:_dg(self.evidence_digest,"evidence")
+ def to_document(self):return {"acceptance_id":self.acceptance_id,"capability":self.capability,"artifact_ref":self.artifact_ref,"result":self.result,"owner":self.owner,"claim_level":self.claim_level.value,"evidence_digest":self.evidence_digest}
+@dataclass(frozen=True,slots=True)
 class CandidateCompletion:
-    disposition: str
-    commit_sha: str
-    tree_digest: str
-    output_receipt_digests: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        if self.disposition not in {"implemented", "no-change"}:
-            _fail(CampaignContractErrorCode.INVALID, "completion disposition is unknown")
-        _sha(self.commit_sha, "commit_sha")
-        try:
-            require_digest(self.tree_digest, "tree_digest")
-        except ContractViolation as error:
-            _fail(CampaignContractErrorCode.INVALID, str(error))
-        if (type(self.output_receipt_digests) is not tuple or not self.output_receipt_digests
-                or len(self.output_receipt_digests) != len(set(self.output_receipt_digests))):
-            _fail(CampaignContractErrorCode.INVALID, "output_receipt_digests must be non-empty and unique")
-        for digest in self.output_receipt_digests:
-            try:
-                require_digest(digest, "output receipt digest")
-            except ContractViolation as error:
-                _fail(CampaignContractErrorCode.INVALID, str(error))
-
-    def to_document(self) -> dict[str, Any]:
-        return {"disposition": self.disposition, "commit_sha": self.commit_sha,
-                "tree_digest": self.tree_digest, "output_receipt_digests": list(self.output_receipt_digests)}
-
-
-@dataclass(frozen=True, slots=True)
+ mission_id:str;package_id:str;authority_digest:str;base_commit_sha:str;base_tree_digest:str;commit_sha:str;tree_digest:str;output_receipts:tuple[tuple[str,str],...];acceptance_receipts:tuple[tuple[str,str],...];disposition:str
+ def __post_init__(self):
+  for x,n in ((self.mission_id,"mission"),(self.package_id,"package")):_id(x,n)
+  for x,n in ((self.authority_digest,"authority"),(self.base_tree_digest,"base tree"),(self.tree_digest,"tree")):_dg(x,n)
+  _sha(self.base_commit_sha,"base commit");_sha(self.commit_sha,"commit")
+  if self.disposition not in {"implemented","no-change"}:_fail(CampaignContractErrorCode.INVALID,"disposition")
+  for xs,n in ((self.output_receipts,"outputs"),(self.acceptance_receipts,"acceptance")):
+   if type(xs)is not tuple or not xs or len({x[0] for x in xs})!=len(xs):_fail(CampaignContractErrorCode.INVALID,n)
+   for a,b in xs:_id(a,n);_dg(b,n)
+  if self.disposition=="no-change" and (self.base_commit_sha!=self.commit_sha or self.base_tree_digest!=self.tree_digest):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"no-change equality")
+@dataclass(frozen=True,slots=True)
 class WorkPackage:
-    """C03: one bounded outcome package and all its exact completion evidence."""
-    schema_version: int
-    package_id: str
-    mission_id: str
-    objective: str
-    target_boundary: str
-    requirement_ids: tuple[str, ...]
-    dependencies: tuple[str, ...]
-    acceptance: tuple[AcceptanceBinding, ...]
-    risk: str
-    resources: ResourceAllocation
-    outputs: tuple[str, ...]
-    rollback: str
-    authority_digest: str
-    state: PackageState
-    created_at: str
-    completion: CandidateCompletion | None = None
-
-    def __post_init__(self) -> None:
-        if type(self.schema_version) is not int or self.schema_version != 1:
-            _fail(CampaignContractErrorCode.INVALID, "unsupported work package schema version")
-        for value, label in ((self.package_id, "package_id"), (self.mission_id, "mission_id")):
-            try: require_identifier(value, label)
-            except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-        _nonempty(self.objective, "objective")
-        try: portable_path(self.target_boundary)
-        except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-        _ids(self.requirement_ids, "requirement_ids")
-        if type(self.dependencies) is not tuple or len(self.dependencies) != len(set(self.dependencies)):
-            _fail(CampaignContractErrorCode.INVALID, "dependencies must be unique")
-        for value in self.dependencies:
-            try: require_identifier(value, "dependency")
-            except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-        if self.package_id in self.dependencies:
-            _fail(CampaignContractErrorCode.ORPHAN_DEPENDENCY, "package cannot depend on itself")
-        if type(self.acceptance) is not tuple or not self.acceptance or len({item.acceptance_id for item in self.acceptance}) != len(self.acceptance):
-            _fail(CampaignContractErrorCode.INVALID, "acceptance must be non-empty with unique IDs")
-        _nonempty(self.risk, "risk"); _ids(self.outputs, "outputs"); _nonempty(self.rollback, "rollback")
-        try: require_digest(self.authority_digest, "authority_digest"); require_time(self.created_at, "created_at")
-        except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-        if not isinstance(self.state, PackageState): _fail(CampaignContractErrorCode.UNKNOWN_STATE, "package state is unknown")
-        if self.state in {PackageState.COMPLETED, PackageState.NO_CHANGE} and self.completion is None:
-            _fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT, "terminal package requires completion")
-        if self.completion is not None and ((self.state is PackageState.NO_CHANGE) != (self.completion.disposition == "no-change")):
-            _fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT, "state and completion disposition disagree")
-
-    def to_document(self) -> dict[str, Any]:
-        return {"schema_version": self.schema_version, "package_id": self.package_id, "mission_id": self.mission_id,
-          "objective": self.objective, "target_boundary": self.target_boundary, "requirement_ids": list(self.requirement_ids),
-          "dependencies": list(self.dependencies), "acceptance": [x.to_document() for x in self.acceptance], "risk": self.risk,
-          "resources": self.resources.to_document(), "outputs": list(self.outputs), "rollback": self.rollback,
-          "authority_digest": self.authority_digest, "state": self.state.value, "created_at": self.created_at,
-          "completion": None if self.completion is None else self.completion.to_document()}
-
-    @property
-    def digest(self) -> str: return canonical_digest(self.to_document())
-
-
-@dataclass(frozen=True, slots=True)
+ schema_version:int;revision:int;package_id:str;mission_id:str;objective:str;target_boundary:str;requirement_ids:tuple[str,...];dependencies:tuple[str,...];capabilities:tuple[str,...];acceptance:tuple[AcceptanceBinding,...];risk:str;resources:ResourceAllocation;outputs:tuple[str,...];rollback:str;authority_digest:str;state:PackageState;created_at:str;completion:CandidateCompletion|None=None
+ def __post_init__(self):
+  if type(self.schema_version)is not int or self.schema_version!=1 or type(self.revision)is not int or self.revision<1:_fail(CampaignContractErrorCode.INVALID,"version")
+  for x,n in ((self.package_id,"package"),(self.mission_id,"mission")):_id(x,n)
+  if not all(type(x)is str and x for x in (self.objective,self.risk,self.rollback)):_fail(CampaignContractErrorCode.INVALID,"required text")
+  object.__setattr__(self,"target_boundary",_path(self.target_boundary));_ids(self.requirement_ids,"requirements");_ids(self.dependencies,"dependencies",False);_ids(self.capabilities,"capabilities");_ids(self.outputs,"outputs")
+  if self.package_id in self.dependencies:_fail(CampaignContractErrorCode.ORPHAN_DEPENDENCY,"self")
+  if type(self.acceptance)is not tuple or not self.acceptance or any(type(x)is not AcceptanceBinding for x in self.acceptance) or len({x.acceptance_id for x in self.acceptance})!=len(self.acceptance):_fail(CampaignContractErrorCode.INVALID,"acceptance exact")
+  if any(x.capability not in self.capabilities or x.artifact_ref not in self.outputs or x.owner=="builder" for x in self.acceptance):_fail(CampaignContractErrorCode.INVALID,"acceptance binding")
+  if any(x.claim_level is ClaimLevel.DEPLOYED_OBSERVED and (x.result!="observed" or x.evidence_digest is None) for x in self.acceptance):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"deployment evidence")
+  if type(self.resources)is not ResourceAllocation:_fail(CampaignContractErrorCode.INVALID,"resource type")
+  _dg(self.authority_digest,"authority");_tm(self.created_at,"time")
+  if not isinstance(self.state,PackageState):_fail(CampaignContractErrorCode.UNKNOWN_STATE,"package")
+  if self.completion is not None and type(self.completion)is not CandidateCompletion:_fail(CampaignContractErrorCode.INVALID,"completion type")
+  terminal=self.state in {PackageState.COMPLETED,PackageState.NO_CHANGE}
+  if terminal != (self.completion is not None):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"terminal")
+  if self.completion:
+   c=self.completion
+   if (c.mission_id,c.package_id,c.authority_digest)!=(self.mission_id,self.package_id,self.authority_digest) or set(x[0] for x in c.output_receipts)!=set(self.outputs) or set(x[0] for x in c.acceptance_receipts)!={x.acceptance_id for x in self.acceptance} or (self.state is PackageState.NO_CHANGE)!=(c.disposition=="no-change"):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completion binding")
+ def to_document(self):return {"schema_version":self.schema_version,"revision":self.revision,"package_id":self.package_id,"mission_id":self.mission_id,"objective":self.objective,"target_boundary":self.target_boundary,"requirement_ids":list(self.requirement_ids),"dependencies":list(self.dependencies),"capabilities":list(self.capabilities),"acceptance":[x.to_document() for x in self.acceptance],"risk":self.risk,"resources":self.resources.to_document(),"outputs":list(self.outputs),"rollback":self.rollback,"authority_digest":self.authority_digest,"state":self.state.value,"created_at":self.created_at,"completion":None}
+@dataclass(frozen=True,slots=True)
 class CampaignMission:
-    """C02: immutable campaign mission binding its packages and requirements."""
-    schema_version: int
-    mission_id: str
-    objective: str
-    target_boundary: str
-    requirement_ids: tuple[str, ...]
-    packages: tuple[WorkPackage, ...]
-    authority_digest: str
-    state: CampaignState
-    created_at: str
-    parent_digest: str | None = None
-
-    def __post_init__(self) -> None:
-        if type(self.schema_version) is not int or self.schema_version != 1: _fail(CampaignContractErrorCode.INVALID, "unsupported campaign schema version")
-        try: require_identifier(self.mission_id, "mission_id"); portable_path(self.target_boundary); require_digest(self.authority_digest, "authority_digest"); require_time(self.created_at, "created_at")
-        except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-        _nonempty(self.objective, "objective"); _ids(self.requirement_ids, "requirement_ids")
-        if type(self.packages) is not tuple or not self.packages or len({item.package_id for item in self.packages}) != len(self.packages): _fail(CampaignContractErrorCode.INVALID, "packages must be non-empty and unique")
-        package_ids = {item.package_id for item in self.packages}
-        if any(item.mission_id != self.mission_id for item in self.packages): _fail(CampaignContractErrorCode.INVALID, "package belongs to another mission")
-        if any(item.authority_digest != self.authority_digest for item in self.packages): _fail(CampaignContractErrorCode.AUTHORITY_CHANGED, "package authority differs from mission")
-        if any(not set(item.requirement_ids).issubset(self.requirement_ids) for item in self.packages): _fail(CampaignContractErrorCode.ORPHAN_REQUIREMENT, "package references undeclared requirement")
-        if any(not set(item.dependencies).issubset(package_ids) for item in self.packages): _fail(CampaignContractErrorCode.ORPHAN_DEPENDENCY, "package dependency is undeclared")
-        if not isinstance(self.state, CampaignState): _fail(CampaignContractErrorCode.UNKNOWN_STATE, "mission state is unknown")
-        if self.parent_digest is not None:
-            try: require_digest(self.parent_digest, "parent_digest")
-            except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-
-    def to_document(self) -> dict[str, Any]:
-        return {"schema_version": self.schema_version, "mission_id": self.mission_id, "objective": self.objective,
-          "target_boundary": self.target_boundary, "requirement_ids": list(self.requirement_ids),
-          "packages": [x.to_document() for x in self.packages], "authority_digest": self.authority_digest,
-          "state": self.state.value, "created_at": self.created_at, "parent_digest": self.parent_digest}
-
-    @property
-    def digest(self) -> str: return canonical_digest(self.to_document())
-
-
-@dataclass(frozen=True, slots=True)
+ schema_version:int;revision:int;mission_id:str;objective:str;target_boundary:str;requirement_ids:tuple[str,...];packages:tuple[WorkPackage,...];authority_digest:str;state:CampaignState;created_at:str;parent_digest:str|None=None
+ def __post_init__(self):
+  if type(self.schema_version)is not int or self.schema_version!=1 or type(self.revision)is not int or self.revision<1:_fail(CampaignContractErrorCode.INVALID,"version")
+  _id(self.mission_id,"mission");object.__setattr__(self,"target_boundary",_path(self.target_boundary));_ids(self.requirement_ids,"requirements");_dg(self.authority_digest,"authority");_tm(self.created_at,"time")
+  if not isinstance(self.state,CampaignState) or type(self.objective)is not str or not self.objective or type(self.packages)is not tuple or not self.packages or any(type(x)is not WorkPackage for x in self.packages) or len({x.package_id for x in self.packages})!=len(self.packages):_fail(CampaignContractErrorCode.INVALID,"mission")
+  ids={x.package_id for x in self.packages};covered=set().union(*(set(x.requirement_ids) for x in self.packages))
+  if any(x.mission_id!=self.mission_id or x.authority_digest!=self.authority_digest for x in self.packages):_fail(CampaignContractErrorCode.AUTHORITY_CHANGED,"package")
+  if any(not(x.target_boundary==self.target_boundary or x.target_boundary.startswith(self.target_boundary+"/")) for x in self.packages):_fail(CampaignContractErrorCode.INVALID,"target")
+  if covered!=set(self.requirement_ids):_fail(CampaignContractErrorCode.ORPHAN_REQUIREMENT,"coverage")
+  pending={x.package_id:set(x.dependencies) for x in self.packages}
+  if any(not v.issubset(ids) for v in pending.values()):_fail(CampaignContractErrorCode.ORPHAN_DEPENDENCY,"unknown")
+  while pending:
+   ready={k for k,v in pending.items() if not v}
+   if not ready:_fail(CampaignContractErrorCode.ORPHAN_DEPENDENCY,"cycle")
+   for k in ready:del pending[k]
+   for v in pending.values():v.difference_update(ready)
+  if self.parent_digest is not None:_dg(self.parent_digest,"parent")
+ def to_document(self):return {"schema_version":self.schema_version,"revision":self.revision,"mission_id":self.mission_id,"objective":self.objective,"target_boundary":self.target_boundary,"requirement_ids":list(self.requirement_ids),"packages":[x.to_document() for x in self.packages],"authority_digest":self.authority_digest,"state":self.state.value,"created_at":self.created_at,"parent_digest":self.parent_digest}
+ @property
+ def digest(self):return canonical_digest(self.to_document())
+@dataclass(frozen=True,slots=True)
 class SuccessorContract:
-    """C09: append-only successor binding; acceptance changes need a disposition."""
-    predecessor_digest: str
-    successor: CampaignMission
-    inherited_requirement_ids: tuple[str, ...]
-    changed_acceptance_ids: tuple[str, ...]
-    independent_disposition_digest: str | None
-
-    def __post_init__(self) -> None:
-        try: require_digest(self.predecessor_digest, "predecessor_digest")
-        except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-        _ids(self.inherited_requirement_ids, "inherited_requirement_ids")
-        if self.successor.parent_digest != self.predecessor_digest:
-            _fail(CampaignContractErrorCode.INVALID, "successor must retain predecessor digest")
-        if set(self.inherited_requirement_ids) != set(self.successor.requirement_ids): _fail(CampaignContractErrorCode.ORPHAN_REQUIREMENT, "successor must retain every requirement")
-        if type(self.changed_acceptance_ids) is not tuple or len(self.changed_acceptance_ids) != len(set(self.changed_acceptance_ids)): _fail(CampaignContractErrorCode.INVALID, "changed acceptance IDs must be unique")
-        if self.changed_acceptance_ids and self.independent_disposition_digest is None: _fail(CampaignContractErrorCode.INVALID, "changed acceptance requires independent disposition")
-        acceptance_ids = {item.acceptance_id for package in self.successor.packages for item in package.acceptance}
-        if not set(self.changed_acceptance_ids).issubset(acceptance_ids):
-            _fail(CampaignContractErrorCode.INVALID, "changed acceptance is not in successor")
-        if self.independent_disposition_digest is not None:
-            try: require_digest(self.independent_disposition_digest, "independent_disposition_digest")
-            except ContractViolation as error: _fail(CampaignContractErrorCode.INVALID, str(error))
-
-    def to_document(self) -> dict[str, Any]:
-        return {"predecessor_digest": self.predecessor_digest,
-                "successor": self.successor.to_document(),
-                "inherited_requirement_ids": list(self.inherited_requirement_ids),
-                "changed_acceptance_ids": list(self.changed_acceptance_ids),
-                "independent_disposition_digest": self.independent_disposition_digest}
-
-    @property
-    def digest(self) -> str:
-        return canonical_digest(self.to_document())
-
-
-def parse_campaign_mission(raw: bytes, *, fixture_mode: bool = False) -> CampaignMission:
-    """Parse only current production schema; historical input is fixture-only."""
-    document = strict_json_object(raw)
-    if document.get("schema_version") != 1:
-        if fixture_mode and document.get("historical_inert_plan") is True:
-            _fail(CampaignContractErrorCode.HISTORICAL_NOT_ALLOWED, "historical inert plans are not C02 records")
-        _fail(CampaignContractErrorCode.HISTORICAL_NOT_ALLOWED, "unsupported campaign schema version")
-    allowed = {"schema_version", "mission_id", "objective", "target_boundary", "requirement_ids", "packages", "authority_digest", "state", "created_at", "parent_digest"}
-    if set(document) - allowed: _fail(CampaignContractErrorCode.UNKNOWN_FIELD, "unknown campaign field")
-    packages = tuple(_package_from_document(item) for item in document.get("packages", ()))
-    return CampaignMission(document["schema_version"], document["mission_id"], document["objective"], document["target_boundary"], tuple(document["requirement_ids"]), packages, document["authority_digest"], CampaignState(document["state"]), document["created_at"], document.get("parent_digest"))
-
-
-def _package_from_document(value: Any) -> WorkPackage:
-    if not isinstance(value, Mapping): _fail(CampaignContractErrorCode.INVALID, "package must be an object")
-    allowed = {"schema_version", "package_id", "mission_id", "objective", "target_boundary", "requirement_ids", "dependencies", "acceptance", "risk", "resources", "outputs", "rollback", "authority_digest", "state", "created_at", "completion"}
-    if set(value) - allowed:
-        _fail(CampaignContractErrorCode.UNKNOWN_FIELD, "unknown work package field")
-    completion = value.get("completion")
-    if completion is not None and (not isinstance(completion, Mapping) or set(completion) != {"disposition", "commit_sha", "tree_digest", "output_receipt_digests"}):
-        _fail(CampaignContractErrorCode.UNKNOWN_FIELD, "invalid completion fields")
-    parsed_completion = None if completion is None else CandidateCompletion(completion["disposition"], completion["commit_sha"], completion["tree_digest"], tuple(completion["output_receipt_digests"]))
-    acceptance = []
-    for item in value["acceptance"]:
-        if not isinstance(item, Mapping) or set(item) != {"acceptance_id", "capability", "artifact_ref", "result", "owner", "claim_level"}:
-            _fail(CampaignContractErrorCode.UNKNOWN_FIELD, "invalid acceptance fields")
-        acceptance.append(AcceptanceBinding(item["acceptance_id"], item["capability"], item["artifact_ref"], item["result"], item["owner"], ClaimLevel(item["claim_level"])))
-    resources = value["resources"]
-    if not isinstance(resources, Mapping) or set(resources) != {"max_wall_seconds", "max_model_calls", "max_cost_microunits"}:
-        _fail(CampaignContractErrorCode.UNKNOWN_FIELD, "invalid resource fields")
-    return WorkPackage(value["schema_version"], value["package_id"], value["mission_id"], value["objective"], value["target_boundary"], tuple(value["requirement_ids"]), tuple(value["dependencies"]), tuple(acceptance), value["risk"], ResourceAllocation(**resources), tuple(value["outputs"]), value["rollback"], value["authority_digest"], PackageState(value["state"]), value["created_at"], parsed_completion)
-
-
-def parse_historical_inert_plan(raw: bytes, *, fixture_mode: bool = False) -> Mapping[str, Any]:
-    """Read a declared historical fixture only; it can never enter C02 admission."""
-    if not fixture_mode:
-        _fail(CampaignContractErrorCode.HISTORICAL_NOT_ALLOWED, "historical plan requires fixture_mode")
-    document = strict_json_object(raw)
-    if document.get("historical_inert_plan") is not True or type(document.get("schema_version")) is not int:
-        _fail(CampaignContractErrorCode.HISTORICAL_NOT_ALLOWED, "not a declared historical inert plan")
-    return document
+ predecessor:CampaignMission;successor:CampaignMission;independent_disposition_digest:str|None=None
+ def __post_init__(self):
+  if type(self.predecessor)is not CampaignMission or type(self.successor)is not CampaignMission:_fail(CampaignContractErrorCode.INVALID,"types")
+  if self.successor.parent_digest!=self.predecessor.digest or self.successor.authority_digest!=self.predecessor.authority_digest or set(self.successor.requirement_ids)!=set(self.predecessor.requirement_ids):_fail(CampaignContractErrorCode.AUTHORITY_CHANGED,"successor")
+  if self.successor.revision<=self.predecessor.revision:_fail(CampaignContractErrorCode.INVALID,"revision")
+  old={(x.acceptance_id,x.to_document().__repr__()) for p in self.predecessor.packages for x in p.acceptance};new={(x.acceptance_id,x.to_document().__repr__()) for p in self.successor.packages for x in p.acceptance}
+  if old!=new and self.independent_disposition_digest is None:_fail(CampaignContractErrorCode.INVALID,"changed acceptance")
+  if self.independent_disposition_digest is not None:_dg(self.independent_disposition_digest,"disposition")
+def parse_campaign_mission(raw:bytes,*,fixture_mode=False):
+    """Production parser: strict JSON plus constructor admission; errors are N04-coded."""
+    try:
+        d=strict_json_object(raw)
+        if d.get("schema_version")!=1 or type(d.get("schema_version")) is not int:_fail(CampaignContractErrorCode.HISTORICAL_NOT_ALLOWED,"version")
+        allowed={"schema_version","revision","mission_id","objective","target_boundary","requirement_ids","packages","authority_digest","state","created_at","parent_digest"}
+        if set(d)!=allowed:_fail(CampaignContractErrorCode.UNKNOWN_FIELD,"campaign")
+        packages=[]
+        for p in d["packages"]:
+            if not isinstance(p,Mapping):_fail(CampaignContractErrorCode.INVALID,"package")
+            a=tuple(AcceptanceBinding(**{**x,"claim_level":ClaimLevel(x["claim_level"])}) for x in p["acceptance"])
+            packages.append(WorkPackage(p["schema_version"],p["revision"],p["package_id"],p["mission_id"],p["objective"],p["target_boundary"],tuple(p["requirement_ids"]),tuple(p["dependencies"]),tuple(p["capabilities"]),a,p["risk"],ResourceAllocation(**p["resources"]),tuple(p["outputs"]),p["rollback"],p["authority_digest"],PackageState(p["state"]),p["created_at"],None))
+        return CampaignMission(d["schema_version"],d["revision"],d["mission_id"],d["objective"],d["target_boundary"],tuple(d["requirement_ids"]),tuple(packages),d["authority_digest"],CampaignState(d["state"]),d["created_at"],d["parent_digest"])
+    except CampaignContractError: raise
+    except (ContractViolation,ValueError,KeyError,TypeError) as e:_fail(CampaignContractErrorCode.INVALID,str(e))
+def parse_historical_inert_plan(raw:bytes,*,fixture_mode=False):
+ try:d=strict_json_object(raw)
+ except ContractViolation as e:_fail(CampaignContractErrorCode.INVALID,str(e))
+ if not fixture_mode or set(d)!={"schema_version","historical_inert_plan","fixture_id","candidate"} or d.get("schema_version")!=0 or d.get("historical_inert_plan") is not True or d.get("fixture_id")!="N04-HISTORICAL-V0" or d.get("candidate")!="candidate/app.txt":_fail(CampaignContractErrorCode.HISTORICAL_NOT_ALLOWED,"historical")
+ return d
