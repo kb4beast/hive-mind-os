@@ -30,6 +30,15 @@ _ALLOWED_PLACEHOLDERS = frozenset({"{workspace}", "{state}", "{cache}", "{output
 _SHELLS = frozenset({"cmd", "cmd.exe", "powershell", "powershell.exe", "sh", "bash", "python", "python.exe", "pwsh", "pwsh.exe"})
 _STORE_LOCK = threading.RLock()
 
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
 
 class RepositoryProfileError(ValueError):
     """Profile data is ambiguous, target-owned, or outside its host boundary."""
@@ -362,9 +371,9 @@ class RepositoryProfileStore:
                 lease = lock_path / "lease.json"
                 try:
                     record = strict_json_object(lease.read_bytes())
-                    if set(record) != {"pid", "created_at"} or type(record["pid"]) is not int or type(record["created_at"]) not in {int, float}:
+                    if set(record) != {"pid", "created_at", "fence"} or type(record["pid"]) is not int or type(record["created_at"]) not in {int, float} or type(record["fence"]) is not str:
                         raise ValueError
-                    if time.time() - float(record["created_at"]) <= self.lock_lease_seconds:
+                    if time.time() - float(record["created_at"]) <= self.lock_lease_seconds or _pid_alive(record["pid"]):
                         raise RepositoryProfileError("profile activation is concurrently locked; retry from host") from error
                     lease.unlink(); lock_path.rmdir(); lock_path.mkdir()
                 except RepositoryProfileError:
@@ -372,7 +381,8 @@ class RepositoryProfileStore:
                 except (OSError, ValueError):
                     raise RepositoryProfileError("profile activation lock is malformed or active") from error
             try:
-                (lock_path / "lease.json").write_bytes(json.dumps({"pid": os.getpid(), "created_at": time.time()}, sort_keys=True).encode("utf-8"))
+                fence = canonical_digest({"pid": os.getpid(), "created_at": time.time(), "profile": profile.profile_id})
+                (lock_path / "lease.json").write_bytes(json.dumps({"pid": os.getpid(), "created_at": time.time(), "fence": fence}, sort_keys=True).encode("utf-8"))
                 for active in self.directory.glob("*.active.json"):
                     if active.is_symlink() or active.stat().st_nlink != 1:
                         raise RepositoryProfileError("active profile pointer must not be linked or redirected")
@@ -391,11 +401,15 @@ class RepositoryProfileStore:
                 fd, name = tempfile.mkstemp(prefix=".profile-", suffix=".tmp", dir=self.directory)
                 try:
                     with os.fdopen(fd, "wb") as stream: stream.write(data); stream.flush(); os.fsync(stream.fileno())
+                    lease = strict_json_object((lock_path / "lease.json").read_bytes())
+                    if lease.get("fence") != fence or lease.get("pid") != os.getpid(): raise RepositoryProfileError("profile lock fence was lost")
                     os.replace(name, target)
                     pointer_data = json.dumps({"profile_id":profile.profile_id,"profile_digest":profile.profile_digest,"generation":profile.generation}, sort_keys=True, separators=(",", ":")).encode("utf-8")
                     pfd, pname = tempfile.mkstemp(prefix=".pointer-", suffix=".tmp", dir=self.directory)
                     try:
                         with os.fdopen(pfd, "wb") as stream: stream.write(pointer_data); stream.flush(); os.fsync(stream.fileno())
+                        lease = strict_json_object((lock_path / "lease.json").read_bytes())
+                        if lease.get("fence") != fence: raise RepositoryProfileError("profile lock fence was lost")
                         os.replace(pname, pointer)
                     finally:
                         if os.path.exists(pname): os.unlink(pname)
