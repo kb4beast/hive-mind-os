@@ -55,6 +55,7 @@ from .repository_profile import (
     ProfileCapability,
     RepositoryProfile,
 )
+from .receipts import filesystem_path
 from .runtime_contracts import canonical_json_bytes, raw_sha256
 from .scoped_learning import LearningScope
 from .verification_adapters import (
@@ -148,20 +149,23 @@ def _repository_identity(repository: Path) -> tuple[str, str, str]:
 
 def _write_once(path: Path, document: Mapping[str, Any]) -> Path:
     body = canonical_json_bytes(dict(document)) + b"\n"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        if path.read_bytes() != body:
+    target = filesystem_path(path)
+    filesystem_path(path.parent).mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        if target.read_bytes() != body:
             raise CodexHostBootstrapError(
                 f"content-addressed host artifact conflicts: {path}"
             )
         return path
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    temporary = filesystem_path(
+        path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    )
     try:
         with temporary.open("xb") as stream:
             stream.write(body)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        os.replace(temporary, target)
     finally:
         temporary.unlink(missing_ok=True)
     return path
@@ -169,21 +173,27 @@ def _write_once(path: Path, document: Mapping[str, Any]) -> Path:
 
 def _replace(path: Path, document: Mapping[str, Any]) -> Path:
     body = canonical_json_bytes(dict(document)) + b"\n"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    target = filesystem_path(path)
+    filesystem_path(path.parent).mkdir(parents=True, exist_ok=True)
+    temporary = filesystem_path(
+        path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    )
     try:
         with temporary.open("xb") as stream:
             stream.write(body)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        os.replace(temporary, target)
     finally:
         temporary.unlink(missing_ok=True)
     return path
 
 
 def _file_ref(path: Path) -> str:
-    return f"file:{path}#sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+    return (
+        f"file:{path}#sha256:"
+        f"{hashlib.sha256(filesystem_path(path).read_bytes()).hexdigest()}"
+    )
 
 
 def _component_digest(name: str) -> str:
