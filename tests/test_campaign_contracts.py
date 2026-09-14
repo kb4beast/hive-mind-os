@@ -1,5 +1,6 @@
 import json
 import unittest
+from pathlib import Path
 from hive_mind_os.campaign_contracts import *
 D="sha256:"+"0"*64; S="0"*40; T="2026-09-14T01:00:00Z"
 def pkg(*,deps=(),target="src",req=("R01",),state=PackageState.READY,authority=D):
@@ -23,9 +24,12 @@ class TestCampaign(unittest.TestCase):
  def test_kernel_adapter_and_historical_gate(self):
   self.assertEqual(campaign_state_event(CampaignState.READY),("mission.transition",{"status":"READY"}))
   self.assertEqual(package_state_event(PackageState.VERIFYING),("work.transition",{"status":"AWAITING_VERIFICATION"}))
-  raw=b'{"schema_version":0,"historical_inert_plan":true,"fixture_id":"N04-HISTORICAL-V0","candidate":"candidate/app.txt"}'
+ raw=b'{"schema_version":0,"historical_inert_plan":true,"fixture_id":"N04-HISTORICAL-V0","candidate":"candidate/app.txt"}'
   self.assertEqual(parse_historical_inert_plan(raw,fixture_mode=True)["schema_version"],0)
   with self.assertRaises(CampaignContractError):parse_historical_inert_plan(raw)
+  root=Path(__file__).parent/"fixtures"/"campaign_contracts"
+  self.assertEqual(parse_historical_inert_plan((root/"historical-v0.json").read_bytes(),fixture_mode=True)["fixture_id"],"N04-HISTORICAL-V0")
+  with self.assertRaises(CampaignContractError):parse_historical_inert_plan((root/"historical-v0-invalid-extra.json").read_bytes(),fixture_mode=True)
  def test_successor_authenticated(self):
   p=mission(); child=mission(parent=p.digest,revision=2)
   SuccessorContract(p,child)
