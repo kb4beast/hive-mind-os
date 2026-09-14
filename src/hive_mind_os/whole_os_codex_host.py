@@ -1217,14 +1217,25 @@ def main(argv: Sequence[str] | None = None) -> None:
     arguments = _parser().parse_args(argv)
     if not 60 <= arguments.timeout_seconds <= 3600:
         raise SystemExit("--timeout-seconds must be between 60 and 3600")
-    code, receipt = execute_trusted_launcher(
+    code, _receipt = execute_trusted_launcher(
         repository=Path(arguments.repository),
         state_root=Path(arguments.state_root),
         tenant_id=arguments.tenant_id,
         repository_id=arguments.repository_id,
         timeout_seconds=arguments.timeout_seconds,
     )
-    print(json.dumps(receipt, indent=2, sort_keys=True))
+    # The complete append-only receipt remains in external state.  Keep the
+    # console contract deliberately narrow so future receipt fields cannot
+    # become a clear-text credential disclosure channel.
+    print(
+        json.dumps(
+            {
+                "receipt_pointer": "startup-current.json",
+                "status": "complete" if code == 0 else "blocked",
+            },
+            sort_keys=True,
+        )
+    )
     raise SystemExit(code)
 
 
