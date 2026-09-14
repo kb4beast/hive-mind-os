@@ -2,5 +2,6 @@
   "type": "object",
   "additionalProperties": false,
   "title": "RobloxRuntimeEvidence",
-  "$schema": "https://json-schema.org/draft/2020-12/schema"
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/roblox-runtime-evidence.schema.json"
 }

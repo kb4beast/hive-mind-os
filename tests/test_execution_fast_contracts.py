@@ -97,7 +97,7 @@ class ExecutionContractsTests(unittest.TestCase):
         self.assertEqual(f.observe(o, "h").decision, FeedbackDecision.DUPLICATE)
         c = RuntimeChallenger(
             "v",
-            "d",
+            "sha256:" + "d" * 64,
             "p",
             "src",
             "dep",

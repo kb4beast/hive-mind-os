@@ -61,11 +61,24 @@ CAMPAIGN_SCHEMA_NAMES = (
     "work-package",
     "whole-os-service-config",
 )
+LEARNING_SCHEMA_NAMES = (
+    "endpoint-episode",
+    "endpoint-seal",
+    "functional-evaluation",
+    "isolation-attestation",
+    "learning-route",
+    "lesson-delivery-obligation",
+    "lesson-draft",
+    "roblox-profile",
+    "roblox-runtime-evidence",
+    "subject-memory-boundary",
+)
 SCHEMA_NAMES = (
     *LEGACY_SCHEMA_NAMES,
     *EXTENSION_SCHEMA_NAMES,
     *KERNEL_SCHEMA_NAMES,
     *CAMPAIGN_SCHEMA_NAMES,
+    *LEARNING_SCHEMA_NAMES,
 )
 ROLE_NAMES = frozenset(
     {

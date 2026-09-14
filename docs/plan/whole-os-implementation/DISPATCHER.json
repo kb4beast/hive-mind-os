@@ -6,7 +6,7 @@
   "plan_path": "docs/plan/whole-os-implementation/whole-os-plan-v2.json",
   "plan_digest": "sha256:a441e4906a01de776af54f0538824d18363c7403b615df67392a51df34b96005",
   "generation_manifest_path": "docs/plan/whole-os-implementation/generation-manifest.json",
-  "generation_manifest_digest": "sha256:9cfd971bbd4403d4072196ffdbfffa174e7a14687ab84a5011d54a293b256c87",
+  "generation_manifest_digest": "sha256:5a6959520e430c525e87ba40ff172a7ee4fe46bb00ca318a7160b90385c2f3d9",
   "node_contracts_path": "docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json",
   "node_contracts_digest": "sha256:e6266ef759c4ddfd87cdf39d0f8faee89283d967f315ae13c9a601178ea0b7cd",
   "historical_node_contracts": {
@@ -16,9 +16,9 @@
     "purpose": "historical-non-admitting-compatibility-evidence"
   },
   "node_prompt_path": "docs/plan/whole-os-implementation/NODE_PROMPT.md",
-  "node_prompt_digest": "sha256:dac3872048f4f2a0ea9d435c951e581b8ba195e01b2809bf758c7e5e11e3fb2a",
+  "node_prompt_digest": "sha256:fe05c8b61ca3f2b77329ca3d96ea97f950da6fe65c66626399d824dab78e8221",
   "node_prompt_renderer_path": "src/hive_mind_os/node_prompt_renderer.py",
-  "node_prompt_renderer_digest": "sha256:20323f5a506c221bfb557115136ee2a6be8d53f78284d0c3d7aaa6ec35e3ae93",
+  "node_prompt_renderer_digest": "sha256:220173d70d9fa4c28504f85aa4080bc0d6a134e089eaee87842c2a3ff095fc66",
   "source_inventory_path": "docs/plan/whole-os-implementation/source-inventory.json",
   "source_inventory_digest": "sha256:39109ae21cc5d55b7fa85506ffc18920701e2e89db77949aa191021d7b85d127",
   "requirements_path": "docs/plan/whole-os-tournament-2026-09-13/requirements.json",

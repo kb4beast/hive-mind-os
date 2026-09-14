@@ -11,6 +11,7 @@ from hive_mind_os.isolated_execution import (
 from hive_mind_os.lesson_drafts import DraftError, ProcessingState, create_draft
 from hive_mind_os.roblox_runtime import RuntimeVerdict, blocked_runtime
 from hive_mind_os.tenant_memory import (
+    BoundaryError,
     ScopedMemoryHandle,
     SubjectMemoryBoundary,
     SubjectNamespace,
@@ -43,7 +44,8 @@ class BoundaryContractsTests(unittest.TestCase):
         store = SubjectNamespace()
         store.put(a, "k", "secret")
         h = ScopedMemoryHandle(a.digest, "builder", "m", ("private",))
-        self.assertIsNone(store.get(h, b, "k"))
+        with self.assertRaises(BoundaryError):
+            store.get(h, b, "k")
 
     def test_draft_requires_review_receipt(self):
         d = create_draft(
