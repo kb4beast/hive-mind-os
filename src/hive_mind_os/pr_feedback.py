@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 
 from .brain_kernel.canonical import canonical_digest
@@ -60,13 +60,33 @@ class FeedbackObserver:
         return {
             "cursor": self.cursor,
             "seen": tuple(sorted(self.seen)),
-            "repairs": tuple(self.repairs),
+            "repairs": tuple(
+                (package_id, asdict(observation))
+                for package_id, observation in sorted(self.repairs.items())
+            ),
         }
 
     def restore(self, state):
         self.cursor = state.get("cursor")
         self.seen = set(tuple(x) for x in state.get("seen", ()))
-        self.repairs = {}
+        repairs = state.get("repairs", ())
+        restored = {}
+        for item in repairs:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                continue
+            package_id, observation = item
+            if not isinstance(package_id, str) or not isinstance(observation, dict):
+                continue
+            try:
+                restored[package_id] = FeedbackObservation(
+                    **{
+                        **observation,
+                        "evidence_refs": tuple(observation.get("evidence_refs", ())),
+                    }
+                )
+            except (TypeError, ValueError):
+                continue
+        self.repairs = restored
 
     def observe(self, o: FeedbackObservation, current_head: str) -> FeedbackResult:
         key = (o.provider, o.pr_id, o.event_id, o.content_digest)

@@ -8,8 +8,9 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from threading import Event, Lock, Thread
 from types import MappingProxyType
-from typing import Any, Mapping, Protocol
+from typing import Any, Callable, Mapping, Protocol
 from uuid import uuid4
 
 from .cohort_assurance import (
@@ -35,6 +36,95 @@ from .scheduler import Job, Scheduler, StaleLeaseError
 
 class ServiceError(RuntimeError):
     pass
+
+
+class _LeaseHeartbeats:
+    """Keep claimed jobs live through host calls and durable result writes.
+
+    A coordinator can be descheduled while a worker is running or while an fsync is
+    in progress.  Heartbeating on a dedicated thread prevents those pauses from
+    turning a completed effect into a stale lease.  Per-job transition locks keep
+    the last heartbeat and the terminal scheduler mutation ordered without making
+    one slow receipt write starve unrelated jobs.
+    """
+
+    def __init__(self, scheduler: Scheduler, jobs: tuple[Job, ...]) -> None:
+        self._scheduler = scheduler
+        self._interval = max(0.01, min(10.0, scheduler.lease_seconds / 3.0))
+        self._jobs = {job.id: job for job in jobs}
+        self._locks = {job.id: Lock() for job in jobs}
+        self._state_lock = Lock()
+        self._stale: set[str] = set()
+        self._stop = Event()
+        self._thread = Thread(
+            target=self._run,
+            name="whole-os-lease-heartbeats",
+            daemon=True,
+        )
+
+    def __enter__(self) -> _LeaseHeartbeats:
+        # Refresh synchronously before worker submission, then let the dedicated
+        # loop own cadence independently of coordinator scheduling and fsync.
+        self._heartbeat_once()
+        self._thread.start()
+        return self
+
+    def __exit__(self, kind: object, value: object, traceback: object) -> None:
+        self._stop.set()
+        self._thread.join(timeout=max(1.0, self._interval * 2.0))
+
+    def _is_active(self, job_id: str) -> bool:
+        with self._state_lock:
+            return job_id in self._jobs
+
+    def is_stale(self, job: Job) -> bool:
+        with self._state_lock:
+            return job.id in self._stale
+
+    def _heartbeat_once(self) -> None:
+        with self._state_lock:
+            jobs = tuple(self._jobs.values())
+        for job in jobs:
+            lock = self._locks[job.id]
+            if not lock.acquire(blocking=False):
+                # A terminal mutation for this exact job is already in progress.
+                continue
+            try:
+                if not self._is_active(job.id):
+                    continue
+                try:
+                    self._scheduler.heartbeat(job.id, job.lease_token or "")
+                except StaleLeaseError:
+                    with self._state_lock:
+                        self._stale.add(job.id)
+                        self._jobs.pop(job.id, None)
+            finally:
+                lock.release()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            self._heartbeat_once()
+
+    def transition(self, job: Job, action: Callable[[], object]) -> None:
+        """Run one final mutation ordered after the job's last heartbeat."""
+        lock = self._locks[job.id]
+        with lock:
+            with self._state_lock:
+                if job.id in self._stale or job.id not in self._jobs:
+                    raise StaleLeaseError("scheduler lease expired before transition")
+            try:
+                # Do not rely on where the periodic loop happened to fall. The
+                # terminal mutation always starts from a freshly persisted lease,
+                # ordered under this job's transition lock.
+                self._scheduler.heartbeat(job.id, job.lease_token or "")
+            except StaleLeaseError:
+                with self._state_lock:
+                    self._stale.add(job.id)
+                    self._jobs.pop(job.id, None)
+                raise
+            action()
+            with self._state_lock:
+                self._jobs.pop(job.id, None)
 
 
 class PackageStatus(StrEnum):
@@ -527,32 +617,53 @@ class WholeOSService:
         if job is None:
             return
         token = job.lease_token or ""
-        try:
-            retained = self._load_terminal_assessment(candidate)
-            if retained is None:
-                assessor = getattr(self.host, "assess_terminal_candidate", None)
-                if not callable(assessor):
-                    raise ServiceError("host terminal assessor is required")
-                frozen_payload = self._freeze(payload)
-                assert isinstance(frozen_payload, Mapping)
-                assessment = assessor(candidate, frozen_payload)
-                if not isinstance(assessment, TerminalAssessment):
-                    raise ServiceError("host returned an untyped terminal assessment")
-                if assessment.evidence.candidate_digest != (
-                    convergence_candidate_digest(candidate)
-                ):
-                    raise ServiceError(
-                        "terminal evidence does not bind the converged candidate"
+        with _LeaseHeartbeats(self.scheduler, (job,)) as heartbeats:
+            try:
+                retained = self._load_terminal_assessment(candidate)
+                if retained is None:
+                    assessor = getattr(self.host, "assess_terminal_candidate", None)
+                    if not callable(assessor):
+                        raise ServiceError("host terminal assessor is required")
+                    frozen_payload = self._freeze(payload)
+                    assert isinstance(frozen_payload, Mapping)
+                    assessment = assessor(candidate, frozen_payload)
+                    if not isinstance(assessment, TerminalAssessment):
+                        raise ServiceError(
+                            "host returned an untyped terminal assessment"
+                        )
+                    if assessment.evidence.candidate_digest != (
+                        convergence_candidate_digest(candidate)
+                    ):
+                        raise ServiceError(
+                            "terminal evidence does not bind the converged candidate"
+                        )
+                    self._persist_terminal_assessment(candidate, assessment)
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"
+                try:
+                    heartbeats.transition(
+                        job,
+                        lambda error=error: self.scheduler.fail(
+                            job.id,
+                            token,
+                            error,
+                            mission_id=self.config.campaign_id,
+                        ),
                     )
-                self._persist_terminal_assessment(candidate, assessment)
-            self.scheduler.complete(job.id, token, mission_id=self.config.campaign_id)
-        except Exception as exc:
-            self.scheduler.fail(
-                job.id,
-                token,
-                f"{type(exc).__name__}: {exc}",
-                mission_id=self.config.campaign_id,
-            )
+                except StaleLeaseError:
+                    # No effect is retried here. A later cohort can reclaim the
+                    # expired exact job and reconcile any retained receipt.
+                    return
+                return
+            try:
+                heartbeats.transition(
+                    job,
+                    lambda: self.scheduler.complete(
+                        job.id, token, mission_id=self.config.campaign_id
+                    ),
+                )
+            except StaleLeaseError:
+                return
 
     def run_once(self) -> ServiceObservation:
         """Execute one package using the original strict compatibility behavior."""
@@ -719,6 +830,49 @@ class WholeOSService:
                 mission_id=self.config.campaign_id,
             )
 
+    def _persist_result_with_heartbeats(
+        self,
+        job: Job,
+        result: PackageExecutionResult,
+        heartbeats: _LeaseHeartbeats,
+    ) -> None:
+        """Persist a result without suspending lease renewal across receipt fsync."""
+        token = job.lease_token or ""
+        if result.status in {PackageStatus.COMPLETED, PackageStatus.NO_CHANGE}:
+            # The receipt is the recoverable side of the receipt/queue boundary.
+            # Keep heartbeating while it is flushed, then serialize only the final
+            # scheduler transition against the lease-keeper thread.
+            self._persist_package_result(result)
+            heartbeats.transition(
+                job,
+                lambda: self.scheduler.complete(
+                    job.id, token, mission_id=self.config.campaign_id
+                ),
+            )
+        elif result.status in {
+            PackageStatus.BLOCKED_AUTHORITY,
+            PackageStatus.BLOCKED_CAPABILITY,
+        }:
+            heartbeats.transition(
+                job,
+                lambda: self.scheduler.dead_letter(
+                    job.id,
+                    token,
+                    result.status.value + ": " + result.message,
+                    mission_id=self.config.campaign_id,
+                ),
+            )
+        else:
+            heartbeats.transition(
+                job,
+                lambda: self.scheduler.fail(
+                    job.id,
+                    token,
+                    result.status.value + ": " + result.message,
+                    mission_id=self.config.campaign_id,
+                ),
+            )
+
     def run_cohort(self) -> ServiceObservation:
         """Run one durable, capacity-bounded dependency-ready package wave.
 
@@ -734,42 +888,28 @@ class WholeOSService:
             return self.observe()
 
         results: dict[str, PackageExecutionResult] = {}
-        stale: set[str] = set()
-        heartbeat_interval = max(0.01, min(10.0, self.scheduler.lease_seconds / 3.0))
-        with ThreadPoolExecutor(
-            max_workers=len(jobs),
-            thread_name_prefix=f"whole-os-{self.config.campaign_id}",
-        ) as pool:
-            active: dict[Future[PackageExecutionResult], Job] = {
-                pool.submit(self._execute_claimed, job): job for job in jobs
-            }
-            while active:
-                completed, _ = wait(
-                    tuple(active),
-                    timeout=heartbeat_interval,
-                    return_when=FIRST_COMPLETED,
-                )
-                for future, job in tuple(active.items()):
-                    if future in completed:
-                        continue
-                    try:
-                        self.scheduler.heartbeat(job.id, job.lease_token or "")
-                    except StaleLeaseError:
-                        stale.add(job.id)
-                for future in completed:
-                    job = active.pop(future)
-                    result = future.result()
-                    if job.id in stale:
-                        result = PackageExecutionResult(
-                            result.package_id,
-                            PackageStatus.FAILED,
-                            None,
-                            result.evidence_refs,
-                            "scheduler lease expired before result persistence",
-                        )
-                    else:
+        with _LeaseHeartbeats(self.scheduler, jobs) as heartbeats:
+            with ThreadPoolExecutor(
+                max_workers=len(jobs),
+                thread_name_prefix=f"whole-os-{self.config.campaign_id}",
+            ) as pool:
+                active: dict[Future[PackageExecutionResult], Job] = {
+                    pool.submit(self._execute_claimed, job): job
+                    for job in jobs
+                    if not heartbeats.is_stale(job)
+                }
+                while active:
+                    completed, _ = wait(
+                        tuple(active),
+                        return_when=FIRST_COMPLETED,
+                    )
+                    for future in completed:
+                        job = active.pop(future)
+                        result = future.result()
                         try:
-                            self._persist_result(job, result)
+                            self._persist_result_with_heartbeats(
+                                job, result, heartbeats
+                            )
                         except StaleLeaseError:
                             result = PackageExecutionResult(
                                 result.package_id,
@@ -778,7 +918,7 @@ class WholeOSService:
                                 result.evidence_refs,
                                 "scheduler lease expired before result persistence",
                             )
-                    results[result.package_id] = result
+                        results[result.package_id] = result
 
         self._enqueue_ready()
         self._run_terminal_assessment_if_ready()

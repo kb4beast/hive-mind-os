@@ -102,7 +102,8 @@ class SubjectNamespace:
         return (boundary.tenant_id, boundary.repository_id, name)
 
     def put(self, boundary: SubjectMemoryBoundary, name: str, value: Any):
-        if boundary.state not in (BoundaryState.BOUND, BoundaryState.ACTIVE):
+        effective_state = self._states.get(boundary.digest, boundary.state)
+        if effective_state not in (BoundaryState.BOUND, BoundaryState.ACTIVE):
             raise BoundaryError("boundary is inactive")
         if (
             type(name) is not str
@@ -119,6 +120,11 @@ class SubjectNamespace:
         self, handle: ScopedMemoryHandle, boundary: SubjectMemoryBoundary, name: str
     ):
         handle.assert_usable(boundary)
+        if self._states.get(boundary.digest, boundary.state) in {
+            BoundaryState.REVOKED,
+            BoundaryState.QUARANTINED,
+        }:
+            raise BoundaryError("memory boundary has been revoked or quarantined")
         return self._data.get(self.key(boundary, name))
 
     def revoke(self, boundary):

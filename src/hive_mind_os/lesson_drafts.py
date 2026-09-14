@@ -48,6 +48,10 @@ class LessonDraft:
     created_at: str
 
     def __post_init__(self):
+        if not isinstance(self.processing_state, ProcessingState):
+            object.__setattr__(
+                self, "processing_state", ProcessingState(self.processing_state)
+            )
         if self.document_status != "DRAFT":
             raise DraftError("document_status must be DRAFT")
         if (
@@ -80,10 +84,16 @@ class LessonDraft:
             for v in seq
         ):
             raise DraftError("draft tokens must be non-empty")
-        if self.processing_state is ProcessingState.REVIEWED_DRAFT and (
-            not self.reviewer_id or not self.sanitization_receipt_digest
-        ):
-            raise DraftError("review evidence required")
+        reviewed_states = {
+            ProcessingState.REVIEWED_DRAFT,
+            ProcessingState.COMMITTED_DRAFT,
+            ProcessingState.DRAFT_PR_OPEN,
+        }
+        if self.processing_state in reviewed_states:
+            if not self.reviewer_id or not self.sanitization_receipt_digest:
+                raise DraftError("review evidence required")
+            if self.reviewer_id == self.generator_id:
+                raise DraftError("draft generator cannot review its own projection")
 
     @property
     def digest(self):
@@ -131,6 +141,56 @@ class LessonDraft:
     def transition(self, state, **changes):
         if not isinstance(state, ProcessingState):
             raise DraftError("invalid processing state")
+        allowed = {
+            ProcessingState.CAPTURED_PRIVATE: {
+                ProcessingState.CANDIDATE_PRIVATE,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.CANDIDATE_PRIVATE: {
+                ProcessingState.SANITIZED_DRAFT,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.SANITIZED_DRAFT: {
+                ProcessingState.REVIEWED_DRAFT,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.REVIEWED_DRAFT: {
+                ProcessingState.COMMITTED_DRAFT,
+                ProcessingState.BLOCKED_EXPORT_DESTINATION,
+                ProcessingState.BLOCKED_EXPORT_AUTHORITY,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.COMMITTED_DRAFT: {
+                ProcessingState.DRAFT_PR_OPEN,
+                ProcessingState.BLOCKED_EXPORT_DESTINATION,
+                ProcessingState.BLOCKED_EXPORT_AUTHORITY,
+                ProcessingState.EXPORT_FAILED_RETRYABLE,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.DRAFT_PR_OPEN: {
+                ProcessingState.EXPORT_FAILED_RETRYABLE,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.EXPORT_FAILED_RETRYABLE: {
+                ProcessingState.DRAFT_PR_OPEN,
+                ProcessingState.BLOCKED_EXPORT_AUTHORITY,
+                ProcessingState.BLOCKED_EXPORT_DESTINATION,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.BLOCKED_EXPORT_AUTHORITY: {
+                ProcessingState.DRAFT_PR_OPEN,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.BLOCKED_EXPORT_DESTINATION: {
+                ProcessingState.DRAFT_PR_OPEN,
+                ProcessingState.QUARANTINED_EXPORT,
+            },
+            ProcessingState.QUARANTINED_EXPORT: set(),
+        }
+        if state not in allowed[self.processing_state]:
+            raise DraftError(
+                f"invalid draft transition: {self.processing_state.value} -> {state.value}"
+            )
         if state is ProcessingState.SANITIZED_DRAFT and not changes.get(
             "sanitization_receipt_digest", self.sanitization_receipt_digest
         ):
@@ -142,6 +202,9 @@ class LessonDraft:
             )
         ):
             raise DraftError("review evidence required")
+        reviewer = changes.get("reviewer_id", self.reviewer_id)
+        if state is ProcessingState.REVIEWED_DRAFT and reviewer == self.generator_id:
+            raise DraftError("draft generator cannot review its own projection")
         return replace(self, processing_state=state, **changes)
 
 

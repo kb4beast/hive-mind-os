@@ -218,6 +218,14 @@ from .source_docket import (
     load_default_source_docket,
     load_source_docket,
 )
+from .whole_os_composition import (
+    BacklogDiscoveryAdapter,
+    BoundedBuilderAdapter,
+    CompositionReadiness,
+    DeliveryPolicy,
+    DurableLearningRecorder,
+    WholeOSCompositionHost,
+)
 from .whole_os_service import (
     PackageExecutionResult,
     PackageStatus,
@@ -396,6 +404,12 @@ __all__ = [
     "WholeOSHost",
     "WholeOSService",
     "WholeOSServiceConfig",
+    "WholeOSCompositionHost",
+    "BacklogDiscoveryAdapter",
+    "BoundedBuilderAdapter",
+    "CompositionReadiness",
+    "DeliveryPolicy",
+    "DurableLearningRecorder",
     "WAR_ROOM_PROJECTION_SCHEMA_VERSION",
     "WorkflowManifest",
     "WorkflowTransition",

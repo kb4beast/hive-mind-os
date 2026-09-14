@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .brain_kernel.canonical import canonical_digest
+from .brain_kernel.canonical import canonical_digest, canonical_document
 from .durable_contracts import ContractStore
 
 
@@ -38,11 +38,13 @@ class EndpointSeal:
     def __post_init__(self):
         if self.learner_id == self.evaluator_id:
             raise CustodyError("learner and evaluator must differ")
-        if self.seal_digest is not None and self.seal_digest != canonical_digest(self):
+        if self.seal_digest is not None and self.seal_digest != self.seal():
             raise CustodyError("seal digest mismatch")
 
     def seal(self):
-        return canonical_digest(self)
+        document = canonical_document(self)
+        document.pop("seal_digest", None)
+        return canonical_digest(document)
 
     def to_dict(self):
         from .brain_kernel.canonical import canonical_document

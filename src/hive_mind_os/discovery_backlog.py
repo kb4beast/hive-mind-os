@@ -78,7 +78,23 @@ class DiscoveryBacklog:
             self._db.execute(
                 "CREATE TABLE IF NOT EXISTS signals (k TEXT PRIMARY KEY, body TEXT NOT NULL)"
             )
+            self._db.execute(
+                "CREATE TABLE IF NOT EXISTS candidates (idea_id TEXT PRIMARY KEY, body TEXT NOT NULL)"
+            )
             self._db.commit()
+            for idea_id, body in self._db.execute(
+                "SELECT idea_id,body FROM candidates"
+            ):
+                value = json.loads(body)
+                self.candidates[idea_id] = BacklogCandidate(
+                    **{
+                        **value,
+                        "atomic_claims": tuple(value["atomic_claims"]),
+                        "dependencies": tuple(value["dependencies"]),
+                        "dissent": tuple(value["dissent"]),
+                        "next_evidence": tuple(value["next_evidence"]),
+                    }
+                )
 
     def ingest(self, signal: DiscoverySignal) -> bool:
         if signal.expires_at is not None and signal.expires_at <= time.time():
@@ -107,7 +123,25 @@ class DiscoveryBacklog:
         return True
 
     def add(self, candidate: BacklogCandidate):
+        old = self.candidates.get(candidate.idea_id)
+        if old is not None and old != candidate:
+            raise ValueError("backlog candidate identity is already bound")
         self.candidates[candidate.idea_id] = candidate
+        if self._db:
+            body = {name: getattr(candidate, name) for name in candidate.__dataclass_fields__}
+            self._db.execute(
+                "INSERT OR REPLACE INTO candidates VALUES (?,?)",
+                (
+                    candidate.idea_id,
+                    json.dumps(body, sort_keys=True, separators=(",", ":")),
+                ),
+            )
+            self._db.commit()
+
+    def close(self) -> None:
+        if self._db is not None:
+            self._db.close()
+            self._db = None
 
     def select(self, *, limit: int = 1) -> BacklogSelection:
         if limit < 1:
