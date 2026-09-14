@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Mapping
 
 from .authority import (
     AuthorityDenied,
@@ -17,6 +17,8 @@ from .canonical import canonical_digest
 from .contracts import EffectIntent, EffectReceipt
 
 if TYPE_CHECKING:
+    from hive_mind_os.repository_profile import RepositoryProfileStore
+
     from .store import KernelStore
 
 
@@ -257,8 +259,8 @@ class EffectGateway:
         intent: EffectIntent,
         token: CapabilityToken,
         *,
-        projection: object,
-        profile_store: object,
+        projection: Mapping[str, Any],
+        profile_store: RepositoryProfileStore,
         capability: object,
         destination: str | None = None,
     ) -> EffectResult:
