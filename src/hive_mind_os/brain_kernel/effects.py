@@ -251,8 +251,13 @@ class EffectGateway:
 
     def execute_profiled(self, intent: EffectIntent, token: CapabilityToken, *, projection: object, profile_store: object, capability: object, destination: str | None = None) -> EffectResult:
         """Host-profile gate for profile-bound adapters; authorize before dispatch."""
-        from hive_mind_os.repository_profile import ProfileEffectAuthorizer
+        from hive_mind_os.repository_profile import ProfileCapability, ProfileEffectAuthorizer
         if self._authority is None:
             raise AuthorityDenied("profiled execution requires live authority")
-        ProfileEffectAuthorizer().require(projection, store=profile_store, authority=self._authority, capability=capability, destination=destination)
+        expected = ProfileCapability.READ_ONLY_PLAN if intent.action == "read" else ProfileCapability.LOCAL_BUILD
+        if ProfileCapability(capability) is not expected:
+            raise AuthorityDenied("profile capability does not bind effect action")
+        profile = ProfileEffectAuthorizer().require(projection, store=profile_store, authority=self._authority, capability=expected, destination=destination)
+        if intent.target_adapter not in {tool.adapter_id for tool in profile.tools}:
+            raise AuthorityDenied("effect adapter is not bound in repository profile")
         return self.execute(intent, token)

@@ -96,7 +96,9 @@ def _git_control_paths(root: Path) -> tuple[Path, ...]:
         try:
             line = dot_git.read_text(encoding="utf-8").splitlines()[0]
             if line.startswith("gitdir: "):
-                paths.append(resolved_path(root / line[8:]))
+                gitdir = resolved_path(root / line[8:])
+                if not gitdir.is_dir(): raise RepositoryProfileError("declared gitdir does not exist")
+                paths.append(gitdir)
         except (OSError, IndexError, UnicodeError) as error:
             raise RepositoryProfileError("malformed Git control metadata") from error
         if not line.startswith("gitdir: ") or not line[8:].strip():
@@ -105,7 +107,9 @@ def _git_control_paths(root: Path) -> tuple[Path, ...]:
     common = git_dir / "commondir"
     if common.is_file():
         try:
-            paths.append(resolved_path(git_dir / common.read_text(encoding="utf-8").strip()))
+            target = common.read_text(encoding="utf-8").strip()
+            if not target: raise RepositoryProfileError("empty Git common-dir metadata")
+            paths.append(resolved_path(git_dir / target))
         except (OSError, UnicodeError) as error:
             raise RepositoryProfileError("malformed Git common-dir metadata") from error
     for base in tuple(paths):
