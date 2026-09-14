@@ -65,6 +65,18 @@ class PilotState:
     rollback_evidence: EvidenceRef | None = None
     obligations: tuple[ExternalObligation, ...] = ()
     revision: int = 0
+    observed_through: int | None = None
+
+    def __post_init__(self) -> None:
+        observed = (
+            self.plan.starts_at
+            if self.observed_through is None
+            else self.observed_through
+        )
+        if not self.plan.starts_at <= observed <= self.plan.ends_at:
+            raise ValueError("pilot observation must stay inside the planned window")
+        if type(self.revision) is not int or self.revision < 0:
+            raise ValueError("pilot revision must be a nonnegative integer")
 
 
 class PilotStore:
@@ -142,6 +154,7 @@ class PilotStore:
             rollback,
             obligations,
             raw["revision"],
+            raw.get("observed_through"),
         )
 
 
@@ -197,6 +210,7 @@ class PilotController:
                 state.rollback_evidence,
                 state.obligations,
                 state.revision + 1,
+                state.observed_through,
             )
 
         state = self.store.load()
@@ -218,7 +232,19 @@ class PilotController:
         rollback_evidence: EvidenceRef | None = None,
         obligations: Iterable[ExternalObligation] = (),
     ) -> PilotState:
+        if duplicate_effects < 0 or avoidable_owner_questions < 0:
+            raise ValueError("pilot control counters cannot decrease")
+        supplied_obligations = tuple(obligations)
+
         def apply(state: PilotState) -> PilotState:
+            reconciled = {item.obligation_id: item for item in state.obligations}
+            for obligation in supplied_obligations:
+                previous = reconciled.get(obligation.obligation_id)
+                if previous is not None and previous != obligation:
+                    raise ValueError(
+                        "obligation identity already has different content"
+                    )
+                reconciled[obligation.obligation_id] = obligation
             return PilotState(
                 state.plan,
                 state.attempts,
@@ -228,20 +254,53 @@ class PilotController:
                 state.duplicate_effects + duplicate_effects,
                 state.avoidable_owner_questions + avoidable_owner_questions,
                 rollback_evidence or state.rollback_evidence,
-                (*state.obligations, *tuple(obligations)),
+                tuple(reconciled.values()),
                 state.revision + 1,
+                state.observed_through,
+            )
+
+        return self._update(apply)
+
+    def record_observation(self, observed_at: int) -> PilotState:
+        """Advance the durable observation watermark without fabricating elapsed time."""
+        if type(observed_at) is not int:
+            raise ValueError("pilot observation timestamp must be an integer")
+
+        def apply(state: PilotState) -> PilotState:
+            prior = (
+                state.plan.starts_at
+                if state.observed_through is None
+                else state.observed_through
+            )
+            if observed_at < prior:
+                raise ValueError("pilot observation timestamp cannot move backward")
+            return PilotState(
+                state.plan,
+                state.attempts,
+                state.restart_exercised,
+                state.duplicate_effects,
+                state.avoidable_owner_questions,
+                state.rollback_evidence,
+                state.obligations,
+                state.revision + 1,
+                observed_at,
             )
 
         return self._update(apply)
 
     def report(self) -> PilotReport:
         state = self.store.load()
+        observed_through = (
+            state.plan.starts_at
+            if state.observed_through is None
+            else state.observed_through
+        )
         return PilotReport(
             state.plan.pilot_id,
             state.plan.mode,
             state.plan.candidate_digest,
             state.plan.starts_at,
-            state.plan.ends_at,
+            observed_through,
             state.attempts,
             state.restart_exercised,
             state.duplicate_effects,
