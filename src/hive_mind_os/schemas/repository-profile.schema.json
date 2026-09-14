@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "repository-profile.schema.json",
+  "title": "Host-issued Repository Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_id", "identity", "repository_root", "workspace_root", "state_root", "cache_root", "grants", "tools", "reports", "external_destinations", "sensitivity", "profile_digest"],
+  "properties": {
+    "profile_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$"},
+    "identity": {"type": "object", "additionalProperties": false, "required": ["tenant_id", "repository_id", "issuer_id", "authority_digest"], "properties": {"tenant_id": {"type": "string"}, "repository_id": {"type": "string"}, "issuer_id": {"type": "string"}, "authority_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}},
+    "repository_root": {"type": "string"}, "workspace_root": {"type": "string"}, "state_root": {"type": "string"}, "cache_root": {"type": "string"},
+    "grants": {"type": "array"}, "tools": {"type": "array"}, "reports": {"type": "array"},
+    "external_destinations": {"type": "array", "items": {"type": "string", "pattern": "^https://"}},
+    "sensitivity": {"enum": ["unknown", "private", "public"]},
+    "profile_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
