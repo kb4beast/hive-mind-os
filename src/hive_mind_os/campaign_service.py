@@ -13,6 +13,7 @@ class CampaignServiceConfig:
     campaign_id: str; config_id: str; repository_ids: tuple[str,...]; binding_digest: str
     concurrency: int = 1; daily_allowance: int = 100; idle_backoff: float = 30.0
     stop_conditions: tuple[str,...] = ()
+    owner_id: str = "campaign-service"
 @dataclass(frozen=True, slots=True)
 class CampaignStep:
     status: CampaignStatus; next_wake: float | None; checkpoint: str | None; message: str = ""
@@ -23,18 +24,19 @@ class CampaignService:
         if config.concurrency < 1: raise ValueError("concurrency must be positive")
         self.config=config; self.scheduler=scheduler; self.executor=executor; self.clock=clock or time.time
         self.path=Path(state_dir); self.path.mkdir(parents=True, exist_ok=True); self.db=self.path/"campaign.sqlite3"
-        self.cx=sqlite3.connect(self.db); self.cx.execute("CREATE TABLE IF NOT EXISTS checkpoints (campaign_id TEXT PRIMARY KEY, body TEXT NOT NULL)"); self.cx.commit()
+        self.cx=sqlite3.connect(self.db); self.cx.execute("CREATE TABLE IF NOT EXISTS checkpoints (campaign_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated REAL NOT NULL)"); self.cx.execute("CREATE TABLE IF NOT EXISTS effects (key TEXT PRIMARY KEY, result TEXT NOT NULL)"); self.cx.commit()
     def checkpoint(self, payload: dict[str,Any]) -> str:
-        body=json.dumps(payload, sort_keys=True, separators=(",",":")); self.cx.execute("INSERT OR REPLACE INTO checkpoints VALUES (?,?)",(self.config.campaign_id,body)); self.cx.commit(); return body
+        body=json.dumps(payload, sort_keys=True, separators=(",",":")); self.cx.execute("INSERT OR REPLACE INTO checkpoints VALUES (?,?,?)",(self.config.campaign_id,body,self.clock())); self.cx.commit(); return self.config.campaign_id+":"+str(self.clock())
     def load_checkpoint(self)->dict[str,Any]:
         row=self.cx.execute("SELECT body FROM checkpoints WHERE campaign_id=?",(self.config.campaign_id,)).fetchone(); return {} if not row else json.loads(row[0])
     def run_once(self, now: float|None=None) -> CampaignStep:
         now=self.clock() if now is None else now; cp=self.load_checkpoint()
         if cp.get("stopped") or any(x in cp.get("stop_conditions",[]) for x in self.config.stop_conditions): return CampaignStep(CampaignStatus.STOPPED,None,self.checkpoint(cp),"stop condition")
-        job=self.scheduler.claim(f"campaign:{self.config.campaign_id}")
+        job=self.scheduler.claim(self.config.owner_id+":"+self.config.campaign_id)
         if job is None: return CampaignStep(CampaignStatus.IDLE,now+self.config.idle_backoff,self.checkpoint({**cp,"last_observation":now}),"no actionable work")
         try:
             result=self.executor(job) if self.executor else job.id
+            if result is None: raise RuntimeError("executor returned no durable result")
             self.scheduler.complete(job.id, job.lease_token or "", mission_id=self.config.campaign_id)
             ref=self.checkpoint({**cp,"last_job":job.id,"last_result":str(result)})
             return CampaignStep(CampaignStatus.PROGRESSED,now,ref)
