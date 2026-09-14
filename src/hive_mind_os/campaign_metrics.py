@@ -84,11 +84,11 @@ class VariantSeal:
   for n in ("variant_id","evaluator_id","stage","regime_id","sealed_at"):_id(getattr(self,n),n)
 @dataclass(frozen=True,slots=True)
 class MatchProtocol:
- protocol_id:str;version:str;track_id:str;entrant_recipes:Mapping[str,Mapping[str,object]];variant_digest_rules:Mapping[str,object];candidate_seal_rule:str;scenario_task_ids:tuple[str,...];dataset_block_ids:tuple[str,...];pairing_rule:str;decision_rule:str;hybrid_recipes:Mapping[str,Mapping[str,object]];elimination_losses:int=3;resource_lease_ref:str="lease-required";max_rounds:int=24;terminal_rules:tuple[str,...]=( "one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted")
+ protocol_id:str;version:str;track_id:str;entrant_recipes:Mapping[str,Mapping[str,object]];variant_digest_rules:Mapping[str,object];candidate_seal_rule:str;scenario_task_ids:tuple[str,...];dataset_block_ids:tuple[str,...];pairing_rule:str;decision_rule:str;hybrid_recipes:Mapping[str,Mapping[str,object]];experiment_manifest:Mapping[str,object];elimination_losses:int=3;resource_lease_ref:str="lease-required";max_rounds:int=24;terminal_rules:tuple[str,...]=( "one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted")
  def __post_init__(self):
   for n in ("protocol_id","version","track_id","resource_lease_ref"):_id(getattr(self,n),n)
   if self.elimination_losses!=3 or self.max_rounds!=24 or set(self.terminal_rules)!={"one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted"}:raise CampaignMetricsError("closed tournament rules required")
-  er=_freeze(self.entrant_recipes);hr=_freeze(self.hybrid_recipes);object.__setattr__(self,"entrant_recipes",er);object.__setattr__(self,"hybrid_recipes",hr);object.__setattr__(self,"variant_digest_rules",_freeze(self.variant_digest_rules));object.__setattr__(self,"scenario_task_ids",tuple(self.scenario_task_ids));object.__setattr__(self,"dataset_block_ids",tuple(self.dataset_block_ids))
+  er=_freeze(self.entrant_recipes);hr=_freeze(self.hybrid_recipes);object.__setattr__(self,"entrant_recipes",er);object.__setattr__(self,"hybrid_recipes",hr);object.__setattr__(self,"variant_digest_rules",_freeze(self.variant_digest_rules));object.__setattr__(self,"experiment_manifest",_freeze(self.experiment_manifest));object.__setattr__(self,"scenario_task_ids",tuple(self.scenario_task_ids));object.__setattr__(self,"dataset_block_ids",tuple(self.dataset_block_ids))
   req={"MB0":"builder-component","MB1":"builder-component","MB2":"builder-component","MB3":"builder-component","MC0":"whole-campaign","MC1":"whole-campaign"}
   if set(er)!=set(req) or set(hr)!={"MH1","MH2","MH3","MH4"}:raise CampaignMetricsError("exact MB/MC/MH recipes required")
   seen=set()
@@ -121,13 +121,19 @@ class MatchProtocol:
     before=prior.get((x.variant_id,"original"if x.variant_id in self.entrant_recipes else"hybrid"))
     if before is None or before.candidate_digest!=x.candidate_digest:raise CampaignMetricsError("final changed/unqualified")
 def load_match_protocol(path:str|Path)->MatchProtocol:
- d=json.loads(Path(path).read_text(encoding="utf-8"));seed=d.pop("recipe_seed",None);d.pop("experiment_manifest",None);d.pop("kind",None);d.pop("status",None);d.pop("protocol_digest",None)
+ return _load_match_protocol(path,allow_unsealed=False)
+def _load_match_protocol(path:str|Path,*,allow_unsealed:bool)->MatchProtocol:
+ d=json.loads(Path(path).read_text(encoding="utf-8"));seed=d.pop("recipe_seed",None);manifest=d.get("experiment_manifest",{});d.pop("kind",None);d.pop("status",None);d.pop("protocol_digest",None)
+ if not allow_unsealed and (manifest.get("holdout_signature_status")!="SIGNED" or manifest.get("custody_status")!="ATTESTED" or seed):raise CampaignMetricsError("external N30 blocker: concrete recipes, signed holdout custody required")
  if seed and not d["entrant_recipes"]:
   def recipe(ident,track):
    return {"track":track,**{f:canonical_digest([seed,ident,f]) for f in RECIPE_FIELDS}}
   d["entrant_recipes"]={x:recipe(x,"builder-component") for x in ("MB0","MB1","MB2","MB3")}|{x:recipe(x,"whole-campaign") for x in ("MC0","MC1")}
   d["hybrid_recipes"]={x:recipe(x,"whole-campaign") for x in ("MH1","MH2","MH3","MH4")}
  return MatchProtocol(**d)
+def load_match_protocol_for_inspection(path:str|Path)->MatchProtocol:
+ """Parse deferred metadata for tests/audit only; never admits an execution stage."""
+ return _load_match_protocol(path,allow_unsealed=True)
 @dataclass(frozen=True,slots=True)
 class ScheduledPair:left:str;right:str|None;bye:bool=False;block_id:str|None=None
 def schedule_round(entrants:Sequence[str],losses:Mapping[str,int],byes:Mapping[str,int],*,round_number:int,inconclusive_meetings:Mapping[frozenset[str],int]|None=None,blocks:Sequence[str]=())->tuple[ScheduledPair,...]:
@@ -150,9 +156,12 @@ class BracketState:
   if self.terminal:return ()
   if not lease_active:object.__setattr__(self,"terminal","lease_exhausted");return ()
   if self.round_number>=p.max_rounds:object.__setattr__(self,"terminal","max_rounds");return ()
-  ids=[x for x,r in{**dict(p.entrant_recipes),**dict(p.hybrid_recipes)}.items()if r["track"]==self.track and x not in self.quarantined and self.losses.get(x,0)<3]
+  if self.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("unknown stage")
+  source=dict(p.entrant_recipes) if self.stage=="original" else (dict(p.hybrid_recipes) if self.stage=="hybrid" else {})
+  ids=[x for x,r in source.items()if r["track"]==self.track and x not in self.quarantined and self.losses.get(x,0)<3]
   if len(ids)==1:object.__setattr__(self,"terminal","one_survivor");return ()
-  return schedule_round(ids,self.losses,self.byes,round_number=self.round_number+1,inconclusive_meetings=self.inconclusive,blocks=p.dataset_block_ids)
+  blocks=("development-screening",) if self.stage=="original" else (("harder-hybrid-development",) if self.stage=="hybrid" else ())
+  return schedule_round(ids,self.losses,self.byes,round_number=self.round_number+1,inconclusive_meetings=self.inconclusive,blocks=blocks)
  def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,lease_active=True):
   if not lease_active:return BracketState(self.protocol_digest,self.stage,self.track,self.round_number,self.losses,self.byes,self.inconclusive,self.quarantined,"lease_exhausted")
   l=dict(self.losses);b=dict(self.byes);i=dict(self.inconclusive);q=set(self.quarantined)
@@ -181,4 +190,4 @@ def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:Pai
  if(cost_ratio.upper<1 and time_ratio.upper<=1.1)or(time_ratio.upper<1 and cost_ratio.upper<=1.1):return"LEFT"
  if(cost_ratio.lower>1 and time_ratio.lower>=1/1.1)or(time_ratio.lower>1 and cost_ratio.lower>=1/1.1):return"RIGHT"
  return"DRAW"
-__all__=["AttemptMetric","BracketState","CampaignMetricsError","MatchProtocol","PairedInterval","ScheduledPair","VariantSeal","canonical_digest","decide_match","load_match_protocol","noninferior","paired_family_bootstrap","schedule_round","summarize_attempts"]
+__all__=["AttemptMetric","BracketState","CampaignMetricsError","MatchProtocol","PairedInterval","ScheduledPair","VariantSeal","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","schedule_round","summarize_attempts"]

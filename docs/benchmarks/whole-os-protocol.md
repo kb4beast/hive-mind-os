@@ -1,8 +1,10 @@
 # Whole-OS measurement protocol (N02)
 
-Status: frozen measurement design; **no execution and no superiority claim**. This
+Status: software contract only, external-evidence blocked; **no execution and no superiority claim**. This
 protocol is an inert contract for N30. Comparator source bytes, licenses, archive
-receipts, runtime availability and provider authority remain open obligations.
+receipts, concrete recipe digests, private task/family manifests, evaluator signature,
+holdout custody and provider authority remain typed external N30 blockers. The normal
+parser rejects the artifact while these fields are OPEN; inspection does not admit runs.
 
 `whole-os-match-protocol.json` is the closed scheduling artifact. It requires the
 same immutable source/binary, prompt, model, command/profile, tool, context,
