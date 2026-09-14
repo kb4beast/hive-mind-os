@@ -275,6 +275,12 @@ def validate_contract(name: str, document: Any) -> ContractValidation:
     except (KeyError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         return ContractValidation(False, (f"schema unavailable: {type(error).__name__}: {error}",))
     _validate_node(document, schema, "$", issues)
+    if name == "repository-profile" and not issues:
+        try:
+            from .repository_profile import RepositoryProfile
+            RepositoryProfile.from_document(document)
+        except (TypeError, ValueError) as error:
+            issues.append(f"$: repository profile runtime validation: {error}")
     return ContractValidation(not issues, tuple(dict.fromkeys(issues)))
 
 
