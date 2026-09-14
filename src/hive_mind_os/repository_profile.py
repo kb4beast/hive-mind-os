@@ -11,6 +11,7 @@ import os
 import re
 import tempfile
 import threading
+import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -329,10 +330,12 @@ class HostProfileIssuer:
 
 class RepositoryProfileStore:
     """Atomic host-side storage; the target repository is never a valid store."""
-    def __init__(self, directory: str | Path, *, repository_root: str | Path, registry: HostProfileRegistry) -> None:
+    def __init__(self, directory: str | Path, *, repository_root: str | Path, registry: HostProfileRegistry, lock_lease_seconds: int = 60) -> None:
         if registry is None or not callable(getattr(registry, "verify_profile", None)): raise RepositoryProfileError("store requires injected host profile registry")
         self.registry = registry
         self.repository_root = str(resolved_path(_raw_absolute(str(repository_root), "repository_root")))
+        if type(lock_lease_seconds) is not int or lock_lease_seconds < 1: raise RepositoryProfileError("lock lease must be positive")
+        self.lock_lease_seconds = lock_lease_seconds
         try:
             self.directory = require_external_path(directory, repository_root, label="profile store")
         except ExternalPathRequired as error:
@@ -352,8 +355,20 @@ class RepositoryProfileStore:
             try:
                 lock_path.mkdir()
             except FileExistsError as error:
-                raise RepositoryProfileError("profile activation is concurrently locked; retry from host") from error
+                lease = lock_path / "lease.json"
+                try:
+                    record = strict_json_object(lease.read_bytes())
+                    if set(record) != {"pid", "created_at"} or type(record["pid"]) is not int or type(record["created_at"]) not in {int, float}:
+                        raise ValueError
+                    if time.time() - float(record["created_at"]) <= self.lock_lease_seconds:
+                        raise RepositoryProfileError("profile activation is concurrently locked; retry from host") from error
+                    lease.unlink(); lock_path.rmdir(); lock_path.mkdir()
+                except RepositoryProfileError:
+                    raise
+                except (OSError, ValueError):
+                    raise RepositoryProfileError("profile activation lock is malformed or active") from error
             try:
+                (lock_path / "lease.json").write_bytes(json.dumps({"pid": os.getpid(), "created_at": time.time()}, sort_keys=True).encode("utf-8"))
                 for active in self.directory.glob("*.active.json"):
                     if active.is_symlink() or active.stat().st_nlink != 1:
                         raise RepositoryProfileError("active profile pointer must not be linked or redirected")
@@ -383,7 +398,8 @@ class RepositoryProfileStore:
                 finally:
                     if os.path.exists(name): os.unlink(name)
             finally:
-                try: lock_path.rmdir()
+                try:
+                    (lock_path / "lease.json").unlink(missing_ok=True); lock_path.rmdir()
                 except OSError: pass
         return target
     def read_document(self, profile_id: str) -> dict[str, Any]:
