@@ -1,0 +1,255 @@
+{
+  "schema": "whole-os-handoff-requirements/v1",
+  "source": "USER_REQUEST.md",
+  "status": "design_handoff_only",
+  "interpretation": "External app code PR stays in target; upstream Hive contribution is sanitized lessons-only draft.",
+  "requirements": [
+    {
+      "id": "R01",
+      "claim": "Operate autonomously after installation and standing configuration",
+      "node_ids": [
+        "N08",
+        "N10",
+        "N12",
+        "N31",
+        "N33"
+      ],
+      "acceptance": "Persistent missions restart without owner context transfer.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R02",
+      "claim": "Discover and select valuable work on its own",
+      "node_ids": [
+        "N02",
+        "N11",
+        "N16",
+        "N31",
+        "N32"
+      ],
+      "acceptance": "Compare opportunities with evidence; accepted outcomes outrank activity.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R03",
+      "claim": "Implement production-ready candidate code",
+      "node_ids": [
+        "N04",
+        "N13",
+        "N14",
+        "N28",
+        "N29",
+        "N32"
+      ],
+      "acceptance": "Exact candidate passes its declared full functional/operational profile.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R04",
+      "claim": "Open and maintain its own scoped PRs",
+      "node_ids": [
+        "N03",
+        "N15",
+        "N16",
+        "N31",
+        "N32"
+      ],
+      "acceptance": "Real granted publication and feedback repair receipts, without duplicate effects.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R05",
+      "claim": "Reduce unnecessary tokens, checks and elapsed time",
+      "node_ids": [
+        "N02",
+        "N05",
+        "N06",
+        "N07",
+        "N12",
+        "N30"
+      ],
+      "acceptance": "Measure same-task quality, cumulative cost/time and duplication with intact gates.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R06",
+      "claim": "Allow flexible plans and implementation inside DAG nodes",
+      "node_ids": [
+        "N01",
+        "N04",
+        "N09",
+        "N13"
+      ],
+      "acceptance": "Outcome contracts permit local reorder/refactor/repair and traceable graph successors.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R07",
+      "claim": "Run against other repositories without application coupling",
+      "node_ids": [
+        "N03",
+        "N18",
+        "N19",
+        "N28",
+        "N32"
+      ],
+      "acceptance": "Admitted targets build/run with Hive service offline.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R08",
+      "claim": "Improve Hive Mind OS itself",
+      "node_ids": [
+        "N17",
+        "N25",
+        "N30",
+        "N31"
+      ],
+      "acceptance": "Independent challenger qualification, external supervisor canary and rollback.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R09",
+      "claim": "Allow target-specific improvement that stays with the app",
+      "node_ids": [
+        "N19",
+        "N24",
+        "N25",
+        "N32"
+      ],
+      "acceptance": "Private app strategy/memory/challenger cannot automatically affect Hive.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R10",
+      "claim": "Prevent secret and private-information leakage",
+      "node_ids": [
+        "N03",
+        "N18",
+        "N19",
+        "N20",
+        "N21",
+        "N23",
+        "N29"
+      ],
+      "acceptance": "Trusted boundaries and negative controls cover tools, context, logs, caches and outgoing bytes.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R11",
+      "claim": "Check in draft lessons-only contributions for external applications",
+      "node_ids": [
+        "N20",
+        "N21",
+        "N25",
+        "N32",
+        "N33"
+      ],
+      "acceptance": "One stable external-mission obligation; staged allowlist and draft/non-active status; missing publication explicit.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R12",
+      "claim": "Learn using first and last commit plus README examples",
+      "node_ids": [
+        "N22",
+        "N23",
+        "N24"
+      ],
+      "acceptance": "Endpoint mode exposes only first snapshot and classified brief until sealing; no invented middle history.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R13",
+      "claim": "Get smarter through evidence over time",
+      "node_ids": [
+        "N02",
+        "N24",
+        "N25",
+        "N30",
+        "N33"
+      ],
+      "acceptance": "Versioned lessons/strategies beat fresh holdouts within budgets; weight training not assumed.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R14",
+      "claim": "Support fully production-qualified Roblox games",
+      "node_ids": [
+        "N22",
+        "N26",
+        "N27",
+        "N32"
+      ],
+      "acceptance": "Agreed gameplay, Studio/multiplayer/device/security/data/assets evidence; static build insufficient.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R15",
+      "claim": "Give smaller models trivial, explicit implementation handoffs",
+      "node_ids": [
+        "N04",
+        "N05",
+        "N07",
+        "N33"
+      ],
+      "acceptance": "All 34 nodes have concrete steps, contracts, scope, tests, receipts, dependencies and rollback.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R16",
+      "claim": "Do not implement code in this task",
+      "node_ids": [],
+      "acceptance": "Package contains documentation and inert planning/evidence data only; no runtime activation or software implementation.",
+      "disposition": "adopt_current_task_scope",
+      "implementation_proven": false
+    },
+    {
+      "id": "R17",
+      "claim": "Run a whole-repository ultimate tournament",
+      "node_ids": [
+        "N00",
+        "N01",
+        "N02",
+        "N30"
+      ],
+      "acceptance": "Current analytical field/brackets/hybrids preserved; future empirical court explicitly separate.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    },
+    {
+      "id": "R18",
+      "claim": "Preserve existing source, role, authority and anti-cheating invariants",
+      "node_ids": [
+        "N00",
+        "N01",
+        "N04",
+        "N12",
+        "N14",
+        "N18",
+        "N23",
+        "N25",
+        "N29",
+        "N33"
+      ],
+      "acceptance": "No vanished source/claim, self-approval, future leakage, fake evidence or weakened gate.",
+      "disposition": "adapt_future_implementation",
+      "implementation_proven": false
+    }
+  ]
+}

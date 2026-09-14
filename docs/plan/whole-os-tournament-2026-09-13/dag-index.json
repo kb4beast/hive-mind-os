@@ -1,0 +1,932 @@
+{
+  "schema": "whole-os-handoff-index/v1",
+  "executable": false,
+  "authority_granted": false,
+  "baseline_commit": "d980a9cfe39f68b3de86ea0530234b3ab4e91390",
+  "baseline_tree": "47f873cf5924b97cfafafe1b9dfb0a450acb2e92",
+  "universal_contract": "RUNBOOK.md section 5",
+  "routes_are_unqualified_starting_hypotheses": true,
+  "routes": {
+    "T1": {
+      "openai": {
+        "model": "gpt-5.6-luna",
+        "effort": "medium"
+      },
+      "anthropic": {
+        "model": "claude-sonnet-5",
+        "effort": "low",
+        "condition": "adapter/account support required"
+      }
+    },
+    "T2": {
+      "openai": {
+        "model": "gpt-5.6-terra",
+        "effort": "medium"
+      },
+      "anthropic": {
+        "model": "claude-sonnet-5",
+        "effort": "medium",
+        "condition": "adapter/account support required"
+      }
+    },
+    "T3": {
+      "openai": {
+        "model": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "anthropic": {
+        "model": "claude-opus-5",
+        "effort": "high",
+        "condition": "adapter/account support required"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "N00",
+      "objective": "Reconcile source, requirements and existing completion",
+      "dependencies": [],
+      "optional_evidence": [],
+      "owner_role": "Explorer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T1",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N00",
+      "requirement_ids": [
+        "R17",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n00-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "successor-source-manifest",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N01",
+      "objective": "Record decisions and compile the successor campaign",
+      "dependencies": [
+        "N00"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Architect",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N01",
+      "requirement_ids": [
+        "R06",
+        "R17",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n01-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "plan-schema",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N02",
+      "objective": "Freeze metrics, comparator manifests and experiment design",
+      "dependencies": [
+        "N00"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Optimizer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N02",
+      "requirement_ids": [
+        "R02",
+        "R05",
+        "R13",
+        "R17"
+      ],
+      "branch_pattern": "codex/whole-os-n02-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "benchmark-rubric",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N03",
+      "objective": "Bind repository, tool and capability profiles",
+      "dependencies": [
+        "N01"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N03",
+      "requirement_ids": [
+        "R04",
+        "R07",
+        "R10"
+      ],
+      "branch_pattern": "codex/whole-os-n03-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "repository-profile",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N04",
+      "objective": "Add typed mission outcomes and acceptance bindings",
+      "dependencies": [
+        "N01"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Architect",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N04",
+      "requirement_ids": [
+        "R03",
+        "R06",
+        "R15",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n04-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "mission-contract",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N05",
+      "objective": "Wire progressive context and immutable capsules",
+      "dependencies": [
+        "N03",
+        "N04"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Builder",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T1",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N05",
+      "requirement_ids": [
+        "R05",
+        "R15"
+      ],
+      "branch_pattern": "codex/whole-os-n05-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "context-assembly",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N06",
+      "objective": "Integrate task reuse, test caching and check invalidation",
+      "dependencies": [
+        "N02",
+        "N04"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Builder",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N06",
+      "requirement_ids": [
+        "R05"
+      ],
+      "branch_pattern": "codex/whole-os-n06-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "validation-cache-contract",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N07",
+      "objective": "Add explicit small-model routing and leased repair budgets",
+      "dependencies": [
+        "N02",
+        "N03",
+        "N04"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Optimizer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-FOUNDATION.md",
+      "contract_section": "N07",
+      "requirement_ids": [
+        "R05",
+        "R15"
+      ],
+      "branch_pattern": "codex/whole-os-n07-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "provider-route-binding",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N08",
+      "objective": "Configure durable canonical mission bindings",
+      "dependencies": [
+        "N03",
+        "N04"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N08",
+      "requirement_ids": [
+        "R01"
+      ],
+      "branch_pattern": "codex/whole-os-n08-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "canonical-runtime-binding",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N09",
+      "objective": "Compile flexible outcome work graphs",
+      "dependencies": [
+        "N01",
+        "N04",
+        "N06"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Architect",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N09",
+      "requirement_ids": [
+        "R06"
+      ],
+      "branch_pattern": "codex/whole-os-n09-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "outcome-graph-contract",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N10",
+      "objective": "Run the durable campaign and recovery service",
+      "dependencies": [
+        "N08",
+        "N09"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Steward",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N10",
+      "requirement_ids": [
+        "R01"
+      ],
+      "branch_pattern": "codex/whole-os-n10-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "scheduler-lifecycle",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N11",
+      "objective": "Discover and rank useful autonomous work",
+      "dependencies": [
+        "N04",
+        "N05",
+        "N10"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Explorer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N11",
+      "requirement_ids": [
+        "R02"
+      ],
+      "branch_pattern": "codex/whole-os-n11-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "discovery-backlog",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N12",
+      "objective": "Account for eight meaningful mission roles",
+      "dependencies": [
+        "N06",
+        "N08",
+        "N09"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Orchestrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N12",
+      "requirement_ids": [
+        "R01",
+        "R05",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n12-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "role-applicability",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N13",
+      "objective": "Execute bounded iterative implementation",
+      "dependencies": [
+        "N05",
+        "N06",
+        "N07",
+        "N12",
+        "N18"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Builder",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N13",
+      "requirement_ids": [
+        "R03",
+        "R06"
+      ],
+      "branch_pattern": "codex/whole-os-n13-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "builder-execution",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N14",
+      "objective": "Independently qualify exact candidates",
+      "dependencies": [
+        "N06",
+        "N12",
+        "N18"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Curator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N14",
+      "requirement_ids": [
+        "R03",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n14-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "verification-registration",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N15",
+      "objective": "Publish scoped code PRs",
+      "dependencies": [
+        "N03",
+        "N10",
+        "N14"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N15",
+      "requirement_ids": [
+        "R04"
+      ],
+      "branch_pattern": "codex/whole-os-n15-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "delivery-broker",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N16",
+      "objective": "Repair from PR and CI feedback",
+      "dependencies": [
+        "N11",
+        "N13",
+        "N15"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Steward",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N16",
+      "requirement_ids": [
+        "R02",
+        "R04"
+      ],
+      "branch_pattern": "codex/whole-os-n16-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "feedback-cursor",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N17",
+      "objective": "Canary and roll back self-upgrades",
+      "dependencies": [
+        "N10",
+        "N14",
+        "N15",
+        "N25"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Optimizer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-EXECUTION.md",
+      "contract_section": "N17",
+      "requirement_ids": [
+        "R08"
+      ],
+      "branch_pattern": "codex/whole-os-n17-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "supervisor-release-pointer",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N18",
+      "objective": "Enforce tenant and host execution boundaries",
+      "dependencies": [
+        "N03",
+        "N04"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N18",
+      "requirement_ids": [
+        "R07",
+        "R10",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n18-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "isolation-backend",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N19",
+      "objective": "Partition memory, caches, logs and evidence",
+      "dependencies": [
+        "N05",
+        "N18"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Architect",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N19",
+      "requirement_ids": [
+        "R07",
+        "R09",
+        "R10"
+      ],
+      "branch_pattern": "codex/whole-os-n19-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "subject-memory",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N20",
+      "objective": "Extract sanitized abstract lesson drafts",
+      "dependencies": [
+        "N19"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Optimizer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N20",
+      "requirement_ids": [
+        "R10",
+        "R11"
+      ],
+      "branch_pattern": "codex/whole-os-n20-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "lesson-draft-contract",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N21",
+      "objective": "Deliver mandatory external-mission draft obligations",
+      "dependencies": [
+        "N15",
+        "N20"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N21",
+      "requirement_ids": [
+        "R10",
+        "R11"
+      ],
+      "branch_pattern": "codex/whole-os-n21-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "lesson-export",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N22",
+      "objective": "Import first/final snapshot curricula",
+      "dependencies": [
+        "N00",
+        "N04"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Explorer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N22",
+      "requirement_ids": [
+        "R12",
+        "R14"
+      ],
+      "branch_pattern": "codex/whole-os-n22-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "curriculum-intake",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N23",
+      "objective": "Enforce hidden-target evaluator custody",
+      "dependencies": [
+        "N18",
+        "N22"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Curator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N23",
+      "requirement_ids": [
+        "R10",
+        "R12",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n23-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "endpoint-custody",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N24",
+      "objective": "Evaluate functional endpoint reconstruction",
+      "dependencies": [
+        "N14",
+        "N23"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Optimizer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N24",
+      "requirement_ids": [
+        "R09",
+        "R12",
+        "R13"
+      ],
+      "branch_pattern": "codex/whole-os-n24-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "functional-oracle",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N25",
+      "objective": "Evaluate separate app and Hive learning challengers",
+      "dependencies": [
+        "N02",
+        "N19",
+        "N24"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Optimizer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N25",
+      "requirement_ids": [
+        "R08",
+        "R09",
+        "R11",
+        "R13",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n25-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "learning-promotion",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N26",
+      "objective": "Build with the Roblox repository profile",
+      "dependencies": [
+        "N03",
+        "N18",
+        "N22"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N26",
+      "requirement_ids": [
+        "R14"
+      ],
+      "branch_pattern": "codex/whole-os-n26-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "roblox-build-profile",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N27",
+      "objective": "Qualify Studio and production game runtime evidence",
+      "dependencies": [
+        "N15",
+        "N24",
+        "N26"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-LEARNING.md",
+      "contract_section": "N27",
+      "requirement_ids": [
+        "R14"
+      ],
+      "branch_pattern": "codex/whole-os-n27-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "roblox-runtime",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N28",
+      "objective": "Compose cross-repository and cross-language operation",
+      "dependencies": [
+        "N13",
+        "N14",
+        "N16",
+        "N21",
+        "N25",
+        "N26"
+      ],
+      "optional_evidence": [
+        "N27"
+      ],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-QUALIFICATION.md",
+      "contract_section": "N28",
+      "requirement_ids": [
+        "R03",
+        "R07"
+      ],
+      "branch_pattern": "codex/whole-os-n28-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "release-composition",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N29",
+      "objective": "Attack recovery, authority, privacy and evaluation boundaries",
+      "dependencies": [
+        "N17",
+        "N18",
+        "N21",
+        "N23",
+        "N28"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Curator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-QUALIFICATION.md",
+      "contract_section": "N29",
+      "requirement_ids": [
+        "R03",
+        "R10",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n29-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "adversarial-harness",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N30",
+      "objective": "Run the measured tournament and promotion court",
+      "dependencies": [
+        "N02",
+        "N28",
+        "N29"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Optimizer",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-QUALIFICATION.md",
+      "contract_section": "N30",
+      "requirement_ids": [
+        "R05",
+        "R08",
+        "R13",
+        "R17"
+      ],
+      "branch_pattern": "codex/whole-os-n30-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "frozen-benchmark",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N31",
+      "objective": "Operate the self-repository pilot",
+      "dependencies": [
+        "N17",
+        "N30"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Steward",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-QUALIFICATION.md",
+      "contract_section": "N31",
+      "requirement_ids": [
+        "R01",
+        "R02",
+        "R04",
+        "R08"
+      ],
+      "branch_pattern": "codex/whole-os-n31-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "self-campaign",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N32",
+      "objective": "Qualify external repositories and a Roblox candidate",
+      "dependencies": [
+        "N21",
+        "N27",
+        "N30"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Integrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T3",
+      "contract_file": "NODES-QUALIFICATION.md",
+      "contract_section": "N32",
+      "requirement_ids": [
+        "R02",
+        "R03",
+        "R04",
+        "R07",
+        "R09",
+        "R11",
+        "R14"
+      ],
+      "branch_pattern": "codex/whole-os-n32-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "external-pilot",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    },
+    {
+      "id": "N33",
+      "objective": "Close outcomes and publish operating handoff",
+      "dependencies": [
+        "N31",
+        "N32"
+      ],
+      "optional_evidence": [],
+      "owner_role": "Orchestrator",
+      "independent_review_required": true,
+      "minimum_route_hypothesis": "T2",
+      "contract_file": "NODES-QUALIFICATION.md",
+      "contract_section": "N33",
+      "requirement_ids": [
+        "R01",
+        "R11",
+        "R13",
+        "R15",
+        "R18"
+      ],
+      "branch_pattern": "codex/whole-os-n33-<short-purpose>",
+      "implementation_status": "not_started_by_this_handoff",
+      "acceptance": "Exact positive/negative/recovery acceptance and command in contract_file; RUNBOOK C04 applies.",
+      "rollback": "Node-specific recipe plus RUNBOOK section 5; retain append-only evidence.",
+      "completion_rule": "Independent exact-candidate qualification plus valid intended integration evidence; publication alone is not integration.",
+      "planning_group": "release-closeout",
+      "lock_authority": "Node prose is canonical. N01 compiles every exact named semantic lock and every resolved write-path lock before launch. planning_group is a navigation label, never an execution lock."
+    }
+  ]
+}

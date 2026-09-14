@@ -1,0 +1,277 @@
+{
+  "schema": "whole-os-local-source-manifest/v1",
+  "source_id": "LOCAL-01",
+  "commit": "d980a9cfe39f68b3de86ea0530234b3ab4e91390",
+  "tree": "47f873cf5924b97cfafafe1b9dfb0a450acb2e92",
+  "observed_at": "2026-09-14T01:20:16.3448589Z",
+  "license": "Repository MIT; embedded external materials retain their source terms",
+  "preservation": "Original Git blobs remain available at pinned commit; checkout hashes capture current line endings",
+  "scope": "Selected sources and tests inspected or referenced by read-only audit; not every file exhaustively audited",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "git_blob": "b7efa65024b617962f882aad82f672b6dbfc6bbc",
+      "checkout_sha256": "2c0a9b7622acddbc41e5ecf24bec00fda04bb4adfeb99c78c7e52c7dd981d24e"
+    },
+    {
+      "path": "LICENSE",
+      "git_blob": "06da1af7996f5e2b059cd52045e36f9f2cfac201",
+      "checkout_sha256": "6e76d648ae297aa3dcefc739604cfcfab2a50b484ab7331090c745a089de21f8"
+    },
+    {
+      "path": "prompts/shared/ULTIMATE_SOLUTION_TOURNAMENT.md",
+      "git_blob": "0fce4315bdaaaf0e1cf4ed5b57dfd15efacd4717",
+      "checkout_sha256": "f810b17311cebae09413abcfbb1c2155a4934d8ebefa483aadb512e36eed2c5b"
+    },
+    {
+      "path": "docs/architecture/HARDENED_VISION_CONTRACT.md",
+      "git_blob": "66a200d99fcd415bbaa2256c134b68fc0cb53aa7",
+      "checkout_sha256": "bc51402f3f1714323c53ddc48ba8e2c81b8af26737e215b5e7947b9b52e8c314"
+    },
+    {
+      "path": "docs/architecture/CONGLOMERATED_SYSTEM.md",
+      "git_blob": "d3cca36c21ba1090f50bc93fc1c2436cc3523580",
+      "checkout_sha256": "ad2ca5e4f065c9c11cfe3f86c27399156d5089659a3a5784e329cfd52ee3e31c"
+    },
+    {
+      "path": "docs/architecture/ADR-074-DIRECT-AGENT-TOURNAMENT-BEHAVIOR.md",
+      "git_blob": "db3b569c5ce5b4119c598483b149c01f0b5d6816",
+      "checkout_sha256": "639ebd3ff2988628f6845458c13d82471bbad744b1a4a7b27205a4930c964f59"
+    },
+    {
+      "path": "docs/architecture/ADR-076-EXTERNAL-TOURNAMENT-PLAN-FACTORY.md",
+      "git_blob": "feda9c742b00af58086f260e5ad494795730042f",
+      "checkout_sha256": "1cb5ffd9cb10d6d61278dc6d01e814b857933b2d005ca6f9471189ca0535a50d"
+    },
+    {
+      "path": "docs/architecture/ADR-077-GENERIC-TOURNAMENT-EXECUTION-BOUNDARY.md",
+      "git_blob": "31f86c0c70d415bd3046aa1197e5c5e7ba86a9e1",
+      "checkout_sha256": "454d13234077804d5a0d71ac9340898793d0488811f808712c1f954cc85907c6"
+    },
+    {
+      "path": "docs/architecture/ADR-078-SELF-TOURNAMENT-BOOTSTRAP-RECOVERY.md",
+      "git_blob": "e13d2f3eabf16a1a9024b5cfa09e6f8a3cc06909",
+      "checkout_sha256": "cd9b2c01ac6423e4af32c83efffd6ebd03dcc211c60af570b3fc03b86c11d4e0"
+    },
+    {
+      "path": "src/hive_mind_os/founding_docket.py",
+      "git_blob": "efc242f13657d2296cf722823227014ebcc72da6",
+      "checkout_sha256": "f82639b0c3b7c1160c27138183e05bc49072af4b737ad25eacaf477e51fdbb9b"
+    },
+    {
+      "path": "src/hive_mind_os/tournament_plan_factory.py",
+      "git_blob": "ecbb2233a392bb235f6820a2767e7162f0a06ab4",
+      "checkout_sha256": "551048f8308730acd1b79c703b0008c2a289297315b584b892817a9c2d10841f"
+    },
+    {
+      "path": "src/hive_mind_os/local_dag_runtime.py",
+      "git_blob": "7aded676230ec0c8e5845c8a2b061e7f118bce06",
+      "checkout_sha256": "fe6f99499a88dfc8d451ac3efe53b54a0f7c19b2d5e1608d7a21897b2e364d52"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/mission_runtime.py",
+      "git_blob": "30b5338081df2f41be479396f57fcfd7eaba5bfd",
+      "checkout_sha256": "ba34272c529ed1b8ecda894e0efb06e171ea12ee21e951533a3c521d99c778dc"
+    },
+    {
+      "path": "src/hive_mind_os/workers.py",
+      "git_blob": "f46f609517a7842fe691f2c6bf92ebe30ba9dd91",
+      "checkout_sha256": "3b378499c38e94d67e1f3118fe803e58201eae80e42f90fa662e1acdfe81706c"
+    },
+    {
+      "path": "src/hive_mind_os/scheduler.py",
+      "git_blob": "fbfea67aaaa7263a380f744397dc4e6f722de8e7",
+      "checkout_sha256": "11580bf837f43d8b5ff185a893e28d6117f7634025ae22bc5c6ac2581b8a5b88"
+    },
+    {
+      "path": "src/hive_mind_os/campaign_continuity.py",
+      "git_blob": "aa2755237fcb588e432de9bedd25841bebdc5150",
+      "checkout_sha256": "e236d72a381c0cc12059330079b31a95fbf38bbf8c26d033114b869e00d19d76"
+    },
+    {
+      "path": "src/hive_mind_os/task_reuse.py",
+      "git_blob": "780a3af51f69a8adff3f5414651c2df3cbf49ae2",
+      "checkout_sha256": "8868d25d6d87cf76b262430e74bae3ee886765d865b6c6499cf737d829752cf9"
+    },
+    {
+      "path": "src/hive_mind_os/test_result_cache.py",
+      "git_blob": "80a377cb29e43bc998020a4fa1ab3a83aa628ace",
+      "checkout_sha256": "91050aeec377e5f40f85edb1f20feca0a960d448450e3d0039d1f66e537d1757"
+    },
+    {
+      "path": "src/hive_mind_os/context_capsule.py",
+      "git_blob": "7526d6e3cd065045e709b9a4b44b57ced1867235",
+      "checkout_sha256": "023473eaa176f9be4ba0e007c36c9f78cceeff8483a6af8723b0d7e520ae7780"
+    },
+    {
+      "path": "src/hive_mind_os/token_ledger.py",
+      "git_blob": "e0c6681c59f3569208751281f90c395d6663b2aa",
+      "checkout_sha256": "4f628f9c2fb048f8c75606edc67dad6d8296122f9889e217ad210af748601cfd"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/role_applicability.py",
+      "git_blob": "a79ca6a800c8facc3cc2f1e15c8f59fd12e37869",
+      "checkout_sha256": "9f84c8ccdc336d64a81873e79afb345ea9f0791acafaa8a45515a03a8c2e24f2"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/role_runtime.py",
+      "git_blob": "5489932cdbd56fc2e98d2ce6533e86d4417839bf",
+      "checkout_sha256": "3d1d8998272466a77118e04aa6ddd43eb668e038f9c582388364981c47bf7c8a"
+    },
+    {
+      "path": "src/hive_mind_os/model_backend.py",
+      "git_blob": "8486a62e50d3589571c767bbb66b30cc09d9719f",
+      "checkout_sha256": "a527f0cc74bc17d54fa0207e38be7d050a6f1ee926cc1e19cb91c8b5b61ef62e"
+    },
+    {
+      "path": "src/hive_mind_os/local_codex_worker.py",
+      "git_blob": "12acc87be3ce81bcbe64a07c43f2fda2c69e6fc5",
+      "checkout_sha256": "aeafe961aa8398146f79ed023d764fd6abc26ac781fa18bf933e565080c495cd"
+    },
+    {
+      "path": "src/hive_mind_os/local_evidence_packet.py",
+      "git_blob": "2ed80fecc51e68b6637316c471274fdcde1db104",
+      "checkout_sha256": "f000893bf62f355beac6404e8e7bd0625a34544821a1cd003c6eabdccf0c7f7a"
+    },
+    {
+      "path": "src/hive_mind_os/verification_adapters.py",
+      "git_blob": "51e6a040723e4a332aa57ef1e39d58f3d38be5b0",
+      "checkout_sha256": "1f35e7fa8cd73ce59daa2a3175b5ec9ad85747291c54fdbb5980c6cb26eb43ce"
+    },
+    {
+      "path": "src/hive_mind_os/sandbox.py",
+      "git_blob": "f6c4c85916c0c9c4c4a832ff8c7ab9cf212f7dfe",
+      "checkout_sha256": "4efaa63b0efbc2808a5dd33a7a0e6491377d7f0c0ebe51db3698e6060936108b"
+    },
+    {
+      "path": "src/hive_mind_os/cortex/github/delivery_adapter.py",
+      "git_blob": "0867366982bb93372d238fafcb15cd2498662627",
+      "checkout_sha256": "046a6646bdc1c0b9b9b17d1817da602507fa696ceee59d0314aaa26f4bec5f18"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/memory.py",
+      "git_blob": "db2994398f3b9d3489c98ffbfa831557e150d489",
+      "checkout_sha256": "65b358bb8e163de64e117c57168352081c215f72c5eea140cc87287a2a5cbd2b"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/contracts.py",
+      "git_blob": "148450e241c25d00dccd7fc6b558dd5a0fe8410e",
+      "checkout_sha256": "aadef71c83d255bb48b95b3721b32c3466889f40342e0427833bea7a7fc5efdb"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/learning_runtime.py",
+      "git_blob": "dcd8070e01d2b044cc77371e7716d35a498cab02",
+      "checkout_sha256": "a0139a0751651e1f941d549324a25ac1caa9e71da9277a72994540b870f1342d"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/challengers.py",
+      "git_blob": "f1baf53b8b46b9a31b505d3114dfc8e9084d3919",
+      "checkout_sha256": "79b2cbf9d714f2b558ffd282e2d6e96581095ed25aded0d3359ca5d829db3b85"
+    },
+    {
+      "path": "src/hive_mind_os/brain_kernel/evaluation_runtime.py",
+      "git_blob": "04cde64ec39d869b422bcd7d660bf048559dbef6",
+      "checkout_sha256": "ccfc472335b9ce910aafab7ab8f39ed709ea2c189d3dde100ef96013221c92d9"
+    },
+    {
+      "path": "src/hive_mind_os/pit_oracle.py",
+      "git_blob": "99ac83b0dc877931b66059c4788057b6b99bf581",
+      "checkout_sha256": "e8651ab6315ac0832f50bdf702d3067c9dfaf5516ac0e10533297a14076458e5"
+    },
+    {
+      "path": "src/hive_mind_os/repository_learning.py",
+      "git_blob": "a6c976954b0e036967ce2c2c07431e320def8e89",
+      "checkout_sha256": "33a58623caebe7a390e1c1f2ed0f0a94e64b9e9ff6f89c8896d3009aeb13460a"
+    },
+    {
+      "path": "src/hive_mind_os/ingestion.py",
+      "git_blob": "a48c9ba0bd364c6678e160587d723c9ee6b3ee7c",
+      "checkout_sha256": "aaf5ed01decf53f4bee39920a5e56b200b8ac446eedc16409b0563bc8f418ee4"
+    },
+    {
+      "path": "src/hive_mind_os/source_docket.py",
+      "git_blob": "bf1a217c3a8d9e2f91172705b75528357408b007",
+      "checkout_sha256": "ca687521605472523b0224f788ca118b6679d7e30742511304dc505453769d5b"
+    },
+    {
+      "path": "src/hive_mind_os/portable_plan.py",
+      "git_blob": "7f90f0b5fd85f5d9e4480bd26252d276b97dfda4",
+      "checkout_sha256": "a013c7b7291b44af880c96381f6925f92a799cbd2712a80eada5a90283b7137d"
+    },
+    {
+      "path": "src/hive_mind_os/runtime_contracts.py",
+      "git_blob": "0dff965d067876e86d2e6ac32696d6c700d603e3",
+      "checkout_sha256": "bd759d5786751d44ed0de4f44ed119e42e2c1762bfe5e5b18d3705aa15be9306"
+    },
+    {
+      "path": "docs/execution/DAG_AUTHORING_STANDARD_V2.md",
+      "git_blob": "2bc9c0fa3baf6fb5cc720ffdbf7528e93f4e7374",
+      "checkout_sha256": "3b072fee295e75b8c28709d417f9036fa384e31dc53ca85526babd0881d0e90a"
+    },
+    {
+      "path": ".autopilot/README.md",
+      "git_blob": "6933885d91468e99704bd45203dd30da326de7d5",
+      "checkout_sha256": "afce0adae94847e5911a1e9390df2d2fab89ec662c3bf1e970f68987fdc7b417"
+    },
+    {
+      "path": ".autopilot/provider-catalog.json",
+      "git_blob": "afafa188b7268833248a139028106638a3b49781",
+      "checkout_sha256": "49247eaf3da14d50f53a32c58ceae5433bd68f7512c673d643e126a18c7749dc"
+    },
+    {
+      "path": "tests/test_control_token_economy.py",
+      "git_blob": "f9614c46b390ba3a5e21fa8bdb7e52dcf8c405cb",
+      "checkout_sha256": "1bff23012ad04f95cafe5e34bd2cbb9c9bf5a1740ee513f743ae8253073c04b1"
+    },
+    {
+      "path": "tests/test_task_reuse.py",
+      "git_blob": "b1bb0c7b43ba642fe333469c9835941dac478bd2",
+      "checkout_sha256": "f4fff5aef264d7500900c2639201c953a53df8708d87ec17b2781ef84ac35f82"
+    },
+    {
+      "path": "tests/test_local_dag_runtime.py",
+      "git_blob": "67dbb5b5cee56b5d349caedec542a27ab215abe7",
+      "checkout_sha256": "ea8ef8adca909ea9d4bd85a3232fbb0a685b6937d8a1f41aac09d5d0c13cf06b"
+    },
+    {
+      "path": "tests/test_tournament_plan_factory.py",
+      "git_blob": "b8560ecd452e08c4661e48550e3a8c18f0fd1356",
+      "checkout_sha256": "401d2fb2d14fb1d1139e07d19d5efa143470e7c5943fc13e984bbca61cdcf0a2"
+    },
+    {
+      "path": "tests/test_hive_cortex_role_applicability.py",
+      "git_blob": "96d904a1c6e56e9384875028d787f59852374868",
+      "checkout_sha256": "39824d23463f8dba3028feb99fa9ba87abe73b20522da9b92622dce54258bcee"
+    },
+    {
+      "path": "tests/test_scheduler.py",
+      "git_blob": "657474ed92cfb05071e1fbe541587f0796905b83",
+      "checkout_sha256": "6a00b1035133f450e8574145ec0be0850fed99868d0c6867838435e1d7dff56d"
+    },
+    {
+      "path": "tests/test_workers.py",
+      "git_blob": "a32d7e73611b916313b5677a57f070e55d299156",
+      "checkout_sha256": "42e6a813660753b9cee5389fb862058da2688fd90230f24412fd69a7cb219220"
+    },
+    {
+      "path": "tests/test_hive_cortex_delivery.py",
+      "git_blob": "f1a15135e97613bbc4e5cef96274d078ce101243",
+      "checkout_sha256": "7eb3a558c9388fdef09e9eefd731f384471948e57028733d4ed77e4fe242506a"
+    },
+    {
+      "path": "tests/test_pit_oracle.py",
+      "git_blob": "60f9777bb09a89b85de2245befe28feeccb9545f",
+      "checkout_sha256": "db538b459c6ee99723bedf6683443882ef16d774cc7c10eb812af7655e893e6c"
+    },
+    {
+      "path": "tests/test_repository_learning.py",
+      "git_blob": "2c50742df8a3f6058947e80d219d22383cacb36f",
+      "checkout_sha256": "f20b7f6c15b6edb00e35a072fb9217f55e6623b39a2aa9986f8a6708e6e5aa97"
+    },
+    {
+      "path": "tests/hive_cortex/test_learning_poisoning.py",
+      "git_blob": "1520ad48e95a060b9cd1ef75ab95b5e44c6cb841",
+      "checkout_sha256": "729dfa8a3344f64eb8628649240019ce0f389279337781dab8f7d3dad069d6c3"
+    }
+  ]
+}
