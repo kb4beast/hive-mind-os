@@ -15,6 +15,11 @@ from types import MappingProxyType
 from typing import Any
 
 from .brain_kernel.canonical import canonical_bytes, canonical_digest
+from .cohort_journal import (
+    CohortJournalEvent,
+    CohortJournalEventKind,
+    CohortJournalStore,
+)
 from .cohort_policy import (
     CheckpointDisposition,
     CohortExecutionMode,
@@ -129,6 +134,14 @@ def _freeze(value: Any) -> Any:
     return value
 
 
+def _thaw(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
+
+
 def _kickoff(
     graph: OutcomeGraphSpec,
     policy: CohortExecutionPolicy,
@@ -161,7 +174,11 @@ class CohortRuntime:
     the consolidated candidate is verified once at the terminal boundary.
     """
 
-    def __init__(self, policy: CohortExecutionPolicy) -> None:
+    def __init__(
+        self,
+        policy: CohortExecutionPolicy,
+        journal: CohortJournalStore | None = None,
+    ) -> None:
         if not isinstance(policy, CohortExecutionPolicy):
             raise CohortRuntimeError("cohort runtime requires a typed execution policy")
         if policy.mode is not CohortExecutionMode.COHORT:
@@ -169,6 +186,7 @@ class CohortRuntime:
                 "strict execution remains owned by the existing strict runtime"
             )
         self.policy = policy
+        self.journal = journal
 
     def execute(
         self,
@@ -180,6 +198,7 @@ class CohortRuntime:
         converge: Converger,
         verify: TerminalVerifier,
         effect_classes: Mapping[str, EffectClass] | None = None,
+        resume: bool = True,
     ) -> CohortRunResult:
         graph = compile_outcome_graph(graph)
         kickoff = _kickoff(graph, self.policy, run_id, kickoff_context)
@@ -191,17 +210,81 @@ class CohortRuntime:
         classifications = dict(effect_classes or {})
         if set(classifications) - set(by_id):
             raise CohortRuntimeError("effect classification names an unknown package")
+        kickoff_record = {
+            "graph_digest": kickoff.graph_digest,
+            "policy_digest": kickoff.policy_digest,
+            "context_digest": kickoff.context_digest,
+            "context": _thaw(kickoff.context),
+            "effect_classes": {
+                package_id: effect.value
+                for package_id, effect in sorted(classifications.items())
+            },
+        }
+        retained: tuple[CohortJournalEvent, ...] = ()
+        retained_convergence: ConvergenceResult | None = None
+        retained_verification: VerificationResult | None = None
+        retained_completion: CohortRunStatus | None = None
+        if self.journal is not None:
+            retained = self.journal.events(run_id)
+            if retained and not resume:
+                raise CohortRuntimeError(
+                    "cohort journal already exists and resume was disabled"
+                )
+            if retained:
+                if (
+                    retained[0].kind is not CohortJournalEventKind.KICKOFF
+                    or canonical_bytes(_thaw(retained[0].payload))
+                    != canonical_bytes(kickoff_record)
+                ):
+                    raise CohortRuntimeError(
+                        "retained cohort kickoff does not match this execution"
+                    )
+                (
+                    results,
+                    batches,
+                    max_parallelism,
+                    retained_convergence,
+                    retained_verification,
+                    retained_completion,
+                ) = self._replay(retained, by_id)
+                pending.difference_update(results)
+            else:
+                self.journal.append(
+                    run_id, CohortJournalEventKind.KICKOFF, kickoff_record
+                )
         for package_id in sorted(pending):
             effect = classifications.get(package_id, EffectClass.ROUTINE_REVERSIBLE)
             decision = self.policy.checkpoint(effect, CohortPhase.IMPLEMENTATION)
             if decision.disposition is CheckpointDisposition.BLOCKED:
-                results[package_id] = PackageRunResult(
+                result = PackageRunResult(
                     package_id,
                     PackageRunState.BLOCKED_POLICY,
                     {},
                     message=decision.reason,
                 )
+                self._record_package_result(run_id, result, "policy")
+                results[package_id] = result
         pending.difference_update(results)
+
+        if retained_completion is not None:
+            assert retained_convergence is not None
+            assert retained_verification is not None
+            ordered = tuple(results[package.package_id] for package in graph.packages)
+            status = self._status(ordered, retained_convergence, retained_verification)
+            if status is not retained_completion:
+                raise CohortRuntimeError(
+                    "retained cohort completion contradicts replayed results"
+                )
+            return CohortRunResult(
+                run_id,
+                status,
+                kickoff,
+                ordered,
+                retained_convergence,
+                retained_verification,
+                tuple(batches),
+                max_parallelism,
+            )
 
         maximum_workers = min(
             graph.maximum_concurrent, self.policy.max_parallel_packages
@@ -232,12 +315,14 @@ class CohortRuntime:
                         if dependency in results
                         and results[dependency].state is not PackageRunState.SUCCEEDED
                     )
-                    results[package_id] = PackageRunResult(
+                    result = PackageRunResult(
                         package_id,
                         PackageRunState.BLOCKED_DEPENDENCY,
                         {},
                         message=f"dependency {dependency} did not succeed",
                     )
+                    self._record_package_result(run_id, result, "dependency")
+                    results[package_id] = result
                     pending.remove(package_id)
 
                 capacity = maximum_workers - len(active)
@@ -276,6 +361,16 @@ class CohortRuntime:
                 if launched:
                     batches.append(tuple(launched))
                     max_parallelism = max(max_parallelism, len(active))
+                    if self.journal is not None:
+                        self.journal.append(
+                            run_id,
+                            CohortJournalEventKind.DISPATCH,
+                            {
+                                "batch_index": len(batches),
+                                "package_ids": launched,
+                                "active_count": len(active),
+                            },
+                        )
 
                 if not active:
                     if pending:
@@ -307,39 +402,49 @@ class CohortRuntime:
                             {},
                             message=f"{type(error).__name__}: {error}",
                         )
+                    self._record_package_result(run_id, result, "executor")
                     results[package_id] = result
 
         ordered = tuple(results[package.package_id] for package in graph.packages)
-        try:
-            convergence = converge(kickoff, ordered)
-            if not isinstance(convergence, ConvergenceResult):
-                raise CohortRuntimeError("converger returned an untyped result")
-        except Exception as error:
-            convergence = ConvergenceResult(
-                False, {}, f"{type(error).__name__}: {error}"
-            )
-        try:
-            verification = verify(kickoff, ordered, convergence)
-            if not isinstance(verification, VerificationResult):
-                raise CohortRuntimeError("terminal verifier returned an untyped result")
-        except Exception as error:
-            verification = VerificationResult(
-                False, (), f"{type(error).__name__}: {error}"
-            )
-
-        direct_failure = any(item.state is PackageRunState.FAILED for item in ordered)
-        dependency_block = any(
-            item.state
-            in {PackageRunState.BLOCKED_DEPENDENCY, PackageRunState.BLOCKED_POLICY}
-            for item in ordered
-        )
-        if direct_failure or not convergence.accepted or not verification.passed:
-            status = CohortRunStatus.FAILED
-        elif dependency_block:
-            status = CohortRunStatus.BLOCKED
+        if retained_convergence is None:
+            try:
+                convergence = converge(kickoff, ordered)
+                if not isinstance(convergence, ConvergenceResult):
+                    raise CohortRuntimeError("converger returned an untyped result")
+            except Exception as error:
+                convergence = ConvergenceResult(
+                    False, {}, f"{type(error).__name__}: {error}"
+                )
+            if self.journal is not None:
+                self.journal.append(
+                    run_id,
+                    CohortJournalEventKind.CONVERGENCE,
+                    self._convergence_document(convergence),
+                )
         else:
-            status = CohortRunStatus.SUCCEEDED
-        return CohortRunResult(
+            convergence = retained_convergence
+        if retained_verification is None:
+            try:
+                verification = verify(kickoff, ordered, convergence)
+                if not isinstance(verification, VerificationResult):
+                    raise CohortRuntimeError(
+                        "terminal verifier returned an untyped result"
+                    )
+            except Exception as error:
+                verification = VerificationResult(
+                    False, (), f"{type(error).__name__}: {error}"
+                )
+            if self.journal is not None:
+                self.journal.append(
+                    run_id,
+                    CohortJournalEventKind.VERIFICATION,
+                    self._verification_document(verification),
+                )
+        else:
+            verification = retained_verification
+
+        status = self._status(ordered, convergence, verification)
+        completed = CohortRunResult(
             run_id,
             status,
             kickoff,
@@ -349,6 +454,221 @@ class CohortRuntime:
             tuple(batches),
             max_parallelism,
         )
+        if self.journal is not None:
+            self.journal.append(
+                run_id,
+                CohortJournalEventKind.RUN_COMPLETED,
+                {
+                    "status": status.value,
+                    "package_count": len(ordered),
+                    "dispatch_batch_count": len(batches),
+                    "max_parallelism": max_parallelism,
+                },
+            )
+        return completed
+
+    def _record_package_result(
+        self, run_id: str, result: PackageRunResult, source: str
+    ) -> None:
+        if self.journal is None:
+            return
+        self.journal.append(
+            run_id,
+            CohortJournalEventKind.PACKAGE_RESULT,
+            {
+                "package_id": result.package_id,
+                "state": result.state.value,
+                "output": _thaw(result.output),
+                "evidence_refs": list(result.evidence_refs),
+                "message": result.message,
+                "source": source,
+            },
+        )
+
+    @staticmethod
+    def _convergence_document(result: ConvergenceResult) -> dict[str, Any]:
+        return {
+            "accepted": result.accepted,
+            "output": _thaw(result.output),
+            "message": result.message,
+        }
+
+    @staticmethod
+    def _verification_document(result: VerificationResult) -> dict[str, Any]:
+        return {
+            "passed": result.passed,
+            "checks": list(result.checks),
+            "message": result.message,
+        }
+
+    @staticmethod
+    def _status(
+        ordered: tuple[PackageRunResult, ...],
+        convergence: ConvergenceResult,
+        verification: VerificationResult,
+    ) -> CohortRunStatus:
+        direct_failure = any(item.state is PackageRunState.FAILED for item in ordered)
+        dependency_block = any(
+            item.state
+            in {PackageRunState.BLOCKED_DEPENDENCY, PackageRunState.BLOCKED_POLICY}
+            for item in ordered
+        )
+        if direct_failure or not convergence.accepted or not verification.passed:
+            return CohortRunStatus.FAILED
+        if dependency_block:
+            return CohortRunStatus.BLOCKED
+        return CohortRunStatus.SUCCEEDED
+
+    @classmethod
+    def _replay(
+        cls,
+        retained: tuple[CohortJournalEvent, ...],
+        by_id: Mapping[str, OutcomeWorkPackage],
+    ) -> tuple[
+        dict[str, PackageRunResult],
+        list[tuple[str, ...]],
+        int,
+        ConvergenceResult | None,
+        VerificationResult | None,
+        CohortRunStatus | None,
+    ]:
+        results: dict[str, PackageRunResult] = {}
+        batches: list[tuple[str, ...]] = []
+        dispatched: set[str] = set()
+        max_parallelism = 0
+        convergence: ConvergenceResult | None = None
+        verification: VerificationResult | None = None
+        completion: CohortRunStatus | None = None
+        for event in retained[1:]:
+            payload = event.payload
+            if event.kind is CohortJournalEventKind.DISPATCH:
+                package_ids = payload.get("package_ids")
+                active_count = payload.get("active_count")
+                if (
+                    not isinstance(package_ids, tuple)
+                    or not package_ids
+                    or any(type(item) is not str or item not in by_id for item in package_ids)
+                    or type(active_count) is not int
+                    or active_count < 1
+                ):
+                    raise CohortRuntimeError("retained cohort dispatch is invalid")
+                batches.append(package_ids)
+                dispatched.update(package_ids)
+                max_parallelism = max(max_parallelism, active_count)
+            elif event.kind is CohortJournalEventKind.PACKAGE_RESULT:
+                result = cls._package_result_from_document(payload)
+                if result.package_id not in by_id:
+                    raise CohortRuntimeError(
+                        "retained result names an unknown package"
+                    )
+                if result.package_id in results:
+                    raise CohortRuntimeError("retained package result is duplicated")
+                source = payload.get("source")
+                if source == "executor" and result.package_id not in dispatched:
+                    raise CohortRuntimeError(
+                        "retained package result has no dispatch evidence"
+                    )
+                if source not in {"executor", "policy", "dependency"}:
+                    raise CohortRuntimeError("retained package result source is invalid")
+                if (
+                    source == "policy"
+                    and result.state is not PackageRunState.BLOCKED_POLICY
+                ) or (
+                    source == "dependency"
+                    and result.state is not PackageRunState.BLOCKED_DEPENDENCY
+                ):
+                    raise CohortRuntimeError(
+                        "retained package result source contradicts its state"
+                    )
+                results[result.package_id] = result
+            elif event.kind is CohortJournalEventKind.CONVERGENCE:
+                if set(results) != set(by_id):
+                    raise CohortRuntimeError(
+                        "retained convergence precedes package completion"
+                    )
+                convergence = cls._convergence_from_document(payload)
+            elif event.kind is CohortJournalEventKind.VERIFICATION:
+                if convergence is None:
+                    raise CohortRuntimeError(
+                        "retained verification precedes convergence"
+                    )
+                verification = cls._verification_from_document(payload)
+            elif event.kind is CohortJournalEventKind.RUN_COMPLETED:
+                if verification is None:
+                    raise CohortRuntimeError(
+                        "retained completion precedes verification"
+                    )
+                try:
+                    completion = CohortRunStatus(payload["status"])
+                except (KeyError, ValueError) as error:
+                    raise CohortRuntimeError(
+                        "retained completion status is invalid"
+                    ) from error
+            elif event.kind is CohortJournalEventKind.REPAIR_ATTEMPT:
+                continue
+        if completion is not None and set(results) != set(by_id):
+            raise CohortRuntimeError("retained completed cohort is missing results")
+        return (
+            results,
+            batches,
+            max_parallelism,
+            convergence,
+            verification,
+            completion,
+        )
+
+    @staticmethod
+    def _package_result_from_document(
+        document: Mapping[str, Any],
+    ) -> PackageRunResult:
+        try:
+            package_id = document["package_id"]
+            state = PackageRunState(document["state"])
+            output = document["output"]
+            evidence_refs = document["evidence_refs"]
+            message = document["message"]
+        except (KeyError, ValueError, TypeError) as error:
+            raise CohortRuntimeError("retained package result is invalid") from error
+        if (
+            type(package_id) is not str
+            or not isinstance(output, Mapping)
+            or not isinstance(evidence_refs, tuple)
+            or any(type(item) is not str for item in evidence_refs)
+            or type(message) is not str
+        ):
+            raise CohortRuntimeError("retained package result is invalid")
+        return PackageRunResult(package_id, state, output, evidence_refs, message)
+
+    @staticmethod
+    def _convergence_from_document(
+        document: Mapping[str, Any],
+    ) -> ConvergenceResult:
+        accepted = document.get("accepted")
+        output = document.get("output")
+        message = document.get("message")
+        if (
+            type(accepted) is not bool
+            or not isinstance(output, Mapping)
+            or type(message) is not str
+        ):
+            raise CohortRuntimeError("retained convergence is invalid")
+        return ConvergenceResult(accepted, output, message)
+
+    @staticmethod
+    def _verification_from_document(
+        document: Mapping[str, Any],
+    ) -> VerificationResult:
+        passed = document.get("passed")
+        checks = document.get("checks")
+        message = document.get("message")
+        if (
+            type(passed) is not bool
+            or not isinstance(checks, tuple)
+            or any(type(item) is not str for item in checks)
+            or type(message) is not str
+        ):
+            raise CohortRuntimeError("retained verification is invalid")
+        return VerificationResult(passed, checks, message)
 
 
 __all__ = [
