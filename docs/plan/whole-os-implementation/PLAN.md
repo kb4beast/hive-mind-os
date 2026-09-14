@@ -1,6 +1,7 @@
 # Whole-OS successor implementation plan — N01 Advocate candidate
 
-Status: **inactive N01 implementation candidate; independent N01 court pending**  
+Status: **inactive N01 implementation candidate; Cross-Examiner ADAPT repaired; Witness and Judge pending**
+
 Base commit: `7dff0a807936b5be33099bdaa5c242674c624776`  
 Base tree: `682619e74077e9d0bbc4486dd7e219a8d282d347`  
 Branch: `codex/whole-os-n01-plan`
@@ -53,11 +54,11 @@ These are N01 Advocate recommendations, not independent judgments.
 ## Compiled artifacts and compatibility
 
 - `whole-os-node-contracts-v1.json` contains all N00–N33 objectives/dependencies plus exact contract-section digests, requirement/source bindings, routes, acceptance/output contracts, semantic locks, normalized POSIX write paths, review obligations, publication stages, completion, and rollback. It contains no `planning_group` field.
-- `whole-os-plan-v2.json` is canonical portable-plan schema v2. Digest: `sha256:2152dd3637d1a7dfd69ad1a121de198b6588a3310fa02ea98483edd4125897b1`.
-- `generation-manifest.json` is the existing closed external-generation format. Generation: `sha256:3e0a738c8ca110181c85c29022f233f5dab0df058755c1883a9d7d20721dce5d`. It requires a distinct host signature and contains none.
+- `whole-os-plan-v2.json` is canonical portable-plan schema v2. Digest: `sha256:7a52c0a98a8b9b20f5f63191c2b02ac2d9ea2fba90ff19f69ef5939e272583a9`.
+- `generation-manifest.json` is the existing closed external-generation format. Generation: `sha256:ef684707714f91faf6002055494865a5e8b455183fccaba7a160016841553648`. It requires a distinct host signature and contains none.
 - `DISPATCHER.json` is the permanent inactive dispatcher entry. It binds the exact plan, generation, node-contract, and node-prompt bytes and says `planning_group_is_lock=false`.
-- `NODE_PROMPT.md` is the permanent compact worker template derived from RUNBOOK section 8. Workers receive only their node, direct prerequisite receipts, named contracts/sources, and compiled locks/outputs.
-- `scripts/generate_whole_os_plan_artifacts.py` deterministically reconstructs the artifacts and performs an inert compilation. It has no activation/signing/publication path.
+- `NODE_PROMPT.md` is the permanent worker-boundary specification derived from RUNBOOK section 8. It is never interpolated. `node_prompt_renderer.py` accepts only a closed canonical request, copies exact sealed node values, structurally separates fixed instructions from data, and returns a digest for the node-admission record.
+- `scripts/generate_whole_os_plan_artifacts.py` deterministically reconstructs the artifacts and performs an inert compilation. Before importing compiler modules it places this checkout's `src` first and fails closed unless every compiler module resolves within that directory. It has no activation/signing/publication path.
 
 Portable schema v1 and `TournamentPlanFactory`'s 13-stage `external-all-aspect-tournament-v2` remain supported by the original compiler package identity. Schema v2 uses a distinct lock-aware compiler identity; it serializes equal semantic locks and equal/ancestor write paths within otherwise parallel dependency levels.
 
@@ -65,14 +66,14 @@ Portable schema v1 and `TournamentPlanFactory`'s 13-stage `external-all-aspect-t
 
 The N01 Architect also acted as Advocate/Builder and therefore does not approve or judge this candidate.
 
-1. A separate Cross-Examiner must produce `docs/plan/whole-os-implementation/N01_EXAMINER_REVIEW.md`, challenge each ADR and R01–R18 recommendation, inspect lock/path completeness and aliases, attempt every negative case, and preserve dissent.
-2. A separate expert witness (Integrator/Steward with portable compiler and recovery expertise) must produce `docs/plan/whole-os-implementation/N01_EXPERT_TESTIMONY.md`, reproduce all 34 mappings, v1 compatibility, deterministic generation, lock-aware rounds, source/authority closure, migration, and rollback on the exact commit.
-3. A Judge distinct from N00 Explorer/Curator and this N01 Architect/Advocate/Builder must produce `docs/plan/whole-os-implementation/N01_JUDGE_VERDICT.md` with one disposition per material ADR and requirement family. The Judge must not infer production, efficiency, Roblox, learning, or superiority from this compilation.
+1. A separate Cross-Examiner produced `N01_EXAMINER_REVIEW.md` at review commit `78d0f32bfb6b47912e6d06ae33ed94d7647cf2d4` against candidate `eb506932e34ed631acb72b77872b72f7d2a0bfe9`. It returned ADAPT: CE-01 required self-verifying generator import provenance and CE-02 required a closed, injection-safe renderer. This successor repair implements both; CE-03/CE-04 controls and CE-05 deferred claims remain unchanged. The review artifact must be retained when commits are composed.
+2. A separate expert witness (Integrator/Steward with portable compiler and recovery expertise) must produce `docs/plan/whole-os-implementation/N01_EXPERT_TESTIMONY.md`, reproduce all 34 mappings, v1 compatibility, deterministic generation, lock-aware rounds, source/authority closure, migration, and rollback on the exact repaired composition.
+3. A Judge distinct from N00 Explorer/Curator, the Cross-Examiner, and this N01 Architect/Advocate/Builder must produce `docs/plan/whole-os-implementation/N01_JUDGE_VERDICT.md` with one disposition per material ADR and requirement family. The Judge must not infer production, efficiency, Roblox, learning, or superiority from this compilation.
 
 Until those exact-candidate artifacts exist, N01 is an implementation candidate awaiting independent disposition and must not be represented as accepted, activated, signed, published, or complete under the repository's full-autonomy definition.
 
 ## Verification and rollback
 
-Focused command: `python -m unittest tests.test_whole_os_plan_contract tests.test_tournament_plan_factory tests.test_compiled_tournament -v`, with `PYTHONPATH` bound to this worktree's absolute `src` and import provenance recorded. The mandatory repository gate remains `python -m unittest discover -s tests -v` at integration; N01 focused checks do not replace it.
+Focused command: `python -m unittest tests.test_whole_os_plan_contract tests.test_node_prompt_renderer tests.test_tournament_plan_factory tests.test_compiled_tournament -v`, with `PYTHONPATH` bound to this worktree's absolute `src` and import provenance recorded. The mandatory repository gate remains `python -m unittest discover -s tests -v` at integration; N01 focused checks do not replace it.
 
 Rollback selects schema-v1 compiler/profile for new admissions and reverts N01 code/docs through normal history. Preserve the v2 plan, generation, Advocate record, failures, and later court artifacts as append-only evidence. No host plan, signature, grant, external branch, PR, protected ref, or production service was touched by N01.

@@ -5,9 +5,45 @@ This script performs no activation, signing, host attestation, or external effec
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
+import sys
 from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = (ROOT / "src").resolve(strict=True)
+source_root_text = str(SOURCE_ROOT)
+if not sys.path or Path(sys.path[0]).resolve() != SOURCE_ROOT:
+    sys.path.insert(0, source_root_text)
+
+
+def _require_local_import(name: str) -> None:
+    spec = importlib.util.find_spec(name)
+    if spec is None or spec.origin is None:
+        raise RuntimeError(f"N01 generator cannot resolve {name}")
+    origin = Path(spec.origin).resolve(strict=True)
+    try:
+        origin.relative_to(SOURCE_ROOT)
+    except ValueError as error:
+        raise RuntimeError(
+            f"N01 generator import provenance mismatch for {name}: {origin}"
+        ) from error
+
+
+# Verify package provenance before importing any compiler module.  A caller that
+# preloaded a foreign package cannot make regeneration silently use those bytes.
+_require_local_import("hive_mind_os")
+for compiler_module in (
+    "hive_mind_os.dag_standard",
+    "hive_mind_os.node_prompt_renderer",
+    "hive_mind_os.plan_generation",
+    "hive_mind_os.portable_plan",
+    "hive_mind_os.runtime_contracts",
+    "hive_mind_os.tournament_plan_factory",
+):
+    _require_local_import(compiler_module)
 
 from hive_mind_os.dag_standard import compile_plan
 from hive_mind_os.plan_generation import PinnedArtifact, PlanGenerationRequest
@@ -15,8 +51,6 @@ from hive_mind_os.portable_plan import RepositorySubject, SubjectBinding
 from hive_mind_os.runtime_contracts import AuthorityEnvelope, EvidenceReference, raw_sha256
 from hive_mind_os.tournament_plan_factory import WholeOSPlanFactory
 
-
-ROOT = Path(__file__).resolve().parents[1]
 HANDOFF = ROOT / "docs/plan/whole-os-tournament-2026-09-13"
 OUTPUT = ROOT / "docs/plan/whole-os-implementation"
 BASE_COMMIT = "7dff0a807936b5be33099bdaa5c242674c624776"
@@ -101,7 +135,9 @@ WRITE_PATHS = {
         "scripts/generate_whole_os_plan_artifacts.py",
         "src/hive_mind_os/portable_plan.py",
         "src/hive_mind_os/dag_standard.py",
+        "src/hive_mind_os/node_prompt_renderer.py",
         "src/hive_mind_os/tournament_plan_factory.py",
+        "tests/test_node_prompt_renderer.py",
         "tests/test_whole_os_plan_contract.py",
     ),
     "N02": (
@@ -502,7 +538,10 @@ def main() -> None:
         for path in (
             "src/hive_mind_os/portable_plan.py",
             "src/hive_mind_os/dag_standard.py",
+            "src/hive_mind_os/node_prompt_renderer.py",
+            "src/hive_mind_os/plan_generation.py",
             "src/hive_mind_os/tournament_plan_factory.py",
+            "scripts/generate_whole_os_plan_artifacts.py",
         )
     )
     source_artifacts = tuple(
@@ -528,8 +567,9 @@ def main() -> None:
     manifest_path.write_bytes(generated.activation_material.external_manifest_bytes)
 
     prompt_path = OUTPUT / "NODE_PROMPT.md"
+    renderer_path = ROOT / "src/hive_mind_os/node_prompt_renderer.py"
     dispatcher = {
-        "schema": "whole-os-dispatcher-entry/v1",
+        "schema": "whole-os-dispatcher-entry/v2",
         "status": "INACTIVE",
         "authority_granted": False,
         "host_attestation_required": True,
@@ -541,11 +581,14 @@ def main() -> None:
         "node_contracts_digest": raw_sha256(contract_path.read_bytes()),
         "node_prompt_path": "docs/plan/whole-os-implementation/NODE_PROMPT.md",
         "node_prompt_digest": raw_sha256(prompt_path.read_bytes()),
+        "node_prompt_renderer_path": "src/hive_mind_os/node_prompt_renderer.py",
+        "node_prompt_renderer_digest": raw_sha256(renderer_path.read_bytes()),
         "dispatch_policy": {
             "dependency_ready_only": True,
             "semantic_and_write_locks_required": True,
             "planning_group_is_lock": False,
             "full_handoff_retransmission_forbidden": True,
+            "structured_renderer_required": True,
         },
     }
     (OUTPUT / "DISPATCHER.json").write_text(

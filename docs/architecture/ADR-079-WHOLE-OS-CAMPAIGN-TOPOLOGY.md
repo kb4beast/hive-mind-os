@@ -1,7 +1,7 @@
 # ADR-079: Whole-OS campaign topology and flexible local execution
 
 Date: 2026-09-14  
-Status: proposed by N01 Architect/Advocate; independent Examiner, Witness, and Judge disposition pending
+Status: proposed by N01 Architect/Advocate; independent Cross-Examiner returned ADAPT; Witness and Judge pending
 
 ## Requirements and sources
 
@@ -17,7 +17,7 @@ Alternative considered: retain the fixed small-improvement tournament as the onl
 
 Advocate argument: extending the existing portable compiler with a closed v2 work-package layer reuses proven identity, DAG, authority, and generation seams without coupling delivered applications to Hive. Exact locks make concurrency a contract rather than a `planning_group` guess.
 
-Examiner objection to investigate: a larger declarative graph can hide ambiguous ownership, stale source mappings, excessive ceremony, or accidental self-approval; lock normalization may serialize safe work or miss aliases. No N01 Examiner statement has been authored by this Advocate.
+Examiner objection to investigate: a larger declarative graph can hide ambiguous ownership, stale source mappings, excessive ceremony, or accidental self-approval; lock normalization may serialize safe work or miss aliases. The independent `N01_EXAMINER_REVIEW.md` at `78d0f32bfb6b47912e6d06ae33ed94d7647cf2d4` returned ADAPT; its CE-01/CE-02 findings are repaired in a successor commit while CE-03/CE-04 controls and CE-05 deferrals remain.
 
 Expert testimony requested: an independent Integrator/Steward should reproduce v1 compatibility, v2 round compilation, dependency recovery, and path-conflict behavior on the exact candidate. No N01 expert testimony is claimed here.
 

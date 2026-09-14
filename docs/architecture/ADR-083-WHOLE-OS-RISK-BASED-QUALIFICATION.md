@@ -1,7 +1,7 @@
 # ADR-083: Risk-based checks, content-bound reuse, and independent qualification
 
 Date: 2026-09-14  
-Status: proposed by N01 Architect/Advocate; independent Examiner, Witness, and Judge disposition pending
+Status: proposed by N01 Architect/Advocate; independent Cross-Examiner returned ADAPT; Witness and Judge pending
 
 ## Requirements and sources
 
@@ -17,7 +17,7 @@ Alternative considered: run the full suite after every edit, which wastes resour
 
 Advocate argument: content/purpose binding reduces demonstrably duplicate work while keeping high-burden checks at the boundaries whose claims they support.
 
-Examiner objection to investigate: dependency impact analysis can be incomplete, environments can contain nondeterministic state, and cache reuse can silently preserve a false pass. No independent N01 Examiner conclusion is asserted.
+Examiner objection to investigate: dependency impact analysis can be incomplete, environments can contain nondeterministic state, and cache reuse can silently preserve a false pass. The independent `N01_EXAMINER_REVIEW.md` at `78d0f32bfb6b47912e6d06ae33ed94d7647cf2d4` returned ADAPT; CE-05 preserves all unmeasured efficiency and production claims as deferred.
 
 Expert testimony requested: an independent Curator/Optimizer should reproduce invalidation matrices and quantify overhead/savings without counting required independent CI as duplication.
 

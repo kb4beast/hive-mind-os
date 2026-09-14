@@ -114,7 +114,9 @@
         "scripts/generate_whole_os_plan_artifacts.py",
         "src/hive_mind_os/portable_plan.py",
         "src/hive_mind_os/dag_standard.py",
+        "src/hive_mind_os/node_prompt_renderer.py",
         "src/hive_mind_os/tournament_plan_factory.py",
+        "tests/test_node_prompt_renderer.py",
         "tests/test_whole_os_plan_contract.py"
       ],
       "acceptance_criteria": [
@@ -138,7 +140,9 @@
         "scripts/generate_whole_os_plan_artifacts.py",
         "src/hive_mind_os/portable_plan.py",
         "src/hive_mind_os/dag_standard.py",
+        "src/hive_mind_os/node_prompt_renderer.py",
         "src/hive_mind_os/tournament_plan_factory.py",
+        "tests/test_node_prompt_renderer.py",
         "tests/test_whole_os_plan_contract.py"
       ],
       "publication_stage": "none",

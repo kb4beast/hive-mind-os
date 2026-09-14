@@ -1,7 +1,7 @@
 # ADR-081: Tenant-bound learning and draft-only cross-repository lessons
 
 Date: 2026-09-14  
-Status: proposed by N01 Architect/Advocate; independent Examiner, Witness, and Judge disposition pending
+Status: proposed by N01 Architect/Advocate; independent Cross-Examiner returned ADAPT; Witness and Judge pending
 
 ## Requirements and sources
 
@@ -17,7 +17,7 @@ Alternative considered: one global target store with namespace strings and autom
 
 Advocate argument: typed custody handles and separate draft/promotion routes implement the owner's lessons-only intent while permitting private app improvement.
 
-Examiner objection to investigate: hashes, errors, embeddings, copied snippets, or generalized prose can still disclose private information; scanners cannot prove universal non-leakage. No independent N01 Examiner result is asserted.
+Examiner objection to investigate: hashes, errors, embeddings, copied snippets, or generalized prose can still disclose private information; scanners cannot prove universal non-leakage. The independent `N01_EXAMINER_REVIEW.md` at `78d0f32bfb6b47912e6d06ae33ed94d7647cf2d4` returned ADAPT; its concrete renderer/provenance repairs do not close the deferred disclosure claim.
 
 Expert testimony requested: a privacy/security expert should attack storage, provider payload, staged bytes, exception paths, and promotion shortcuts, including non-regex canaries.
 

@@ -259,10 +259,12 @@ class WholeOSPlanContractTests(unittest.TestCase):
             ("generation_manifest_path", "generation_manifest_digest"),
             ("node_contracts_path", "node_contracts_digest"),
             ("node_prompt_path", "node_prompt_digest"),
+            ("node_prompt_renderer_path", "node_prompt_renderer_digest"),
         ):
             self.assertEqual(
                 dispatcher[digest_key], raw_sha256((ROOT / dispatcher[path_key]).read_bytes())
             )
+        self.assertTrue(dispatcher["dispatch_policy"]["structured_renderer_required"])
 
     def test_regeneration_is_byte_deterministic(self) -> None:
         paths = tuple(

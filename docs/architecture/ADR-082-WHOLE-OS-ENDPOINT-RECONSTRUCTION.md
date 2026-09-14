@@ -1,7 +1,7 @@
 # ADR-082: Endpoint reconstruction alongside strict point-in-time replay
 
 Date: 2026-09-14  
-Status: proposed by N01 Architect/Advocate; independent Examiner, Witness, and Judge disposition pending
+Status: proposed by N01 Architect/Advocate; independent Cross-Examiner returned ADAPT; Witness and Judge pending
 
 ## Requirements and sources
 
@@ -17,7 +17,7 @@ Alternative considered: expose ancestor history or infer missing intermediate de
 
 Advocate argument: explicit modes preserve PIT truth while implementing the owner's endpoint examples with testable custody and functional outcomes.
 
-Examiner objection to investigate: public-model pretraining, dependency caches, Git alternates, final README clues, and family overlap may still contaminate results; final commits may themselves be unhealthy. No independent N01 Examiner statement is claimed.
+Examiner objection to investigate: public-model pretraining, dependency caches, Git alternates, final README clues, and family overlap may still contaminate results; final commits may themselves be unhealthy. The independent `N01_EXAMINER_REVIEW.md` at `78d0f32bfb6b47912e6d06ae33ed94d7647cf2d4` returned ADAPT; CE-05 preserves these learning and production claims as deferred.
 
 Expert testimony requested: an evaluation/PIT expert should inspect seal timing, visible Git objects, family splits, reference health, and reveal retirement.
 

@@ -1,20 +1,23 @@
 {
-  "schema": "whole-os-dispatcher-entry/v1",
+  "schema": "whole-os-dispatcher-entry/v2",
   "status": "INACTIVE",
   "authority_granted": false,
   "host_attestation_required": true,
   "plan_path": "docs/plan/whole-os-implementation/whole-os-plan-v2.json",
-  "plan_digest": "sha256:2152dd3637d1a7dfd69ad1a121de198b6588a3310fa02ea98483edd4125897b1",
+  "plan_digest": "sha256:7a52c0a98a8b9b20f5f63191c2b02ac2d9ea2fba90ff19f69ef5939e272583a9",
   "generation_manifest_path": "docs/plan/whole-os-implementation/generation-manifest.json",
-  "generation_manifest_digest": "sha256:1adafc787ee011faf1f7641bc481d30f5e05433af1590afa9a30ea123a972eab",
+  "generation_manifest_digest": "sha256:070fbbde160dba3fa0a69afe941db66e742bf14428d6ed20e428cad460777b73",
   "node_contracts_path": "docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json",
-  "node_contracts_digest": "sha256:ad08bfd079fa4f2d9f1d2682de0808b596225b56886ac78b154083a168be7195",
+  "node_contracts_digest": "sha256:5f09d86039835bad72e75cd7179fc73c74db38b3874115a7d7f7f1e2fe776f77",
   "node_prompt_path": "docs/plan/whole-os-implementation/NODE_PROMPT.md",
-  "node_prompt_digest": "sha256:9464ce6330f94def4fbdf4618109dd65d2bd0b1f7844dd84935b24bc7753f1d0",
+  "node_prompt_digest": "sha256:afa2feb80434b1a5d8a1754b5db7ae4f64b5acda5701373ee963f73bc3f3d3c7",
+  "node_prompt_renderer_path": "src/hive_mind_os/node_prompt_renderer.py",
+  "node_prompt_renderer_digest": "sha256:20323f5a506c221bfb557115136ee2a6be8d53f78284d0c3d7aaa6ec35e3ae93",
   "dispatch_policy": {
     "dependency_ready_only": true,
     "semantic_and_write_locks_required": true,
     "planning_group_is_lock": false,
-    "full_handoff_retransmission_forbidden": true
+    "full_handoff_retransmission_forbidden": true,
+    "structured_renderer_required": true
   }
 }

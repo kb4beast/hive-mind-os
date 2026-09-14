@@ -1,7 +1,7 @@
 # ADR-080: One durable campaign composition with separate delivery authority
 
 Date: 2026-09-14  
-Status: proposed by N01 Architect/Advocate; independent Examiner, Witness, and Judge disposition pending
+Status: proposed by N01 Architect/Advocate; independent Cross-Examiner returned ADAPT; Witness and Judge pending
 
 ## Requirements and sources
 
@@ -17,7 +17,7 @@ Alternative considered: a second queue/workflow truth store. It may benefit a pr
 
 Advocate argument: composition at existing typed seams minimizes duplicate state while preserving separately revocable publication authority and effect reconciliation.
 
-Examiner objection to investigate: one service may become a single failure/authority concentration point; recovery could double-deliver after an uncertain effect; compatibility state may be misread. No independent N01 Examiner statement is claimed.
+Examiner objection to investigate: one service may become a single failure/authority concentration point; recovery could double-deliver after an uncertain effect; compatibility state may be misread. The independent `N01_EXAMINER_REVIEW.md` at `78d0f32bfb6b47912e6d06ae33ed94d7647cf2d4` returned ADAPT; its concrete renderer/provenance repairs do not remove this later runtime burden.
 
 Expert testimony requested: a durability/effect expert should trace crash points, fencing, outbox reconciliation, and grant revocation across N08, N10, N15, and N16. No testimony is fabricated.
 
