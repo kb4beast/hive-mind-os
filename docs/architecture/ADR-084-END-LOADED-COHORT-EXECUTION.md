@@ -56,9 +56,9 @@ evidence; typed obligations remain attached to every deferral and become mandato
 convergence. The third threat is using cohort mode as an authority bypass; the hard-gate
 set is code-defined and not configurable.
 
-Migration is opt-in: existing callers remain in `strict` mode. A runtime may inject a
-separate `CohortExecutionPolicy` without changing the closed Whole-OS service document.
-Rollback selects `strict`, preserving all retained execution and evidence records.
+Migration makes `cohort` the default for new direct and Whole-OS runs. Existing callers
+that require the former hand-off sequence can explicitly select `strict`. Rollback
+selects `strict`, preserving all retained execution and evidence records.
 
 ## Acceptance evidence
 

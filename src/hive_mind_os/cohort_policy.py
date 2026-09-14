@@ -75,8 +75,8 @@ class CheckpointDecision:
 class CohortExecutionPolicy:
     """Immutable execution scheduling policy with non-configurable hard gates."""
 
-    mode: CohortExecutionMode = CohortExecutionMode.STRICT
-    max_parallel_packages: int = 1
+    mode: CohortExecutionMode = CohortExecutionMode.COHORT
+    max_parallel_packages: int = 8
 
     CONVERGENCE_GATE: ClassVar[str] = "all_runnable_packages_terminal"
     HARD_GATE_EFFECTS: ClassVar[frozenset[EffectClass]] = frozenset(
@@ -127,7 +127,9 @@ class CohortExecutionPolicy:
             "convergence_gate",
         }
         if set(document) != required or document.get("schema_version") != 1:
-            raise CohortPolicyError("cohort execution policy has an unknown shape or schema")
+            raise CohortPolicyError(
+                "cohort execution policy has an unknown shape or schema"
+            )
         if document.get("convergence_gate") != cls.CONVERGENCE_GATE:
             raise CohortPolicyError("the cohort convergence gate cannot be weakened")
         maximum = document.get("max_parallel_packages")
@@ -164,7 +166,10 @@ class CohortExecutionPolicy:
                 phase,
                 f"{effect.value} requires an immediate fail-closed gate",
             )
-        if self.mode is CohortExecutionMode.COHORT and phase is CohortPhase.IMPLEMENTATION:
+        if (
+            self.mode is CohortExecutionMode.COHORT
+            and phase is CohortPhase.IMPLEMENTATION
+        ):
             return CheckpointDecision(
                 CheckpointDisposition.DEFER_TO_COHORT_END,
                 effect,

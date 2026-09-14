@@ -14,6 +14,25 @@ from .autonomy import (
     EvolutionArena,
     MissionCharter,
 )
+from .cohort_policy import (
+    CheckpointDecision,
+    CheckpointDisposition,
+    CohortExecutionMode,
+    CohortExecutionPolicy,
+    CohortPhase,
+    EffectClass,
+)
+from .cohort_runtime import (
+    CohortKickoff,
+    CohortRunResult,
+    CohortRunStatus,
+    CohortRuntime,
+    CohortRuntimeError,
+    ConvergenceResult,
+    PackageRunResult,
+    PackageRunState,
+    VerificationResult,
+)
 from .contracts import (
     ContractValidation,
     load_schema,
@@ -168,7 +187,7 @@ from .reference.package_system import (
 )
 from .reference.vision import HardenedVisionContract, VisionComplianceGate
 from .repository_learning import RepositoryLearningCurriculum, RepositoryScout
-from .runtime import HiveKernel
+from .runtime import ExecutionStrategy, HiveKernel
 from .scheduler import Job, ManualClock, Scheduler, StaleLeaseError, SystemClock
 from .source_docket import (
     FoundingSourceDocket,
@@ -312,6 +331,22 @@ __all__ = [
     "ToolManifest",
     "TrustState",
     "CheckResult",
+    "CheckpointDecision",
+    "CheckpointDisposition",
+    "CohortExecutionMode",
+    "CohortExecutionPolicy",
+    "CohortKickoff",
+    "CohortPhase",
+    "CohortRunResult",
+    "CohortRunStatus",
+    "CohortRuntime",
+    "CohortRuntimeError",
+    "ConvergenceResult",
+    "EffectClass",
+    "ExecutionStrategy",
+    "PackageRunResult",
+    "PackageRunState",
+    "VerificationResult",
     "VisionComplianceGate",
     "Worker",
     "PackageExecutionResult",

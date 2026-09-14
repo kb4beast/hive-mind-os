@@ -201,7 +201,7 @@ class CohortRuntimeTests(unittest.TestCase):
 
     def test_strict_policy_stays_on_existing_runtime(self) -> None:
         with self.assertRaisesRegex(ValueError, "existing strict runtime"):
-            CohortRuntime(CohortExecutionPolicy())
+            CohortRuntime(CohortExecutionPolicy(CohortExecutionMode.STRICT, 1))
 
 
 if __name__ == "__main__":

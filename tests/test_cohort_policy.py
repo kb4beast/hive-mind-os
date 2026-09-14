@@ -15,6 +15,12 @@ from hive_mind_os.policy import Action
 
 
 class CohortExecutionPolicyTests(unittest.TestCase):
+    def test_cohort_is_the_high_throughput_default(self) -> None:
+        policy = CohortExecutionPolicy()
+
+        self.assertEqual(CohortExecutionMode.COHORT, policy.mode)
+        self.assertEqual(8, policy.max_parallel_packages)
+
     def test_closed_configuration_round_trips_and_is_digest_bound(self) -> None:
         document = {
             "schema_version": 1,
@@ -35,7 +41,9 @@ class CohortExecutionPolicyTests(unittest.TestCase):
                 {**document, "convergence_gate": "first_package_finished"}
             )
 
-    def test_cohort_mode_defers_complete_assurance_bundle_until_convergence(self) -> None:
+    def test_cohort_mode_defers_complete_assurance_bundle_until_convergence(
+        self,
+    ) -> None:
         policy = CohortExecutionPolicy(CohortExecutionMode.COHORT, 12)
         decision = policy.checkpoint(
             EffectClass.ROUTINE_REVERSIBLE, CohortPhase.IMPLEMENTATION
@@ -55,9 +63,7 @@ class CohortExecutionPolicyTests(unittest.TestCase):
 
         for phase in (CohortPhase.CONVERGENCE, CohortPhase.CLOSEOUT):
             with self.subTest(phase=phase):
-                convergence = policy.checkpoint(
-                    EffectClass.ROUTINE_REVERSIBLE, phase
-                )
+                convergence = policy.checkpoint(EffectClass.ROUTINE_REVERSIBLE, phase)
                 self.assertEqual(
                     CheckpointDisposition.REQUIRE_NOW, convergence.disposition
                 )

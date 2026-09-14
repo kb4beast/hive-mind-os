@@ -1,8 +1,7 @@
 """High-throughput dependency-aware cohort execution.
 
-This module is deliberately additive.  Existing executors retain their strict
-node-by-node contracts; callers opt into this runtime when implementation work
-may fan out and defer review to one convergence and one terminal verification.
+This is the default high-throughput execution model. Existing executors retain
+their strict node-by-node contracts as an explicit compatibility mode.
 """
 
 from __future__ import annotations
@@ -301,7 +300,7 @@ class CohortRuntime:
                             raise CohortRuntimeError(
                                 "package executor returned a cross-package result"
                             )
-                    except BaseException as error:
+                    except Exception as error:
                         result = PackageRunResult(
                             package_id,
                             PackageRunState.FAILED,
@@ -315,7 +314,7 @@ class CohortRuntime:
             convergence = converge(kickoff, ordered)
             if not isinstance(convergence, ConvergenceResult):
                 raise CohortRuntimeError("converger returned an untyped result")
-        except BaseException as error:
+        except Exception as error:
             convergence = ConvergenceResult(
                 False, {}, f"{type(error).__name__}: {error}"
             )
@@ -323,7 +322,7 @@ class CohortRuntime:
             verification = verify(kickoff, ordered, convergence)
             if not isinstance(verification, VerificationResult):
                 raise CohortRuntimeError("terminal verifier returned an untyped result")
-        except BaseException as error:
+        except Exception as error:
             verification = VerificationResult(
                 False, (), f"{type(error).__name__}: {error}"
             )
