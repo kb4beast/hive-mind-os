@@ -18,6 +18,16 @@ function Read-Json([string]$Path) {
     return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
+function Invoke-GitSingleLine([string[]]$Arguments, [string]$FailureMessage) {
+    $output = @(& git -C $repo @Arguments 2>&1)
+    $status = $LASTEXITCODE
+    Require ($status -eq 0) "$FailureMessage (git exit $status)"
+    Require ($output.Count -eq 1) "$FailureMessage (expected one output line)"
+    $value = [string]$output[0]
+    Require (-not [string]::IsNullOrWhiteSpace($value)) "$FailureMessage (empty output)"
+    return $value.Trim()
+}
+
 $manifest = Read-Json (Join-Path $handoff "MANIFEST.json")
 foreach ($entry in $manifest.files) {
     $path = Join-Path $handoff $entry.path
@@ -28,19 +38,17 @@ foreach ($entry in $manifest.files) {
 }
 
 $local = Read-Json (Join-Path $handoff "local-source-manifest.json")
-$pinnedTree = (git -C $repo rev-parse "$($local.commit)^{tree}").Trim()
-Require ($LASTEXITCODE -eq 0) "missing pinned local-source commit: $($local.commit)"
+$pinnedTree = Invoke-GitSingleLine @("rev-parse", "$($local.commit)^{tree}") "missing pinned local-source commit: $($local.commit)"
 Require ($pinnedTree -eq $local.tree) "wrong pinned local-source tree: $($local.commit)"
 foreach ($entry in $local.files) {
-    $blob = (git -C $repo rev-parse "$($local.commit):$($entry.path)").Trim()
-    Require ($LASTEXITCODE -eq 0) "missing pinned local source: $($entry.path)"
+    $blob = Invoke-GitSingleLine @("rev-parse", "$($local.commit):$($entry.path)") "missing pinned local source: $($entry.path)"
     Require ($blob -eq $entry.git_blob) "wrong pinned local source blob: $($entry.path)"
     if ($RequireLiveCheckoutMatch) {
         $path = Join-Path $repo $entry.path
         Require (Test-Path -LiteralPath $path) "missing live local source: $($entry.path)"
         $digest = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
         Require ($digest -eq $entry.checkout_sha256) "live local source drift: $($entry.path)"
-        $liveBlob = (git -C $repo hash-object -- $path).Trim()
+        $liveBlob = Invoke-GitSingleLine @("hash-object", "--", $path) "cannot hash live local source: $($entry.path)"
         Require ($liveBlob -eq $entry.git_blob) "live local source blob drift: $($entry.path)"
     }
 }
@@ -65,8 +73,7 @@ $requiredAdrs = 74..78 | ForEach-Object { "GOV-ADR-{0:D3}" -f $_ }
 foreach ($id in $requiredAdrs) {
     $record = @($inventory.sources | Where-Object id -eq $id)
     Require ($record.Count -eq 1) "missing ADR source: $id"
-    $blob = (git -C $repo rev-parse "$($inventory.repository.handoff_commit):$($record[0].locator)").Trim()
-    Require ($LASTEXITCODE -eq 0) "missing pinned ADR source: $id"
+    $blob = Invoke-GitSingleLine @("rev-parse", "$($inventory.repository.handoff_commit):$($record[0].locator)") "missing pinned ADR source: $id"
     Require ($blob -eq $record[0].git_blob) "wrong ADR blob: $id"
 }
 
