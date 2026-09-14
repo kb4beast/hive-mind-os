@@ -77,7 +77,9 @@ class AdversarialHarness:
         self, *, candidate_digest: str, effect_classes: Sequence[str],
         residual_risks: Sequence[str] = (), real_backend_evidence: Sequence[EvidenceRef] = (),
     ) -> AdversarialReport:
-        if not effect_classes:
+        if not candidate_digest.startswith("sha256:") or len(candidate_digest) != 71:
+            raise ValueError("candidate digest must be pinned")
+        if not effect_classes or len(set(effect_classes)) != len(effect_classes):
             raise ValueError("at least one durable effect class is required")
         observations = tuple(
             self.adapter.inject(effect, point, candidate_digest)
@@ -87,7 +89,7 @@ class AdversarialHarness:
             self.adapter.attack_boundary(boundary, candidate_digest)
             for boundary in MANDATORY_BOUNDARIES
         )
-        if len({item.digest for item in boundary_evidence}) != len(MANDATORY_BOUNDARIES):
+        if len(boundary_evidence) != len(MANDATORY_BOUNDARIES) or len({item.digest for item in boundary_evidence}) != len(MANDATORY_BOUNDARIES):
             raise ValueError("boundary attacks require distinct evidence receipts")
         return AdversarialReport(
             candidate_digest=candidate_digest,

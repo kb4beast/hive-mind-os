@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from dataclasses import asdict
+import json
+from pathlib import Path
 from typing import Iterable, Mapping
 
 from .benchmark_adapters import BenchmarkExecutionBroker, BenchmarkResponse, PinnedRecipeAdapter
@@ -89,13 +92,16 @@ class RecordedAttempt:
 class WholeOSTournament:
     """Records every eligible execution result; no result is silently dropped."""
 
-    def __init__(self, experiment: FrozenExperiment, lease: ExperimentLease, broker: BenchmarkExecutionBroker) -> None:
+    def __init__(self, experiment: FrozenExperiment, lease: ExperimentLease, broker: BenchmarkExecutionBroker, *, state_path: str | Path | None = None) -> None:
         if lease.experiment_id != experiment.experiment_id or lease.admission_digest != experiment.digest:
             raise TournamentError("lease is not bound to the frozen experiment")
         self.experiment = experiment
         self.lease = lease
         self.broker = broker
+        self.state_path = Path(state_path) if state_path is not None else None
         self._attempts: list[RecordedAttempt] = []
+        if self.state_path is not None and self.state_path.exists():
+            self._load()
 
     @property
     def attempts(self) -> tuple[RecordedAttempt, ...]:
@@ -147,7 +153,34 @@ class WholeOSTournament:
         )
         recorded = RecordedAttempt(metric, response.operation_id, response.receipt_digest, response.failure_category)
         self._attempts.append(recorded)
+        self._persist()
         return recorded
+
+    def _persist(self) -> None:
+        if self.state_path is None:
+            return
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        document = {"experiment_digest": self.experiment.digest, "attempts": [asdict(item) for item in self._attempts]}
+        encoded = json.dumps(document, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+        temporary = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
+        temporary.write_text(encoded, encoding="utf-8")
+        temporary.replace(self.state_path)
+
+    def _load(self) -> None:
+        try:
+            raw = json.loads(self.state_path.read_text(encoding="utf-8"))
+            if raw.get("experiment_digest") != self.experiment.digest or not isinstance(raw.get("attempts"), list):
+                raise TournamentError("persisted tournament state is bound to another experiment")
+            for item in raw["attempts"]:
+                metric = AttemptMetric(**item["metric"])
+                recorded = RecordedAttempt(metric, item["operation_id"], item["receipt_digest"], item.get("failure_category"))
+                if recorded.metric.variant_id not in self.experiment.candidate_digests or recorded.metric.candidate_digest != self.experiment.candidate_digests[recorded.metric.variant_id]:
+                    raise TournamentError("persisted attempt targets an unsealed candidate")
+                self._attempts.append(recorded)
+        except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            if isinstance(exc, TournamentError):
+                raise
+            raise TournamentError("persisted tournament state is corrupt") from exc
 
     def summary(self) -> Mapping[str, int]:
         return summarize_attempts(row.metric for row in self._attempts)

@@ -34,6 +34,14 @@ class PackageExecutionResult:
     evidence_refs: tuple[str, ...]
     message: str = ""
 
+    def __post_init__(self) -> None:
+        if not self.package_id.strip() or type(self.status) is not PackageStatus:
+            raise ServiceError("package result identity and status must be typed")
+        if self.status in {PackageStatus.COMPLETED, PackageStatus.NO_CHANGE} and not self.candidate_digest:
+            raise ServiceError("successful package results require a candidate digest")
+        if len(set(self.evidence_refs)) != len(self.evidence_refs):
+            raise ServiceError("package evidence references must be unique")
+
 
 class WholeOSHost(Protocol):
     """Host-owned effect boundary; implementations hold credentials and sandboxes."""
@@ -202,8 +210,11 @@ def graph_from_document(document: Mapping[str, object]) -> OutcomeGraphSpec:
     for raw in document["packages"]:
         if not isinstance(raw, dict):
             raise ServiceError("graph package must be an object")
+        required = {"package_id", "outcome_ids"}
+        if not required.issubset(raw) or not isinstance(raw["package_id"], str) or not isinstance(raw["outcome_ids"], list):
+            raise ServiceError("graph package requires typed package_id and outcome_ids")
         packages.append(OutcomeWorkPackage(
-            package_id=str(raw["package_id"]), outcome_ids=tuple(raw["outcome_ids"]),
+            package_id=raw["package_id"], outcome_ids=tuple(raw["outcome_ids"]),
             dependencies=tuple(raw.get("dependencies", ())), allowed_paths=tuple(raw.get("allowed_paths", ())),
             semantic_locks=tuple(raw.get("semantic_locks", ())), acceptance_ids=tuple(raw.get("acceptance_ids", ())),
             risk_tier=str(raw.get("risk_tier", "medium")), required_roles=tuple(raw.get("required_roles", ())),
