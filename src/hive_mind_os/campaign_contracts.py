@@ -65,8 +65,9 @@ class CandidateCompletion:
   _sha(self.base_commit_sha,"base commit");_sha(self.commit_sha,"commit")
   if self.disposition not in {"implemented","no-change"}:_fail(CampaignContractErrorCode.INVALID,"disposition")
   for xs,n in ((self.output_receipts,"outputs"),(self.acceptance_receipts,"acceptance")):
-   if type(xs)is not tuple or not xs or len({x[0] for x in xs})!=len(xs):_fail(CampaignContractErrorCode.INVALID,n)
+   if type(xs)is not tuple or not xs or any(type(x)is not tuple or len(x)!=2 or any(type(y)is not str for y in x) for x in xs) or len({x[0] for x in xs})!=len(xs):_fail(CampaignContractErrorCode.INVALID,n)
    for a,b in xs:_id(a,n);_dg(b,n)
+  object.__setattr__(self,"output_receipts",tuple(tuple(x) for x in self.output_receipts));object.__setattr__(self,"acceptance_receipts",tuple(tuple(x) for x in self.acceptance_receipts))
   if self.disposition=="no-change" and (self.base_commit_sha!=self.commit_sha or self.base_tree_digest!=self.tree_digest):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"no-change equality")
 @dataclass(frozen=True,slots=True)
 class WorkPackage:
@@ -89,7 +90,7 @@ class WorkPackage:
   if self.completion:
    c=self.completion
    if (c.mission_id,c.package_id,c.authority_digest)!=(self.mission_id,self.package_id,self.authority_digest) or set(x[0] for x in c.output_receipts)!=set(self.outputs) or set(x[0] for x in c.acceptance_receipts)!={x.acceptance_id for x in self.acceptance} or (self.state is PackageState.NO_CHANGE)!=(c.disposition=="no-change"):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completion binding")
- def to_document(self):return {"schema_version":self.schema_version,"revision":self.revision,"package_id":self.package_id,"mission_id":self.mission_id,"objective":self.objective,"target_boundary":self.target_boundary,"requirement_ids":list(self.requirement_ids),"dependencies":list(self.dependencies),"capabilities":list(self.capabilities),"acceptance":[x.to_document() for x in self.acceptance],"risk":self.risk,"resources":self.resources.to_document(),"outputs":list(self.outputs),"rollback":self.rollback,"authority_digest":self.authority_digest,"state":self.state.value,"created_at":self.created_at,"completion":None}
+ def to_document(self):return {"schema_version":self.schema_version,"revision":self.revision,"package_id":self.package_id,"mission_id":self.mission_id,"objective":self.objective,"target_boundary":self.target_boundary,"requirement_ids":list(self.requirement_ids),"dependencies":list(self.dependencies),"capabilities":list(self.capabilities),"acceptance":[x.to_document() for x in self.acceptance],"risk":self.risk,"resources":self.resources.to_document(),"outputs":list(self.outputs),"rollback":self.rollback,"authority_digest":self.authority_digest,"state":self.state.value,"created_at":self.created_at,"completion":None if self.completion is None else {"mission_id":self.completion.mission_id,"package_id":self.completion.package_id,"authority_digest":self.completion.authority_digest,"base_commit_sha":self.completion.base_commit_sha,"base_tree_digest":self.completion.base_tree_digest,"commit_sha":self.completion.commit_sha,"tree_digest":self.completion.tree_digest,"output_receipts":[list(x) for x in self.completion.output_receipts],"acceptance_receipts":[list(x) for x in self.completion.acceptance_receipts],"disposition":self.completion.disposition}}
 @dataclass(frozen=True,slots=True)
 class CampaignMission:
  schema_version:int;revision:int;mission_id:str;objective:str;target_boundary:str;requirement_ids:tuple[str,...];packages:tuple[WorkPackage,...];authority_digest:str;state:CampaignState;created_at:str;parent_digest:str|None=None
@@ -133,7 +134,9 @@ def parse_campaign_mission(raw:bytes,*,fixture_mode=False):
         for p in d["packages"]:
             if not isinstance(p,Mapping):_fail(CampaignContractErrorCode.INVALID,"package")
             a=tuple(AcceptanceBinding(**{**x,"claim_level":ClaimLevel(x["claim_level"])}) for x in p["acceptance"])
-            packages.append(WorkPackage(p["schema_version"],p["revision"],p["package_id"],p["mission_id"],p["objective"],p["target_boundary"],tuple(p["requirement_ids"]),tuple(p["dependencies"]),tuple(p["capabilities"]),a,p["risk"],ResourceAllocation(**p["resources"]),tuple(p["outputs"]),p["rollback"],p["authority_digest"],PackageState(p["state"]),p["created_at"],None))
+            c=p["completion"]
+            completion=None if c is None else CandidateCompletion(c["mission_id"],c["package_id"],c["authority_digest"],c["base_commit_sha"],c["base_tree_digest"],c["commit_sha"],c["tree_digest"],tuple(tuple(x) for x in c["output_receipts"]),tuple(tuple(x) for x in c["acceptance_receipts"]),c["disposition"])
+            packages.append(WorkPackage(p["schema_version"],p["revision"],p["package_id"],p["mission_id"],p["objective"],p["target_boundary"],tuple(p["requirement_ids"]),tuple(p["dependencies"]),tuple(p["capabilities"]),a,p["risk"],ResourceAllocation(**p["resources"]),tuple(p["outputs"]),p["rollback"],p["authority_digest"],PackageState(p["state"]),p["created_at"],completion))
         return CampaignMission(d["schema_version"],d["revision"],d["mission_id"],d["objective"],d["target_boundary"],tuple(d["requirement_ids"]),tuple(packages),d["authority_digest"],CampaignState(d["state"]),d["created_at"],d["parent_digest"])
     except CampaignContractError: raise
     except (ContractViolation,ValueError,KeyError,TypeError) as e:_fail(CampaignContractErrorCode.INVALID,str(e))
