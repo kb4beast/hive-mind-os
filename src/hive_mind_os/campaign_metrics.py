@@ -64,6 +64,10 @@ def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,fixture_hmac_k
   if recipe.get("availability")!="available" or "provenance_digest" not in recipe:raise CampaignMetricsError("recipe is deferred or lacks provenance")
   _digest(recipe["provenance_digest"],"recipe provenance")
  return AdmittedProtocol(protocol,stage_evidence,canonical_digest([protocol.protocol_digest,stage_evidence.block_digest,stage_evidence.evaluator.payload_digest]))
+def _require_admission(protocol:object,admission:AdmittedProtocol|None,*,stage:str|None)->None:
+ if not isinstance(admission,AdmittedProtocol) or admission.protocol is not protocol:raise CampaignMetricsError("missing or foreign admission receipt")
+ if admission.admission_digest!=canonical_digest([protocol.protocol_digest,admission.stage_evidence.block_digest,admission.stage_evidence.evaluator.payload_digest]):raise CampaignMetricsError("stale admission receipt")
+ if stage is not None and admission.stage_evidence.stage!=stage:raise CampaignMetricsError("admission stage mismatch")
 def canonical_digest(v:object)->str:
  def plain(x):
   if isinstance(x,Mapping):return {str(k):plain(y)for k,y in x.items()}
@@ -155,7 +159,8 @@ class MatchProtocol:
  def protocol_digest(self):return canonical_digest(self.to_document())
  def to_document(self):return {n:getattr(self,n)for n in self.__dataclass_fields__}
  def recipe(self,v):return ({**dict(self.entrant_recipes),**dict(self.hybrid_recipes)}).get(v)
- def validate_seals(self,seals:Iterable[VariantSeal],*,final=False,evaluator_id:str|None=None)->None:
+ def validate_seals(self,seals:Iterable[VariantSeal],*,admission:AdmittedProtocol|None=None,final=False,evaluator_id:str|None=None)->None:
+  _require_admission(self,admission,stage="final" if final else None)
   prior={};finals=[]
   for s in seals:
    if s.protocol_digest!=self.protocol_digest or self.recipe(s.variant_id)is None or s.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("unknown variant/protocol/stage")
@@ -215,7 +220,8 @@ class BracketState:
   for n in ("losses","byes","inconclusive"):object.__setattr__(self,n,_freeze(getattr(self,n)))
   for pair,count in self.inconclusive.items():
    if not isinstance(pair,frozenset) or len(pair)!=2 or any(not isinstance(x,str) for x in pair) or type(count)is not int or count<0:raise CampaignMetricsError("invalid inconclusive matchup")
- def schedule(self,p:MatchProtocol,*,lease_active=True):
+ def schedule(self,p:MatchProtocol,*,admission:AdmittedProtocol|None=None,lease_active=True):
+  _require_admission(p,admission,stage=self.stage)
   if self.protocol_digest!=p.protocol_digest:raise CampaignMetricsError("foreign protocol")
   if self.terminal:return ()
   if not lease_active:object.__setattr__(self,"terminal","lease_exhausted");return ()
@@ -226,10 +232,11 @@ class BracketState:
   if len(ids)==1:object.__setattr__(self,"terminal","one_survivor");return ()
   blocks=("development-screening",) if self.stage=="original" else (("harder-hybrid-development",) if self.stage=="hybrid" else ())
   return schedule_round(ids,self.losses,self.byes,round_number=self.round_number+1,inconclusive_meetings=self.inconclusive,blocks=blocks)
- def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,lease_active=True):
+ def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,admission:AdmittedProtocol|None=None,lease_active=True):
+  _require_admission(p,admission,stage=self.stage)
   if not lease_active:return BracketState(self.protocol_digest,self.stage,self.track,self.round_number,self.losses,self.byes,self.inconclusive,self.quarantined,"lease_exhausted")
   l=dict(self.losses);b=dict(self.byes);i=dict(self.inconclusive);q=set(self.quarantined)
-  issued=tuple(self.schedule(p,lease_active=True));allowed={x.left if x.right is None else (x.left,x.right,x.bye,x.block_id) for x in issued}
+  issued=tuple(self.schedule(p,admission=admission,lease_active=True));allowed={x.left if x.right is None else (x.left,x.right,x.bye,x.block_id) for x in issued}
   if len(pairs)!=len(set((x.left,x.right,x.bye,x.block_id) for x in pairs)):raise CampaignMetricsError("duplicate issued pair")
   for x in pairs:
    if (x.left if x.right is None else (x.left,x.right,x.bye,x.block_id)) not in allowed:raise CampaignMetricsError("pair was not issued")
