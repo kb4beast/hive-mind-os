@@ -16,6 +16,7 @@ from .runtime_contracts import (
     canonical_digest,
     raw_sha256,
     require_digest,
+    requires_external_authority,
 )
 
 STANDARD_VERSION = 2
@@ -30,6 +31,18 @@ COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
     "standard_version": STANDARD_VERSION,
 }
 COMPILER_PACKAGE_DIGEST = canonical_digest(COMPILER_PACKAGE_DESCRIPTOR)
+WORK_PACKAGE_COMPILER_PACKAGE_ID = "hive-mind-portable-compiler-v2"
+WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
+    "algorithm": "canonical-kahn-lock-aware-first-fit-v2",
+    "canonical_json": "utf8-sorted-compact-v1",
+    "conflicts": "resource-semantic-write-path-v2",
+    "package_id": WORK_PACKAGE_COMPILER_PACKAGE_ID,
+    "plan_schema_version": 2,
+    "standard_version": STANDARD_VERSION,
+}
+WORK_PACKAGE_COMPILER_PACKAGE_DIGEST = canonical_digest(
+    WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR
+)
 
 REQUIRED_ROLES = frozenset(
     {
@@ -162,10 +175,15 @@ def load_bound_plan(
         raise ContractViolation("authoring-standard byte count mismatch")
     if standard.git_blob != git_blob_id(standard_bytes):
         raise ContractViolation("authoring-standard Git blob mismatch")
-    if (
-        standard.package_id != COMPILER_PACKAGE_ID
-        or standard.package_digest != COMPILER_PACKAGE_DIGEST
-    ):
+    expected_compiler = (
+        (COMPILER_PACKAGE_ID, COMPILER_PACKAGE_DIGEST)
+        if plan.schema_version == 1
+        else (
+            WORK_PACKAGE_COMPILER_PACKAGE_ID,
+            WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
+        )
+    )
+    if (standard.package_id, standard.package_digest) != expected_compiler:
         raise ContractViolation("canonical compiler package identity mismatch")
     _validate_governance_coverage(plan)
     return plan
@@ -202,6 +220,57 @@ def _validate_governance_coverage(plan: PortablePlanBundle) -> None:
             "portable plan omits required lifecycle stage(s): "
             + ", ".join(sorted(missing_stages))
         )
+    if plan.schema_version == 2:
+        authorities = {item.authority_id: item for item in plan.authority}
+        for capability in plan.capabilities:
+            authority = authorities[capability.authority_id]
+            if (
+                capability.operation not in authority.allowed_actions
+                or capability.operation in authority.denied_actions
+            ):
+                raise ContractViolation(
+                    "portable work package capability is not explicitly granted"
+                )
+            if requires_external_authority(capability.effect_class) and not authority.external_effects:
+                raise ContractViolation(
+                    "portable work package external effect lacks authority"
+                )
+            if capability.operation in {"merge", "protected-merge"}:
+                raise ContractViolation("protected merge is never delegated")
+        expected_requirements = {
+            claim_id
+            for evidence in plan.evidence
+            for claim_id in evidence.claim_ids
+            if claim_id.startswith("R") and claim_id[1:].isdigit()
+        }
+        observed_requirements = {
+            requirement_id
+            for node in plan.nodes
+            for requirement_id in node.work_package.requirement_ids  # type: ignore[union-attr]
+        }
+        if not expected_requirements or observed_requirements != expected_requirements:
+            raise ContractViolation(
+                "portable work packages lose or substitute requirement claims"
+            )
+
+
+def _paths_overlap(left: str, right: str) -> bool:
+    left_parts = left.split("/")
+    right_parts = right.split("/")
+    common = min(len(left_parts), len(right_parts))
+    return left_parts[:common] == right_parts[:common]
+
+
+def _nodes_conflict(left: PortableNode, right: PortableNode) -> bool:
+    if left.work_package is None or right.work_package is None:
+        return False
+    if set(left.work_package.semantic_locks) & set(right.work_package.semantic_locks):
+        return True
+    return any(
+        _paths_overlap(left_path, right_path)
+        for left_path in left.work_package.write_paths
+        for right_path in right.work_package.write_paths
+    )
 
 
 def graph_metrics(plan: PortablePlanBundle) -> GraphMetrics:
@@ -283,6 +352,8 @@ def _compile_rounds(
             for batch, usage in zip(batches, usages, strict=True):
                 if len(batch) >= maximum_workers:
                     continue
+                if any(_nodes_conflict(node, by_id[member]) for member in batch):
+                    continue
                 if any(usage.get(resource_id, 0) + 1 > capacities[resource_id] for resource_id in node.resource_ids):
                     continue
                 batch.append(node_id)
@@ -349,6 +420,9 @@ __all__ = [
     "REQUIRED_ROLES",
     "STANDARD_SOURCE_PATH",
     "STANDARD_VERSION",
+    "WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR",
+    "WORK_PACKAGE_COMPILER_PACKAGE_DIGEST",
+    "WORK_PACKAGE_COMPILER_PACKAGE_ID",
     "compile_plan",
     "git_blob_id",
     "graph_metrics",

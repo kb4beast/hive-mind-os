@@ -1,0 +1,20 @@
+{
+  "schema": "whole-os-dispatcher-entry/v1",
+  "status": "INACTIVE",
+  "authority_granted": false,
+  "host_attestation_required": true,
+  "plan_path": "docs/plan/whole-os-implementation/whole-os-plan-v2.json",
+  "plan_digest": "sha256:2152dd3637d1a7dfd69ad1a121de198b6588a3310fa02ea98483edd4125897b1",
+  "generation_manifest_path": "docs/plan/whole-os-implementation/generation-manifest.json",
+  "generation_manifest_digest": "sha256:1adafc787ee011faf1f7641bc481d30f5e05433af1590afa9a30ea123a972eab",
+  "node_contracts_path": "docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json",
+  "node_contracts_digest": "sha256:ad08bfd079fa4f2d9f1d2682de0808b596225b56886ac78b154083a168be7195",
+  "node_prompt_path": "docs/plan/whole-os-implementation/NODE_PROMPT.md",
+  "node_prompt_digest": "sha256:9464ce6330f94def4fbdf4618109dd65d2bd0b1f7844dd84935b24bc7753f1d0",
+  "dispatch_policy": {
+    "dependency_ready_only": true,
+    "semantic_and_write_locks_required": true,
+    "planning_group_is_lock": false,
+    "full_handoff_retransmission_forbidden": true
+  }
+}

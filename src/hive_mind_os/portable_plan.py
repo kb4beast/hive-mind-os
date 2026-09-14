@@ -49,6 +49,100 @@ class NodeEffectMode(StrEnum):
     BOUNDED_WRITE = "bounded-write"
 
 
+class PublicationStage(StrEnum):
+    """External lifecycle stage named by an inert work package.
+
+    A value here is a planning obligation, never authority to perform the effect.
+    """
+
+    NONE = "none"
+    CODE_PR = "code-pr"
+    LESSON_DRAFT = "lesson-draft"
+    PILOT = "pilot"
+    RELEASE_HANDOFF = "release-handoff"
+
+
+@dataclass(frozen=True, slots=True)
+class PortableWorkPackageContract:
+    """Versioned whole-campaign fields layered onto a portable node."""
+
+    contract_version: int
+    revision: int
+    contract_path: str
+    contract_section: str
+    contract_digest: str
+    requirement_ids: tuple[str, ...]
+    source_ids: tuple[str, ...]
+    semantic_locks: tuple[str, ...]
+    write_paths: tuple[str, ...]
+    minimum_route: str
+    output_contracts: tuple[str, ...]
+    publication_stage: PublicationStage
+    independent_review_required: bool
+    completion_rule: str
+
+    def __post_init__(self) -> None:
+        if type(self.contract_version) is not int or self.contract_version != 1:
+            raise ContractViolation("unsupported work-package contract version")
+        if type(self.revision) is not int or self.revision < 1:
+            raise ContractViolation("work-package revision must be positive")
+        if portable_path(self.contract_path) != self.contract_path:
+            raise ContractViolation("work-package contract_path is not normalized")
+        require_identifier(self.contract_section, "work-package contract_section")
+        require_digest(self.contract_digest, "work-package contract digest")
+        for values, label in (
+            (self.requirement_ids, "work-package requirement_ids"),
+            (self.source_ids, "work-package source_ids"),
+            (self.semantic_locks, "work-package semantic_locks"),
+            (self.write_paths, "work-package write_paths"),
+            (self.output_contracts, "work-package output_contracts"),
+        ):
+            if (
+                type(values) is not tuple
+                or not values
+                or any(type(value) is not str or not value for value in values)
+                or len(set(values)) != len(values)
+            ):
+                raise ContractViolation(f"{label} must be unique non-empty strings")
+        for requirement_id in self.requirement_ids:
+            require_identifier(requirement_id, "work-package requirement_id")
+        for source_id in self.source_ids:
+            require_identifier(source_id, "work-package source_id")
+        for semantic_lock in self.semantic_locks:
+            require_identifier(semantic_lock, "work-package semantic lock")
+        for write_path in self.write_paths:
+            if portable_path(write_path) != write_path:
+                raise ContractViolation("work-package write path is not normalized")
+        if self.minimum_route not in {"T0", "T1", "T2", "T3"}:
+            raise ContractViolation("work-package minimum route is unknown")
+        if not isinstance(self.publication_stage, PublicationStage):
+            raise ContractViolation("work-package publication stage must be typed")
+        if type(self.independent_review_required) is not bool:
+            raise ContractViolation(
+                "work-package independent_review_required must be boolean"
+            )
+        if type(self.completion_rule) is not str or not self.completion_rule:
+            raise ContractViolation("work-package completion_rule is required")
+
+    def to_document(self) -> dict[str, Any]:
+        return {
+            "contract_version": self.contract_version,
+            "revision": self.revision,
+            "contract_path": self.contract_path,
+            "contract_section": self.contract_section,
+            "contract_digest": self.contract_digest,
+            "requirement_ids": list(self.requirement_ids),
+            "source_ids": list(self.source_ids),
+            "semantic_locks": list(self.semantic_locks),
+            "write_paths": list(self.write_paths),
+            "minimum_route": self.minimum_route,
+            "output_contracts": list(self.output_contracts),
+            "publication_stage": self.publication_stage.value,
+            "independent_review_required": self.independent_review_required,
+            "completion_rule": self.completion_rule,
+        }
+
+
 @dataclass(frozen=True, slots=True)
 class NodeExecutionContract:
     """Plan-authored execution semantics with no node-name conventions.
@@ -286,6 +380,7 @@ class PortableNode:
     roles: tuple[str, ...]
     lifecycle_stages: tuple[str, ...]
     execution: NodeExecutionContract | None = None
+    work_package: PortableWorkPackageContract | None = None
 
     def __post_init__(self) -> None:
         require_identifier(self.node_id, "node_id")
@@ -325,6 +420,10 @@ class PortableNode:
                 raise ContractViolation("node execution contract must be typed")
             if self.execution.execution_role not in self.roles:
                 raise ContractViolation("execution role must be declared by the node")
+        if self.work_package is not None and not isinstance(
+            self.work_package, PortableWorkPackageContract
+        ):
+            raise ContractViolation("node work_package contract must be typed")
 
     def to_document(self) -> dict[str, Any]:
         document = {
@@ -344,6 +443,8 @@ class PortableNode:
         }
         if self.execution is not None:
             document["execution"] = self.execution.to_document()
+        if self.work_package is not None:
+            document["work_package"] = self.work_package.to_document()
         return document
 
 
@@ -367,7 +468,7 @@ class PortablePlanBundle:
     nodes: tuple[PortableNode, ...]
 
     def __post_init__(self) -> None:
-        if type(self.schema_version) is not int or self.schema_version != 1:
+        if type(self.schema_version) is not int or self.schema_version not in {1, 2}:
             raise ContractViolation("unsupported portable-plan schema version")
         require_identifier(self.plan_id, "plan_id")
         require_digest(self.request_id, "request_id")
@@ -403,6 +504,28 @@ class PortablePlanBundle:
                 )
         by_node = {node.node_id: node for node in self.nodes}
         for node in self.nodes:
+            if self.schema_version == 1 and node.work_package is not None:
+                raise ContractViolation(
+                    "portable-plan v1 cannot carry work-package contracts"
+                )
+            if self.schema_version == 2 and node.work_package is None:
+                raise ContractViolation(
+                    "portable-plan v2 requires every node work-package contract"
+                )
+            if self.schema_version == 2 and node.execution is None:
+                raise ContractViolation(
+                    "portable-plan v2 requires every node execution contract"
+                )
+            if (
+                self.schema_version == 2
+                and node.execution is not None
+                and node.work_package is not None
+                and node.execution.required_outputs
+                != node.work_package.output_contracts
+            ):
+                raise ContractViolation(
+                    "portable-plan v2 execution outputs do not match its work package"
+                )
             checks = (
                 (node.resource_ids, ids["resources"], "resource"),
                 (node.capability_ids, ids["capabilities"], "capability"),
@@ -751,8 +874,9 @@ def _node_from_document(value: Mapping[str, Any]) -> PortableNode:
         "roles",
         "lifecycle_stages",
         "execution",
+        "work_package",
     }
-    required = fields - {"execution"}
+    required = fields - {"execution", "work_package"}
     unknown = set(value) - fields
     missing = required - set(value)
     if unknown or missing:
@@ -784,6 +908,52 @@ def _node_from_document(value: Mapping[str, Any]) -> PortableNode:
             execution_value["failure_transition"], execution_value["retry_policy"],
             execution_value["cancellation_policy"],
         )
+    work_package_value = value.get("work_package")
+    work_package = None
+    if work_package_value is not None:
+        if not isinstance(work_package_value, Mapping):
+            raise ContractViolation("node work_package contract must be an object")
+        work_package_fields = {
+            "contract_version",
+            "revision",
+            "contract_path",
+            "contract_section",
+            "contract_digest",
+            "requirement_ids",
+            "source_ids",
+            "semantic_locks",
+            "write_paths",
+            "minimum_route",
+            "output_contracts",
+            "publication_stage",
+            "independent_review_required",
+            "completion_rule",
+        }
+        _closed(work_package_value, work_package_fields, "work-package contract")
+        try:
+            publication_stage = PublicationStage(
+                work_package_value["publication_stage"]
+            )
+        except (KeyError, ValueError) as error:
+            raise ContractViolation(
+                "work-package publication stage is unsupported"
+            ) from error
+        work_package = PortableWorkPackageContract(
+            work_package_value["contract_version"],
+            work_package_value["revision"],
+            work_package_value["contract_path"],
+            work_package_value["contract_section"],
+            work_package_value["contract_digest"],
+            _string_list(work_package_value, "requirement_ids"),
+            _string_list(work_package_value, "source_ids"),
+            _string_list(work_package_value, "semantic_locks"),
+            _string_list(work_package_value, "write_paths"),
+            work_package_value["minimum_route"],
+            _string_list(work_package_value, "output_contracts"),
+            publication_stage,
+            work_package_value["independent_review_required"],
+            work_package_value["completion_rule"],
+        )
     return PortableNode(
         value["node_id"],
         value["objective"],
@@ -799,6 +969,7 @@ def _node_from_document(value: Mapping[str, Any]) -> PortableNode:
         _string_list(value, "roles"),
         _string_list(value, "lifecycle_stages"),
         execution,
+        work_package,
     )
 
 
@@ -917,6 +1088,8 @@ __all__ = [
     "NonRepositorySubject",
     "PortableNode",
     "PortablePlanBundle",
+    "PortableWorkPackageContract",
+    "PublicationStage",
     "RepositorySubject",
     "StandardBinding",
     "SubjectBinding",

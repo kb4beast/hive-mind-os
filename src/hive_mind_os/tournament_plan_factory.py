@@ -7,13 +7,16 @@ implementations nor authenticates execution, integration, or promotion.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from .dag_standard import (
     COMPILER_PACKAGE_DIGEST,
     COMPILER_PACKAGE_ID,
     STANDARD_SOURCE_PATH,
     STANDARD_VERSION,
+    WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
+    WORK_PACKAGE_COMPILER_PACKAGE_ID,
     git_blob_id,
 )
 from .plan_generation import (
@@ -28,6 +31,8 @@ from .portable_plan import (
     NodeExecutionContract,
     PortableNode,
     PortablePlanBundle,
+    PortableWorkPackageContract,
+    PublicationStage,
     RepositorySubject,
     StandardBinding,
     SubjectBinding,
@@ -44,6 +49,7 @@ from .runtime_contracts import (
     ResourceRequirement,
     TokenPolicy,
     canonical_digest,
+    require_digest,
 )
 
 _FIXTURE_STAGE_KINDS = {
@@ -154,7 +160,6 @@ class TournamentPlanFactory:
             evidence=evidence_inventory,
             nodes=self._nodes(authority.authority_id, evidence_inventory),
         )
-
     def generate(
         self,
         request: PlanGenerationRequest,
@@ -587,4 +592,260 @@ class TournamentPlanFactory:
         )
 
 
-__all__ = ["TournamentPlanFactory"]
+class WholeOSPlanFactory:
+    """Compile the court-selected 34-node handoff into an inert v2 plan.
+
+    The checked node-contract document is the canonical prose-to-contract
+    translation.  This factory never reads host configuration, activates a
+    plan, signs a manifest, or performs a publication stage.
+    """
+
+    PLAN_ID = "whole-os-successor-campaign-v1"
+    CONTRACT_SCHEMA = "whole-os-node-contracts/v1"
+    NODE_FIELDS = {
+        "id",
+        "objective",
+        "dependencies",
+        "owner_role",
+        "roles",
+        "lifecycle_stages",
+        "minimum_route",
+        "contract_path",
+        "contract_section",
+        "contract_digest",
+        "requirement_ids",
+        "source_ids",
+        "semantic_locks",
+        "write_paths",
+        "acceptance_criteria",
+        "rollback",
+        "output_contracts",
+        "publication_stage",
+        "independent_review_required",
+        "completion_rule",
+    }
+
+    def __init__(self, generator: PlanGenerator | None = None) -> None:
+        self._generator = generator or PlanGenerator()
+
+    def build(
+        self,
+        request: PlanGenerationRequest,
+        *,
+        standard: PinnedArtifact,
+        authority: AuthorityEnvelope,
+        evidence: Iterable[EvidenceReference],
+        node_contracts: Mapping[str, Any],
+    ) -> PortablePlanBundle:
+        repository = TournamentPlanFactory._repository_subject(request)
+        TournamentPlanFactory._validate_standard(standard)
+        TournamentPlanFactory._validate_authority(authority)
+        evidence_inventory = TournamentPlanFactory._evidence_inventory(evidence)
+        nodes = self._nodes(authority.authority_id, evidence_inventory, node_contracts)
+        return PortablePlanBundle(
+            schema_version=2,
+            plan_id=self.PLAN_ID,
+            request_id=request.request_id,
+            objective_digest=request.objective_digest,
+            subject=SubjectBinding.for_repository(repository),
+            standard=StandardBinding(
+                STANDARD_VERSION,
+                STANDARD_SOURCE_PATH,
+                standard.digest,
+                len(standard.content),
+                git_blob_id(standard.content),
+                WORK_PACKAGE_COMPILER_PACKAGE_ID,
+                WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
+            ),
+            resources=(
+                ResourceRequirement(
+                    "implementation-workspaces",
+                    "compute",
+                    4,
+                    "workspace",
+                    ("isolated", "reversible"),
+                ),
+            ),
+            capabilities=TournamentPlanFactory._capabilities(authority.authority_id),
+            adapters=TournamentPlanFactory._adapters(),
+            authority=(authority,),
+            budgets=(
+                BudgetAllocation(
+                    "route-t1", BudgetPolicy(2_700, 12, 120_000, 24_000, 0, 64, 4)
+                ),
+                BudgetAllocation(
+                    "route-t2", BudgetPolicy(5_400, 20, 240_000, 40_000, 0, 128, 4)
+                ),
+                BudgetAllocation(
+                    "route-t3", BudgetPolicy(7_200, 28, 360_000, 60_000, 0, 192, 4)
+                ),
+            ),
+            recovery=RecoveryPolicy(
+                3,
+                True,
+                True,
+                (
+                    "authority-gap",
+                    "capability-gap",
+                    "contract-contradiction",
+                    "evidence-gap",
+                    "resource-exhaustion",
+                ),
+            ),
+            integration=IntegrationPolicy(
+                "compare-and-swap",
+                request.target,
+                canonical_digest(
+                    {"commit": repository.commit, "tree": repository.tree}
+                ),
+                True,
+                True,
+            ),
+            token_policy=TokenPolicy(
+                360_000,
+                60_000,
+                45_000,
+                "measured-or-unavailable",
+                "stop",
+            ),
+            evidence=evidence_inventory,
+            nodes=nodes,
+        )
+
+    def generate(
+        self,
+        request: PlanGenerationRequest,
+        *,
+        standard: PinnedArtifact,
+        authority: AuthorityEnvelope,
+        evidence: Iterable[EvidenceReference],
+        node_contracts: Mapping[str, Any],
+        node_mappings: PinnedArtifact,
+        sources: Iterable[PinnedArtifact],
+        compiler: PinnedArtifact,
+    ) -> tuple[GeneratedPlan, bool]:
+        plan = self.build(
+            request,
+            standard=standard,
+            authority=authority,
+            evidence=evidence,
+            node_contracts=node_contracts,
+        )
+        return self._generator.generate(
+            request,
+            plan,
+            node_mappings=node_mappings,
+            sources=sources,
+            standard=standard,
+            standard_version=STANDARD_VERSION,
+            compiler=compiler,
+        )
+
+    @classmethod
+    def _nodes(
+        cls,
+        authority_id: str,
+        evidence: tuple[EvidenceReference, ...],
+        document: Mapping[str, Any],
+    ) -> tuple[PortableNode, ...]:
+        if set(document) != {"schema", "source_inventory", "nodes"}:
+            raise ContractViolation("whole-OS node-contract document is not closed")
+        if document["schema"] != cls.CONTRACT_SCHEMA:
+            raise ContractViolation("unsupported whole-OS node-contract schema")
+        source_inventory = document["source_inventory"]
+        if not isinstance(source_inventory, Mapping) or set(source_inventory) != {
+            "inventory_id",
+            "sha256",
+        }:
+            raise ContractViolation("whole-OS source inventory binding is incomplete")
+        require_digest(source_inventory["sha256"], "whole-OS source inventory digest")
+        if not any(
+            item.evidence_id == "accepted-n00-inventory"
+            and item.digest == source_inventory["sha256"]
+            for item in evidence
+        ):
+            raise ContractViolation(
+                "whole-OS node contracts are not bound to accepted N00 evidence"
+            )
+        node_documents = document["nodes"]
+        if not isinstance(node_documents, list):
+            raise ContractViolation("whole-OS nodes must be an object list")
+        expected_ids = {f"N{index:02d}" for index in range(34)}
+        observed_ids = {
+            item.get("id") for item in node_documents if isinstance(item, Mapping)
+        }
+        if len(node_documents) != 34 or observed_ids != expected_ids:
+            raise ContractViolation("whole-OS node set must be exactly N00 through N33")
+        evidence_ids = tuple(item.evidence_id for item in evidence)
+        result: list[PortableNode] = []
+        for item in node_documents:
+            if not isinstance(item, Mapping) or set(item) != cls.NODE_FIELDS:
+                raise ContractViolation("whole-OS node contract is not closed")
+            for field in (
+                "dependencies",
+                "roles",
+                "lifecycle_stages",
+                "requirement_ids",
+                "source_ids",
+                "semantic_locks",
+                "write_paths",
+                "acceptance_criteria",
+                "output_contracts",
+            ):
+                if not isinstance(item[field], list) or any(
+                    type(value) is not str for value in item[field]
+                ):
+                    raise ContractViolation(
+                        f"whole-OS node {item['id']} {field} must be a string list"
+                    )
+            try:
+                publication_stage = PublicationStage(item["publication_stage"])
+            except (TypeError, ValueError) as error:
+                raise ContractViolation("unknown whole-OS publication stage") from error
+            package = PortableWorkPackageContract(
+                1,
+                1,
+                item["contract_path"],
+                item["contract_section"],
+                item["contract_digest"],
+                tuple(item["requirement_ids"]),
+                tuple(item["source_ids"]),
+                tuple(item["semantic_locks"]),
+                tuple(item["write_paths"]),
+                item["minimum_route"],
+                tuple(item["output_contracts"]),
+                publication_stage,
+                item["independent_review_required"],
+                item["completion_rule"],
+            )
+            route = item["minimum_route"].lower()
+            result.append(
+                PortableNode(
+                    item["id"],
+                    item["objective"],
+                    tuple(item["dependencies"]),
+                    ("implementation-workspaces",),
+                    ("inspect-subject", "build-direct-challenger", "run-independent-checks", "record-evidence"),
+                    ("subject-inspector", "candidate-workspace", "test-runner", "evidence-writer"),
+                    authority_id,
+                    f"route-{route}",
+                    evidence_ids,
+                    tuple(item["acceptance_criteria"]),
+                    item["rollback"],
+                    tuple(item["roles"]),
+                    tuple(item["lifecycle_stages"]),
+                    NodeExecutionContract(
+                        "whole-os-work-package",
+                        item["owner_role"].lower(),
+                        "candidate-workspace",
+                        NodeEffectMode.BOUNDED_WRITE,
+                        True,
+                        tuple(item["output_contracts"]),
+                    ),
+                    package,
+                )
+            )
+        return tuple(result)
+
+
+__all__ = ["TournamentPlanFactory", "WholeOSPlanFactory"]
