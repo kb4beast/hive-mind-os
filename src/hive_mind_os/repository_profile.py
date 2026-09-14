@@ -53,6 +53,7 @@ class ProfileCapability(StrEnum):
 class HostProfileRegistry(Protocol):
     """Composition-injected, persistent host custody boundary (never a module key)."""
     def verify_profile(self, *, registry_handle: str, profile_digest: str, tenant_id: str, repository_id: str, authority_digest: str, generation: int) -> bool: ...
+    def authorize_capability(self, *, registry_handle: str, profile_digest: str, generation: int, capability: str, destination: str | None) -> bool: ...
 
 
 def _raw_absolute(value: str, label: str) -> Path:
@@ -322,35 +323,44 @@ class RepositoryProfileStore:
         target = self.directory / f"{profile.profile_id}.{profile.profile_digest[7:]}.json"
         pointer = self.directory / f"{profile.profile_id}.active.json"
         data = json.dumps(profile.to_document(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+        lock_path = self.directory / ".profile-cas.lock"
         with _STORE_LOCK:
-            for active in self.directory.glob("*.active.json"):
-                if active.is_symlink() or active.stat().st_nlink != 1:
-                    raise RepositoryProfileError("active profile pointer must not be linked or redirected")
-                other_id = active.name.removesuffix(".active.json")
-                if other_id != profile.profile_id:
-                    other = self.load(other_id)
-                    if other.repository_root == profile.repository_root and (other.identity.tenant_id, other.identity.repository_id) != (profile.identity.tenant_id, profile.identity.repository_id):
-                        raise RepositoryProfileError("physical repository root is already bound to another tenant or repository")
-            if pointer.exists():
-                current = self.read_document(profile.profile_id)
-                old = RepositoryProfile.from_document(current)
-                if (old.identity.tenant_id, old.identity.repository_id, old.repository_root) != (profile.identity.tenant_id, profile.identity.repository_id, profile.repository_root):
-                    raise RepositoryProfileError("profile id is already bound to another tenant, repository, or root")
-                if profile.generation <= old.generation:
-                    raise RepositoryProfileError("profile generation must advance monotonically")
-            fd, name = tempfile.mkstemp(prefix=".profile-", suffix=".tmp", dir=self.directory)
             try:
-                with os.fdopen(fd, "wb") as stream: stream.write(data); stream.flush(); os.fsync(stream.fileno())
-                os.replace(name, target)
-                pointer_data = json.dumps({"profile_id":profile.profile_id,"profile_digest":profile.profile_digest,"generation":profile.generation}, sort_keys=True, separators=(",", ":")).encode("utf-8")
-                pfd, pname = tempfile.mkstemp(prefix=".pointer-", suffix=".tmp", dir=self.directory)
+                lock_path.mkdir()
+            except FileExistsError as error:
+                raise RepositoryProfileError("profile activation is concurrently locked; retry from host") from error
+            try:
+                for active in self.directory.glob("*.active.json"):
+                    if active.is_symlink() or active.stat().st_nlink != 1:
+                        raise RepositoryProfileError("active profile pointer must not be linked or redirected")
+                    other_id = active.name.removesuffix(".active.json")
+                    if other_id != profile.profile_id:
+                        other = self.load(other_id)
+                        if other.repository_root == profile.repository_root and (other.identity.tenant_id, other.identity.repository_id) != (profile.identity.tenant_id, profile.identity.repository_id):
+                            raise RepositoryProfileError("physical repository root is already bound to another tenant or repository")
+                if pointer.exists():
+                    current = self.read_document(profile.profile_id)
+                    old = RepositoryProfile.from_document(current)
+                    if (old.identity.tenant_id, old.identity.repository_id, old.repository_root) != (profile.identity.tenant_id, profile.identity.repository_id, profile.repository_root):
+                        raise RepositoryProfileError("profile id is already bound to another tenant, repository, or root")
+                    if profile.generation <= old.generation:
+                        raise RepositoryProfileError("profile generation must advance monotonically")
+                fd, name = tempfile.mkstemp(prefix=".profile-", suffix=".tmp", dir=self.directory)
                 try:
-                    with os.fdopen(pfd, "wb") as stream: stream.write(pointer_data); stream.flush(); os.fsync(stream.fileno())
-                    os.replace(pname, pointer)
+                    with os.fdopen(fd, "wb") as stream: stream.write(data); stream.flush(); os.fsync(stream.fileno())
+                    os.replace(name, target)
+                    pointer_data = json.dumps({"profile_id":profile.profile_id,"profile_digest":profile.profile_digest,"generation":profile.generation}, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                    pfd, pname = tempfile.mkstemp(prefix=".pointer-", suffix=".tmp", dir=self.directory)
+                    try:
+                        with os.fdopen(pfd, "wb") as stream: stream.write(pointer_data); stream.flush(); os.fsync(stream.fileno())
+                        os.replace(pname, pointer)
+                    finally:
+                        if os.path.exists(pname): os.unlink(pname)
                 finally:
-                    if os.path.exists(pname): os.unlink(pname)
+                    if os.path.exists(name): os.unlink(name)
             finally:
-                if os.path.exists(name): os.unlink(name)
+                try: lock_path.rmdir()
+                except OSError: pass
         return target
     def read_document(self, profile_id: str) -> dict[str, Any]:
         _id(profile_id, "profile_id")
@@ -384,6 +394,9 @@ class ProfileEffectAuthorizer:
         if projection != current.projection(): raise RepositoryProfileError("projection does not bind current host profile")
         try: authority.envelope(current.identity.authority_digest)
         except AuthorityDenied as error: raise RepositoryProfileError("profile authority is revoked") from error
+        verifier = getattr(store.registry, "authorize_capability", None)
+        if not callable(verifier) or not verifier(registry_handle=current.registry_handle, profile_digest=current.profile_digest, generation=current.generation, capability=ProfileCapability(capability).value, destination=destination):
+            raise RepositoryProfileError("host registry denied capability, version, or revocation state")
         if not current.allows(capability, destination=destination): raise RepositoryProfileError("capability is absent, revoked, or route-denied")
         return current
 
