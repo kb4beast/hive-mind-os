@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIPELINE = ROOT / "scripts" / "whole-os" / "Invoke-WholeOSPipeline.ps1"
 RUNNER = ROOT / "scripts" / "whole-os" / "Invoke-WholeOSAgentStage.ps1"
+CODEX_HOST = ROOT / "scripts" / "whole-os" / "Invoke-WholeOSCodexService.ps1"
 SCHEMA = ROOT / "scripts" / "whole-os" / "stage-result.schema.json"
 STAGES = (
     "Invoke-WholeOSHostBootstrap.ps1",
@@ -49,6 +50,14 @@ class WholeOSPowerShellPipelineTests(unittest.TestCase):
         self.assertIn('"pipeline-process.json"', text)
         self.assertIn("Get-Process -Id", text)
 
+    def test_trusted_codex_host_uses_checkout_source_and_external_state(self) -> None:
+        text = CODEX_HOST.read_text(encoding="utf-8")
+        self.assertIn("hive_mind_os.whole_os_codex_host", text)
+        self.assertIn("$env:PYTHONPATH = $sourceRoot", text)
+        self.assertIn("HiveMindOS\\whole-os-codex-host", text)
+        self.assertNotIn("GH_TOKEN", text)
+        self.assertNotIn("OPENAI_API_KEY", text)
+
     def test_result_schema_is_closed_and_covers_every_stage(self) -> None:
         schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
         self.assertFalse(schema["additionalProperties"])
@@ -83,7 +92,7 @@ class WholeOSPowerShellPipelineTests(unittest.TestCase):
     )
     def test_every_powershell_script_parses(self) -> None:
         shell = shutil.which("powershell") or shutil.which("pwsh")
-        scripts = (PIPELINE, RUNNER, *(PIPELINE.parent / item for item in STAGES))
+        scripts = (PIPELINE, RUNNER, CODEX_HOST, *(PIPELINE.parent / item for item in STAGES))
         command = (
             "$errors=$null; [void][System.Management.Automation.Language.Parser]::"
             "ParseFile($env:HIVE_PS_PARSE_TARGET,[ref]$null,[ref]$errors); if($errors.Count){"

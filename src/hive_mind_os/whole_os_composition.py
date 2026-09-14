@@ -48,6 +48,7 @@ from .delivery_broker import (
 from .discovery_backlog import BacklogSelection, DiscoveryBacklog
 from .outcome_graph import OutcomeWorkPackage
 from .pr_feedback import FeedbackDecision, FeedbackObservation, FeedbackObserver
+from .receipts import filesystem_path
 from .repository_profile import ProfileCapability, RepositoryProfile
 from .roblox_profile import RobloxProfile
 from .roblox_runtime import RobloxRuntimeEvidence, RuntimeVerdict
@@ -481,18 +482,21 @@ class WholeOSCompositionHost:
             )
             + "\n"
         ).encode("utf-8")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists():
-            if path.read_bytes() != body:
+        target = filesystem_path(path)
+        filesystem_path(path.parent).mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            if target.read_bytes() != body:
                 raise CompositionError("composition receipt conflicts with replay")
             return
-        temporary = path.with_name(f".{path.name}.{uuid4()}.tmp")
+        temporary = filesystem_path(
+            path.with_name(f".{path.name}.{uuid4()}.tmp")
+        )
         try:
             with temporary.open("xb") as handle:
                 handle.write(body)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, path)
+            os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -513,10 +517,11 @@ class WholeOSCompositionHost:
 
     @staticmethod
     def _load_result(path: Path, payload_digest: str) -> PackageExecutionResult | None:
-        if not path.exists():
+        target = filesystem_path(path)
+        if not target.exists():
             return None
         try:
-            document = json.loads(path.read_text(encoding="utf-8"))
+            document = json.loads(target.read_text(encoding="utf-8"))
             if (
                 set(document)
                 != {
