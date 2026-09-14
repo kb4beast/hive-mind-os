@@ -4,6 +4,12 @@ from tempfile import TemporaryDirectory
 from threading import Barrier, Event, Lock, Thread
 from time import sleep
 
+from hive_mind_os.cohort_assurance import (
+    TerminalAssessment,
+    TerminalEvidence,
+    convergence_candidate_digest,
+)
+from hive_mind_os.cohort_runtime import VerificationResult
 from hive_mind_os.cortex.repository.mission_bindings import (
     ConfiguredMissionBindingsProvider,
     MissionBindingDescriptor,
@@ -24,6 +30,20 @@ class FakeHost:
     def execute_package(self, package, bindings, payload):
         return PackageExecutionResult(
             package.package_id, PackageStatus.COMPLETED, D, (D,)
+        )
+
+    def assess_terminal_candidate(self, candidate, payload):
+        digest = convergence_candidate_digest(candidate)
+        return TerminalAssessment(
+            VerificationResult(True, ("whole-os-terminal-curator",), "accepted"),
+            TerminalEvidence(
+                digest,
+                "whole-os-builder",
+                "whole-os-curator",
+                (f"review:{digest}",),
+                (f"aggregate:{digest}",),
+                (f"verify:{digest}",),
+            ),
         )
 
 
@@ -134,6 +154,9 @@ class WholeOSIntegrationTests(unittest.TestCase):
                     package.package_id, PackageStatus.COMPLETED, D, (D,)
                 )
 
+            def assess_terminal_candidate(self, candidate, payload):
+                return FakeHost().assess_terminal_candidate(candidate, payload)
+
             @staticmethod
             def assert_immutable(kickoff):
                 class Raises:
@@ -199,6 +222,94 @@ class WholeOSIntegrationTests(unittest.TestCase):
             self.assertEqual(resumed.run_to_completion().status, "complete")
             self.assertEqual(host.calls, ["A", "B"])
             resumed.close()
+
+    def test_terminal_assessment_is_candidate_bound_and_resumes_exactly_once(self):
+        class CountingHost(FakeHost):
+            def __init__(self):
+                self.package_calls = 0
+                self.assessment_calls = 0
+
+            def execute_package(self, package, bindings, payload):
+                self.package_calls += 1
+                return super().execute_package(package, bindings, payload)
+
+            def assess_terminal_candidate(self, candidate, payload):
+                self.assessment_calls += 1
+                return super().assess_terminal_candidate(candidate, payload)
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = CountingHost()
+            config, provider, _ = self._components(
+                root,
+                (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
+                host=host,
+            )
+            first = WholeOSService(config, provider, host)
+            completed = first.run_to_completion()
+            self.assertEqual(completed.status, "complete")
+            assessment = completed.terminal_assessment
+            self.assertIsNotNone(assessment)
+            assert assessment is not None
+            candidate = first._terminal_candidate()
+            self.assertEqual(
+                assessment.evidence.candidate_digest,
+                convergence_candidate_digest(candidate),
+            )
+            self.assertEqual(host.package_calls, 1)
+            self.assertEqual(host.assessment_calls, 1)
+            first.close()
+
+            resumed = WholeOSService(config, provider, host)
+            self.assertEqual(resumed.run_to_completion().status, "complete")
+            self.assertEqual(host.package_calls, 1)
+            self.assertEqual(host.assessment_calls, 1)
+            self.assertEqual(resumed._terminal_jobs()[0].state, "done")
+            resumed.close()
+
+    def test_missing_or_cross_candidate_assessor_fails_closed(self):
+        class MissingAssessor:
+            def execute_package(self, package, bindings, payload):
+                return PackageExecutionResult(
+                    package.package_id, PackageStatus.COMPLETED, D, (D,)
+                )
+
+        class CrossCandidateHost(FakeHost):
+            def assess_terminal_candidate(self, candidate, payload):
+                digest = "sha256:" + "b" * 64
+                return TerminalAssessment(
+                    VerificationResult(True, ("curator",), "accepted"),
+                    TerminalEvidence(
+                        digest,
+                        "builder",
+                        "curator",
+                        (f"review:{digest}",),
+                        (f"aggregate:{digest}",),
+                        (f"verify:{digest}",),
+                    ),
+                )
+
+        for host in (MissingAssessor(), CrossCandidateHost()):
+            with self.subTest(host=type(host).__name__):
+                with TemporaryDirectory() as directory:
+                    config, provider, _ = self._components(
+                        Path(directory),
+                        (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
+                        attempts=1,
+                        host=host,
+                    )
+                    service = WholeOSService(
+                        config,
+                        provider,
+                        host,  # pyright: ignore[reportArgumentType]
+                    )
+                    result = service.run_to_completion()
+                    self.assertEqual(result.status, "blocked")
+                    self.assertEqual(result.completed_packages, ("A",))
+                    self.assertIsNone(result.terminal_assessment)
+                    self.assertIn("terminal", result.terminal_message)
+                    self.assertEqual(service._terminal_jobs()[0].state, "dead-letter")
+                    service.close()
 
     def test_terminal_blocker_is_persisted_and_only_stops_dependents(self):
         class BlockingHost(FakeHost):
