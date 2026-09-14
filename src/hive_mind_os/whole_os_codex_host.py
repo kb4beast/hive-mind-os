@@ -553,6 +553,59 @@ def _worker_receipt_ok(receipt: Mapping[str, Any]) -> bool:
     )
 
 
+def _source_packet(
+    bundle: DeploymentBundle,
+    focused_receipt: Mapping[str, Any],
+    *,
+    purpose: str,
+) -> dict[str, Any]:
+    """Materialize exact host-observed bytes for a tool-free Codex session."""
+
+    relative_paths = (
+        "AGENTS.md",
+        "docs/plan/whole-os-tournament-2026-09-13/NODES-QUALIFICATION.md",
+        "scripts/whole-os/Invoke-WholeOSCodexService.ps1",
+        "src/hive_mind_os/whole_os_bootstrap.py",
+        "src/hive_mind_os/whole_os_codex_host.py",
+        "src/hive_mind_os/whole_os_composition.py",
+        "src/hive_mind_os/whole_os_service.py",
+        "tests/test_whole_os_bootstrap.py",
+        "tests/test_whole_os_codex_host.py",
+        "tests/test_whole_os_powershell_pipeline.py",
+    )
+    files: list[dict[str, str]] = []
+    for relative in relative_paths:
+        path = bundle.repository / relative
+        body = path.read_bytes()
+        files.append(
+            {
+                "path": relative,
+                "digest": raw_sha256(body),
+                "content": body.decode("utf-8"),
+            }
+        )
+    head, tree, branch = _repository_identity(bundle.repository)
+    if (head, tree, branch) != (bundle.head, bundle.tree, bundle.branch):
+        raise CodexHostBootstrapError(
+            "repository identity changed while materializing the source packet"
+        )
+    return {
+        "schema_version": 1,
+        "kind": "whole-os-host-source-packet-v1",
+        "purpose": purpose,
+        "repository": str(bundle.repository),
+        "head": head,
+        "tree": tree,
+        "branch": branch,
+        "clean": True,
+        "host_seal_digest": bundle.seal_digest,
+        "service_config_digest": raw_sha256(bundle.config_path.read_bytes()),
+        "service_config": json.loads(bundle.config_path.read_text(encoding="utf-8")),
+        "focused_verification": dict(focused_receipt),
+        "files": files,
+    }
+
+
 class _AdmissionCurator:
     curator_id = CURATOR_ID
 
@@ -721,6 +774,11 @@ def compose_factory(
                 ),
                 timeout_seconds=timeout_seconds,
                 writable=False,
+                source_packet=_source_packet(
+                    bundle,
+                    focused_receipt,
+                    purpose="builder-startup-admission",
+                ),
             )
             receipt_path = evidence_directory / "receipt.json"
             if receipt_path.is_file():
@@ -891,6 +949,11 @@ def _admission_review(
         ),
         timeout_seconds=timeout_seconds,
         writable=False,
+        source_packet=_source_packet(
+            bundle,
+            focused_receipt,
+            purpose="independent-curator-admission",
+        ),
     )
     return receipt, directory / "receipt.json"
 
