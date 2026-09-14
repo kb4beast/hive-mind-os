@@ -5,6 +5,7 @@ from pathlib import Path
 from hive_mind_os.repository_profile import (CapabilityGrant, CapabilityReport, CapabilityStatus, HostIdentity, HostProfileIssuer, HostToolBinding, ProfileCapability, RepositoryProfile, RepositoryProfileError, RepositoryProfileStore)
 from hive_mind_os.brain_kernel.authority import AuthorityRegistry
 from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope
+from hive_mind_os.contracts import validate_contract
 
 D = "sha256:" + "a" * 64
 class FixtureRegistry:
@@ -77,5 +78,12 @@ class RepositoryProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "target"; root.mkdir(); item = profile(root, grants=(CapabilityGrant(ProfileCapability.LEARNING_EXPORT, "grant.export", D),))
             self.assertFalse(item.allows(ProfileCapability.LEARNING_EXPORT)); self.assertFalse(item.allows(ProfileCapability.LEARNING_EXPORT, destination="https://example.invalid"))
+    def test_closed_schema_matches_profile_document_and_nested_rejection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "target"; root.mkdir(); document = profile(root).to_document()
+            self.assertTrue(validate_contract("repository-profile", document).valid)
+            document["grants"][0]["unexpected"] = True
+            self.assertFalse(validate_contract("repository-profile", document).valid)
+            with self.assertRaises(RepositoryProfileError): RepositoryProfile.from_document(document)
 
 if __name__ == "__main__": unittest.main()
