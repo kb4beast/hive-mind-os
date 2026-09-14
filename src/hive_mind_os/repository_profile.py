@@ -230,6 +230,19 @@ class CapabilityReport:
         if type(self.reason) is not str or not self.reason.strip(): raise RepositoryProfileError("capability report reason is required")
         if self.receipt_digest is not None: _digest(self.receipt_digest, "receipt_digest")
 
+@dataclass(frozen=True, slots=True)
+class ProfileActivationReceipt:
+    profile_id: str
+    profile_digest: str
+    generation: int
+    fence: str
+    activated_at: float
+    def __post_init__(self) -> None:
+        _id(self.profile_id, "profile_id"); _digest(self.profile_digest, "profile_digest"); _digest(self.fence, "fence")
+        if type(self.generation) is not int or self.generation < 1 or type(self.activated_at) not in {int, float}: raise RepositoryProfileError("invalid activation receipt")
+    @property
+    def digest(self) -> str: return canonical_digest({"profile_id":self.profile_id,"profile_digest":self.profile_digest,"generation":self.generation,"fence":self.fence,"activated_at":self.activated_at})
+
 
 def undiscovered_capability_report(adapter_ids: tuple[str, ...]) -> tuple[CapabilityReport, ...]:
     """Host discovery seam: PATH presence is not an execution attestation."""
@@ -361,6 +374,7 @@ class RepositoryProfileStore:
         except ExternalPathRequired as error:
             raise RepositoryProfileError(str(error)) from error
         self.directory.mkdir(parents=True, exist_ok=True)
+        self.last_activation_receipt: ProfileActivationReceipt | None = None
     def write(self, profile: RepositoryProfile) -> Path:
         if type(profile) is not RepositoryProfile:
             raise RepositoryProfileError("profile store requires an exact issued RepositoryProfile")
@@ -391,7 +405,8 @@ class RepositoryProfileStore:
                 except (OSError, ValueError):
                     raise RepositoryProfileError("profile activation lock is malformed or active") from error
             try:
-                fence = canonical_digest({"pid": os.getpid(), "created_at": time.time(), "profile": profile.profile_id})
+                activated_at = time.time()
+                fence = canonical_digest({"pid": os.getpid(), "created_at": activated_at, "profile": profile.profile_id, "generation": profile.generation})
                 (lock_path / "lease.json").write_bytes(json.dumps({"pid": os.getpid(), "created_at": time.time(), "fence": fence}, sort_keys=True).encode("utf-8"))
                 for active in self.directory.glob("*.active.json"):
                     if active.is_symlink() or active.stat().st_nlink != 1:
@@ -429,6 +444,7 @@ class RepositoryProfileStore:
                 try:
                     (lock_path / "lease.json").unlink(missing_ok=True); lock_path.rmdir()
                 except OSError: pass
+        self.last_activation_receipt = ProfileActivationReceipt(profile.profile_id, profile.profile_digest, profile.generation, fence, activated_at)
         return target
     def read_document(self, profile_id: str) -> dict[str, Any]:
         _id(profile_id, "profile_id")
@@ -474,4 +490,4 @@ class ProfileEffectAuthorizer:
         return current
 
 
-__all__ = ["CapabilityGrant", "CapabilityReport", "CapabilityStatus", "HostIdentity", "HostProfileIssuer", "HostToolBinding", "ProfileCapability", "ProfileEffectAuthorizer", "RepositoryProfile", "RepositoryProfileError", "RepositoryProfileStore", "undiscovered_capability_report"]
+__all__ = ["CapabilityGrant", "CapabilityReport", "CapabilityStatus", "HostIdentity", "HostProfileIssuer", "HostToolBinding", "ProfileActivationReceipt", "ProfileCapability", "ProfileEffectAuthorizer", "RepositoryProfile", "RepositoryProfileError", "RepositoryProfileStore", "undiscovered_capability_report"]
