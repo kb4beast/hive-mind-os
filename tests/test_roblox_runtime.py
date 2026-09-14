@@ -4,9 +4,13 @@ import unittest
 from hashlib import sha256
 from pathlib import Path
 from typing import cast
+from unittest.mock import patch
 
-from hive_mind_os.contracts import validate_contract
+from hive_mind_os.brain_kernel.canonical import canonical_digest
+from hive_mind_os.contracts import load_schema, validate_contract
 from hive_mind_os.roblox_runtime import (
+    QualificationEvidenceKind,
+    QualificationReceipt,
     RobloxRuntimeAdapter,
     RobloxRuntimeAdmission,
     RobloxRuntimeEvidence,
@@ -16,6 +20,7 @@ from hive_mind_os.roblox_runtime import (
     RuntimeReceipt,
     RuntimeVerdict,
     StudioToolReceipt,
+    VerifierEvidenceScope,
     blocked_runtime,
 )
 
@@ -27,37 +32,65 @@ D4 = "sha256:" + "4" * 64
 
 class ToolVerifier:
     verifier_id = "fixture.tool-verifier"
+    evidence_scope = VerifierEvidenceScope.CONTRACT_FIXTURE
 
-    def __init__(self, accepted=True):
+    def __init__(self, accepted=True, error=None):
         self.accepted = accepted
+        self.error = error
         self.calls = []
 
     def verify_tool_receipt(self, receipt):
         self.calls.append(receipt)
+        if self.error is not None:
+            raise self.error
         return self.accepted
 
 
 class RuntimeVerifier:
     verifier_id = "fixture.runtime-verifier"
+    evidence_scope = VerifierEvidenceScope.CONTRACT_FIXTURE
 
-    def __init__(self, accepted=True):
+    def __init__(self, accepted=True, error=None):
         self.accepted = accepted
+        self.error = error
         self.calls = []
 
     def verify_runtime_receipt(self, receipt):
         self.calls.append(receipt)
+        if self.error is not None:
+            raise self.error
         return self.accepted
 
 
 class AuthorityVerifier:
     verifier_id = "fixture.authority-verifier"
+    evidence_scope = VerifierEvidenceScope.CONTRACT_FIXTURE
 
-    def __init__(self, accepted=True):
+    def __init__(self, accepted=True, error=None):
         self.accepted = accepted
+        self.error = error
         self.calls = []
 
     def verify_runtime_authority(self, admission):
         self.calls.append(admission)
+        if self.error is not None:
+            raise self.error
+        return self.accepted
+
+
+class QualificationVerifier:
+    verifier_id = "fixture.qualification-verifier"
+    evidence_scope = VerifierEvidenceScope.CONTRACT_FIXTURE
+
+    def __init__(self, accepted=True, error=None):
+        self.accepted = accepted
+        self.error = error
+        self.calls = []
+
+    def verify_qualification_receipt(self, receipt):
+        self.calls.append(receipt)
+        if self.error is not None:
+            raise self.error
         return self.accepted
 
 
@@ -75,8 +108,12 @@ class RobloxRuntimeTests(unittest.TestCase):
         self.tool_verifier = ToolVerifier()
         self.runtime_verifier = RuntimeVerifier()
         self.authority_verifier = AuthorityVerifier()
+        self.qualification_verifier = QualificationVerifier()
         self.adapter = RobloxRuntimeAdapter(
-            self.tool_verifier, self.runtime_verifier, self.authority_verifier
+            self.tool_verifier,
+            self.runtime_verifier,
+            self.authority_verifier,
+            self.qualification_verifier,
         )
 
     def tearDown(self):
@@ -86,6 +123,14 @@ class RobloxRuntimeTests(unittest.TestCase):
         values = {
             "candidate_digest": D1,
             "profile_digest": D2,
+            "qualification_id": "qualification.n27.001",
+            "verifier_manifest_ref": "ref:verifiers/n27.fixture",
+            "verifier_manifest_digest": D4,
+            "studio_verifier_id": "fixture.tool-verifier",
+            "runtime_verifier_id": "fixture.runtime-verifier",
+            "authority_verifier_id": "fixture.authority-verifier",
+            "qualification_verifier_id": "fixture.qualification-verifier",
+            "verifier_evidence_scope": VerifierEvidenceScope.CONTRACT_FIXTURE,
             "project_root": str(self.root),
             "project_manifest_path": str(self.manifest),
             "project_manifest_digest": self.manifest_digest,
@@ -99,7 +144,11 @@ class RobloxRuntimeTests(unittest.TestCase):
             "account_capability_refs": ("ref:broker/account.n27",),
             "authority_refs": ("ref:authority/runtime.n27",),
             "asset_rights_refs": ("ref:rights/assets.n27",),
+            "broker_lease_ref": "ref:lease/broker.n27",
             "resource_lease_ref": "ref:lease/runtime.n27",
+            "broker_lease_expires_at": 1100,
+            "resource_lease_expires_at": 1100,
+            "evidence_max_age_seconds": 200,
         }
         values.update(changes)
         return RobloxRuntimeAdmission(**values)
@@ -114,7 +163,9 @@ class RobloxRuntimeTests(unittest.TestCase):
             "signature_status": "Valid",
             "signer_subject": "CN=Roblox Corporation, O=Roblox Corporation",
             "signer_thumbprint": "A" * 40,
-            "observed_at": 1,
+            "verifier_id": "fixture.tool-verifier",
+            "observed_at": 900,
+            "expires_at": 1100,
         }
         values.update(changes)
         return StudioToolReceipt(**values)
@@ -123,6 +174,7 @@ class RobloxRuntimeTests(unittest.TestCase):
         values = {
             "receipt_ref": f"ref:runtime/{evidence_class.value.lower()}/{scenario}",
             "evidence_class": evidence_class,
+            "qualification_id": "qualification.n27.001",
             "candidate_digest": D1,
             "profile_digest": D2,
             "project_manifest_digest": self.manifest_digest,
@@ -131,15 +183,87 @@ class RobloxRuntimeTests(unittest.TestCase):
             "studio_version": "0.735.0.7351131",
             "studio_tool_receipt_ref": "ref:host/studio.discovery",
             "environment_id": "test-universe.n27",
+            "broker_lease_ref": "ref:lease/broker.n27",
+            "environment_lease_ref": "ref:lease/runtime.n27",
+            "verifier_id": "fixture.runtime-verifier",
             "scenario_id": scenario,
             "device_id": device,
             "passed": True,
-            "observed_at": 2,
+            "observed_at": 920,
+            "expires_at": 1100,
         }
         values.update(changes)
         return RuntimeReceipt(**values)
 
-    def qualify(self, admission=None, studio_receipt=None, runtime_receipts=()):
+    def qualification_receipt(self, kind, **changes):
+        if kind is QualificationEvidenceKind.METRIC:
+            payload = {
+                "evidence_kind": kind.value,
+                "performance_samples": [16.5],
+            }
+        elif kind is QualificationEvidenceKind.CLEANUP:
+            payload = {
+                "cleanup_receipt": "ref:cleanup/runtime.n27",
+                "evidence_kind": kind.value,
+            }
+        else:
+            result_names = {
+                QualificationEvidenceKind.PERSISTENCE: "retry-idempotency",
+                QualificationEvidenceKind.SECURITY: "hostile-client",
+                QualificationEvidenceKind.ASSET: "load-and-rights",
+            }
+            payload = {
+                "evidence_kind": kind.value,
+                "results": {result_names[kind]: "PASS"},
+            }
+        values = {
+            "receipt_ref": f"ref:qualification/{kind.value.lower()}",
+            "evidence_kind": kind,
+            "qualification_id": "qualification.n27.001",
+            "candidate_digest": D1,
+            "profile_digest": D2,
+            "project_manifest_digest": self.manifest_digest,
+            "scenario_manifest_digest": D3,
+            "studio_binary_digest": self.studio_digest,
+            "studio_tool_receipt_ref": "ref:host/studio.discovery",
+            "environment_id": "test-universe.n27",
+            "broker_lease_ref": "ref:lease/broker.n27",
+            "environment_lease_ref": "ref:lease/runtime.n27",
+            "payload_digest": canonical_digest(payload),
+            "verifier_id": "fixture.qualification-verifier",
+            "observed_at": 930,
+            "expires_at": 1100,
+        }
+        values.update(changes)
+        return QualificationReceipt(**values)
+
+    def complete_qualification_receipts(self):
+        return tuple(
+            self.qualification_receipt(kind) for kind in QualificationEvidenceKind
+        )
+
+    def qualify(
+        self,
+        admission=None,
+        studio_receipt=None,
+        runtime_receipts=(),
+        qualification_receipts=None,
+        **changes,
+    ):
+        values = {
+            "performance_samples": (16.5,),
+            "persistence_results": {"retry-idempotency": "PASS"},
+            "security_results": {"hostile-client": "PASS"},
+            "asset_results": {"load-and-rights": "PASS"},
+            "cleanup_receipt": "ref:cleanup/runtime.n27",
+            "qualification_receipts": (
+                self.complete_qualification_receipts()
+                if qualification_receipts is None
+                else qualification_receipts
+            ),
+            "qualified_at": 1000,
+        }
+        values.update(changes)
         return self.adapter.qualify(
             admission or self.admission(),
             studio_receipt=(
@@ -148,11 +272,7 @@ class RobloxRuntimeTests(unittest.TestCase):
                 else studio_receipt
             ),
             runtime_receipts=runtime_receipts,
-            performance_samples=(16.5,),
-            persistence_results={"retry-idempotency": "PASS"},
-            security_results={"hostile-client": "PASS"},
-            asset_results={"load-and-rights": "PASS"},
-            cleanup_receipt="ref:cleanup/runtime.n27",
+            **values,
         )
 
     def complete_receipts(self):
@@ -184,16 +304,30 @@ class RobloxRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(validate_contract("roblox-runtime-evidence", report.to_dict()).valid)
 
-    def test_verified_engine_and_device_matrix_can_form_candidate_evidence(self):
+    def test_verified_fixture_matrix_forms_runtime_validated_evidence_only(self):
         report = self.qualify(runtime_receipts=self.complete_receipts())
 
-        self.assertEqual(report.verdict, RuntimeVerdict.PRODUCTION_CANDIDATE)
+        self.assertEqual(report.verdict, RuntimeVerdict.RUNTIME_VALIDATED)
+        self.assertEqual(
+            report.verifier_evidence_scope,
+            VerifierEvidenceScope.CONTRACT_FIXTURE,
+        )
         self.assertEqual(report.missing_obligations, ())
         self.assertEqual(len(report.runtime_receipts), 4)
         self.assertEqual(len(self.runtime_verifier.calls), 4)
+        self.assertEqual(len(self.qualification_verifier.calls), 5)
+        self.assertEqual(report.broker_lease_ref, "ref:lease/broker.n27")
+        self.assertEqual(report.environment_lease_ref, "ref:lease/runtime.n27")
+        self.assertEqual(len(report.verifier_ids), 4)
+        self.assertEqual(len(report.qualification_receipts), 5)
         validation = validate_contract("roblox-runtime-evidence", report.to_dict())
         self.assertTrue(validation.valid, validation.issues)
         self.assertEqual(RobloxRuntimeEvidence.from_dict(report.to_dict()), report)
+
+        with self.assertRaisesRegex(ValueError, "fixture evidence"):
+            RobloxRuntimeEvidence.from_dict(
+                {**report.to_dict(), "verdict": "PRODUCTION_CANDIDATE"}
+            )
 
     def test_invalid_authenticode_or_unverified_runtime_fails_closed(self):
         bad_tool = self.studio_receipt(signature_status="NotSigned")
@@ -203,7 +337,10 @@ class RobloxRuntimeTests(unittest.TestCase):
         self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
 
         rejecting = RobloxRuntimeAdapter(
-            self.tool_verifier, RuntimeVerifier(False), self.authority_verifier
+            self.tool_verifier,
+            RuntimeVerifier(False),
+            self.authority_verifier,
+            self.qualification_verifier,
         )
         report = rejecting.qualify(
             self.admission(),
@@ -214,6 +351,8 @@ class RobloxRuntimeTests(unittest.TestCase):
             security_results={"hostile-client": "PASS"},
             asset_results={"load-and-rights": "PASS"},
             cleanup_receipt="ref:cleanup/runtime.n27",
+            qualification_receipts=self.complete_qualification_receipts(),
+            qualified_at=1000,
         )
         self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
 
@@ -221,6 +360,7 @@ class RobloxRuntimeTests(unittest.TestCase):
             self.tool_verifier,
             self.runtime_verifier,
             AuthorityVerifier(False),
+            self.qualification_verifier,
         ).qualify(
             self.admission(),
             studio_receipt=self.studio_receipt(),
@@ -230,11 +370,226 @@ class RobloxRuntimeTests(unittest.TestCase):
             security_results={"hostile-client": "PASS"},
             asset_results={"load-and-rights": "PASS"},
             cleanup_receipt="ref:cleanup/runtime.n27",
+            qualification_receipts=self.complete_qualification_receipts(),
+            qualified_at=1000,
         )
         self.assertEqual(blocked.verdict, RuntimeVerdict.BLOCKED_RUNTIME)
         self.assertIn(
             RuntimeBlockerKind.BLOCKED_AUTHORITY,
             {item.kind for item in blocked.missing_obligations},
+        )
+
+    def test_verifier_identities_are_independent_and_receipt_bound(self):
+        duplicate = RuntimeVerifier()
+        duplicate.verifier_id = self.tool_verifier.verifier_id
+        with self.assertRaisesRegex(ValueError, "must be independent"):
+            RobloxRuntimeAdapter(
+                self.tool_verifier,
+                duplicate,
+                self.authority_verifier,
+                self.qualification_verifier,
+            )
+
+        substituted = self.runtime_receipt(
+            RuntimeEvidenceClass.STUDIO_ENGINE,
+            "core-loop",
+            verifier_id="foreign.runtime-verifier",
+        )
+        report = self.qualify(runtime_receipts=(substituted,))
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+        substituted_result = self.qualification_receipt(
+            QualificationEvidenceKind.SECURITY,
+            verifier_id="foreign.qualification-verifier",
+        )
+        receipts = tuple(
+            substituted_result
+            if item.evidence_kind is QualificationEvidenceKind.SECURITY
+            else item
+            for item in self.complete_qualification_receipts()
+        )
+        report = self.qualify(
+            runtime_receipts=self.complete_receipts(),
+            qualification_receipts=receipts,
+        )
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+        injected_runtime_verifier = RuntimeVerifier()
+        injected_runtime_verifier.verifier_id = "injected.runtime-verifier"
+        injected_adapter = RobloxRuntimeAdapter(
+            self.tool_verifier,
+            injected_runtime_verifier,
+            self.authority_verifier,
+            self.qualification_verifier,
+        )
+        original = self.adapter
+        self.adapter = injected_adapter
+        try:
+            injected_receipts = tuple(
+                self.runtime_receipt(
+                    receipt.evidence_class,
+                    receipt.scenario_id,
+                    receipt.device_id,
+                    receipt_ref=receipt.receipt_ref,
+                    verifier_id="injected.runtime-verifier",
+                )
+                for receipt in self.complete_receipts()
+            )
+            report = self.qualify(runtime_receipts=injected_receipts)
+        finally:
+            self.adapter = original
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+    def test_result_groups_require_independent_receipts(self):
+        report = self.qualify(
+            runtime_receipts=self.complete_receipts(),
+            qualification_receipts=(),
+        )
+
+        self.assertEqual(report.verdict, RuntimeVerdict.BLOCKED_RUNTIME)
+        obligation_ids = {item.obligation_id for item in report.missing_obligations}
+        for kind in QualificationEvidenceKind:
+            self.assertIn(
+                "n27.qualification-receipt-" + kind.value.lower(),
+                obligation_ids,
+            )
+
+        bad_payload = self.qualification_receipt(
+            QualificationEvidenceKind.METRIC,
+            payload_digest=D4,
+        )
+        receipts = tuple(
+            bad_payload
+            if item.evidence_kind is QualificationEvidenceKind.METRIC
+            else item
+            for item in self.complete_qualification_receipts()
+        )
+        report = self.qualify(
+            runtime_receipts=self.complete_receipts(),
+            qualification_receipts=receipts,
+        )
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+    def test_expired_leases_and_stale_or_future_receipts_fail_closed(self):
+        expired = self.admission(
+            broker_lease_expires_at=999,
+            resource_lease_expires_at=999,
+        )
+        report = self.qualify(
+            admission=expired,
+            runtime_receipts=self.complete_receipts(),
+        )
+        self.assertEqual(report.verdict, RuntimeVerdict.BLOCKED_RUNTIME)
+        self.assertIn(
+            "n27.runtime-lease-expired",
+            {item.obligation_id for item in report.missing_obligations},
+        )
+
+        stale = self.studio_receipt(observed_at=700, expires_at=1100)
+        report = self.qualify(
+            admission=self.admission(evidence_max_age_seconds=200),
+            studio_receipt=stale,
+            runtime_receipts=self.complete_receipts(),
+        )
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+        future = self.qualification_receipt(
+            QualificationEvidenceKind.CLEANUP,
+            observed_at=1001,
+        )
+        receipts = tuple(
+            future
+            if item.evidence_kind is QualificationEvidenceKind.CLEANUP
+            else item
+            for item in self.complete_qualification_receipts()
+        )
+        report = self.qualify(
+            runtime_receipts=self.complete_receipts(),
+            qualification_receipts=receipts,
+        )
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+    def test_qualification_and_runtime_receipt_replay_is_rejected(self):
+        replayed = self.qualification_receipt(
+            QualificationEvidenceKind.METRIC,
+            receipt_ref="ref:runtime/studio_engine/core-loop",
+        )
+        receipts = tuple(
+            replayed
+            if item.evidence_kind is QualificationEvidenceKind.METRIC
+            else item
+            for item in self.complete_qualification_receipts()
+        )
+        report = self.qualify(
+            runtime_receipts=self.complete_receipts(),
+            qualification_receipts=receipts,
+        )
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+        old_run = self.runtime_receipt(
+            RuntimeEvidenceClass.STUDIO_ENGINE,
+            "core-loop",
+            qualification_id="qualification.n27.old",
+        )
+        report = self.qualify(runtime_receipts=(old_run,))
+        self.assertEqual(report.verdict, RuntimeVerdict.FAILED)
+
+    def test_verifier_and_file_exceptions_become_typed_blockers(self):
+        adapters = (
+            RobloxRuntimeAdapter(
+                ToolVerifier(error=OSError("tool unavailable")),
+                self.runtime_verifier,
+                self.authority_verifier,
+                self.qualification_verifier,
+            ),
+            RobloxRuntimeAdapter(
+                self.tool_verifier,
+                RuntimeVerifier(error=TimeoutError("runtime unavailable")),
+                self.authority_verifier,
+                self.qualification_verifier,
+            ),
+            RobloxRuntimeAdapter(
+                self.tool_verifier,
+                self.runtime_verifier,
+                AuthorityVerifier(error=ConnectionError("broker unavailable")),
+                self.qualification_verifier,
+            ),
+            RobloxRuntimeAdapter(
+                self.tool_verifier,
+                self.runtime_verifier,
+                self.authority_verifier,
+                QualificationVerifier(error=TimeoutError("curator unavailable")),
+            ),
+        )
+        expected_ids = (
+            "n27.studio-verifier-unavailable",
+            "n27.runtime-verifier-unavailable",
+            "n27.runtime-authority-verifier-unavailable",
+            "n27.qualification-verifier-metric",
+        )
+        for adapter, expected_id in zip(adapters, expected_ids, strict=True):
+            with self.subTest(expected_id=expected_id):
+                original = self.adapter
+                self.adapter = adapter
+                try:
+                    report = self.qualify(runtime_receipts=self.complete_receipts())
+                finally:
+                    self.adapter = original
+                self.assertEqual(report.verdict, RuntimeVerdict.BLOCKED_RUNTIME)
+                self.assertIn(
+                    expected_id,
+                    {item.obligation_id for item in report.missing_obligations},
+                )
+
+        with patch(
+            "hive_mind_os.roblox_runtime.Path.read_bytes",
+            side_effect=OSError("file busy"),
+        ):
+            report = self.qualify(runtime_receipts=self.complete_receipts())
+        self.assertEqual(report.verdict, RuntimeVerdict.BLOCKED_RUNTIME)
+        self.assertIn(
+            "n27.project-file-observation",
+            {item.obligation_id for item in report.missing_obligations},
         )
 
     def test_stale_candidate_receipt_and_manifest_substitution_fail(self):
@@ -272,7 +627,10 @@ class RobloxRuntimeTests(unittest.TestCase):
             account_capability_refs=(),
             authority_refs=(),
             asset_rights_refs=(),
+            broker_lease_ref=None,
             resource_lease_ref=None,
+            broker_lease_expires_at=None,
+            resource_lease_expires_at=None,
         )
         report = self.adapter.qualify(
             admission,
@@ -283,6 +641,8 @@ class RobloxRuntimeTests(unittest.TestCase):
             security_results={},
             asset_results={},
             cleanup_receipt=None,
+            qualification_receipts=(),
+            qualified_at=1000,
         )
 
         self.assertEqual(report.verdict, RuntimeVerdict.BLOCKED_RUNTIME)
@@ -342,6 +702,20 @@ class RobloxRuntimeTests(unittest.TestCase):
         self.assertFalse(validate_contract("roblox-runtime-evidence", candidate).valid)
         with self.assertRaisesRegex(ValueError, "security acceptance"):
             RobloxRuntimeEvidence.from_dict(candidate)
+
+        for result_group in (
+            "persistence_results",
+            "security_results",
+            "asset_results",
+        ):
+            empty = self.qualify(runtime_receipts=self.complete_receipts()).to_dict()
+            empty[result_group] = {}
+            with self.assertRaisesRegex(ValueError, "all acceptance result groups"):
+                RobloxRuntimeEvidence.from_dict(empty)
+            qualified_properties = load_schema("roblox-runtime-evidence")["allOf"][0][
+                "then"
+            ]["properties"]
+            self.assertEqual(qualified_properties[result_group]["minProperties"], 1)
 
         candidate["verdict"] = "DEPLOYED_OBSERVED"
         self.assertFalse(validate_contract("roblox-runtime-evidence", candidate).valid)
