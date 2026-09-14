@@ -10,6 +10,7 @@ from hive_mind_os.contracts import validate_contract
 D = "sha256:" + "a" * 64
 class FixtureRegistry:
     def verify_profile(self, **kwargs): return kwargs["registry_handle"] == "fixture"
+    def claim_identity(self, **kwargs): return kwargs["registry_handle"] == "fixture"
 REGISTRY = FixtureRegistry()
 
 def profile(root, **changes):

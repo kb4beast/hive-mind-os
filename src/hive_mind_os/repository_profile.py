@@ -64,6 +64,7 @@ class HostProfileRegistry(Protocol):
     """Composition-injected, persistent host custody boundary (never a module key)."""
     def verify_profile(self, *, registry_handle: str, profile_digest: str, tenant_id: str, repository_id: str, authority_digest: str, generation: int) -> bool: ...
     def authorize_capability(self, *, registry_handle: str, profile_digest: str, generation: int, capability: str, destination: str | None) -> bool: ...
+    def claim_identity(self, *, registry_handle: str, profile_id: str, tenant_id: str, repository_id: str, repository_root: str) -> bool: ...
 
 class HostDiscoveryProvider(Protocol):
     """Externally composed receipt verifier; construction never discovers tools."""
@@ -358,6 +359,9 @@ class RepositoryProfileStore:
         if type(profile) is not RepositoryProfile:
             raise RepositoryProfileError("profile store requires an exact issued RepositoryProfile")
         if profile.repository_root != self.repository_root: raise RepositoryProfileError("store and profile repository roots differ")
+        claimant = getattr(self.registry, "claim_identity", None)
+        if not callable(claimant) or not claimant(registry_handle=profile.registry_handle, profile_id=profile.profile_id, tenant_id=profile.identity.tenant_id, repository_id=profile.identity.repository_id, repository_root=profile.repository_root):
+            raise RepositoryProfileError("host registry rejected global profile identity binding")
         if not self.registry.verify_profile(registry_handle=profile.registry_handle, profile_digest=profile.profile_digest, tenant_id=profile.identity.tenant_id, repository_id=profile.identity.repository_id, authority_digest=profile.identity.authority_digest, generation=profile.generation): raise RepositoryProfileError("host registry did not authenticate profile")
         if is_within(self.directory, profile.repository_root): raise RepositoryProfileError("profile store overlaps target repository")
         target = self.directory / f"{profile.profile_id}.{profile.profile_digest[7:]}.json"
