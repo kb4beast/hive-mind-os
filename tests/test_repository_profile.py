@@ -38,6 +38,7 @@ class RepositoryProfileTests(unittest.TestCase):
             root = Path(temp) / "target"; root.mkdir()
             with self.assertRaises(RepositoryProfileError): profile(root, state_root=str(root / "state"))
             with self.assertRaises(RepositoryProfileError): profile(root, workspace_root=str(root.parent / "same"), state_root=str(root.parent / "same"))
+            with self.assertRaises(RepositoryProfileError): profile(root, workspace_root=str(root.parent / "work"), state_root=str(root.parent / "work" / "nested"))
     def test_git_common_dir_and_alternate_paths_cannot_be_profile_roots(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "target"; root.mkdir(); control = Path(temp) / "control"; control.mkdir()

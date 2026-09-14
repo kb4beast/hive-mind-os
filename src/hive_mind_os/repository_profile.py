@@ -174,7 +174,7 @@ class HostToolBinding:
         if self.secret_handles: raise RepositoryProfileError("secret handles remain only in the host broker")
         if type(self.timeout_seconds) is not int or isinstance(self.timeout_seconds, bool) or self.timeout_seconds < 0: raise RepositoryProfileError("timeout_seconds must be non-negative")
         if not isinstance(self.status, CapabilityStatus): object.__setattr__(self, "status", CapabilityStatus(self.status))
-        if self.status is CapabilityStatus.REAL and (self.executable_path is None or self.binary_digest is None or self.probe_receipt_digest is None or self.host_receipt_witness != _host_witness(self._receipt_payload())): raise RepositoryProfileError("real tool binding requires a host-issued path, digest, and probe receipt")
+        if self.status is CapabilityStatus.REAL: raise RepositoryProfileError("REAL tool binding requires injected host discovery verification")
         if self.status is CapabilityStatus.UNAVAILABLE and self.executable_path is not None: raise RepositoryProfileError("unavailable binding must not invent an executable path")
         if self.probe_receipt_digest is not None: _digest(self.probe_receipt_digest, "probe_receipt_digest")
 
@@ -229,12 +229,13 @@ class RepositoryProfile:
                 value = require_external_path(_raw_absolute(getattr(self, name), name), root, label=name)
             except ExternalPathRequired as error:
                 raise RepositoryProfileError(str(error)) from error
-            if any(is_within(value, control) for control in controls):
+            if any(is_within(value, control) or is_within(control, value) for control in controls):
                 raise RepositoryProfileError(f"{name} must not overlap Git common-dir or alternates")
             if is_within(root, value):
                 raise RepositoryProfileError(f"{name} must not contain the target repository")
             object.__setattr__(self, name, str(value))
-        if len({os.path.normcase(str(resolved_path(getattr(self, n)))) for n in ("workspace_root", "state_root", "cache_root")}) != 3: raise RepositoryProfileError("workspace/state/cache roots must be distinct")
+        roots = tuple(resolved_path(getattr(self, n)) for n in ("workspace_root", "state_root", "cache_root"))
+        if any(is_within(left, right) or is_within(right, left) for index, left in enumerate(roots) for right in roots[index + 1:]): raise RepositoryProfileError("workspace/state/cache roots must be distinct and non-nested")
         if type(self.grants) is not tuple or len({g.capability for g in self.grants}) != len(self.grants): raise RepositoryProfileError("grants must have one immutable record per capability")
         if any(type(g) is not CapabilityGrant for g in self.grants): raise RepositoryProfileError("grants must be typed")
         if type(self.tools) is not tuple or len({t.adapter_id for t in self.tools}) != len(self.tools): raise RepositoryProfileError("tools must have unique admitted adapter IDs")
@@ -322,6 +323,14 @@ class RepositoryProfileStore:
         pointer = self.directory / f"{profile.profile_id}.active.json"
         data = json.dumps(profile.to_document(), sort_keys=True, separators=(",", ":")).encode("utf-8")
         with _STORE_LOCK:
+            for active in self.directory.glob("*.active.json"):
+                if active.is_symlink() or active.stat().st_nlink != 1:
+                    raise RepositoryProfileError("active profile pointer must not be linked or redirected")
+                other_id = active.name.removesuffix(".active.json")
+                if other_id != profile.profile_id:
+                    other = self.load(other_id)
+                    if other.repository_root == profile.repository_root and (other.identity.tenant_id, other.identity.repository_id) != (profile.identity.tenant_id, profile.identity.repository_id):
+                        raise RepositoryProfileError("physical repository root is already bound to another tenant or repository")
             if pointer.exists():
                 current = self.read_document(profile.profile_id)
                 old = RepositoryProfile.from_document(current)
@@ -345,7 +354,10 @@ class RepositoryProfileStore:
         return target
     def read_document(self, profile_id: str) -> dict[str, Any]:
         _id(profile_id, "profile_id")
-        pointer = strict_json_object((self.directory / f"{profile_id}.active.json").read_bytes())
+        pointer_path = self.directory / f"{profile_id}.active.json"
+        if pointer_path.is_symlink() or pointer_path.stat().st_nlink != 1:
+            raise RepositoryProfileError("active profile pointer must not be linked or redirected")
+        pointer = strict_json_object(pointer_path.read_bytes())
         if set(pointer) != {"profile_id", "profile_digest", "generation"} or pointer["profile_id"] != profile_id:
             raise RepositoryProfileError("active profile pointer is invalid")
         _digest(pointer["profile_digest"], "pointer profile_digest")
