@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stage",
+    "status",
+    "summary",
+    "commit",
+    "blockers",
+    "receipts",
+    "retry_after_seconds"
+  ],
+  "properties": {
+    "stage": {
+      "type": "string",
+      "enum": ["host-bootstrap", "n30-tournament", "n31-self-pilot", "n32-external-pilot", "n33-closeout"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["complete", "in_progress", "blocked", "failed"]
+    },
+    "summary": {"type": "string", "minLength": 1},
+    "commit": {"type": ["string", "null"]},
+    "blockers": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "receipts": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "retry_after_seconds": {"type": "integer", "minimum": 0, "maximum": 86400}
+  }
+}

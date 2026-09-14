@@ -40,6 +40,17 @@ factory in that same process. A deployment console script should call
 the stock shell cannot infer adapters or credentials from a repository or service
 JSON document. `inspect` and `status` remain directly usable from the stock shell.
 
+For the repository-owned Codex deployment host, use the sequential executable
+pipeline. It launches one stage at a time and durably resumes incomplete stages:
+
+```powershell
+powershell -NoProfile -File scripts/whole-os/Invoke-WholeOSPipeline.ps1 -Background
+```
+
+Individual stages can also be invoked directly from `scripts/whole-os/`. Their
+structured receipts default to `%LOCALAPPDATA%\HiveMindOS\whole-os-pipeline`, outside
+the target repository and its application artifacts.
+
 Configured hosts use `run_cohort()` for one capacity-bounded wave or
 `run_to_completion()` for bounded dependency-aware fanout until the graph is
 terminal or no work is immediately claimable. `run_to_completion()` never sleeps
