@@ -61,7 +61,7 @@ def protocol():
         tuple(f"task-{index:02d}" for index in range(30)),
         ("development-screening", "harder-hybrid-development", "promotion_holdout"),
         "registry-state-cas-loss-id-rotate-odd-bye-two-inconclusive",
-        "registry-bound-stage-pair-positive-ratio-bootstrap-hard-gates", hybrids, manifest,
+        "registry-bound-exact-observation-shape-stage-pair-positive-ratio-bootstrap-hard-gates", hybrids, manifest,
         "closure:fixture-only", 3, "N30-bounded-lease-required", 24,
         ("one_survivor", "no_schedulable_pairs", "max_rounds", "lease_exhausted"),
     )
@@ -94,6 +94,13 @@ def stage_evidence(p, stage, *, final_pair=(), stage_opened_at=10, holdout_opene
         task_bindings(stage), PRINCIPALS, 314159 if stage == "final" else 271828,
         3 if stage == "final" else 1, stage_opened_at, tuple(final_pair), holdout_opened_at,
     )
+
+
+def observation_shape(evidence):
+    return tuple(sorted(
+        ObservationShapeEntry(task.family_id, task.task_id, repetition, task.repetition_seeds[repetition])
+        for task in evidence.tasks for repetition in range(evidence.repetitions)
+    ))
 
 
 def lease(p, stage, *, issued_by="host:lease", issued_at=1, expires_at=1000, revoked_at=None, operations=None):
@@ -492,8 +499,40 @@ class CampaignMetricsTests(unittest.TestCase):
                 receipt_digest = digest(["final-measurement", task.task_id, repetition])
                 registry.measurement_receipts.add(receipt_digest)
                 final_rows.append(FamilyObservation(task.family_id, task.task_id, repetition, receipt_digest, 0.0))
-        aggregate = stage_paired_bootstrap(p, "success_difference", "MC0", "MH1", final_rows, left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle)
-        self.assertIsInstance(aggregate, AggregateReceipt)
+        final_aggregates = []
+        for metric, value in (("success_difference", 0.0), ("cost_ratio", 0.8), ("time_ratio", 0.8)):
+            rows = tuple(replace(row, value=value) for row in final_rows)
+            final_aggregates.append(stage_paired_bootstrap(p, metric, "MC0", "MH1", rows, left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle))
+        self.assertTrue(all(isinstance(aggregate, AggregateReceipt) for aggregate in final_aggregates))
+        self.assertEqual(decide_match(p, *final_aggregates, registry=registry, admission_handle=registry.handle), "LEFT")
+        expected_shape = observation_shape(final_evidence)
+        def forged_final(shape, family_count):
+            receipts = []
+            for metric, interval in (
+                ("success_difference", DescriptiveInterval(0.1, 0.01, 0.2, family_count)),
+                ("cost_ratio", DescriptiveInterval(0.8, 0.7, 0.9, family_count)),
+                ("time_ratio", DescriptiveInterval(0.8, 0.7, 0.9, family_count)),
+            ):
+                record = AggregateEvidence(
+                    registry.snapshot.admission_digest, p.protocol_digest, "final", "whole-campaign", "whole-default",
+                    final_evidence.block_digest, final_evidence.task_manifest_digest, final_evidence.family_manifest_digest,
+                    shape, metric, "MC0", "MH1", digest(["forged-final", metric, family_count, shape]), interval, True, True,
+                )
+                receipts.append(registry.fixture_aggregate(record))
+            return receipts
+        with self.assertRaises(CampaignMetricsError):
+            decide_match(p, *forged_final(expected_shape, 1), registry=registry, admission_handle=registry.handle)
+        with self.assertRaises(CampaignMetricsError):
+            decide_match(p, *forged_final(expected_shape[:-1], 30), registry=registry, admission_handle=registry.handle)
+        wrong_seed_shape = (replace(expected_shape[0], seed=expected_shape[0].seed + 1000),) + expected_shape[1:]
+        with self.assertRaises(CampaignMetricsError):
+            decide_match(p, *forged_final(wrong_seed_shape, 30), registry=registry, admission_handle=registry.handle)
+        base_record = registry.resolve_aggregate(registry.handle, final_aggregates[0])
+        with self.assertRaises(CampaignMetricsError):
+            replace(base_record, observation_shape=expected_shape + (expected_shape[0],))
+        repeated_repetition = expected_shape[:-1] + (replace(expected_shape[-1], repetition=expected_shape[-2].repetition),)
+        with self.assertRaises(CampaignMetricsError):
+            replace(base_record, observation_shape=repeated_repetition)
         for wrong_pair in (("MC1", "MH2"), ("MB0", "MH1")):
             with self.assertRaises(CampaignMetricsError):
                 stage_paired_bootstrap(p, "success_difference", *wrong_pair, final_rows, left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle)
@@ -504,7 +543,7 @@ class CampaignMetricsTests(unittest.TestCase):
             wrong_evidence = AggregateEvidence(
                 registry.snapshot.admission_digest, p.protocol_digest, "final", track, regime,
                 final_evidence.block_digest, final_evidence.task_manifest_digest, final_evidence.family_manifest_digest,
-                "success_difference", left, right, digest(["wrong-final-observations", left, right]), DescriptiveInterval(0.1, 0.01, 0.2, 30), True, True,
+                observation_shape(final_evidence), "success_difference", left, right, digest(["wrong-final-observations", left, right]), DescriptiveInterval(0.1, 0.01, 0.2, 30), True, True,
             )
             wrong_receipts = []
             for metric, interval in (
@@ -587,6 +626,7 @@ class CampaignMetricsTests(unittest.TestCase):
         for metric, value in (("success_difference", 0.0), ("cost_ratio", 0.8), ("time_ratio", 1.0)):
             rows = tuple(replace(row, value=value) for row in observations)
             receipts.append(stage_paired_bootstrap(p, metric, "MB0", "MB1", rows, left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle))
+        self.assertTrue(all(registry.resolve_aggregate(registry.handle, receipt).observation_shape == observation_shape(evidence) for receipt in receipts))
         self.assertEqual(decide_match(p, *receipts, registry=registry, admission_handle=registry.handle), "LEFT")
         with self.assertRaises(CampaignMetricsError):
             stage_paired_bootstrap(p, "success_difference", "MB0", "MB1", observations[:-1], left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle)
@@ -603,10 +643,10 @@ class CampaignMetricsTests(unittest.TestCase):
 
     def test_registry_bound_decision_symmetry_noninferiority_and_quarantine(self):
         p, evidence, registry, _ = admitted()
-        def decision(success_i, cost_i, time_i, gates=(True, True)):
+        def decision(success_i, cost_i, time_i, gates=(True, True), shape=None):
             receipts = []
             for metric, interval in (("success_difference", success_i), ("cost_ratio", cost_i), ("time_ratio", time_i)):
-                aggregate = AggregateEvidence(registry.snapshot.admission_digest, p.protocol_digest, "original", "builder-component", "component-default", evidence.block_digest, evidence.task_manifest_digest, evidence.family_manifest_digest, metric, "MB0", "MB1", digest([metric, interval.to_document(), gates]), interval, *gates)
+                aggregate = AggregateEvidence(registry.snapshot.admission_digest, p.protocol_digest, "original", "builder-component", "component-default", evidence.block_digest, evidence.task_manifest_digest, evidence.family_manifest_digest, shape or observation_shape(evidence), metric, "MB0", "MB1", digest([metric, interval.to_document(), gates]), interval, *gates)
                 opaque = _Handle(); receipt = AggregateReceipt(opaque, canonical_digest(aggregate)); registry.aggregate_by_handle[id(opaque)] = aggregate; receipts.append(receipt)
             return decide_match(p, *receipts, registry=registry, admission_handle=registry.handle)
         symmetric = DescriptiveInterval(0, -0.04, 0.04, 12)
@@ -620,6 +660,10 @@ class CampaignMetricsTests(unittest.TestCase):
         ):
             with self.assertRaises(CampaignMetricsError):
                 decision(symmetric, invalid, DescriptiveInterval(1.0, 0.9, 1.1, 12))
+        with self.assertRaises(CampaignMetricsError):
+            decision(DescriptiveInterval(0.1, 0.01, 0.2, 1), DescriptiveInterval(0.8, 0.7, 0.9, 1), DescriptiveInterval(0.8, 0.7, 0.9, 1))
+        with self.assertRaises(CampaignMetricsError):
+            decision(symmetric, DescriptiveInterval(0.8, 0.7, 0.9, 12), DescriptiveInterval(0.8, 0.7, 0.9, 12), shape=observation_shape(evidence)[:-1])
 
     def test_every_execution_surface_revalidates_lease(self):
         p, evidence, registry, state = admitted()

@@ -517,10 +517,23 @@ class FamilyObservation:
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
 
+@dataclass(frozen=True, slots=True, order=True)
+class ObservationShapeEntry:
+    """One independently recheckable admitted task/repetition identity."""
+    family_id: str; task_id: str; repetition: int; seed: int
+    def __post_init__(self) -> None:
+        _id(self.family_id, "family"); _id(self.task_id, "task")
+        if type(self.repetition) is not int or self.repetition < 0 or type(self.seed) is not int:
+            raise CampaignMetricsError("invalid observation-shape repetition/seed")
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
 @dataclass(frozen=True, slots=True)
 class AggregateEvidence:
     admission_digest: str; protocol_digest: str; stage: str; track: str; regime_id: str
     block_digest: str; task_manifest_digest: str; family_manifest_digest: str
+    observation_shape: tuple[ObservationShapeEntry, ...]
     metric: str; left: str; right: str; observation_digest: str; interval: DescriptiveInterval
     left_hard_gates: bool; right_hard_gates: bool
     def __post_init__(self) -> None:
@@ -530,6 +543,15 @@ class AggregateEvidence:
             _id(getattr(self, name), name)
         if self.stage not in STAGES or self.left == self.right or type(self.left_hard_gates) is not bool or type(self.right_hard_gates) is not bool:
             raise CampaignMetricsError("invalid aggregate binding")
+        shape = tuple(self.observation_shape)
+        if not shape or any(not isinstance(entry, ObservationShapeEntry) for entry in shape) or len(shape) != len(set(shape)):
+            raise CampaignMetricsError("aggregate requires unique observation shape")
+        by_family: dict[str, list[ObservationShapeEntry]] = {}
+        for entry in shape:
+            by_family.setdefault(entry.family_id, []).append(entry)
+        if any(len({entry.task_id for entry in entries}) != 1 or len({entry.repetition for entry in entries}) != len(entries) or len({entry.seed for entry in entries}) != len(entries) for entries in by_family.values()):
+            raise CampaignMetricsError("aggregate observation shape repeats task/repetition/seed")
+        object.__setattr__(self, "observation_shape", tuple(sorted(shape)))
     def to_document(self) -> Mapping[str, object]:
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
@@ -644,6 +666,13 @@ def _validate_final_binding(protocol: MatchProtocol, evidence: StageEvidence, hi
 def _active_variants(protocol: MatchProtocol, evidence: StageEvidence, track: str) -> tuple[str, ...]:
     source = protocol.entrant_recipes if evidence.stage == "original" else protocol.hybrid_recipes if evidence.stage == "hybrid" else {entry.variant_id: protocol.recipe(entry.variant_id) for entry in evidence.final_pair}
     return tuple(sorted(variant for variant, recipe in source.items() if recipe is not None and recipe["track"] == track))
+
+
+def _observation_shape(evidence: StageEvidence) -> tuple[ObservationShapeEntry, ...]:
+    return tuple(sorted(
+        ObservationShapeEntry(task.family_id, task.task_id, repetition, task.repetition_seeds[repetition])
+        for task in evidence.tasks for repetition in range(evidence.repetitions)
+    ))
 
 
 def _compatible(protocol: MatchProtocol, left: str, right: str) -> bool:
@@ -883,7 +912,7 @@ def stage_paired_bootstrap(protocol: MatchProtocol, metric: str, left: str, righ
             raise CampaignMetricsError("unknown qualification metric")
         grouped.setdefault(row.family_id, []).append(row.value)
     interval = paired_family_bootstrap(grouped, seed=evidence.seed)
-    record = AggregateEvidence(snapshot.admission_digest, protocol.protocol_digest, stage, str(left_recipe["track"]), str(left_recipe["regime_id"]), evidence.block_digest, evidence.task_manifest_digest, evidence.family_manifest_digest, metric, left, right, canonical_digest(rows), interval, left_hard_gates, right_hard_gates)
+    record = AggregateEvidence(snapshot.admission_digest, protocol.protocol_digest, stage, str(left_recipe["track"]), str(left_recipe["regime_id"]), evidence.block_digest, evidence.task_manifest_digest, evidence.family_manifest_digest, _observation_shape(evidence), metric, left, right, canonical_digest(rows), interval, left_hard_gates, right_hard_gates)
     receipt = registry.record_aggregate(admission_handle, record, rows)
     if not isinstance(receipt, AggregateReceipt) or receipt.aggregate_digest != canonical_digest(record):
         raise CampaignMetricsError("registry returned invalid aggregate receipt")
@@ -895,8 +924,10 @@ def decide_match(protocol: MatchProtocol, success: AggregateReceipt, cost_ratio:
         raise CampaignMetricsError("qualification decisions require registry aggregate receipts")
     stage = _stage_from_handle(registry, admission_handle, protocol, "decide"); snapshot = _resolve(registry, admission_handle, protocol, stage, "decide")
     aggregates = tuple(registry.resolve_aggregate(admission_handle, receipt) for receipt in (success, cost_ratio, time_ratio)); expected_metrics = ("success_difference", "cost_ratio", "time_ratio"); first = aggregates[0]
+    expected_shape = _observation_shape(snapshot.stage_evidence)
+    expected_family_count = len({entry.family_id for entry in expected_shape})
     for aggregate, metric in zip(aggregates, expected_metrics):
-        if not isinstance(aggregate, AggregateEvidence) or aggregate.metric != metric or aggregate.admission_digest != snapshot.admission_digest or aggregate.protocol_digest != protocol.protocol_digest or aggregate.stage != stage or aggregate.track != first.track or aggregate.regime_id != first.regime_id or aggregate.block_digest != snapshot.stage_evidence.block_digest or aggregate.task_manifest_digest != snapshot.stage_evidence.task_manifest_digest or aggregate.family_manifest_digest != snapshot.stage_evidence.family_manifest_digest or (aggregate.left, aggregate.right) != (first.left, first.right) or aggregate.left_hard_gates != first.left_hard_gates or aggregate.right_hard_gates != first.right_hard_gates:
+        if not isinstance(aggregate, AggregateEvidence) or aggregate.metric != metric or aggregate.admission_digest != snapshot.admission_digest or aggregate.protocol_digest != protocol.protocol_digest or aggregate.stage != stage or aggregate.track != first.track or aggregate.regime_id != first.regime_id or aggregate.block_digest != snapshot.stage_evidence.block_digest or aggregate.task_manifest_digest != snapshot.stage_evidence.task_manifest_digest or aggregate.family_manifest_digest != snapshot.stage_evidence.family_manifest_digest or aggregate.observation_shape != expected_shape or aggregate.interval.family_count != expected_family_count or (aggregate.left, aggregate.right) != (first.left, first.right) or aggregate.left_hard_gates != first.left_hard_gates or aggregate.right_hard_gates != first.right_hard_gates:
             raise CampaignMetricsError("qualification aggregates are not co-bound")
     left_recipe = protocol.recipe(first.left); right_recipe = protocol.recipe(first.right)
     if left_recipe is None or right_recipe is None or first.track != left_recipe["track"] or first.track != right_recipe["track"] or first.regime_id != left_recipe["regime_id"] or first.regime_id != right_recipe["regime_id"]:
@@ -925,7 +956,7 @@ __all__ = [
     "AdmissionRegistry", "AdmissionSnapshot", "AdmissionUse", "AggregateEvidence", "AggregateReceipt",
     "AttemptMetric", "AuthorityBinding", "BracketSchedule", "BracketSnapshot", "BracketState", "BracketTransition", "CampaignMetricsError",
     "ConsumeRoundRequest", "DescriptiveInterval", "FamilyObservation", "FinalistBinding", "IssuedReceipt",
-    "LeaseExhausted", "LeaseRecord", "MatchProtocol", "MatchProtocolInspection", "RECIPE_FIELDS", "REQUIRED_STRATA",
+    "LeaseExhausted", "LeaseRecord", "MatchProtocol", "MatchProtocolInspection", "ObservationShapeEntry", "RECIPE_FIELDS", "REQUIRED_STRATA",
     "ReceiptOutcome", "RoundPlanEntry", "StageEvidence", "TaskBinding", "VariantSeal", "canonical_digest",
     "decide_match", "load_match_protocol", "load_match_protocol_for_inspection", "paired_family_bootstrap",
     "stage_paired_bootstrap", "summarize_attempts", "validate_and_append_seals",

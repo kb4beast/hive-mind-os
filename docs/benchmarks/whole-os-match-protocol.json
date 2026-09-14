@@ -21,7 +21,7 @@
   "scenario_task_ids": [],
   "dataset_block_ids": ["development-screening", "harder-hybrid-development", "promotion_holdout"],
   "pairing_rule": "registry-state-cas-loss-id-rotate-odd-bye-two-inconclusive",
-  "decision_rule": "registry-bound-stage-pair-positive-ratio-bootstrap-hard-gates",
+  "decision_rule": "registry-bound-exact-observation-shape-stage-pair-positive-ratio-bootstrap-hard-gates",
   "hybrid_recipes": {
     "MH1": {"track": "whole-campaign", "regime_id": "whole-default", "availability": "DEFERRED", "provenance_digest": null},
     "MH2": {"track": "whole-campaign", "regime_id": "whole-default", "availability": "DEFERRED", "provenance_digest": null},

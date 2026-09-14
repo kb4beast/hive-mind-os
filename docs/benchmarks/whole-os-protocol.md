@@ -83,12 +83,19 @@ families × one declared repetition for original/hybrid, or 30 distinct families
 three declared repetitions for final. Every row carries a distinct execution
 receipt digest; the registry verifies it against durable consumed evidence and
 returns an opaque `AggregateReceipt`. Aggregate evidence binds the exact admitted
-stage, pair, track, regime, block, task manifest and family manifest. Final
+stage, pair, track, regime, block, task manifest and family manifest, plus the
+normalized tuple of every family ID, task ID, repetition index and declared distinct
+seed. Final
 aggregation accepts only the ordered finalist pair recorded in the admitted final
 evidence. `decide_match` accepts only three co-bound registry aggregate receipts for
 success difference, cost ratio and time ratio. Success observations and intervals
 must remain in [-1, 1]; cost and time observations and every known interval endpoint
-must be finite and strictly positive.
+must be finite and strictly positive. Before any verdict, `decide_match` reconstructs
+the exact observation-shape tuple from registry-resolved `StageEvidence`, compares it
+with all three aggregate receipts, and requires the interval family count to be 12
+for screening or 30 for final. A one-family interval, missing/repeated observation,
+wrong repetition count or changed seed rejects even when all other receipt bindings
+match.
 
 Success noninferiority requires each directional lower bound to be strictly greater
 than -0.05 and both hard gates. A strictly positive/negative success interval wins

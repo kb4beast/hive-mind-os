@@ -11,18 +11,22 @@
 The N02 contract in
 `docs/plan/whole-os-tournament-2026-09-13/NODES-FOUNDATION.md` requires frozen,
 independently signed measurement custody, deterministic triple elimination and no
-fabricated external evidence. Six independent Curator reviews were inspected from
+fabricated external evidence. Seven independent Curator reviews were inspected from
 their retained review worktrees, including
 `C:\h\wos-n02-rereview-r5\docs\benchmarks\whole-os-protocol-curator-r5.md` over
 builder commit `92bf72453d80e5f98d496070bccd4f8d7d2214d4` and the round-6 review at
 `C:\h\wos-n02-rereview-r6\docs\benchmarks\whole-os-protocol-curator-r6.md` over
-`a86717340936eb99934055c8494a7f6f95a3b521`. R5's atomic C1–C8 claims are
+`a86717340936eb99934055c8494a7f6f95a3b521`, followed by the round-7 review at
+`C:\h\wos-n02-rereview-r7\docs\benchmarks\whole-os-protocol-curator-r7.md` over
+`5c710cf602e9afc3b25e8261490cb28dab3fc513`. R5's atomic C1–C8 claims are
 retained as the repair requirements: caller-minted authority; incomplete identity;
 relabelled OPEN input; stale leases; noncanonical/multi-use receipts; incomplete
 terminal/bye/quarantine transitions; unsatisfiable final custody; and bypassable
 qualification. R6 adds caller-controlled bracket history, stage/final-pair
 substitution at aggregation, post-open seal backdating, repeated final seeds,
-omitted builder/champion rosters and impossible efficiency ratios.
+omitted builder/champion rosters and impossible efficiency ratios. R7-D1 adds the
+remaining claim that co-bound aggregate receipts can misstate the admitted 12x1 or
+30x3 observation cardinality at the defensive decision boundary.
 
 No external source body was newly ingested. The existing EX01/EX03/EX06/EX07 and
 N00 evidence obligations remain open; this decision does not infer their content,
@@ -56,13 +60,15 @@ secret or treating Python object privacy as authority.
 
 ## Expert testimony
 
-The r5 and r6 Curator reviews are treated as independent adversarial testimony for this
+The r5, r6 and r7 Curator reviews are treated as independent adversarial testimony for this
 repair. It specifically requires a host-owned registry, opaque instance-bound
 handles, per-pair/bye receipts, durable replay, repeated lease validation,
 append-only seals and admission-bound aggregates. R6 further requires authenticated
 bracket state, exact stage/final-pair aggregate binding, trusted-time seal closure,
 distinct repetition seeds, complete independent role sets and metric-specific
-domains. No new independent security or evaluation witness has yet reproduced this
+domains. R7 requires every aggregate to expose an independently recheckable admitted
+family/task/repetition/seed shape and the decision to reconstruct it from current
+stage evidence. No new independent security or evaluation witness has yet reproduced this
 successor candidate.
 
 ## Decision
@@ -80,6 +86,9 @@ each transition. Pair receipts bind that exact bracket digest. Aggregate receipt
 bind exact stage, track, regime, pair and manifests; final permits only the admitted
 ordered pair. Trusted seal time must precede holdout opening, repeated seeds and
 incomplete/colliding role rosters reject, and success/ratio domains are enforced.
+Aggregate evidence additionally carries the normalized exact family, task,
+repetition and seed tuple. Decision recomputes that tuple from the registry-resolved
+stage and verifies its family count before interpreting any interval.
 
 Rejected alternatives are (a) another private module token, (b) caller-supplied
 verifier callbacks, (c) status-string closure, (d) self-signed fixture receipts
@@ -94,15 +103,17 @@ receipt sets, field substitution, replay from a prior state, zero/odd/bye/no-pai
 third loss, dual quarantine, actual final holdout binding, seal order/time/principals,
 exact 12x1/30x3 aggregate membership, all four public bracket-history forgeries plus
 rewind, MC1/MH2 and MB0/MH1 final substitution, post-open backdating, `(7,7,7)`
-seeds, empty/colliding role sets and nonpositive ratios. Inherited benchmark/evaluation suites must
+seeds, empty/colliding role sets, nonpositive ratios, one-family aggregates, missing
+or repeated shape entries, wrong final repetition count and changed declared seeds.
+Both exact 12x1 and 30x3 paths must succeed. Inherited benchmark/evaluation suites must
 also pass with worktree-bound imports.
 
-Outcome metric: every r5 and r6 executable counterexample fails at its intended boundary
+Outcome metric: every r5, r6 and r7 executable counterexample fails at its intended boundary
 while the fixture-only complete path succeeds. This is software conformance, not a
 benchmark outcome or superiority result.
 
 Rollback is the immediate parent commit
-`a86717340936eb99934055c8494a7f6f95a3b521`; no external state, credential,
+`5c710cf602e9afc3b25e8261490cb28dab3fc513`; no external state, credential,
 comparator, holdout or lease is changed by this repair. The successor schema is
 intentionally incompatible with the caller-verifier API so an unsafe fallback cannot
 silently survive migration.
