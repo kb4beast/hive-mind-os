@@ -66,6 +66,20 @@ class WholeOSCodexHostTests(unittest.TestCase):
         contract = repository / "docs" / "plan" / "whole-os-tournament-2026-09-13"
         contract.mkdir(parents=True)
         (contract / "NODES-QUALIFICATION.md").write_text("## N28\n", encoding="utf-8")
+        for relative in (
+            "AGENTS.md",
+            "scripts/whole-os/Invoke-WholeOSCodexService.ps1",
+            "src/hive_mind_os/whole_os_bootstrap.py",
+            "src/hive_mind_os/whole_os_codex_host.py",
+            "src/hive_mind_os/whole_os_composition.py",
+            "src/hive_mind_os/whole_os_service.py",
+            "tests/test_whole_os_bootstrap.py",
+            "tests/test_whole_os_codex_host.py",
+            "tests/test_whole_os_powershell_pipeline.py",
+        ):
+            path = repository / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"owned fixture for {relative}\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=repository, check=True)
         subprocess.run(["git", "commit", "-m", "fixture"], cwd=repository, check=True, capture_output=True)
         return repository
