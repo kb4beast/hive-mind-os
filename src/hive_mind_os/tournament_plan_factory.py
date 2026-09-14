@@ -17,8 +17,12 @@ from .dag_standard import (
     STANDARD_VERSION,
     WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
     WORK_PACKAGE_COMPILER_PACKAGE_ID,
+    WORK_PACKAGE_REQUIREMENTS_DIGEST,
+    WORK_PACKAGE_REQUIREMENTS_PATH,
+    WORK_PACKAGE_REQUIREMENT_IDS,
     WORK_PACKAGE_SOURCE_INVENTORY_DIGEST,
     WORK_PACKAGE_SOURCE_INVENTORY_ID,
+    WORK_PACKAGE_SOURCE_INVENTORY_PATH,
     git_blob_id,
 )
 from .plan_generation import (
@@ -52,6 +56,8 @@ from .runtime_contracts import (
     TokenPolicy,
     canonical_digest,
     require_digest,
+    require_identifier,
+    strict_json_object,
 )
 
 _FIXTURE_STAGE_KINDS = {
@@ -603,7 +609,7 @@ class WholeOSPlanFactory:
     """
 
     PLAN_ID = "whole-os-successor-campaign-v1"
-    CONTRACT_SCHEMA = "whole-os-node-contracts/v1"
+    CONTRACT_SCHEMA = "whole-os-node-contracts/v2"
     NODE_FIELDS = {
         "id",
         "objective",
@@ -638,12 +644,25 @@ class WholeOSPlanFactory:
         authority: AuthorityEnvelope,
         evidence: Iterable[EvidenceReference],
         node_contracts: Mapping[str, Any],
+        source_inventory: PinnedArtifact,
+        requirements: PinnedArtifact,
     ) -> PortablePlanBundle:
         repository = TournamentPlanFactory._repository_subject(request)
         TournamentPlanFactory._validate_standard(standard)
         TournamentPlanFactory._validate_authority(authority)
         evidence_inventory = TournamentPlanFactory._evidence_inventory(evidence)
-        nodes = self._nodes(authority.authority_id, evidence_inventory, node_contracts)
+        admitted_sources, admitted_requirements = self._validate_namespaces(
+            evidence_inventory,
+            source_inventory=source_inventory,
+            requirements=requirements,
+        )
+        nodes = self._nodes(
+            authority.authority_id,
+            evidence_inventory,
+            node_contracts,
+            admitted_sources=admitted_sources,
+            admitted_requirements=admitted_requirements,
+        )
         return PortablePlanBundle(
             schema_version=2,
             plan_id=self.PLAN_ID,
@@ -722,6 +741,8 @@ class WholeOSPlanFactory:
         authority: AuthorityEnvelope,
         evidence: Iterable[EvidenceReference],
         node_contracts: Mapping[str, Any],
+        source_inventory: PinnedArtifact,
+        requirements: PinnedArtifact,
         node_mappings: PinnedArtifact,
         sources: Iterable[PinnedArtifact],
         compiler: PinnedArtifact,
@@ -732,6 +753,8 @@ class WholeOSPlanFactory:
             authority=authority,
             evidence=evidence,
             node_contracts=node_contracts,
+            source_inventory=source_inventory,
+            requirements=requirements,
         )
         return self._generator.generate(
             request,
@@ -743,14 +766,99 @@ class WholeOSPlanFactory:
             compiler=compiler,
         )
 
+    @staticmethod
+    def _validate_namespaces(
+        evidence: tuple[EvidenceReference, ...],
+        *,
+        source_inventory: PinnedArtifact,
+        requirements: PinnedArtifact,
+    ) -> tuple[frozenset[str], frozenset[str]]:
+        if source_inventory.digest != WORK_PACKAGE_SOURCE_INVENTORY_DIGEST:
+            raise ContractViolation(
+                "whole-OS source namespace is not the accepted N00 bytes"
+            )
+        source_document = strict_json_object(
+            source_inventory.content, maximum_bytes=1_000_000
+        )
+        if (
+            source_document.get("schema") != "whole-os-source-inventory/v1"
+            or source_document.get("inventory_id")
+            != WORK_PACKAGE_SOURCE_INVENTORY_ID
+        ):
+            raise ContractViolation("whole-OS source namespace is not accepted N00")
+        source_entries = source_document.get("sources")
+        if not isinstance(source_entries, list) or not source_entries:
+            raise ContractViolation("whole-OS source inventory requires sources")
+        source_ids: list[str] = []
+        for source in source_entries:
+            if not isinstance(source, Mapping) or "id" not in source:
+                raise ContractViolation("whole-OS source inventory entry lacks id")
+            source_id = source["id"]
+            require_identifier(source_id, "whole-OS source inventory id")
+            source_ids.append(source_id)
+        if len(set(source_ids)) != len(source_ids):
+            raise ContractViolation("whole-OS source inventory has duplicate ids")
+
+        if requirements.digest != WORK_PACKAGE_REQUIREMENTS_DIGEST:
+            raise ContractViolation(
+                "whole-OS requirements are not the accepted N00 bytes"
+            )
+        requirement_document = strict_json_object(
+            requirements.content, maximum_bytes=1_000_000
+        )
+        if requirement_document.get("schema") != "whole-os-handoff-requirements/v1":
+            raise ContractViolation("whole-OS requirements schema is unsupported")
+        requirement_entries = requirement_document.get("requirements")
+        if not isinstance(requirement_entries, list):
+            raise ContractViolation("whole-OS requirements inventory requires a list")
+        requirement_ids = tuple(
+            item.get("id") if isinstance(item, Mapping) else None
+            for item in requirement_entries
+        )
+        if requirement_ids != WORK_PACKAGE_REQUIREMENT_IDS:
+            raise ContractViolation(
+                "whole-OS requirement ids are not accepted R01-R18"
+            )
+
+        accepted_source = tuple(
+            item for item in evidence if item.evidence_id == "accepted-n00-inventory"
+        )
+        accepted_requirements = tuple(
+            item
+            for item in evidence
+            if item.evidence_id == "accepted-n00-requirements"
+        )
+        if (
+            len(accepted_source) != 1
+            or accepted_source[0].digest != source_inventory.digest
+            or accepted_source[0].source != WORK_PACKAGE_SOURCE_INVENTORY_PATH
+            or accepted_source[0].claim_ids != ("N00-ACCEPTED",)
+            or len(accepted_requirements) != 1
+            or accepted_requirements[0].digest != requirements.digest
+            or accepted_requirements[0].source != WORK_PACKAGE_REQUIREMENTS_PATH
+            or accepted_requirements[0].claim_ids != WORK_PACKAGE_REQUIREMENT_IDS
+        ):
+            raise ContractViolation(
+                "whole-OS namespaces lack accepted N00 evidence bindings"
+            )
+        return frozenset(source_ids), frozenset(WORK_PACKAGE_REQUIREMENT_IDS)
+
     @classmethod
     def _nodes(
         cls,
         authority_id: str,
         evidence: tuple[EvidenceReference, ...],
         document: Mapping[str, Any],
+        *,
+        admitted_sources: frozenset[str],
+        admitted_requirements: frozenset[str],
     ) -> tuple[PortableNode, ...]:
-        if set(document) != {"schema", "source_inventory", "nodes"}:
+        if set(document) != {
+            "schema",
+            "source_inventory",
+            "requirement_inventory",
+            "nodes",
+        }:
             raise ContractViolation("whole-OS node-contract document is not closed")
         if document["schema"] != cls.CONTRACT_SCHEMA:
             raise ContractViolation("unsupported whole-OS node-contract schema")
@@ -775,6 +883,22 @@ class WholeOSPlanFactory:
         ):
             raise ContractViolation(
                 "whole-OS node contracts are not bound to accepted N00 evidence"
+            )
+        requirement_inventory = document["requirement_inventory"]
+        if not isinstance(requirement_inventory, Mapping) or set(
+            requirement_inventory
+        ) != {"path", "sha256", "requirement_ids"}:
+            raise ContractViolation(
+                "whole-OS requirement inventory binding is incomplete"
+            )
+        if (
+            requirement_inventory["path"] != WORK_PACKAGE_REQUIREMENTS_PATH
+            or requirement_inventory["sha256"] != WORK_PACKAGE_REQUIREMENTS_DIGEST
+            or requirement_inventory["requirement_ids"]
+            != list(WORK_PACKAGE_REQUIREMENT_IDS)
+        ):
+            raise ContractViolation(
+                "whole-OS requirement namespace is not accepted N00"
             )
         node_documents = document["nodes"]
         if not isinstance(node_documents, list):
@@ -811,6 +935,18 @@ class WholeOSPlanFactory:
                 publication_stage = PublicationStage(item["publication_stage"])
             except (TypeError, ValueError) as error:
                 raise ContractViolation("unknown whole-OS publication stage") from error
+            unknown_sources = set(item["source_ids"]) - admitted_sources
+            if unknown_sources:
+                raise ContractViolation(
+                    f"whole-OS node {item['id']} cites unadmitted source id(s): "
+                    + ", ".join(sorted(unknown_sources))
+                )
+            unknown_requirements = set(item["requirement_ids"]) - admitted_requirements
+            if unknown_requirements:
+                raise ContractViolation(
+                    f"whole-OS node {item['id']} cites unadmitted requirement id(s): "
+                    + ", ".join(sorted(unknown_requirements))
+                )
             package = PortableWorkPackageContract(
                 1,
                 1,
@@ -853,6 +989,15 @@ class WholeOSPlanFactory:
                     ),
                     package,
                 )
+            )
+        observed_requirements = {
+            requirement_id
+            for node in result
+            for requirement_id in node.work_package.requirement_ids  # type: ignore[union-attr]
+        }
+        if observed_requirements != admitted_requirements:
+            raise ContractViolation(
+                "whole-OS nodes lose or substitute accepted requirements"
             )
         return tuple(result)
 

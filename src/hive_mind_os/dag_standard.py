@@ -35,9 +35,19 @@ COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
 COMPILER_PACKAGE_DIGEST = canonical_digest(COMPILER_PACKAGE_DESCRIPTOR)
 WORK_PACKAGE_COMPILER_PACKAGE_ID = "hive-mind-portable-compiler-v2"
 WORK_PACKAGE_SOURCE_INVENTORY_ID = "WOS-N00-20260914-01"
+WORK_PACKAGE_SOURCE_INVENTORY_PATH = (
+    "docs/plan/whole-os-implementation/source-inventory.json"
+)
 WORK_PACKAGE_SOURCE_INVENTORY_DIGEST = (
     "sha256:39109ae21cc5d55b7fa85506ffc18920701e2e89db77949aa191021d7b85d127"
 )
+WORK_PACKAGE_REQUIREMENTS_PATH = (
+    "docs/plan/whole-os-tournament-2026-09-13/requirements.json"
+)
+WORK_PACKAGE_REQUIREMENTS_DIGEST = (
+    "sha256:5c49bc3f9c818b6adfb326adb08bc103abd6f7e84feeebe74bdbe4f782d4b7d5"
+)
+WORK_PACKAGE_REQUIREMENT_IDS = tuple(f"R{index:02d}" for index in range(1, 19))
 WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
     "algorithm": "canonical-kahn-lock-aware-first-fit-v2",
     "canonical_json": "utf8-sorted-compact-v1",
@@ -46,6 +56,10 @@ WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
     "plan_schema_version": 2,
     "source_inventory_digest": WORK_PACKAGE_SOURCE_INVENTORY_DIGEST,
     "source_inventory_id": WORK_PACKAGE_SOURCE_INVENTORY_ID,
+    "source_inventory_path": WORK_PACKAGE_SOURCE_INVENTORY_PATH,
+    "requirements_digest": WORK_PACKAGE_REQUIREMENTS_DIGEST,
+    "requirements_path": WORK_PACKAGE_REQUIREMENTS_PATH,
+    "requirement_ids": list(WORK_PACKAGE_REQUIREMENT_IDS),
     "standard_version": STANDARD_VERSION,
 }
 WORK_PACKAGE_COMPILER_PACKAGE_DIGEST = canonical_digest(
@@ -156,6 +170,7 @@ def load_bound_plan(
     expected_request_id: str | None = None,
     expected_subject_id: str | None = None,
     source_inventory_bytes: bytes | None = None,
+    requirements_bytes: bytes | None = None,
 ) -> PortablePlanBundle:
     """Parse one canonical plan and authenticate every compiler binding."""
 
@@ -195,7 +210,9 @@ def load_bound_plan(
     if (standard.package_id, standard.package_digest) != expected_compiler:
         raise ContractViolation("canonical compiler package identity mismatch")
     _validate_governance_coverage(
-        plan, source_inventory_bytes=source_inventory_bytes
+        plan,
+        source_inventory_bytes=source_inventory_bytes,
+        requirements_bytes=requirements_bytes,
     )
     return plan
 
@@ -238,6 +255,7 @@ def _validate_source_namespace(
     if (
         len(inventory_evidence) != 1
         or inventory_evidence[0].digest != inventory_digest
+        or inventory_evidence[0].source != WORK_PACKAGE_SOURCE_INVENTORY_PATH
         or inventory_evidence[0].claim_ids != ("N00-ACCEPTED",)
     ):
         raise ContractViolation(
@@ -253,8 +271,60 @@ def _validate_source_namespace(
             )
 
 
+def _validate_requirement_namespace(
+    plan: PortablePlanBundle, requirements_bytes: bytes | None
+) -> None:
+    if requirements_bytes is None:
+        raise ContractViolation(
+            "portable work packages require pinned requirements bytes"
+        )
+    if raw_sha256(requirements_bytes) != WORK_PACKAGE_REQUIREMENTS_DIGEST:
+        raise ContractViolation(
+            "portable work-package requirements are not the accepted N00 bytes"
+        )
+    document = strict_json_object(requirements_bytes, maximum_bytes=1_000_000)
+    if document.get("schema") != "whole-os-handoff-requirements/v1":
+        raise ContractViolation("portable work packages use unknown requirements")
+    requirements = document.get("requirements")
+    if not isinstance(requirements, list):
+        raise ContractViolation("requirements inventory must contain a list")
+    requirement_ids: list[str] = []
+    for requirement in requirements:
+        if not isinstance(requirement, Mapping) or "id" not in requirement:
+            raise ContractViolation("requirements inventory entry lacks an id")
+        requirement_id = requirement["id"]
+        require_identifier(requirement_id, "requirements inventory id")
+        requirement_ids.append(requirement_id)
+    if tuple(requirement_ids) != WORK_PACKAGE_REQUIREMENT_IDS:
+        raise ContractViolation("requirements inventory ids are not accepted R01-R18")
+    evidence = tuple(
+        item for item in plan.evidence if item.evidence_id == "accepted-n00-requirements"
+    )
+    if (
+        len(evidence) != 1
+        or evidence[0].digest != WORK_PACKAGE_REQUIREMENTS_DIGEST
+        or evidence[0].source != WORK_PACKAGE_REQUIREMENTS_PATH
+        or evidence[0].claim_ids != WORK_PACKAGE_REQUIREMENT_IDS
+    ):
+        raise ContractViolation(
+            "portable work-package requirement namespace lacks accepted N00 evidence"
+        )
+    observed = {
+        requirement_id
+        for node in plan.nodes
+        for requirement_id in node.work_package.requirement_ids  # type: ignore[union-attr]
+    }
+    if observed != set(WORK_PACKAGE_REQUIREMENT_IDS):
+        raise ContractViolation(
+            "portable work packages lose or substitute accepted requirements"
+        )
+
+
 def _validate_governance_coverage(
-    plan: PortablePlanBundle, *, source_inventory_bytes: bytes | None
+    plan: PortablePlanBundle,
+    *,
+    source_inventory_bytes: bytes | None,
+    requirements_bytes: bytes | None,
 ) -> None:
     roles: set[str] = set()
     stages: set[str] = set()
@@ -288,6 +358,7 @@ def _validate_governance_coverage(
         )
     if plan.schema_version == 2:
         _validate_source_namespace(plan, source_inventory_bytes)
+        _validate_requirement_namespace(plan, requirements_bytes)
         authorities = {item.authority_id: item for item in plan.authority}
         for capability in plan.capabilities:
             authority = authorities[capability.authority_id]
@@ -304,21 +375,6 @@ def _validate_governance_coverage(
                 )
             if capability.operation in {"merge", "protected-merge"}:
                 raise ContractViolation("protected merge is never delegated")
-        expected_requirements = {
-            claim_id
-            for evidence in plan.evidence
-            for claim_id in evidence.claim_ids
-            if claim_id.startswith("R") and claim_id[1:].isdigit()
-        }
-        observed_requirements = {
-            requirement_id
-            for node in plan.nodes
-            for requirement_id in node.work_package.requirement_ids  # type: ignore[union-attr]
-        }
-        if not expected_requirements or observed_requirements != expected_requirements:
-            raise ContractViolation(
-                "portable work packages lose or substitute requirement claims"
-            )
 
 
 def _paths_overlap(left: str, right: str) -> bool:
@@ -452,6 +508,7 @@ def compile_plan(
     expected_subject_id: str | None = None,
     maximum_workers: int | None = None,
     source_inventory_bytes: bytes | None = None,
+    requirements_bytes: bytes | None = None,
 ) -> CompilationReceipt:
     """Authenticate and compile one plan without performing any host effect."""
 
@@ -462,6 +519,7 @@ def compile_plan(
         expected_request_id=expected_request_id,
         expected_subject_id=expected_subject_id,
         source_inventory_bytes=source_inventory_bytes,
+        requirements_bytes=requirements_bytes,
     )
     worker_limit = _worker_limit(plan, maximum_workers)
     rounds = _compile_rounds(plan, maximum_workers=worker_limit)
@@ -494,6 +552,10 @@ __all__ = [
     "WORK_PACKAGE_COMPILER_PACKAGE_ID",
     "WORK_PACKAGE_SOURCE_INVENTORY_DIGEST",
     "WORK_PACKAGE_SOURCE_INVENTORY_ID",
+    "WORK_PACKAGE_SOURCE_INVENTORY_PATH",
+    "WORK_PACKAGE_REQUIREMENTS_DIGEST",
+    "WORK_PACKAGE_REQUIREMENTS_PATH",
+    "WORK_PACKAGE_REQUIREMENT_IDS",
     "compile_plan",
     "git_blob_id",
     "graph_metrics",

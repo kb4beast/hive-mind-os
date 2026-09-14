@@ -5,6 +5,7 @@ import runpy
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import Mock
 
 from hive_mind_os.dag_standard import (
     WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
@@ -27,6 +28,8 @@ OUTPUT = ROOT / "docs/plan/whole-os-implementation"
 HANDOFF = ROOT / "docs/plan/whole-os-tournament-2026-09-13"
 STANDARD = (ROOT / "docs/execution/DAG_AUTHORING_STANDARD_V2.md").read_bytes()
 SOURCE_INVENTORY = (OUTPUT / "source-inventory.json").read_bytes()
+REQUIREMENTS_PATH = HANDOFF / "requirements.json"
+REQUIREMENTS = REQUIREMENTS_PATH.read_bytes()
 
 
 def load_plan() -> PortablePlanBundle:
@@ -44,6 +47,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             expected_request_id=plan.request_id,
             expected_subject_id=plan.subject.subject_id,
             source_inventory_bytes=SOURCE_INVENTORY,
+            requirements_bytes=REQUIREMENTS,
         )
         self.assertEqual(2, plan.schema_version)
         self.assertEqual(WORK_PACKAGE_COMPILER_PACKAGE_ID, receipt.compiler_package_id)
@@ -88,7 +92,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             None,
         )
         contracts = json.loads(
-            (OUTPUT / "whole-os-node-contracts-v1.json").read_text(encoding="utf-8")
+            (OUTPUT / "whole-os-node-contracts-v2.json").read_text(encoding="utf-8")
         )
         rebuilt = WholeOSPlanFactory().build(
             generation_request,
@@ -96,6 +100,8 @@ class WholeOSPlanContractTests(unittest.TestCase):
             authority=plan.authority[0],
             evidence=plan.evidence,
             node_contracts=contracts,
+            source_inventory=PinnedArtifact.pin("n00-source-inventory", SOURCE_INVENTORY),
+            requirements=PinnedArtifact.pin("n00-requirements", REQUIREMENTS),
         )
         self.assertEqual(plan.canonical_bytes(), rebuilt.canonical_bytes())
 
@@ -110,6 +116,10 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 authority=plan.authority[0],
                 evidence=plan.evidence,
                 node_contracts=substituted_inventory,
+                source_inventory=PinnedArtifact.pin(
+                    "n00-source-inventory", SOURCE_INVENTORY
+                ),
+                requirements=PinnedArtifact.pin("n00-requirements", REQUIREMENTS),
             )
 
         compatibility = TournamentPlanFactory().build(
@@ -131,7 +141,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             str(ROOT / "scripts/generate_whole_os_plan_artifacts.py")
         )
         contracts = json.loads(
-            (OUTPUT / "whole-os-node-contracts-v1.json").read_text(encoding="utf-8")
+            (OUTPUT / "whole-os-node-contracts-v2.json").read_text(encoding="utf-8")
         )
         inventory = json.loads(
             (OUTPUT / "source-inventory.json").read_text(encoding="utf-8")
@@ -172,6 +182,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             expected_plan_digest=plan.digest(),
             standard_bytes=STANDARD,
             source_inventory_bytes=SOURCE_INVENTORY,
+            requirements_bytes=REQUIREMENTS,
         )
         rounds = {
             node_id: item.round_index
@@ -180,6 +191,146 @@ class WholeOSPlanContractTests(unittest.TestCase):
         }
         self.assertNotEqual(rounds["N11"], rounds["N15"])
         self.assertNotEqual(rounds["N14"], rounds["N18"])
+
+    def test_factory_and_compiler_reject_namespace_substitution_before_seal(
+        self,
+    ) -> None:
+        plan = load_plan()
+        repository = plan.subject.repository
+        assert repository is not None
+        generation_request = PlanGenerationRequest(
+            plan.request_id,
+            plan.objective_digest,
+            plan.subject.subject_id,
+            plan.subject.kind.value,
+            repository.repository_id,
+            repository.target_branch,
+            repository.commit,
+            repository.tree,
+            None,
+        )
+        contracts = json.loads(
+            (OUTPUT / "whole-os-node-contracts-v2.json").read_text(encoding="utf-8")
+        )
+        source_artifact = PinnedArtifact.pin("n00-source-inventory", SOURCE_INVENTORY)
+        requirements_artifact = PinnedArtifact.pin("n00-requirements", REQUIREMENTS)
+
+        bogus_source = json.loads(json.dumps(contracts))
+        bogus_source["nodes"][1]["source_ids"].append("GOV-NONEXISTENT")
+        with self.assertRaisesRegex(ContractViolation, "unadmitted source"):
+            WholeOSPlanFactory().build(
+                generation_request,
+                standard=PinnedArtifact.pin("dag-standard-v2", STANDARD),
+                authority=plan.authority[0],
+                evidence=plan.evidence,
+                node_contracts=bogus_source,
+                source_inventory=source_artifact,
+                requirements=requirements_artifact,
+            )
+        sealer = Mock()
+        with self.assertRaisesRegex(ContractViolation, "unadmitted source"):
+            WholeOSPlanFactory(generator=sealer).generate(
+                generation_request,
+                standard=PinnedArtifact.pin("dag-standard-v2", STANDARD),
+                authority=plan.authority[0],
+                evidence=plan.evidence,
+                node_contracts=bogus_source,
+                source_inventory=source_artifact,
+                requirements=requirements_artifact,
+                node_mappings=PinnedArtifact.pin("node-mappings", b"mapping"),
+                sources=(),
+                compiler=PinnedArtifact.pin("compiler", b"compiler"),
+            )
+        sealer.generate.assert_not_called()
+
+        substituted_source_evidence = tuple(
+            replace(item, claim_ids=("N00-SUBSTITUTED",))
+            if item.evidence_id == "accepted-n00-inventory"
+            else item
+            for item in plan.evidence
+        )
+        with self.assertRaisesRegex(ContractViolation, "evidence bindings"):
+            WholeOSPlanFactory().build(
+                generation_request,
+                standard=PinnedArtifact.pin("dag-standard-v2", STANDARD),
+                authority=plan.authority[0],
+                evidence=substituted_source_evidence,
+                node_contracts=contracts,
+                source_inventory=source_artifact,
+                requirements=requirements_artifact,
+            )
+
+        colluding_requirements = json.loads(json.dumps(contracts))
+        for node in colluding_requirements["nodes"]:
+            node["requirement_ids"] = [
+                "R99" if item == "R01" else item
+                for item in node["requirement_ids"]
+            ]
+        colluding_requirements["requirement_inventory"]["requirement_ids"] = [
+            "R99" if item == "R01" else item
+            for item in colluding_requirements["requirement_inventory"][
+                "requirement_ids"
+            ]
+        ]
+        with self.assertRaisesRegex(ContractViolation, "not accepted N00"):
+            WholeOSPlanFactory().build(
+                generation_request,
+                standard=PinnedArtifact.pin("dag-standard-v2", STANDARD),
+                authority=plan.authority[0],
+                evidence=plan.evidence,
+                node_contracts=colluding_requirements,
+                source_inventory=source_artifact,
+                requirements=requirements_artifact,
+            )
+
+        altered_requirements = json.loads(REQUIREMENTS)
+        altered_requirements["requirements"][0]["id"] = "R99"
+        with self.assertRaisesRegex(ContractViolation, "accepted N00 bytes"):
+            WholeOSPlanFactory().build(
+                generation_request,
+                standard=PinnedArtifact.pin("dag-standard-v2", STANDARD),
+                authority=plan.authority[0],
+                evidence=plan.evidence,
+                node_contracts=contracts,
+                source_inventory=source_artifact,
+                requirements=PinnedArtifact.pin(
+                    "altered-requirements",
+                    json.dumps(altered_requirements, sort_keys=True).encode("utf-8"),
+                ),
+            )
+
+        colluding_plan = plan.to_document()
+        for node in colluding_plan["nodes"]:
+            node["work_package"]["requirement_ids"] = [
+                "R99" if item == "R01" else item
+                for item in node["work_package"]["requirement_ids"]
+            ]
+        accepted_evidence = next(
+            item
+            for item in colluding_plan["evidence"]
+            if item["evidence_id"] == "accepted-n00-requirements"
+        )
+        accepted_evidence["claim_ids"] = [
+            "R99" if item == "R01" else item
+            for item in accepted_evidence["claim_ids"]
+        ]
+        candidate = PortablePlanBundle.from_document(colluding_plan)
+        with self.assertRaisesRegex(ContractViolation, "accepted N00 evidence"):
+            compile_plan(
+                candidate.canonical_bytes(),
+                expected_plan_digest=candidate.digest(),
+                standard_bytes=STANDARD,
+                source_inventory_bytes=SOURCE_INVENTORY,
+                requirements_bytes=REQUIREMENTS,
+            )
+
+        with self.assertRaisesRegex(ContractViolation, "pinned requirements bytes"):
+            compile_plan(
+                plan.canonical_bytes(),
+                expected_plan_digest=plan.digest(),
+                standard_bytes=STANDARD,
+                source_inventory_bytes=SOURCE_INVENTORY,
+            )
 
     def test_missing_role_output_unknown_route_cycle_and_lost_claim_reject(self) -> None:
         base = load_plan().to_document()
@@ -239,6 +390,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 expected_plan_digest=candidate.digest(),
                 standard_bytes=STANDARD,
                 source_inventory_bytes=SOURCE_INVENTORY,
+                requirements_bytes=REQUIREMENTS,
             )
 
         bogus_source = json.loads(json.dumps(base))
@@ -252,6 +404,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 expected_plan_digest=candidate.digest(),
                 standard_bytes=STANDARD,
                 source_inventory_bytes=SOURCE_INVENTORY,
+                requirements_bytes=REQUIREMENTS,
             )
 
         with self.assertRaisesRegex(ContractViolation, "source-inventory bytes"):
@@ -259,6 +412,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 load_plan().canonical_bytes(),
                 expected_plan_digest=load_plan().digest(),
                 standard_bytes=STANDARD,
+                requirements_bytes=REQUIREMENTS,
             )
 
         substituted_sources = json.loads(SOURCE_INVENTORY)
@@ -271,6 +425,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 source_inventory_bytes=(
                     json.dumps(substituted_sources, sort_keys=True).encode("utf-8")
                 ),
+                requirements_bytes=REQUIREMENTS,
             )
 
     def test_altered_standard_and_unauthorized_effect_reject(self) -> None:
@@ -281,6 +436,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 expected_plan_digest=plan.digest(),
                 standard_bytes=STANDARD + b"altered",
                 source_inventory_bytes=SOURCE_INVENTORY,
+                requirements_bytes=REQUIREMENTS,
             )
         unauthorized = replace(
             plan,
@@ -295,6 +451,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 expected_plan_digest=unauthorized.digest(),
                 standard_bytes=STANDARD,
                 source_inventory_bytes=SOURCE_INVENTORY,
+                requirements_bytes=REQUIREMENTS,
             )
 
     def test_generation_and_dispatcher_are_permanent_inert_artifacts(self) -> None:
@@ -345,7 +502,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
         paths = tuple(
             OUTPUT / name
             for name in (
-                "whole-os-node-contracts-v1.json",
+                "whole-os-node-contracts-v2.json",
                 "whole-os-plan-v2.json",
                 "generation-manifest.json",
                 "DISPATCHER.json",
@@ -356,6 +513,30 @@ class WholeOSPlanContractTests(unittest.TestCase):
             str(ROOT / "scripts/generate_whole_os_plan_artifacts.py")
         )
         source["main"]()
+        self.assertEqual(expected, {path: path.read_bytes() for path in paths})
+
+    def test_generator_admission_failure_precedes_every_artifact_write(self) -> None:
+        paths = tuple(
+            OUTPUT / name
+            for name in (
+                "whole-os-node-contracts-v2.json",
+                "whole-os-plan-v2.json",
+                "generation-manifest.json",
+                "DISPATCHER.json",
+            )
+        )
+        expected = {path: path.read_bytes() for path in paths}
+        source = runpy.run_path(
+            str(ROOT / "scripts/generate_whole_os_plan_artifacts.py")
+        )
+
+        class RefusingFactory:
+            def build(self, *args: object, **kwargs: object) -> None:
+                raise ContractViolation("fixture admission refusal")
+
+        source["main"].__globals__["WholeOSPlanFactory"] = RefusingFactory
+        with self.assertRaisesRegex(ContractViolation, "admission refusal"):
+            source["main"]()
         self.assertEqual(expected, {path: path.read_bytes() for path in paths})
 
 

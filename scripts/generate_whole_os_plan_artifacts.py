@@ -128,6 +128,7 @@ WRITE_PATHS = {
         "docs/architecture/ADR_INDEX.md",
         "docs/plan/whole-os-implementation/PLAN.md",
         "docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json",
+        "docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json",
         "docs/plan/whole-os-implementation/whole-os-plan-v2.json",
         "docs/plan/whole-os-implementation/generation-manifest.json",
         "docs/plan/whole-os-implementation/DISPATCHER.json",
@@ -437,13 +438,22 @@ def _node_contracts() -> dict[str, object]:
                 "completion_rule": node["completion_rule"],
             }
         )
+    requirements_path = HANDOFF / "requirements.json"
+    requirement_document = json.loads(requirements_path.read_text(encoding="utf-8"))
     return {
-        "schema": "whole-os-node-contracts/v1",
+        "schema": "whole-os-node-contracts/v2",
         "source_inventory": {
             "inventory_id": "WOS-N00-20260914-01",
             "sha256": raw_sha256(
                 (OUTPUT / "source-inventory.json").read_bytes()
             ),
+        },
+        "requirement_inventory": {
+            "path": "docs/plan/whole-os-tournament-2026-09-13/requirements.json",
+            "sha256": raw_sha256(requirements_path.read_bytes()),
+            "requirement_ids": [
+                item["id"] for item in requirement_document["requirements"]
+            ],
         },
         "nodes": nodes,
     }
@@ -456,8 +466,7 @@ def main() -> None:
     contract_bytes = (
         json.dumps(contracts, indent=2, ensure_ascii=False) + "\n"
     ).encode("utf-8")
-    contract_path = OUTPUT / "whole-os-node-contracts-v1.json"
-    contract_path.write_bytes(contract_bytes)
+    contract_path = OUTPUT / "whole-os-node-contracts-v2.json"
 
     repository_id = raw_sha256(b"https://github.com/kb4beast/hive-mind-os.git")
     subject = SubjectBinding.for_repository(
@@ -494,6 +503,12 @@ def main() -> None:
         "2099-01-01T00:00:00Z",
         False,
     )
+    source_inventory = PinnedArtifact.pin(
+        "n00-source-inventory", (OUTPUT / "source-inventory.json").read_bytes()
+    )
+    requirements = PinnedArtifact.pin(
+        "n00-requirements", (HANDOFF / "requirements.json").read_bytes()
+    )
     evidence = (
         EvidenceReference(
             "whole-os-handoff",
@@ -509,6 +524,13 @@ def main() -> None:
             ("N00-ACCEPTED",),
             "2026-09-14T02:49:00Z",
         ),
+        EvidenceReference(
+            "accepted-n00-requirements",
+            requirements.digest,
+            "docs/plan/whole-os-tournament-2026-09-13/requirements.json",
+            tuple(f"R{index:02d}" for index in range(1, 19)),
+            "2026-09-14T02:49:00Z",
+        ),
     )
     standard = PinnedArtifact.pin(
         "dag-standard-v2", (ROOT / "docs/execution/DAG_AUTHORING_STANDARD_V2.md").read_bytes()
@@ -520,6 +542,8 @@ def main() -> None:
         authority=authority,
         evidence=evidence,
         node_contracts=contracts,
+        source_inventory=source_inventory,
+        requirements=requirements,
     )
     receipt = compile_plan(
         plan.canonical_bytes(),
@@ -528,11 +552,11 @@ def main() -> None:
         expected_request_id=request.request_id,
         expected_subject_id=request.subject_id,
         source_inventory_bytes=(OUTPUT / "source-inventory.json").read_bytes(),
+        requirements_bytes=requirements.content,
     )
     if receipt.metrics.node_count != 34:
         raise ValueError("compiled successor does not contain all 34 nodes")
     plan_path = OUTPUT / "whole-os-plan-v2.json"
-    plan_path.write_bytes(plan.canonical_bytes())
 
     compiler_bytes = b"\n".join(
         (ROOT / path).read_bytes()
@@ -552,6 +576,7 @@ def main() -> None:
             ("implementation-prompt", "docs/plan/whole-os-tournament-2026-09-13-IMPLEMENTATION_PROMPT.md"),
             ("handoff-manifest", "docs/plan/whole-os-tournament-2026-09-13/MANIFEST.json"),
             ("n00-inventory", "docs/plan/whole-os-implementation/source-inventory.json"),
+            ("n00-requirements", "docs/plan/whole-os-tournament-2026-09-13/requirements.json"),
             ("node-prompt", "docs/plan/whole-os-implementation/NODE_PROMPT.md"),
         )
     )
@@ -561,33 +586,38 @@ def main() -> None:
         authority=authority,
         evidence=evidence,
         node_contracts=contracts,
+        source_inventory=source_inventory,
+        requirements=requirements,
         node_mappings=PinnedArtifact.pin("whole-os-node-contracts", contract_bytes),
         sources=source_artifacts,
         compiler=PinnedArtifact.pin("whole-os-compiler", compiler_bytes),
     )
     manifest_path = OUTPUT / "generation-manifest.json"
-    manifest_path.write_bytes(generated.activation_material.external_manifest_bytes)
 
     prompt_path = OUTPUT / "NODE_PROMPT.md"
     renderer_path = ROOT / "src/hive_mind_os/node_prompt_renderer.py"
     source_inventory_path = OUTPUT / "source-inventory.json"
     dispatcher = {
-        "schema": "whole-os-dispatcher-entry/v2",
+        "schema": "whole-os-dispatcher-entry/v3",
         "status": "INACTIVE",
         "authority_granted": False,
         "host_attestation_required": True,
         "plan_path": "docs/plan/whole-os-implementation/whole-os-plan-v2.json",
-        "plan_digest": raw_sha256(plan_path.read_bytes()),
+        "plan_digest": raw_sha256(plan.canonical_bytes()),
         "generation_manifest_path": "docs/plan/whole-os-implementation/generation-manifest.json",
-        "generation_manifest_digest": raw_sha256(manifest_path.read_bytes()),
-        "node_contracts_path": "docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json",
-        "node_contracts_digest": raw_sha256(contract_path.read_bytes()),
+        "generation_manifest_digest": raw_sha256(
+            generated.activation_material.external_manifest_bytes
+        ),
+        "node_contracts_path": "docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json",
+        "node_contracts_digest": raw_sha256(contract_bytes),
         "node_prompt_path": "docs/plan/whole-os-implementation/NODE_PROMPT.md",
         "node_prompt_digest": raw_sha256(prompt_path.read_bytes()),
         "node_prompt_renderer_path": "src/hive_mind_os/node_prompt_renderer.py",
         "node_prompt_renderer_digest": raw_sha256(renderer_path.read_bytes()),
         "source_inventory_path": "docs/plan/whole-os-implementation/source-inventory.json",
         "source_inventory_digest": raw_sha256(source_inventory_path.read_bytes()),
+        "requirements_path": "docs/plan/whole-os-tournament-2026-09-13/requirements.json",
+        "requirements_digest": requirements.digest,
         "dispatch_policy": {
             "dependency_ready_only": True,
             "semantic_and_write_locks_required": True,
@@ -596,9 +626,15 @@ def main() -> None:
             "structured_renderer_required": True,
         },
     }
-    (OUTPUT / "DISPATCHER.json").write_text(
-        json.dumps(dispatcher, indent=2) + "\n", encoding="utf-8", newline="\n"
-    )
+    dispatcher_bytes = (json.dumps(dispatcher, indent=2) + "\n").encode("utf-8")
+
+    # Validation and sealing above are intentionally side-effect free.  Only
+    # after both factory admission and compiler checks succeed do generated
+    # repository artifacts change.
+    contract_path.write_bytes(contract_bytes)
+    plan_path.write_bytes(plan.canonical_bytes())
+    manifest_path.write_bytes(generated.activation_material.external_manifest_bytes)
+    (OUTPUT / "DISPATCHER.json").write_bytes(dispatcher_bytes)
 
 
 if __name__ == "__main__":
