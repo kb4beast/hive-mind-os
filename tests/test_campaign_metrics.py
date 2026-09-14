@@ -2,6 +2,9 @@ import math,unittest
 from pathlib import Path
 from hive_mind_os.campaign_metrics import *
 D="sha256:"+"a"*64
+class _FixtureVerifier:
+ def __init__(self,key):self.key=key
+ def verify(self,envelope,payload):return envelope.verify_fixture_hmac(self.key)
 class T(unittest.TestCase):
  def test_json_closed_and_deep_frozen(self):
   with self.assertRaises(CampaignMetricsError):load_match_protocol(Path("docs/benchmarks/whole-os-match-protocol.json"))
@@ -47,7 +50,7 @@ class T(unittest.TestCase):
   hybrids={f"MH{i}":recipe(i+6,"whole-campaign") for i in range(1,5)}
   manifest={"selection_seed":1,"bootstrap_seed":2,"retry_rule":"invalidated-only","holdout_manifest_digest":D,"task_manifest_status":"CLOSED","family_split_status":"CLOSED","custody_status":"ATTESTED","holdout_signature_status":"SIGNED"}
   p=MatchProtocol("fixture","1","fixture",entrants,{},"seal",tuple(f"t{i}" for i in range(12)),("development-screening","harder-hybrid-development","promotion_holdout"),"pair","decide",hybrids,manifest,3,"lease",24,("one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted"))
-  evidence=StageEvidence("original",D,D,D,D,env,REQUIRED_STRATA,12,1,1);admission=admit_protocol(p,evidence,lease=LeaseRecord(D,p.protocol_id,99,"host"),fixture_hmac_key=key,builder_ids=("builder",))
+  evidence=StageEvidence("original",D,D,D,D,env,REQUIRED_STRATA,12,1,1);admission=admit_protocol(p,evidence,lease=LeaseRecord(D,p.protocol_id,99,"host"),verifier=_FixtureVerifier(key),builder_ids=("builder",))
   state=BracketState(p.protocol_digest,"original","builder-component");pairs=state.schedule(p,admission=admission);self.assertTrue(pairs)
   issued=IssuedReceipt("original",1,pairs[0].left,pairs[0].right,D,"t0",1,"eval",D)
   next_state=state.apply(p,pairs,{frozenset((pairs[0].left,pairs[0].right)):"LEFT"},receipt=issued,admission=admission);self.assertEqual(next_state.losses[pairs[0].right],1)

@@ -7,12 +7,14 @@ from pathlib import Path
 from random import Random
 from statistics import mean
 from types import MappingProxyType
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping, Sequence, Protocol
 import hmac
 
 BOOTSTRAP_RESAMPLES=10_000; CONFIDENCE=.95; NONINFERIORITY_MARGIN=-.05; SCREENING_FAMILIES=12; FINAL_FAMILIES=30
 RECIPE_FIELDS=("source_or_binary_digest","prompt_digest","model_digest","command_profile_digest","tool_digest","context_digest","check_policy_digest","learning_policy_digest")
 class CampaignMetricsError(ValueError): pass
+class EvidenceVerifier(Protocol):
+ def verify(self,envelope:"SignedCustodyEnvelope",payload:object)->bool: ...
 REQUIRED_STRATA=("small-bug","feature","absent-tests","multi-file","cross-language","self-runtime","ambiguous-backlog","provider-failure","restart","tenant-isolation","draft-export","endpoint-learning","roblox-runtime")
 
 @dataclass(frozen=True,slots=True)
@@ -62,11 +64,12 @@ class AdmittedProtocol:
  def __setattr__(self,name,value):
   if hasattr(self,name):raise CampaignMetricsError("admission receipt is immutable")
   object.__setattr__(self,name,value)
-def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,lease:LeaseRecord|None=None,fixture_hmac_key:bytes|None=None,builder_ids:Sequence[str]=())->AdmittedProtocol:
+def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,lease:LeaseRecord|None=None,verifier:EvidenceVerifier|None=None,builder_ids:Sequence[str]=())->AdmittedProtocol:
  """Only execution-facing gateway; OPEN/deferred or unverified evidence cannot pass."""
  if not isinstance(protocol,MatchProtocol):raise CampaignMetricsError("inspection is not executable")
  if lease is None or not lease.active or lease.lease_digest!=stage_evidence.lease_digest or lease.scope!=protocol.protocol_id:raise CampaignMetricsError("missing or mismatched issued lease")
- if not stage_evidence.evaluator.verify_fixture_hmac(fixture_hmac_key or b""):raise CampaignMetricsError("unauthenticated evaluator signature")
+ payload={"protocol_digest":protocol.protocol_digest,"stage":stage_evidence.stage,"block_digest":stage_evidence.block_digest,"task_manifest_digest":stage_evidence.task_manifest_digest,"family_manifest_digest":stage_evidence.family_manifest_digest,"lease_digest":stage_evidence.lease_digest,"seed":stage_evidence.seed,"families":stage_evidence.families,"repetitions":stage_evidence.repetitions}
+ if verifier is None or not verifier.verify(stage_evidence.evaluator,payload):raise CampaignMetricsError("unauthenticated evaluator signature")
  if stage_evidence.evaluator.signer_id in set(builder_ids):raise CampaignMetricsError("evaluator is not independent")
  manifest=protocol.experiment_manifest
  for key in ("selection_seed","bootstrap_seed","retry_rule"):
