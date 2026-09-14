@@ -1,0 +1,8 @@
+{
+  "source": "host_task_listing",
+  "observed_at": "2026-09-14T15:01:00Z",
+  "host_surface": "chatgpt_plugin",
+  "existing_task_id": "task-fixture-lifecycle",
+  "task_title": "Coupon Hive — household watch",
+  "observed_current_state": "active"
+}

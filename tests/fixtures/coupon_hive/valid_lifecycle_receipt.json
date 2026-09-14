@@ -1,0 +1,10 @@
+{
+  "source": "host_lifecycle_receipt",
+  "received_at": "2026-09-14T15:01:01Z",
+  "status": "succeeded",
+  "host_surface": "chatgpt_plugin",
+  "task_id": "task-fixture-lifecycle",
+  "task_title": "Coupon Hive — household watch",
+  "action": "pause",
+  "final_state": "paused"
+}

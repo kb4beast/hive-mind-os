@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "skill_version": "0.1.0",
+  "confirmation": {
+    "confirmed_by_user": true,
+    "confirmed_at": "2026-09-14T15:00:00Z",
+    "lifecycle_card_summary": "Pause existing task task-fixture-lifecycle titled Coupon Hive — household watch; expected state changes from active to paused.",
+    "approved_mutation_digest": "sha256:5cf6d4f0f7cc9de687ca4533186861bbdfbca27f9c11c0e3a71020aa71d1038a"
+  },
+  "mutation": {
+    "host_surface": "chatgpt_plugin",
+    "existing_task_id": "task-fixture-lifecycle",
+    "task_title": "Coupon Hive — household watch",
+    "action": "pause",
+    "expected_current_state": "active",
+    "expected_final_state": "paused"
+  },
+  "status": "confirmed"
+}
