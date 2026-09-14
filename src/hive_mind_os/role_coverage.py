@@ -11,6 +11,7 @@ class RoleCoveragePlan:
     mission_id:str; cohort_id:str; graph_digest:str; policy_digest:str; rows:tuple[RoleRow,...]
     def __post_init__(self):
         if {r.role for r in self.rows} != set(ROLES): raise ValueError("coverage requires exactly eight specialist roles")
+        if any(not r.identity.strip() for r in self.rows) or len({r.identity for r in self.rows}) != 8: raise ValueError("role identities must be present and distinct")
     @property
     def digest(self): return canonical_digest(self)
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,7 @@ def build_coverage(plan:RoleCoveragePlan, results:dict[str,tuple[str,str]])->Rol
     rows=[]; missing=[]
     for role in ROLES:
         result=results.get(role)
-        if not result or not all(isinstance(x,str) and x.strip() for x in result): missing.append(role); continue
+        row=next(r for r in plan.rows if r.role==role)
+        if not result or not all(isinstance(x,str) and x.strip() for x in result) or (row.packages and not row.evidence): missing.append(role); continue
         rows.append((role,result[0],result[1]))
     return RoleCoverageReceipt(plan.digest,tuple(rows),not missing,tuple(missing))
