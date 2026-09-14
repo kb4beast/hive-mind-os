@@ -88,7 +88,7 @@ class CandidateQualifier:
                     tuple(checks),
                     ("check-failed",),
                 )
-            if not isinstance(count, int) or count < 0:
+            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
                 return QualificationReceipt(
                     canonical_digest(request),
                     QualificationDisposition.QUARANTINED,

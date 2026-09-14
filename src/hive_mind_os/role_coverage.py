@@ -37,7 +37,7 @@ class RoleCoveragePlan:
     rows: tuple[RoleRow, ...]
 
     def __post_init__(self):
-        if {r.role for r in self.rows} != set(ROLES):
+        if len(self.rows) != len(ROLES) or {r.role for r in self.rows} != set(ROLES):
             raise ValueError("coverage requires exactly eight specialist roles")
         if (
             any(not r.identity.strip() for r in self.rows)

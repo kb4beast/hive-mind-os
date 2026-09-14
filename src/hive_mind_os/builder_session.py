@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
 from pathlib import PurePosixPath
+from time import monotonic
 from typing import Callable, Iterable
 
 
@@ -51,7 +52,9 @@ class BuilderSessionResult:
 
 
 class BuilderSession:
-    def __init__(self, spec: BuilderSessionSpec):
+    def __init__(
+        self, spec: BuilderSessionSpec, *, clock: Callable[[], float] | None = None
+    ):
         if (
             not spec.package_id
             or not spec.attempt_id
@@ -61,6 +64,7 @@ class BuilderSession:
         ):
             raise ValueError("invalid bounded builder session")
         self.spec = spec
+        self.clock = clock or monotonic
         self.state = BuilderState.READY
         self.tool_count = 0
         self.repair_count = 0
@@ -104,6 +108,7 @@ class BuilderSession:
     def run(
         self, action: Callable[["BuilderSession"], BuilderSessionResult] | None = None
     ) -> BuilderSessionResult:
+        started_at = self.clock()
         self.state = BuilderState.WORKING
         if action:
             result = action(self)
@@ -118,5 +123,14 @@ class BuilderSession:
                 BuilderDisposition.NO_CHANGE, self.spec.starting_candidate, ()
             )
         self.validate_paths(result.changed_paths)
+        if self.clock() - started_at > self.spec.max_seconds:
+            result = BuilderSessionResult(
+                BuilderDisposition.BUDGET_EXHAUSTED,
+                None,
+                (),
+                result.checks,
+                (*result.failures, "builder wall-time budget exhausted"),
+                result.evidence_refs,
+            )
         self.state = BuilderState.TERMINAL
         return result
