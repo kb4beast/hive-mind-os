@@ -1,6 +1,6 @@
 # Whole-OS successor implementation plan — N01 Advocate candidate
 
-Status: **inactive N01 implementation candidate; Cross-Examiner and preliminary Expert r1/r2 ADAPT findings repaired; formal Witness and Judge artifacts pending**
+Status: **inactive N01 implementation candidate; Cross-Examiner, Expert r1/r2, and Judge ADAPT findings repaired; final independent disposition pending**
 
 Base commit: `7dff0a807936b5be33099bdaa5c242674c624776`  
 Base tree: `682619e74077e9d0bbc4486dd7e219a8d282d347`  
@@ -53,10 +53,15 @@ These are N01 Advocate recommendations, not independent judgments.
 
 ## Compiled artifacts and compatibility
 
-- `whole-os-node-contracts-v1.json` is retained as the historical pre-namespace contract. `whole-os-node-contracts-v2.json` is current and contains all N00–N33 objectives/dependencies plus exact contract-section digests, accepted source/requirement namespace bindings, routes, acceptance/output contracts, semantic locks, normalized POSIX write paths, review obligations, publication stages, completion, and rollback. Neither contains a `planning_group` field.
-- `whole-os-plan-v2.json` is canonical portable-plan schema v2. Digest: `sha256:4e94938d1762336ba34f064e58550d92ff3a2d6147486cb9fa851d2c53f40980`.
-- `generation-manifest.json` is the existing closed external-generation format. Generation: `sha256:50bdd4cbc2712892713d3ef5dffccb792f0605db77ed40ca434ba594a8ee9a0c`. It requires a distinct host signature and contains none.
-- `DISPATCHER.json` is the permanent inactive dispatcher entry. It binds the exact plan, generation, node-contract, and node-prompt bytes and says `planning_group_is_lock=false`.
+Canonical successor node contracts: `docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json`
+
+Historical non-admitting compatibility evidence: `docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json`
+
+The v2 artifact contains all N00–N33 objectives/dependencies plus exact contract-section digests, accepted source/requirement namespace bindings, routes, acceptance/output contracts, semantic locks, normalized POSIX write paths, review obligations, publication stages, completion, and rollback. The historical v1 artifact is retained only to demonstrate compatibility and must never be admitted or dispatched. Neither artifact contains a `planning_group` field.
+
+- `whole-os-plan-v2.json` is canonical portable-plan schema v2. Digest: `sha256:a441e4906a01de776af54f0538824d18363c7403b615df67392a51df34b96005`.
+- `generation-manifest.json` is the existing closed external-generation format. Generation: `sha256:fcdef7271f6f0076b305c2989b4e27179b8518888ad22ba18d40bb3fed0b69d3`. It requires a distinct host signature and contains none.
+- `DISPATCHER.json` is the permanent inactive dispatcher entry. It binds the exact plan, generation, current canonical v2 node-contract, and node-prompt bytes; explicitly marks v1 historical with `admission_allowed=false`; and says `planning_group_is_lock=false`.
 - `NODE_PROMPT.md` is the permanent worker-boundary specification derived from RUNBOOK section 8. It is never interpolated. `node_prompt_renderer.py` accepts only a closed canonical request, copies exact sealed node values, structurally separates fixed instructions from data, and returns a digest for the node-admission record.
 - `scripts/generate_whole_os_plan_artifacts.py` deterministically reconstructs the artifacts and performs an inert compilation. Before importing compiler modules it places this checkout's `src` first and fails closed unless every compiler module resolves within that directory. It has no activation/signing/publication path.
 
@@ -73,6 +78,8 @@ The N01 Architect also acted as Advocate/Builder and therefore does not approve 
 Preliminary Expert review of repair `1f7557f2c91fbaadba67387275390e33dfa9d262` returned ADAPT on three technical points without issuing the requested final testimony: the schema-v2 compilation receipt named the v1 compiler, source IDs lacked runtime namespace closure, and control/Unicode path characters were admitted. This successor repair derives receipt identity from the authenticated standard binding, requires exact accepted-N00 inventory bytes for v2 compilation, closes every work-package source ID against that inventory, pins the Whole-OS factory to the accepted inventory ID/digest, and rejects non-ASCII/control path characters at the shared portable-path boundary. Existing external-defer claims remain unchanged.
 
 Preliminary Expert r2 review of repair `97cdaf3d998ef1517592f4ceff13f14b07fe7d6d` remained ADAPT because factory sealing preceded source-ID closure and requirement closure was self-referential. This successor repair validates exact accepted source-inventory and requirements bytes before constructing or sealing a plan, pins the v2 compiler descriptor to the exact R01–R18 IDs and requirements digest, requires both byte artifacts at compilation, and delays every generated repository write until factory admission, compilation, and generation succeed. A colluding R01-to-R99 substitution and `GOV-NONEXISTENT` source now fail before the sealer is called. No external-defer claim is changed.
+
+Independent Judge review of repair `7d89d27be127aef7320b9b2510c8525df8d9eda2` returned ADAPT because the dispatcher and PLAN selected v2 while the permanent node template still called v1 canonical. This successor repair makes v2 the one canonical admitting successor contract across dispatcher, PLAN, template, and generator; preserves v1 only as explicitly historical, non-admitting compatibility evidence; and adds an executable divergence check. No external-defer claim is changed, and this Advocate/Builder does not issue the final disposition.
 
 Until those exact-candidate artifacts exist, N01 is an implementation candidate awaiting independent disposition and must not be represented as accepted, activated, signed, published, or complete under the repository's full-autonomy definition.
 

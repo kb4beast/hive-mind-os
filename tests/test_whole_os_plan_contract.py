@@ -498,6 +498,68 @@ class WholeOSPlanContractTests(unittest.TestCase):
             )
         self.assertTrue(dispatcher["dispatch_policy"]["structured_renderer_required"])
 
+    def test_canonical_contract_path_is_closed_across_permanent_artifacts(
+        self,
+    ) -> None:
+        source = runpy.run_path(
+            str(ROOT / "scripts/generate_whole_os_plan_artifacts.py")
+        )
+        current = source["CURRENT_NODE_CONTRACTS_PATH"]
+        historical = source["HISTORICAL_NODE_CONTRACTS_PATH"]
+        current_declaration = source["CURRENT_CONTRACT_DECLARATION"]
+        historical_declaration = source["HISTORICAL_CONTRACT_DECLARATION"]
+        contracts = json.loads((ROOT / current).read_text(encoding="utf-8"))
+        prompt_text = (OUTPUT / "NODE_PROMPT.md").read_text(encoding="utf-8")
+        plan_text = (OUTPUT / "PLAN.md").read_text(encoding="utf-8")
+        dispatcher = json.loads(
+            (OUTPUT / "DISPATCHER.json").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(
+            "docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json",
+            current,
+        )
+        self.assertEqual("whole-os-node-contracts/v2", contracts["schema"])
+        self.assertEqual(current, dispatcher["node_contracts_path"])
+        self.assertEqual(historical, dispatcher["historical_node_contracts"]["path"])
+        self.assertFalse(
+            dispatcher["historical_node_contracts"]["admission_allowed"]
+        )
+        for content in (prompt_text, plan_text):
+            self.assertEqual(1, content.count(current_declaration))
+            self.assertEqual(1, content.count(historical_declaration))
+
+        validate = source["_validate_contract_selection"]
+        validate(
+            contracts,
+            template_text=prompt_text,
+            plan_text=plan_text,
+            dispatcher=dispatcher,
+        )
+        with self.assertRaisesRegex(ValueError, "current canonical contract"):
+            validate(
+                contracts,
+                template_text=prompt_text.replace(current, historical, 1),
+                plan_text=plan_text,
+                dispatcher=dispatcher,
+            )
+        with self.assertRaisesRegex(ValueError, "current canonical contract"):
+            validate(
+                contracts,
+                template_text=prompt_text,
+                plan_text=plan_text.replace(current, historical, 1),
+                dispatcher=dispatcher,
+            )
+        divergent_dispatcher = json.loads(json.dumps(dispatcher))
+        divergent_dispatcher["node_contracts_path"] = historical
+        with self.assertRaisesRegex(ValueError, "canonical v2 contract"):
+            validate(
+                contracts,
+                template_text=prompt_text,
+                plan_text=plan_text,
+                dispatcher=divergent_dispatcher,
+            )
+
     def test_regeneration_is_byte_deterministic(self) -> None:
         paths = tuple(
             OUTPUT / name

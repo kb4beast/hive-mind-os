@@ -56,6 +56,19 @@ OUTPUT = ROOT / "docs/plan/whole-os-implementation"
 BASE_COMMIT = "7dff0a807936b5be33099bdaa5c242674c624776"
 BASE_TREE = "682619e74077e9d0bbc4486dd7e219a8d282d347"
 TARGET = "codex/whole-os-tournament-implementation"
+CURRENT_NODE_CONTRACTS_PATH = (
+    "docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json"
+)
+HISTORICAL_NODE_CONTRACTS_PATH = (
+    "docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json"
+)
+CURRENT_CONTRACT_DECLARATION = (
+    f"Canonical successor node contracts: `{CURRENT_NODE_CONTRACTS_PATH}`"
+)
+HISTORICAL_CONTRACT_DECLARATION = (
+    "Historical non-admitting compatibility evidence: "
+    f"`{HISTORICAL_NODE_CONTRACTS_PATH}`"
+)
 
 
 LOCKS = {
@@ -127,8 +140,7 @@ WRITE_PATHS = {
         "docs/architecture/ADR-083-WHOLE-OS-RISK-BASED-QUALIFICATION.md",
         "docs/architecture/ADR_INDEX.md",
         "docs/plan/whole-os-implementation/PLAN.md",
-        "docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json",
-        "docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json",
+        CURRENT_NODE_CONTRACTS_PATH,
         "docs/plan/whole-os-implementation/whole-os-plan-v2.json",
         "docs/plan/whole-os-implementation/generation-manifest.json",
         "docs/plan/whole-os-implementation/DISPATCHER.json",
@@ -459,14 +471,56 @@ def _node_contracts() -> dict[str, object]:
     }
 
 
+def _validate_contract_selection(
+    contracts: dict[str, object],
+    *,
+    template_text: str,
+    plan_text: str,
+    dispatcher: dict[str, object] | None = None,
+) -> None:
+    """Fail closed when permanent artifacts disagree on the admitting contract."""
+
+    if contracts.get("schema") != "whole-os-node-contracts/v2":
+        raise ValueError("current canonical node contracts must use schema v2")
+    for name, content in (("NODE_PROMPT.md", template_text), ("PLAN.md", plan_text)):
+        if content.count(CURRENT_CONTRACT_DECLARATION) != 1:
+            raise ValueError(
+                f"{name} does not uniquely identify the current canonical contract"
+            )
+        if content.count(HISTORICAL_CONTRACT_DECLARATION) != 1:
+            raise ValueError(
+                f"{name} does not uniquely label v1 historical and non-admitting"
+            )
+    if dispatcher is not None:
+        if dispatcher.get("node_contracts_path") != CURRENT_NODE_CONTRACTS_PATH:
+            raise ValueError("dispatcher does not select the canonical v2 contract")
+        historical = dispatcher.get("historical_node_contracts")
+        if not isinstance(historical, dict) or historical != {
+            "path": HISTORICAL_NODE_CONTRACTS_PATH,
+            "digest": raw_sha256((ROOT / HISTORICAL_NODE_CONTRACTS_PATH).read_bytes()),
+            "admission_allowed": False,
+            "purpose": "historical-non-admitting-compatibility-evidence",
+        }:
+            raise ValueError(
+                "dispatcher does not isolate v1 as historical non-admitting evidence"
+            )
+
+
 def main() -> None:
     if len(LOCKS) != 34 or len(WRITE_PATHS) != 34:
         raise ValueError("lock/write-path mappings must cover N00 through N33")
     contracts = _node_contracts()
+    prompt_path = OUTPUT / "NODE_PROMPT.md"
+    plan_documentation_path = OUTPUT / "PLAN.md"
+    _validate_contract_selection(
+        contracts,
+        template_text=prompt_path.read_text(encoding="utf-8"),
+        plan_text=plan_documentation_path.read_text(encoding="utf-8"),
+    )
     contract_bytes = (
         json.dumps(contracts, indent=2, ensure_ascii=False) + "\n"
     ).encode("utf-8")
-    contract_path = OUTPUT / "whole-os-node-contracts-v2.json"
+    contract_path = ROOT / CURRENT_NODE_CONTRACTS_PATH
 
     repository_id = raw_sha256(b"https://github.com/kb4beast/hive-mind-os.git")
     subject = SubjectBinding.for_repository(
@@ -594,7 +648,6 @@ def main() -> None:
     )
     manifest_path = OUTPUT / "generation-manifest.json"
 
-    prompt_path = OUTPUT / "NODE_PROMPT.md"
     renderer_path = ROOT / "src/hive_mind_os/node_prompt_renderer.py"
     source_inventory_path = OUTPUT / "source-inventory.json"
     dispatcher = {
@@ -608,8 +661,14 @@ def main() -> None:
         "generation_manifest_digest": raw_sha256(
             generated.activation_material.external_manifest_bytes
         ),
-        "node_contracts_path": "docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json",
+        "node_contracts_path": CURRENT_NODE_CONTRACTS_PATH,
         "node_contracts_digest": raw_sha256(contract_bytes),
+        "historical_node_contracts": {
+            "path": HISTORICAL_NODE_CONTRACTS_PATH,
+            "digest": raw_sha256((ROOT / HISTORICAL_NODE_CONTRACTS_PATH).read_bytes()),
+            "admission_allowed": False,
+            "purpose": "historical-non-admitting-compatibility-evidence",
+        },
         "node_prompt_path": "docs/plan/whole-os-implementation/NODE_PROMPT.md",
         "node_prompt_digest": raw_sha256(prompt_path.read_bytes()),
         "node_prompt_renderer_path": "src/hive_mind_os/node_prompt_renderer.py",
@@ -626,6 +685,12 @@ def main() -> None:
             "structured_renderer_required": True,
         },
     }
+    _validate_contract_selection(
+        contracts,
+        template_text=prompt_path.read_text(encoding="utf-8"),
+        plan_text=plan_documentation_path.read_text(encoding="utf-8"),
+        dispatcher=dispatcher,
+    )
     dispatcher_bytes = (json.dumps(dispatcher, indent=2) + "\n").encode("utf-8")
 
     # Validation and sealing above are intentionally side-effect free.  Only

@@ -2,7 +2,10 @@
 
 Canonical dispatcher: `docs/plan/whole-os-implementation/DISPATCHER.json`  
 Canonical portable plan: `docs/plan/whole-os-implementation/whole-os-plan-v2.json`  
-Canonical node contracts: `docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json`
+Canonical successor node contracts: `docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json`
+Historical non-admitting compatibility evidence: `docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json`
+
+The historical v1 artifact must never be admitted, dispatched, or used to render a worker payload.
 
 This Markdown is explanatory and **must never be interpolated or executed as a worker prompt**. It grants no authority. The dispatcher supplies a canonical JSON `NodePromptRenderRequest` to `hive_mind_os.node_prompt_renderer.render_node_prompt`; the renderer copies the exact sealed node contract from the admitted portable plan and returns canonical JSON plus `payload_digest`. The node-admission record must bind that digest before a worker receives the payload.
 

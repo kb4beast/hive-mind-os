@@ -125,7 +125,7 @@ class NodePromptRendererTests(unittest.TestCase):
         artifact_paths = tuple(
             OUTPUT / name
             for name in (
-                "whole-os-node-contracts-v1.json",
+                "whole-os-node-contracts-v2.json",
                 "whole-os-plan-v2.json",
                 "generation-manifest.json",
                 "DISPATCHER.json",
