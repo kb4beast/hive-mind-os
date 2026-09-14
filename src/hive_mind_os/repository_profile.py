@@ -55,6 +55,11 @@ class HostProfileRegistry(Protocol):
     def verify_profile(self, *, registry_handle: str, profile_digest: str, tenant_id: str, repository_id: str, authority_digest: str, generation: int) -> bool: ...
     def authorize_capability(self, *, registry_handle: str, profile_digest: str, generation: int, capability: str, destination: str | None) -> bool: ...
 
+class HostDiscoveryProvider(Protocol):
+    """Externally composed receipt verifier; construction never discovers tools."""
+    provider_id: str
+    def verify_tool_receipt(self, *, adapter_id: str, version: str, executable_path: str, binary_digest: str, probe_receipt_digest: str) -> bool: ...
+
 
 def _raw_absolute(value: str, label: str) -> Path:
     if type(value) is not str or not value or value.startswith("\\\\") or not Path(value).is_absolute():
@@ -183,6 +188,19 @@ class HostToolBinding:
 
     def _receipt_payload(self) -> dict[str, Any]:
         return {"adapter_id": self.adapter_id, "version": self.version, "executable_path": self.executable_path, "binary_digest": self.binary_digest, "platform": self.platform, "probe_receipt_digest": self.probe_receipt_digest}
+
+    @classmethod
+    def admit_real(cls, provider: HostDiscoveryProvider, **values: Any) -> "HostToolBinding":
+        """Only an injected discovery provider can create a REAL binding."""
+        required = {"adapter_id", "version", "executable_path", "binary_digest", "platform", "fixed_argv", "placeholders", "safe_environment_names", "secret_handles", "timeout_seconds", "probe_receipt_digest"}
+        if set(values) != required or not callable(getattr(provider, "verify_tool_receipt", None)):
+            raise RepositoryProfileError("REAL tool requires a closed discovery provider request")
+        if not provider.verify_tool_receipt(adapter_id=values["adapter_id"], version=values["version"], executable_path=values["executable_path"], binary_digest=values["binary_digest"], probe_receipt_digest=values["probe_receipt_digest"]):
+            raise RepositoryProfileError("discovery provider did not verify tool receipt")
+        candidate = cls(**values, status=CapabilityStatus.UNTESTED)
+        object.__setattr__(candidate, "status", CapabilityStatus.REAL)
+        object.__setattr__(candidate, "host_receipt_witness", str(provider.provider_id))
+        return candidate
 
 
 @dataclass(frozen=True, slots=True)
