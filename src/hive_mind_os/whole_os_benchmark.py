@@ -242,6 +242,8 @@ class WholeOSTournament:
         temporary.replace(self.state_path)
 
     def _load(self) -> None:
+        if self.state_path is None:
+            raise TournamentError("cannot load tournament state without a state path")
         try:
             raw = json.loads(self.state_path.read_text(encoding="utf-8"))
             if raw.get("experiment_digest") != self.experiment.digest or not isinstance(
