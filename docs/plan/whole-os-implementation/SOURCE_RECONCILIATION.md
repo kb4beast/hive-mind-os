@@ -1,11 +1,11 @@
 # Whole-OS implementation source reconciliation
 
-Status: N00 candidate, awaiting the separately recorded Curator disposition.  
-Observed: 2026-09-14T02:24:40Z.  
-Implementation branch: `codex/whole-os-tournament-implementation`.  
-Handoff commit: `3dc87ad0749ee468ed7ceab779d92c9446248b7e`.  
-Handoff tree: `e319165996f0e8a29b758c58a026d5ebb651e561`.  
-Inspected implementation baseline: `d980a9cfe39f68b3de86ea0530234b3ab4e91390`.  
+Status: N00 candidate, awaiting the separately recorded Curator disposition.
+Observed: 2026-09-14T02:24:40Z.
+Implementation branch: `codex/whole-os-tournament-implementation`.
+Handoff commit: `3dc87ad0749ee468ed7ceab779d92c9446248b7e`.
+Handoff tree: `e319165996f0e8a29b758c58a026d5ebb651e561`.
+Inspected implementation baseline: `d980a9cfe39f68b3de86ea0530234b3ab4e91390`.
 Baseline tree: `47f873cf5924b97cfafafe1b9dfb0a450acb2e92`.
 
 ## Reconciliation verdict

@@ -1,7 +1,7 @@
 # Whole-OS node worker boundary v2
 
-Canonical dispatcher: `docs/plan/whole-os-implementation/DISPATCHER.json`  
-Canonical portable plan: `docs/plan/whole-os-implementation/whole-os-plan-v2.json`  
+Canonical dispatcher: `docs/plan/whole-os-implementation/DISPATCHER.json`
+Canonical portable plan: `docs/plan/whole-os-implementation/whole-os-plan-v2.json`
 Canonical successor node contracts: `docs/plan/whole-os-implementation/whole-os-node-contracts-v2.json`
 Historical non-admitting compatibility evidence: `docs/plan/whole-os-implementation/whole-os-node-contracts-v1.json`
 

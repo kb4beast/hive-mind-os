@@ -1,6 +1,6 @@
 # ADR-081: Tenant-bound learning and draft-only cross-repository lessons
 
-Date: 2026-09-14  
+Date: 2026-09-14
 Status: proposed by N01 Architect/Advocate; independent Cross-Examiner returned ADAPT; Witness and Judge pending
 
 ## Requirements and sources

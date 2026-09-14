@@ -1,8 +1,8 @@
 # N01 independent Cross-Examiner rereview
 
-Reviewed repair candidate: `1f7557f2c91fbaadba67387275390e33dfa9d262`  
-Reviewed tree: `1a624333951e2abd6a5a49b26a124e5f3e55a706`  
-Examiner: `/root/n02_metrics`, distinct from the N01 Architect/Builder  
+Reviewed repair candidate: `1f7557f2c91fbaadba67387275390e33dfa9d262`
+Reviewed tree: `1a624333951e2abd6a5a49b26a124e5f3e55a706`
+Examiner: `/root/n02_metrics`, distinct from the N01 Architect/Builder
 Worktree: `C:\h\wos-n01-exam-r2`
 
 This is an append-only rereview of CE-01 and CE-02 from

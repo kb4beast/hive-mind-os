@@ -1,7 +1,7 @@
 # N01 independent Cross-Examiner rereview R3
 
-Candidate: `7d89d27be127aef7320b9b2510c8525df8d9eda2`  
-Tree: `56d9a91b6b205b0a08ed4e3dbe544c2ef1011faa`  
+Candidate: `7d89d27be127aef7320b9b2510c8525df8d9eda2`
+Tree: `56d9a91b6b205b0a08ed4e3dbe544c2ef1011faa`
 Examiner: `/root/n02_metrics`; fresh worktree `C:\h\wos-n01-exam-r3`
 
 This append-only review follows the two prior Examiner reviews. It is not a Judge

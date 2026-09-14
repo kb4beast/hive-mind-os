@@ -2,8 +2,8 @@
 
 Status: **inactive N01 implementation candidate; Cross-Examiner, Expert r1/r2, and Judge ADAPT findings repaired; final independent disposition pending**
 
-Base commit: `7dff0a807936b5be33099bdaa5c242674c624776`  
-Base tree: `682619e74077e9d0bbc4486dd7e219a8d282d347`  
+Base commit: `7dff0a807936b5be33099bdaa5c242674c624776`
+Base tree: `682619e74077e9d0bbc4486dd7e219a8d282d347`
 Branch: `codex/whole-os-n01-plan`
 
 This record compiles the accepted N00 inventory into versioned portable contracts. It does not activate a host plan, sign an artifact, publish a branch/PR, merge, deploy, or establish a product/superiority claim.

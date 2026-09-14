@@ -1,6 +1,6 @@
 # ADR-080: One durable campaign composition with separate delivery authority
 
-Date: 2026-09-14  
+Date: 2026-09-14
 Status: proposed by N01 Architect/Advocate; independent Cross-Examiner returned ADAPT; Witness and Judge pending
 
 ## Requirements and sources

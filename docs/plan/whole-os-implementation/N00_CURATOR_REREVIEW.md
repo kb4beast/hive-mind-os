@@ -1,8 +1,8 @@
 # N00 independent Curator rereview
 
-Reviewed at: 2026-09-14T02:49:00Z  
-Curator identity: `/root/n00_curator`  
-Corrected inventory ID: `WOS-N00-20260914-01`  
+Reviewed at: 2026-09-14T02:49:00Z
+Curator identity: `/root/n00_curator`
+Corrected inventory ID: `WOS-N00-20260914-01`
 Verdict: **ACCEPT**
 
 This is an append-only rereview of the corrected N00 candidate. It supersedes the ADAPT disposition in `N00_CURATOR_REVIEW.md` only for the exact hashes sealed below. The earlier rejected candidate hash remains recorded there and was never sealed for downstream use.

@@ -1,7 +1,7 @@
 # N01 independent Cross-Examination
 
-Reviewed candidate: `eb506932e34ed631acb72b77872b72f7d2a0bfe9`  
-Examiner: `/root/n02_metrics`, acting only as N01 Cross-Examiner  
+Reviewed candidate: `eb506932e34ed631acb72b77872b72f7d2a0bfe9`
+Examiner: `/root/n02_metrics`, acting only as N01 Cross-Examiner
 Scope: independent worktree `C:\h\wos-n01-exam`; no builder artifact was edited.
 
 ## Method and reproduced evidence

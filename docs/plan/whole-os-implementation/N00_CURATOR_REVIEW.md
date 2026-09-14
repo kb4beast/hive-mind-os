@@ -1,8 +1,8 @@
 # N00 independent Curator review
 
-Reviewed at: 2026-09-14T02:36:04Z  
-Curator identity: `/root/n00_curator`  
-Candidate inventory: `WOS-N00-20260914-01`  
+Reviewed at: 2026-09-14T02:36:04Z
+Curator identity: `/root/n00_curator`
+Candidate inventory: `WOS-N00-20260914-01`
 Verdict: **ADAPT — do not seal N00 until the required corrections below are made and their hashes are revalidated.**
 
 ## Independence and scope
