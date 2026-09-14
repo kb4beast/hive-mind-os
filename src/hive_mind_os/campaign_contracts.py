@@ -70,7 +70,7 @@ class CandidateCompletion:
    if type(xs)is not tuple or not xs or any(type(x)is not tuple or len(x)!=2 or any(type(y)is not str for y in x) for x in xs) or len({x[0] for x in xs})!=len(xs):_fail(CampaignContractErrorCode.INVALID,n)
    for a,b in xs:_id(a,n);_dg(b,n)
   object.__setattr__(self,"output_receipts",tuple(tuple(x) for x in self.output_receipts));object.__setattr__(self,"acceptance_receipts",tuple(tuple(x) for x in self.acceptance_receipts))
- if self.disposition=="no-change" and (self.base_commit_sha!=self.commit_sha or self.base_tree_digest!=self.tree_digest):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"no-change equality")
+  if self.disposition=="no-change" and (self.base_commit_sha!=self.commit_sha or self.base_tree_digest!=self.tree_digest):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"no-change equality")
  @property
  def digest(self):return canonical_digest({"mission_id":self.mission_id,"package_id":self.package_id,"authority_digest":self.authority_digest,"package_revision":self.package_revision,"objective_digest":self.objective_digest,"base_commit_sha":self.base_commit_sha,"base_tree_digest":self.base_tree_digest,"commit_sha":self.commit_sha,"tree_digest":self.tree_digest,"output_receipts":self.output_receipts,"acceptance_receipts":self.acceptance_receipts,"disposition":self.disposition})
 @dataclass(frozen=True,slots=True)
