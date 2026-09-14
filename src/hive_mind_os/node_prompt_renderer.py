@@ -47,7 +47,9 @@ def _safe_receipt_path(value: str) -> str:
     if type(value) is not str or len(value) > MAXIMUM_RECEIPT_PATH_CHARS:
         raise ContractViolation("prerequisite receipt path exceeds its length bound")
     if any(ord(character) < 32 or ord(character) == 127 for character in value):
-        raise ContractViolation("prerequisite receipt path contains a control character")
+        raise ContractViolation(
+            "prerequisite receipt path contains a control character"
+        )
     normalized = portable_path(value)
     if normalized != value:
         raise ContractViolation("prerequisite receipt path is not normalized")
@@ -183,9 +185,7 @@ def render_node_prompt(
     if request.node_id not in nodes:
         raise ContractViolation("node-prompt request targets an unknown node")
     node = nodes[request.node_id]
-    receipt_node_ids = tuple(
-        item.node_id for item in request.prerequisite_receipts
-    )
+    receipt_node_ids = tuple(item.node_id for item in request.prerequisite_receipts)
     if receipt_node_ids != node.dependencies:
         raise ContractViolation(
             "node-prompt request must bind each direct prerequisite in plan order"

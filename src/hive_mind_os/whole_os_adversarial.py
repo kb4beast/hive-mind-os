@@ -1,4 +1,5 @@
 """Executable N29 failure and disclosure attack harness."""
+
 from __future__ import annotations
 
 import base64
@@ -6,16 +7,30 @@ from dataclasses import dataclass
 from typing import Mapping, Protocol, Sequence
 
 from .whole_os_qualification import (
-    AdversarialReport, EvidenceRef, FailureObservation, FailurePoint,
+    AdversarialReport,
+    EvidenceRef,
+    FailureObservation,
+    FailurePoint,
 )
 
-
 MANDATORY_BOUNDARIES = (
-    "tenant-collision", "mount-escape", "host-file-read", "denied-egress",
-    "secret-inheritance", "private-embedding", "provider-payload",
-    "artifact-extraction", "lesson-export", "pr-metadata", "logs-errors",
-    "endpoint-git-objects", "endpoint-source-mirrors", "draft-activation",
-    "stale-holdout", "same-actor-review", "hidden-failure-deletion",
+    "tenant-collision",
+    "mount-escape",
+    "host-file-read",
+    "denied-egress",
+    "secret-inheritance",
+    "private-embedding",
+    "provider-payload",
+    "artifact-extraction",
+    "lesson-export",
+    "pr-metadata",
+    "logs-errors",
+    "endpoint-git-objects",
+    "endpoint-source-mirrors",
+    "draft-activation",
+    "stale-holdout",
+    "same-actor-review",
+    "hidden-failure-deletion",
     "self-upgrade-rollback",
 )
 
@@ -23,7 +38,9 @@ MANDATORY_BOUNDARIES = (
 class AdversarialAdapter(Protocol):
     identity: str
 
-    def inject(self, effect_class: str, point: FailurePoint, candidate_digest: str) -> FailureObservation: ...
+    def inject(
+        self, effect_class: str, point: FailurePoint, candidate_digest: str
+    ) -> FailureObservation: ...
     def attack_boundary(self, boundary: str, candidate_digest: str) -> EvidenceRef: ...
 
 
@@ -55,7 +72,10 @@ class CanaryScanner:
             for path, body in artifacts.items():
                 if any(variant in body for variant in canary.variants()):
                     hit.append(path)
-            if any(variant in ordered or variant in compact for variant in canary.variants()):
+            if any(
+                variant in ordered or variant in compact
+                for variant in canary.variants()
+            ):
                 hit.append("<cross-artifact>")
             if hit:
                 findings[canary.canary_id] = tuple(sorted(set(hit)))
@@ -74,8 +94,12 @@ class AdversarialHarness:
         self.adapter = adapter
 
     def run(
-        self, *, candidate_digest: str, effect_classes: Sequence[str],
-        residual_risks: Sequence[str] = (), real_backend_evidence: Sequence[EvidenceRef] = (),
+        self,
+        *,
+        candidate_digest: str,
+        effect_classes: Sequence[str],
+        residual_risks: Sequence[str] = (),
+        real_backend_evidence: Sequence[EvidenceRef] = (),
     ) -> AdversarialReport:
         if not candidate_digest.startswith("sha256:") or len(candidate_digest) != 71:
             raise ValueError("candidate digest must be pinned")
@@ -83,17 +107,21 @@ class AdversarialHarness:
             raise ValueError("at least one durable effect class is required")
         observations = tuple(
             self.adapter.inject(effect, point, candidate_digest)
-            for effect in effect_classes for point in FailurePoint
+            for effect in effect_classes
+            for point in FailurePoint
         )
         boundary_evidence = tuple(
             self.adapter.attack_boundary(boundary, candidate_digest)
             for boundary in MANDATORY_BOUNDARIES
         )
-        if len(boundary_evidence) != len(MANDATORY_BOUNDARIES) or len({item.digest for item in boundary_evidence}) != len(MANDATORY_BOUNDARIES):
+        if len(boundary_evidence) != len(MANDATORY_BOUNDARIES) or len(
+            {item.digest for item in boundary_evidence}
+        ) != len(MANDATORY_BOUNDARIES):
             raise ValueError("boundary attacks require distinct evidence receipts")
         return AdversarialReport(
             candidate_digest=candidate_digest,
-            effect_classes=tuple(effect_classes), observations=observations,
+            effect_classes=tuple(effect_classes),
+            observations=observations,
             attempted_boundaries=MANDATORY_BOUNDARIES,
             residual_risks=tuple(residual_risks),
             real_backend_evidence=tuple(real_backend_evidence),

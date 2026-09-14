@@ -1,9 +1,8 @@
+import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
 
 from hive_mind_os.pilot_runtime import PilotController, PilotPlan, PilotStore
-
 
 D = "sha256:" + "a" * 64
 

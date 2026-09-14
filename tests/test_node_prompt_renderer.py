@@ -22,7 +22,6 @@ from hive_mind_os.runtime_contracts import (
     raw_sha256,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs/plan/whole-os-implementation"
 PLAN_PATH = OUTPUT / "whole-os-plan-v2.json"
@@ -51,7 +50,9 @@ def request_for(plan: PortablePlanBundle, node_id: str) -> NodePromptRenderReque
 
 
 class NodePromptRendererTests(unittest.TestCase):
-    def test_rendered_payload_separates_fixed_instructions_from_sealed_data(self) -> None:
+    def test_rendered_payload_separates_fixed_instructions_from_sealed_data(
+        self,
+    ) -> None:
         plan = load_plan()
         request = request_for(plan, "N03")
         rendered = render_node_prompt(plan, request.canonical_bytes())
@@ -80,7 +81,9 @@ class NodePromptRendererTests(unittest.TestCase):
         injected = replace(target, objective=marker)
         injected_plan = replace(
             plan,
-            nodes=tuple(injected if item.node_id == "N03" else item for item in plan.nodes),
+            nodes=tuple(
+                injected if item.node_id == "N03" else item for item in plan.nodes
+            ),
         )
         request = request_for(injected_plan, "N03")
         payload = json.loads(
@@ -91,7 +94,9 @@ class NodePromptRendererTests(unittest.TestCase):
         self.assertEqual(marker, payload["data"]["node_contract"]["objective"])
         self.assertNotIn(marker, payload["instruction_contract"])
 
-    def test_closed_request_rejects_injection_substitution_and_noncanonical_json(self) -> None:
+    def test_closed_request_rejects_injection_substitution_and_noncanonical_json(
+        self,
+    ) -> None:
         plan = load_plan()
         request = request_for(plan, "N03")
         document = request.to_document()

@@ -11,7 +11,6 @@ import re
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = (ROOT / "src").resolve(strict=True)
 source_root_text = str(SOURCE_ROOT)
@@ -45,11 +44,18 @@ for compiler_module in (
 ):
     _require_local_import(compiler_module)
 
-from hive_mind_os.dag_standard import compile_plan
-from hive_mind_os.plan_generation import PinnedArtifact, PlanGenerationRequest
-from hive_mind_os.portable_plan import RepositorySubject, SubjectBinding
-from hive_mind_os.runtime_contracts import AuthorityEnvelope, EvidenceReference, raw_sha256
-from hive_mind_os.tournament_plan_factory import WholeOSPlanFactory
+from hive_mind_os.dag_standard import compile_plan  # noqa: E402
+from hive_mind_os.plan_generation import (  # noqa: E402
+    PinnedArtifact,
+    PlanGenerationRequest,
+)
+from hive_mind_os.portable_plan import RepositorySubject, SubjectBinding  # noqa: E402
+from hive_mind_os.runtime_contracts import (  # noqa: E402
+    AuthorityEnvelope,
+    EvidenceReference,
+    raw_sha256,
+)
+from hive_mind_os.tournament_plan_factory import WholeOSPlanFactory  # noqa: E402
 
 HANDOFF = ROOT / "docs/plan/whole-os-tournament-2026-09-13"
 OUTPUT = ROOT / "docs/plan/whole-os-implementation"
@@ -385,7 +391,7 @@ def _sections(path: Path) -> dict[str, str]:
     result: dict[str, str] = {}
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        result[match.group(1)] = text[match.start():end].rstrip() + "\n"
+        result[match.group(1)] = text[match.start() : end].rstrip() + "\n"
     return result
 
 
@@ -456,9 +462,7 @@ def _node_contracts() -> dict[str, object]:
         "schema": "whole-os-node-contracts/v2",
         "source_inventory": {
             "inventory_id": "WOS-N00-20260914-01",
-            "sha256": raw_sha256(
-                (OUTPUT / "source-inventory.json").read_bytes()
-            ),
+            "sha256": raw_sha256((OUTPUT / "source-inventory.json").read_bytes()),
         },
         "requirement_inventory": {
             "path": "docs/plan/whole-os-tournament-2026-09-13/requirements.json",
@@ -531,7 +535,9 @@ def main() -> None:
     ).read_bytes()
     request = PlanGenerationRequest(
         raw_sha256(prompt_bytes),
-        raw_sha256(b"Implement the accepted N00 through N33 whole-OS successor campaign."),
+        raw_sha256(
+            b"Implement the accepted N00 through N33 whole-OS successor campaign."
+        ),
         subject.subject_id,
         "repository",
         repository_id,
@@ -587,7 +593,8 @@ def main() -> None:
         ),
     )
     standard = PinnedArtifact.pin(
-        "dag-standard-v2", (ROOT / "docs/execution/DAG_AUTHORING_STANDARD_V2.md").read_bytes()
+        "dag-standard-v2",
+        (ROOT / "docs/execution/DAG_AUTHORING_STANDARD_V2.md").read_bytes(),
     )
     factory = WholeOSPlanFactory()
     plan = factory.build(
@@ -627,10 +634,22 @@ def main() -> None:
     source_artifacts = tuple(
         PinnedArtifact.pin(name, (ROOT / path).read_bytes())
         for name, path in (
-            ("implementation-prompt", "docs/plan/whole-os-tournament-2026-09-13-IMPLEMENTATION_PROMPT.md"),
-            ("handoff-manifest", "docs/plan/whole-os-tournament-2026-09-13/MANIFEST.json"),
-            ("n00-inventory", "docs/plan/whole-os-implementation/source-inventory.json"),
-            ("n00-requirements", "docs/plan/whole-os-tournament-2026-09-13/requirements.json"),
+            (
+                "implementation-prompt",
+                "docs/plan/whole-os-tournament-2026-09-13-IMPLEMENTATION_PROMPT.md",
+            ),
+            (
+                "handoff-manifest",
+                "docs/plan/whole-os-tournament-2026-09-13/MANIFEST.json",
+            ),
+            (
+                "n00-inventory",
+                "docs/plan/whole-os-implementation/source-inventory.json",
+            ),
+            (
+                "n00-requirements",
+                "docs/plan/whole-os-tournament-2026-09-13/requirements.json",
+            ),
             ("node-prompt", "docs/plan/whole-os-implementation/NODE_PROMPT.md"),
         )
     )

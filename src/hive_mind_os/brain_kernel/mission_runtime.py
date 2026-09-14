@@ -148,7 +148,9 @@ class MissionRunReceipt:
             "consultation_digest": self.consultation_digest,
             "role_results": [asdict(item) for item in self.role_results],
             "effect_receipt_digests": list(self.effect_receipt_digests),
-            "evaluation_result_digests": dict(sorted(self.evaluation_result_digests.items())),
+            "evaluation_result_digests": dict(
+                sorted(self.evaluation_result_digests.items())
+            ),
             "bundle_refs": list(self.bundle_refs),
             "closeout": self.closeout.to_document(),
             "event_head_digest": self.event_head_digest,
@@ -173,17 +175,32 @@ class MissionRuntime:
         self.store = store
 
     def _append(
-        self, config: MissionConfig, event_type: str, payload: Mapping[str, Any], *,
-        event_id: str, actor_id: str, actor_role: str | None = None,
-        work_id: str | None = None, attempt_id: str | None = None,
+        self,
+        config: MissionConfig,
+        event_type: str,
+        payload: Mapping[str, Any],
+        *,
+        event_id: str,
+        actor_id: str,
+        actor_role: str | None = None,
+        work_id: str | None = None,
+        attempt_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> int:
         events = self.store.events()
         return self.store.append(
-            KernelEvent(event_id, config.mission_id, event_type, actor_id,
-                        config.occurred_at, dict(payload), work_id=work_id,
-                        attempt_id=attempt_id, actor_role=actor_role,
-                        previous_digest=events[-1]["digest"] if events else None),
+            KernelEvent(
+                event_id,
+                config.mission_id,
+                event_type,
+                actor_id,
+                config.occurred_at,
+                dict(payload),
+                work_id=work_id,
+                attempt_id=attempt_id,
+                actor_role=actor_role,
+                previous_digest=events[-1]["digest"] if events else None,
+            ),
             idempotency_key=idempotency_key,
         )
 
@@ -196,42 +213,99 @@ class MissionRuntime:
         return f"ATTEMPT-{config.mission_id.removeprefix('MISSION-')}-{role}"
 
     @staticmethod
-    def _context(config: MissionConfig, charter_digest: str, role: str, work_id: str,
-                 attempt_id: str) -> CompiledContext:
+    def _context(
+        config: MissionConfig,
+        charter_digest: str,
+        role: str,
+        work_id: str,
+        attempt_id: str,
+    ) -> CompiledContext:
         evaluator = role == "curator"
         request = ContextRequest(
-            config.mission_id, work_id, attempt_id, role, charter_digest, _Z, 0,
-            "canonical local mission", config.occurred_at, ("repository",), (),
+            config.mission_id,
+            work_id,
+            attempt_id,
+            role,
+            charter_digest,
+            _Z,
+            0,
+            "canonical local mission",
+            config.occurred_at,
+            ("repository",),
+            (),
             evaluator_mode=evaluator,
         )
         manifest = ContextManifest(
-            config.mission_id, work_id, attempt_id, role, charter_digest, _Z,
-            0, 0, (), (), (), (), {"budget": 0}, (), evaluator,
+            config.mission_id,
+            work_id,
+            attempt_id,
+            role,
+            charter_digest,
+            _Z,
+            0,
+            0,
+            (),
+            (),
+            (),
+            (),
+            {"budget": 0},
+            (),
+            evaluator,
             canonical_digest({"role": role, "attempt": attempt_id}),
         )
         return CompiledContext(request, manifest, (), ())
 
     def _validate_bindings(self, bindings: MissionBindings) -> None:
         if set(bindings.verification) != set(KERNEL_IMPLEMENTED_ROLES):
-            raise MissionRuntimeError("verification bindings must cover exactly every role")
+            raise MissionRuntimeError(
+                "verification bindings must cover exactly every role"
+            )
         request = bindings.consultation_request
-        if request.requesting_role != "builder" or not set(request.applicable_roles).issubset(_CONSULTING_ROLES):
-            raise MissionRuntimeError("consultation must be builder-requested and role-first")
+        if request.requesting_role != "builder" or not set(
+            request.applicable_roles
+        ).issubset(_CONSULTING_ROLES):
+            raise MissionRuntimeError(
+                "consultation must be builder-requested and role-first"
+            )
 
-    def run(self, config: MissionConfig, bindings: MissionBindings) -> MissionRunReceipt:
+    def run(
+        self, config: MissionConfig, bindings: MissionBindings
+    ) -> MissionRunReceipt:
         self._validate_bindings(bindings)
         charter = MissionCharter(
-            1, config.mission_id, config.occurred_at, config.objective,
-            (config.acceptance_spec,), config.repository_root, config.base_commit,
-            config.target_branch, _Z, _Z, _Z, config.charter_budget, (), ("main",), (),
+            1,
+            config.mission_id,
+            config.occurred_at,
+            config.objective,
+            (config.acceptance_spec,),
+            config.repository_root,
+            config.base_commit,
+            config.target_branch,
+            _Z,
+            _Z,
+            _Z,
+            config.charter_budget,
+            (),
+            ("main",),
+            (),
             MissionState.CREATED,
         )
-        self._append(config, "mission.created", {"charter": charter.to_document()},
-                     event_id=f"mission-created:{config.mission_id}",
-                     actor_id=f"{config.executor_prefix}:orchestrator", actor_role="orchestrator")
-        self._append(config, "mission.transition", {"status": MissionState.PLANNING.value},
-                     event_id=f"mission-planning:{config.mission_id}",
-                     actor_id=f"{config.executor_prefix}:orchestrator", actor_role="orchestrator")
+        self._append(
+            config,
+            "mission.created",
+            {"charter": charter.to_document()},
+            event_id=f"mission-created:{config.mission_id}",
+            actor_id=f"{config.executor_prefix}:orchestrator",
+            actor_role="orchestrator",
+        )
+        self._append(
+            config,
+            "mission.transition",
+            {"status": MissionState.PLANNING.value},
+            event_id=f"mission-planning:{config.mission_id}",
+            actor_id=f"{config.executor_prefix}:orchestrator",
+            actor_role="orchestrator",
+        )
 
         items: list[WorkItem] = []
         schedules: list[WorkSchedule] = []
@@ -239,30 +313,65 @@ class MissionRuntime:
         for role in KERNEL_IMPLEMENTED_ROLES:
             work_id = self._work_id(config, role)
             item = WorkItem(
-                work_id, config.mission_id, None, 0, f"{role} lifecycle work",
-                config.objective, role, "R1", () if previous is None else (previous,),
-                (), (), (config.acceptance_spec,), (),
-                (), {"role": role}, 2, WorkState.PROPOSED, _Z,
+                work_id,
+                config.mission_id,
+                None,
+                0,
+                f"{role} lifecycle work",
+                config.objective,
+                role,
+                "R1",
+                () if previous is None else (previous,),
+                (),
+                (),
+                (config.acceptance_spec,),
+                (),
+                (),
+                {"role": role},
+                2,
+                WorkState.PROPOSED,
+                _Z,
                 canonical_digest({"work_id": work_id}),
             )
-            consultation_roles = tuple(candidate for candidate in _CONSULTING_ROLES if candidate != role)[:2]
-            schedules.append(WorkSchedule(work_id, config.schedule_budget, "R1",
-                                          ("mission-runtime-bounded",), consultation_roles, ()))
+            consultation_roles = tuple(
+                candidate for candidate in _CONSULTING_ROLES if candidate != role
+            )[:2]
+            schedules.append(
+                WorkSchedule(
+                    work_id,
+                    config.schedule_budget,
+                    "R1",
+                    ("mission-runtime-bounded",),
+                    consultation_roles,
+                    (),
+                )
+            )
             items.append(item)
             previous = work_id
         plan = OrchestratorPlanner().plan(charter, items, schedules)
         persist_plan(self.store, plan)
-        declare_closeout_obligations(self.store, config.mission_id,
-                                     actor_id=f"{config.executor_prefix}:orchestrator")
+        declare_closeout_obligations(
+            self.store,
+            config.mission_id,
+            actor_id=f"{config.executor_prefix}:orchestrator",
+        )
         for status in (MissionState.READY, MissionState.RUNNING):
-            self._append(config, "mission.transition", {"status": status.value},
-                         event_id=f"mission-{status.value.lower()}:{config.mission_id}",
-                         actor_id=f"{config.executor_prefix}:orchestrator", actor_role="orchestrator")
+            self._append(
+                config,
+                "mission.transition",
+                {"status": status.value},
+                event_id=f"mission-{status.value.lower()}:{config.mission_id}",
+                actor_id=f"{config.executor_prefix}:orchestrator",
+                actor_role="orchestrator",
+            )
 
         _, consultation = ConsultationLoop().append(
             bindings.consultation_request, bindings.consultation_assessments
         )
-        if consultation.human_escalation or consultation.decision is not ConsultationDecision.RESOLVED:
+        if (
+            consultation.human_escalation
+            or consultation.decision is not ConsultationDecision.RESOLVED
+        ):
             raise MissionEscalationRequired(consultation)
         consultation_digest = canonical_digest(consultation.to_document())
         consultation_ref = "consultation:" + consultation_digest
@@ -275,16 +384,29 @@ class MissionRuntime:
             attempt_id = self._attempt_id(config, role)
             spec = bindings.verification[role]
             for status in (WorkState.READY, WorkState.LEASED, WorkState.RUNNING):
-                self._append(config, "work.transition", {"status": status.value},
-                             event_id=f"work-{status.value.lower()}:{work_id}",
-                             actor_id=f"{config.executor_prefix}:orchestrator", actor_role="orchestrator",
-                             work_id=work_id, attempt_id=attempt_id)
+                self._append(
+                    config,
+                    "work.transition",
+                    {"status": status.value},
+                    event_id=f"work-{status.value.lower()}:{work_id}",
+                    actor_id=f"{config.executor_prefix}:orchestrator",
+                    actor_role="orchestrator",
+                    work_id=work_id,
+                    attempt_id=attempt_id,
+                )
             evaluation_plan = create_evaluation_plan(
-                f"PLAN-{work_id}", spec.base_root,
-                acceptance_commands=spec.acceptance_commands, allowed_paths=spec.allowed_paths,
+                f"PLAN-{work_id}",
+                spec.base_root,
+                acceptance_commands=spec.acceptance_commands,
+                allowed_paths=spec.allowed_paths,
             )
-            seal_evaluation_plan(self.store, work_id, evaluation_plan, base_root=spec.base_root,
-                                 actor_id=f"{config.executor_prefix}:architect")
+            seal_evaluation_plan(
+                self.store,
+                work_id,
+                evaluation_plan,
+                base_root=spec.base_root,
+                actor_id=f"{config.executor_prefix}:architect",
+            )
             receipt_digest: str | None = None
             if role == "builder":
                 effect = bindings.builder_effect.gateway.execute(
@@ -299,56 +421,131 @@ class MissionRuntime:
                 receipt_digest = effect.receipt_digest
                 effects.append(receipt_digest)
             invocation = RoleInvocation(
-                config.mission_id, work_id, attempt_id, role,
+                config.mission_id,
+                work_id,
+                attempt_id,
+                role,
                 f"{config.executor_prefix}:{role}",
-                self._context(config, charter.digest(), role, work_id, attempt_id), _Z,
-                (consultation_ref,) if role == "builder" else ("charter:" + charter.digest(),),
-                ("workspace:base",), ("workspace:candidate",),
+                self._context(config, charter.digest(), role, work_id, attempt_id),
+                _Z,
+                (consultation_ref,)
+                if role == "builder"
+                else ("charter:" + charter.digest(),),
+                ("workspace:base",),
+                ("workspace:candidate",),
             )
             result = bindings.role_executor.execute(invocation)
             if receipt_digest is not None:
-                provisional = RoleResult(**{**asdict(result), "effect_receipt_refs": (receipt_digest,), "result_digest": _Z})
-                result = RoleResult(**{**asdict(provisional), "result_digest": result_digest(provisional)})
+                provisional = RoleResult(
+                    **{
+                        **asdict(result),
+                        "effect_receipt_refs": (receipt_digest,),
+                        "result_digest": _Z,
+                    }
+                )
+                result = RoleResult(
+                    **{
+                        **asdict(provisional),
+                        "result_digest": result_digest(provisional),
+                    }
+                )
             append_role_result(self.store, result, occurred_at=config.occurred_at)
             results.append(result)
-            self._append(config, "work.transition", {"status": WorkState.AWAITING_VERIFICATION.value},
-                         event_id=f"work-awaiting-verification:{work_id}",
-                         actor_id=f"{config.executor_prefix}:orchestrator", actor_role="orchestrator",
-                         work_id=work_id, attempt_id=attempt_id)
+            self._append(
+                config,
+                "work.transition",
+                {"status": WorkState.AWAITING_VERIFICATION.value},
+                event_id=f"work-awaiting-verification:{work_id}",
+                actor_id=f"{config.executor_prefix}:orchestrator",
+                actor_role="orchestrator",
+                work_id=work_id,
+                attempt_id=attempt_id,
+            )
             outcome = verify_exact_candidate(
-                self.store, work_id, evaluation_plan, spec.candidate_root,
-                builder_id=result.executor_id, evaluator_id=f"{config.executor_prefix}:curator:evaluator",
-                check_runner=spec.check_runner, bundle_directory=spec.bundle_directory,
+                self.store,
+                work_id,
+                evaluation_plan,
+                spec.candidate_root,
+                builder_id=result.executor_id,
+                evaluator_id=f"{config.executor_prefix}:curator:evaluator",
+                check_runner=spec.check_runner,
+                bundle_directory=spec.bundle_directory,
             )
             if outcome.result.state is not EvaluationState.PASSED:
-                raise MissionRuntimeError(f"exact candidate verification failed for {work_id}")
-            record_evaluation_bundle(self.store, work_id, outcome.result, spec.bundle_directory,
-                                     bundle_ref=spec.bundle_ref,
-                                     actor_id=f"{config.executor_prefix}:curator:evaluator")
-            accept_verified_work(self.store, work_id, outcome.result,
-                                 actor_id=f"{config.executor_prefix}:integrator")
-            integrate_verified_work(self.store, work_id, outcome.result,
-                                    actor_id=f"{config.executor_prefix}:integrator")
+                raise MissionRuntimeError(
+                    f"exact candidate verification failed for {work_id}"
+                )
+            record_evaluation_bundle(
+                self.store,
+                work_id,
+                outcome.result,
+                spec.bundle_directory,
+                bundle_ref=spec.bundle_ref,
+                actor_id=f"{config.executor_prefix}:curator:evaluator",
+            )
+            accept_verified_work(
+                self.store,
+                work_id,
+                outcome.result,
+                actor_id=f"{config.executor_prefix}:integrator",
+            )
+            integrate_verified_work(
+                self.store,
+                work_id,
+                outcome.result,
+                actor_id=f"{config.executor_prefix}:integrator",
+            )
             evaluations[work_id] = outcome.result.result_digest
             bundle_refs.append(spec.bundle_ref)
-        for status in (MissionState.VERIFYING, MissionState.INTEGRATING, MissionState.COMPLETED):
-            self._append(config, "mission.transition", {"status": status.value},
-                         event_id=f"mission-{status.value.lower()}:{config.mission_id}",
-                         actor_id=f"{config.executor_prefix}:orchestrator", actor_role="orchestrator")
-        directories = {spec.bundle_ref: spec.bundle_directory for spec in bindings.verification.values()}
-        closeout = derive_technical_closeout(self.store, config.mission_id, bundle_directories=directories)
+        for status in (
+            MissionState.VERIFYING,
+            MissionState.INTEGRATING,
+            MissionState.COMPLETED,
+        ):
+            self._append(
+                config,
+                "mission.transition",
+                {"status": status.value},
+                event_id=f"mission-{status.value.lower()}:{config.mission_id}",
+                actor_id=f"{config.executor_prefix}:orchestrator",
+                actor_role="orchestrator",
+            )
+        directories = {
+            spec.bundle_ref: spec.bundle_directory
+            for spec in bindings.verification.values()
+        }
+        closeout = derive_technical_closeout(
+            self.store, config.mission_id, bundle_directories=directories
+        )
         if closeout.state is not TechnicalCloseoutState.TECHNICALLY_VERIFIED:
-            raise MissionRuntimeError("technical closeout is incomplete: " + ", ".join(closeout.missing_obligations))
+            raise MissionRuntimeError(
+                "technical closeout is incomplete: "
+                + ", ".join(closeout.missing_obligations)
+            )
         events = self.store.events()
         return MissionRunReceipt(
-            config.mission_id, charter.digest(), plan.digest, consultation, consultation_digest,
-            tuple(results), tuple(effects), evaluations, tuple(bundle_refs), closeout,
-            events[-1]["digest"], canonical_digest(self.store.projection()),
+            config.mission_id,
+            charter.digest(),
+            plan.digest,
+            consultation,
+            consultation_digest,
+            tuple(results),
+            tuple(effects),
+            evaluations,
+            tuple(bundle_refs),
+            closeout,
+            events[-1]["digest"],
+            canonical_digest(self.store.projection()),
         )
 
-    def repair_pass(self, mission_id: str, *, now: float,
-                    observed_overrides: Mapping[str, Any] | None = None,
-                    policy: ReconciliationPolicy | None = None) -> ReconciliationResult:
+    def repair_pass(
+        self,
+        mission_id: str,
+        *,
+        now: float,
+        observed_overrides: Mapping[str, Any] | None = None,
+        policy: ReconciliationPolicy | None = None,
+    ) -> ReconciliationResult:
         projection = self.store.projection()
         if mission_id not in projection["missions"]:
             raise MissionRuntimeError("mission is unknown")
@@ -356,16 +553,29 @@ class MissionRuntime:
             "mission_id": mission_id,
             "mission_status": projection["missions"][mission_id],
             "work": [
-                {"work_id": work_id, "mission_id": data["mission_id"], "status": data["status"], "attempts": 0}
-                for work_id, data in projection["work"].items() if data["mission_id"] == mission_id
+                {
+                    "work_id": work_id,
+                    "mission_id": data["mission_id"],
+                    "status": data["status"],
+                    "attempts": 0,
+                }
+                for work_id, data in projection["work"].items()
+                if data["mission_id"] == mission_id
             ],
-            "leases": (), "intents": (), "workspaces": (), "provider_failures": (),
-            "verifications": (), "no_progress_count": 0, "authority_scope": ("candidate",),
+            "leases": (),
+            "intents": (),
+            "workspaces": (),
+            "provider_failures": (),
+            "verifications": (),
+            "no_progress_count": 0,
+            "authority_scope": ("candidate",),
         }
         document.update(dict(observed_overrides or {}))
         return DesiredStateReconciler(policy).reconcile(document, now=now)
 
-    def replay(self, mission_id: str, *, bundle_directories: Mapping[str, str | Path]) -> MissionReplayEvidence:
+    def replay(
+        self, mission_id: str, *, bundle_directories: Mapping[str, str | Path]
+    ) -> MissionReplayEvidence:
         events = self.store.events()
         if not any(event["mission_id"] == mission_id for event in events):
             raise MissionRuntimeError("mission is unknown")
@@ -378,12 +588,26 @@ class MissionRuntime:
         rebuilt_digest = canonical_digest(self.store.projection())
         if projection_digest != rebuilt_digest:
             raise MissionRuntimeError("rebuilt projection differs from live projection")
-        closeout = derive_technical_closeout(self.store, mission_id, bundle_directories=bundle_directories)
-        return MissionReplayEvidence(events[-1]["digest"], projection_digest, rebuilt_digest, closeout.report_digest)
+        closeout = derive_technical_closeout(
+            self.store, mission_id, bundle_directories=bundle_directories
+        )
+        return MissionReplayEvidence(
+            events[-1]["digest"],
+            projection_digest,
+            rebuilt_digest,
+            closeout.report_digest,
+        )
 
 
 __all__ = [
-    "BuilderEffectBinding", "MissionBindings", "MissionConfig", "MissionEscalationRequired",
-    "MissionReplayEvidence", "MissionRunReceipt", "MissionRuntime", "MissionRuntimeError",
-    "RoleExecutor", "WorkVerificationSpec",
+    "BuilderEffectBinding",
+    "MissionBindings",
+    "MissionConfig",
+    "MissionEscalationRequired",
+    "MissionReplayEvidence",
+    "MissionRunReceipt",
+    "MissionRuntime",
+    "MissionRuntimeError",
+    "RoleExecutor",
+    "WorkVerificationSpec",
 ]

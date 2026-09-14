@@ -179,19 +179,30 @@ class NodeExecutionContract:
             raise ContractViolation("node effect_mode must be typed")
         if type(self.exclusive_writer) is not bool:
             raise ContractViolation("exclusive_writer must be boolean")
-        if self.effect_mode is NodeEffectMode.BOUNDED_WRITE and not self.exclusive_writer:
-            raise ContractViolation("bounded-write nodes must request an exclusive writer lease")
+        if (
+            self.effect_mode is NodeEffectMode.BOUNDED_WRITE
+            and not self.exclusive_writer
+        ):
+            raise ContractViolation(
+                "bounded-write nodes must request an exclusive writer lease"
+            )
         if self.effect_mode is NodeEffectMode.READ_ONLY and self.exclusive_writer:
-            raise ContractViolation("read-only nodes cannot request an exclusive writer lease")
+            raise ContractViolation(
+                "read-only nodes cannot request an exclusive writer lease"
+            )
         if (
             type(self.required_outputs) is not tuple
             or not self.required_outputs
-            or any(type(value) is not str or not value for value in self.required_outputs)
+            or any(
+                type(value) is not str or not value for value in self.required_outputs
+            )
             or len(set(self.required_outputs)) != len(self.required_outputs)
         ):
             raise ContractViolation("required_outputs must be unique non-empty strings")
         if self.failure_transition != "halt-dependents":
-            raise ContractViolation("local execution must halt dependents after failure")
+            raise ContractViolation(
+                "local execution must halt dependents after failure"
+            )
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -890,22 +901,34 @@ def _node_from_document(value: Mapping[str, Any]) -> PortableNode:
         if not isinstance(execution_value, Mapping):
             raise ContractViolation("node execution contract must be an object")
         execution_fields = {
-            "stage_kind", "execution_role", "worker_capability", "effect_mode",
-            "exclusive_writer", "required_outputs", "success_transition",
-            "failure_transition", "retry_policy", "cancellation_policy",
+            "stage_kind",
+            "execution_role",
+            "worker_capability",
+            "effect_mode",
+            "exclusive_writer",
+            "required_outputs",
+            "success_transition",
+            "failure_transition",
+            "retry_policy",
+            "cancellation_policy",
         }
         _closed(execution_value, execution_fields, "node execution contract")
         try:
             effect_mode = NodeEffectMode(execution_value["effect_mode"])
         except (KeyError, ValueError) as error:
-            raise ContractViolation("node execution effect_mode is unsupported") from error
+            raise ContractViolation(
+                "node execution effect_mode is unsupported"
+            ) from error
         execution = NodeExecutionContract(
-            execution_value["stage_kind"], execution_value["execution_role"],
-            execution_value["worker_capability"], effect_mode,
+            execution_value["stage_kind"],
+            execution_value["execution_role"],
+            execution_value["worker_capability"],
+            effect_mode,
             execution_value["exclusive_writer"],
             _string_list(execution_value, "required_outputs"),
             execution_value["success_transition"],
-            execution_value["failure_transition"], execution_value["retry_policy"],
+            execution_value["failure_transition"],
+            execution_value["retry_policy"],
             execution_value["cancellation_policy"],
         )
     work_package_value = value.get("work_package")

@@ -175,7 +175,6 @@ from .source_docket import (
     load_default_source_docket,
     load_source_docket,
 )
-from .workers import Worker, serve
 from .whole_os_service import (
     PackageExecutionResult,
     PackageStatus,
@@ -188,6 +187,7 @@ from .whole_os_service import (
     load_graph,
     load_service_config,
 )
+from .workers import Worker, serve
 
 __all__ = [
     "ActionKind",

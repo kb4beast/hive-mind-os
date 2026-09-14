@@ -10,7 +10,9 @@ class WholeOSAdversarialTests(unittest.TestCase):
         self.assertIn("secret", scanner.scan({"encoded": b"YWxwaGEtYnJhdm8="}))
 
     def test_clean_export_is_admitted(self):
-        CanaryScanner((Canary("secret", b"alpha-bravo"),)).require_clean({"lesson.md": b"abstract retry guidance"})
+        CanaryScanner((Canary("secret", b"alpha-bravo"),)).require_clean(
+            {"lesson.md": b"abstract retry guidance"}
+        )
 
 
 if __name__ == "__main__":

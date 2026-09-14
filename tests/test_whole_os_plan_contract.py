@@ -22,7 +22,6 @@ from hive_mind_os.tournament_plan_factory import (
 )
 from tests.test_tournament_plan_factory import authority, evidence, request
 
-
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs/plan/whole-os-implementation"
 HANDOFF = ROOT / "docs/plan/whole-os-tournament-2026-09-13"
@@ -33,7 +32,9 @@ REQUIREMENTS = REQUIREMENTS_PATH.read_bytes()
 
 
 def load_plan() -> PortablePlanBundle:
-    return PortablePlanBundle.from_bytes((OUTPUT / "whole-os-plan-v2.json").read_bytes())
+    return PortablePlanBundle.from_bytes(
+        (OUTPUT / "whole-os-plan-v2.json").read_bytes()
+    )
 
 
 class WholeOSPlanContractTests(unittest.TestCase):
@@ -100,7 +101,9 @@ class WholeOSPlanContractTests(unittest.TestCase):
             authority=plan.authority[0],
             evidence=plan.evidence,
             node_contracts=contracts,
-            source_inventory=PinnedArtifact.pin("n00-source-inventory", SOURCE_INVENTORY),
+            source_inventory=PinnedArtifact.pin(
+                "n00-source-inventory", SOURCE_INVENTORY
+            ),
             requirements=PinnedArtifact.pin("n00-requirements", REQUIREMENTS),
         )
         self.assertEqual(plan.canonical_bytes(), rebuilt.canonical_bytes())
@@ -263,8 +266,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
         colluding_requirements = json.loads(json.dumps(contracts))
         for node in colluding_requirements["nodes"]:
             node["requirement_ids"] = [
-                "R99" if item == "R01" else item
-                for item in node["requirement_ids"]
+                "R99" if item == "R01" else item for item in node["requirement_ids"]
             ]
         colluding_requirements["requirement_inventory"]["requirement_ids"] = [
             "R99" if item == "R01" else item
@@ -311,8 +313,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             if item["evidence_id"] == "accepted-n00-requirements"
         )
         accepted_evidence["claim_ids"] = [
-            "R99" if item == "R01" else item
-            for item in accepted_evidence["claim_ids"]
+            "R99" if item == "R01" else item for item in accepted_evidence["claim_ids"]
         ]
         candidate = PortablePlanBundle.from_document(colluding_plan)
         with self.assertRaisesRegex(ContractViolation, "accepted N00 evidence"):
@@ -332,7 +333,9 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 source_inventory_bytes=SOURCE_INVENTORY,
             )
 
-    def test_missing_role_output_unknown_route_cycle_and_lost_claim_reject(self) -> None:
+    def test_missing_role_output_unknown_route_cycle_and_lost_claim_reject(
+        self,
+    ) -> None:
         base = load_plan().to_document()
 
         missing_role = json.loads(json.dumps(base))
@@ -365,9 +368,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             PortablePlanBundle.from_document(control_path)
 
         unicode_path = json.loads(json.dumps(base))
-        unicode_path["nodes"][0]["work_package"]["write_paths"][0] = (
-            "docs/caf\u00e9.md"
-        )
+        unicode_path["nodes"][0]["work_package"]["write_paths"][0] = "docs/caf\u00e9.md"
         with self.assertRaisesRegex(ContractViolation, "ASCII"):
             PortablePlanBundle.from_document(unicode_path)
 
@@ -394,9 +395,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             )
 
         bogus_source = json.loads(json.dumps(base))
-        bogus_source["nodes"][1]["work_package"]["source_ids"].append(
-            "BOGUS-SOURCE-99"
-        )
+        bogus_source["nodes"][1]["work_package"]["source_ids"].append("BOGUS-SOURCE-99")
         candidate = PortablePlanBundle.from_document(bogus_source)
         with self.assertRaisesRegex(ContractViolation, "unadmitted source"):
             compile_plan(
@@ -471,7 +470,9 @@ class WholeOSPlanContractTests(unittest.TestCase):
 
         copied_signature = json.loads(json.dumps(manifest))
         copied_signature["signature"] = "copied-old-signature"
-        copied_bytes = json.dumps(copied_signature, separators=(",", ":"), sort_keys=True).encode()
+        copied_bytes = json.dumps(
+            copied_signature, separators=(",", ":"), sort_keys=True
+        ).encode()
         with self.assertRaisesRegex(ContractViolation, "not closed"):
             ActivationMaterial(
                 manifest["generation"]["generation_id"],
@@ -481,7 +482,9 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 raw_sha256(copied_bytes),
             )
 
-        dispatcher = json.loads((OUTPUT / "DISPATCHER.json").read_text(encoding="utf-8"))
+        dispatcher = json.loads(
+            (OUTPUT / "DISPATCHER.json").read_text(encoding="utf-8")
+        )
         self.assertEqual("INACTIVE", dispatcher["status"])
         self.assertFalse(dispatcher["authority_granted"])
         self.assertFalse(dispatcher["dispatch_policy"]["planning_group_is_lock"])
@@ -494,7 +497,8 @@ class WholeOSPlanContractTests(unittest.TestCase):
             ("source_inventory_path", "source_inventory_digest"),
         ):
             self.assertEqual(
-                dispatcher[digest_key], raw_sha256((ROOT / dispatcher[path_key]).read_bytes())
+                dispatcher[digest_key],
+                raw_sha256((ROOT / dispatcher[path_key]).read_bytes()),
             )
         self.assertTrue(dispatcher["dispatch_policy"]["structured_renderer_required"])
 
@@ -522,9 +526,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
         self.assertEqual("whole-os-node-contracts/v2", contracts["schema"])
         self.assertEqual(current, dispatcher["node_contracts_path"])
         self.assertEqual(historical, dispatcher["historical_node_contracts"]["path"])
-        self.assertFalse(
-            dispatcher["historical_node_contracts"]["admission_allowed"]
-        )
+        self.assertFalse(dispatcher["historical_node_contracts"]["admission_allowed"])
         for content in (prompt_text, plan_text):
             self.assertEqual(1, content.count(current_declaration))
             self.assertEqual(1, content.count(historical_declaration))

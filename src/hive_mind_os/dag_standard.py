@@ -131,7 +131,9 @@ class CompilationReceipt:
 
     def __post_init__(self) -> None:
         if self.lint_errors or self.lint_warnings:
-            raise ContractViolation("a compilation receipt cannot contain lint findings")
+            raise ContractViolation(
+                "a compilation receipt cannot contain lint findings"
+            )
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -179,19 +181,28 @@ def load_bound_plan(
     if plan_bytes != plan.canonical_bytes():
         raise ContractViolation("portable plan bytes are not in canonical form")
     if plan.digest() != expected_plan_digest:
-        raise ContractViolation("portable plan digest does not match caller expectation")
+        raise ContractViolation(
+            "portable plan digest does not match caller expectation"
+        )
     if expected_request_id is not None:
         require_digest(expected_request_id, "expected request_id")
         if plan.request_id != expected_request_id:
-            raise ContractViolation("portable plan request binding is stale or substituted")
+            raise ContractViolation(
+                "portable plan request binding is stale or substituted"
+            )
     if expected_subject_id is not None:
         require_digest(expected_subject_id, "expected subject_id")
         if plan.subject.subject_id != expected_subject_id:
-            raise ContractViolation("portable plan subject binding is stale or substituted")
+            raise ContractViolation(
+                "portable plan subject binding is stale or substituted"
+            )
     if type(standard_bytes) is not bytes:
         raise ContractViolation("standard input must be immutable bytes")
     standard = plan.standard
-    if standard.version != STANDARD_VERSION or standard.source_path != STANDARD_SOURCE_PATH:
+    if (
+        standard.version != STANDARD_VERSION
+        or standard.source_path != STANDARD_SOURCE_PATH
+    ):
         raise ContractViolation("portable plan uses an unsupported authoring standard")
     if standard.raw_sha256 != raw_sha256(standard_bytes):
         raise ContractViolation("authoring-standard raw digest mismatch")
@@ -226,7 +237,9 @@ def _validate_source_namespace(
         )
     inventory = strict_json_object(source_inventory_bytes, maximum_bytes=1_000_000)
     if inventory.get("schema") != "whole-os-source-inventory/v1":
-        raise ContractViolation("portable work packages use an unknown source inventory")
+        raise ContractViolation(
+            "portable work packages use an unknown source inventory"
+        )
     inventory_id = inventory.get("inventory_id")
     require_identifier(inventory_id, "source inventory_id")
     inventory_digest = raw_sha256(source_inventory_bytes)
@@ -298,7 +311,9 @@ def _validate_requirement_namespace(
     if tuple(requirement_ids) != WORK_PACKAGE_REQUIREMENT_IDS:
         raise ContractViolation("requirements inventory ids are not accepted R01-R18")
     evidence = tuple(
-        item for item in plan.evidence if item.evidence_id == "accepted-n00-requirements"
+        item
+        for item in plan.evidence
+        if item.evidence_id == "accepted-n00-requirements"
     )
     if (
         len(evidence) != 1
@@ -369,7 +384,10 @@ def _validate_governance_coverage(
                 raise ContractViolation(
                     "portable work package capability is not explicitly granted"
                 )
-            if requires_external_authority(capability.effect_class) and not authority.external_effects:
+            if (
+                requires_external_authority(capability.effect_class)
+                and not authority.external_effects
+            ):
                 raise ContractViolation(
                     "portable work package external effect lacks authority"
                 )
@@ -433,7 +451,9 @@ def _dependency_levels(by_id: Mapping[str, PortableNode]) -> dict[str, int]:
     def level(node_id: str) -> int:
         if node_id not in levels:
             dependencies = by_id[node_id].dependencies
-            levels[node_id] = 0 if not dependencies else 1 + max(level(item) for item in dependencies)
+            levels[node_id] = (
+                0 if not dependencies else 1 + max(level(item) for item in dependencies)
+            )
         return levels[node_id]
 
     for node_id in sorted(by_id):
@@ -445,7 +465,9 @@ def _worker_limit(plan: PortablePlanBundle, requested: int | None) -> int:
     budgets = {item.budget_id: item.policy for item in plan.budgets}
     declared = [budgets[node.budget_id].concurrent_workers for node in plan.nodes]
     if not declared or min(declared) < 1:
-        raise ContractViolation("every scheduled node requires a positive worker allowance")
+        raise ContractViolation(
+            "every scheduled node requires a positive worker allowance"
+        )
     limit = min(declared)
     if requested is not None:
         if type(requested) is not int or requested < 1:
@@ -461,23 +483,32 @@ def _compile_rounds(
 ) -> tuple[DispatchRound, ...]:
     by_id = {node.node_id: node for node in plan.nodes}
     levels = _dependency_levels(by_id)
-    capacities = {resource.resource_id: resource.quantity for resource in plan.resources}
+    capacities = {
+        resource.resource_id: resource.quantity for resource in plan.resources
+    }
     result: list[DispatchRound] = []
     for dependency_level in range(max(levels.values(), default=-1) + 1):
-        members = sorted(node_id for node_id, value in levels.items() if value == dependency_level)
+        members = sorted(
+            node_id for node_id, value in levels.items() if value == dependency_level
+        )
         batches: list[list[str]] = []
         usages: list[dict[str, int]] = []
         for node_id in members:
             node = by_id[node_id]
             if any(capacities[resource_id] < 1 for resource_id in node.resource_ids):
-                raise ContractViolation(f"node {node_id} requires an unavailable resource")
+                raise ContractViolation(
+                    f"node {node_id} requires an unavailable resource"
+                )
             placed = False
             for batch, usage in zip(batches, usages, strict=True):
                 if len(batch) >= maximum_workers:
                     continue
                 if any(_nodes_conflict(node, by_id[member]) for member in batch):
                     continue
-                if any(usage.get(resource_id, 0) + 1 > capacities[resource_id] for resource_id in node.resource_ids):
+                if any(
+                    usage.get(resource_id, 0) + 1 > capacities[resource_id]
+                    for resource_id in node.resource_ids
+                ):
                     continue
                 batch.append(node_id)
                 for resource_id in node.resource_ids:

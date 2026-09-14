@@ -156,14 +156,18 @@ _canonical_bindings_provider: CanonicalMissionBindingsProvider | None = None
 
 
 def configured_mission_bindings_provider(
-    descriptor_path: Path, resolver: Callable[[Any, Mapping[str, Any], Path], tuple[Any, Any]]
+    descriptor_path: Path,
+    resolver: Callable[[Any, Mapping[str, Any], Path], tuple[Any, Any]],
 ) -> CanonicalMissionBindingsProvider:
     """Build an explicit N08 provider during host startup, never from target files."""
     from .cortex.repository.mission_bindings import (
         ConfiguredMissionBindingsProvider,
         load_descriptor,
     )
-    return ConfiguredMissionBindingsProvider(load_descriptor(Path(descriptor_path)), resolver)
+
+    return ConfiguredMissionBindingsProvider(
+        load_descriptor(Path(descriptor_path)), resolver
+    )
 
 
 def set_canonical_mission_bindings_provider(
@@ -401,7 +405,9 @@ def serve(
         raise RuntimeError(f"worker failed: {errors[0]}")
     queue = Scheduler(state_dir)
     try:
-        unfinished = [job for job in queue.jobs() if job.state not in {"done", "dead-letter"}]
+        unfinished = [
+            job for job in queue.jobs() if job.state not in {"done", "dead-letter"}
+        ]
         return 0 if not unfinished else 1
     finally:
         queue.close()

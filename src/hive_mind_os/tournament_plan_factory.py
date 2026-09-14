@@ -17,9 +17,9 @@ from .dag_standard import (
     STANDARD_VERSION,
     WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
     WORK_PACKAGE_COMPILER_PACKAGE_ID,
+    WORK_PACKAGE_REQUIREMENT_IDS,
     WORK_PACKAGE_REQUIREMENTS_DIGEST,
     WORK_PACKAGE_REQUIREMENTS_PATH,
-    WORK_PACKAGE_REQUIREMENT_IDS,
     WORK_PACKAGE_SOURCE_INVENTORY_DIGEST,
     WORK_PACKAGE_SOURCE_INVENTORY_ID,
     WORK_PACKAGE_SOURCE_INVENTORY_PATH,
@@ -168,6 +168,7 @@ class TournamentPlanFactory:
             evidence=evidence_inventory,
             nodes=self._nodes(authority.authority_id, evidence_inventory),
         )
+
     def generate(
         self,
         request: PlanGenerationRequest,
@@ -241,7 +242,9 @@ class TournamentPlanFactory:
         evidence: Iterable[EvidenceReference],
     ) -> tuple[EvidenceReference, ...]:
         inventory = tuple(evidence)
-        if not inventory or any(not isinstance(item, EvidenceReference) for item in inventory):
+        if not inventory or any(
+            not isinstance(item, EvidenceReference) for item in inventory
+        ):
             raise ContractViolation("tournament plan requires typed evidence")
         if len({item.evidence_id for item in inventory}) != len(inventory):
             raise ContractViolation("tournament evidence identifiers must be unique")
@@ -582,14 +585,20 @@ class TournamentPlanFactory:
             NodeExecutionContract(
                 stage_kind=_FIXTURE_STAGE_KINDS[node_id],
                 execution_role=roles[0],
-                worker_capability="candidate-workspace" if build else "subject-inspector",
+                worker_capability="candidate-workspace"
+                if build
+                else "subject-inspector",
                 effect_mode=(
                     NodeEffectMode.BOUNDED_WRITE if build else NodeEffectMode.READ_ONLY
                 ),
                 exclusive_writer=build,
                 required_outputs=(
-                    "summary", "findings", "acceptance_evidence", "ideas",
-                    "selected_idea_ids", "changed_paths",
+                    "summary",
+                    "findings",
+                    "acceptance_evidence",
+                    "ideas",
+                    "selected_idea_ids",
+                    "changed_paths",
                 ),
                 success_transition=(
                     "selected-experiment-or-no-change"
@@ -782,8 +791,7 @@ class WholeOSPlanFactory:
         )
         if (
             source_document.get("schema") != "whole-os-source-inventory/v1"
-            or source_document.get("inventory_id")
-            != WORK_PACKAGE_SOURCE_INVENTORY_ID
+            or source_document.get("inventory_id") != WORK_PACKAGE_SOURCE_INVENTORY_ID
         ):
             raise ContractViolation("whole-OS source namespace is not accepted N00")
         source_entries = source_document.get("sources")
@@ -816,17 +824,13 @@ class WholeOSPlanFactory:
             for item in requirement_entries
         )
         if requirement_ids != WORK_PACKAGE_REQUIREMENT_IDS:
-            raise ContractViolation(
-                "whole-OS requirement ids are not accepted R01-R18"
-            )
+            raise ContractViolation("whole-OS requirement ids are not accepted R01-R18")
 
         accepted_source = tuple(
             item for item in evidence if item.evidence_id == "accepted-n00-inventory"
         )
         accepted_requirements = tuple(
-            item
-            for item in evidence
-            if item.evidence_id == "accepted-n00-requirements"
+            item for item in evidence if item.evidence_id == "accepted-n00-requirements"
         )
         if (
             len(accepted_source) != 1
@@ -970,8 +974,18 @@ class WholeOSPlanFactory:
                     item["objective"],
                     tuple(item["dependencies"]),
                     ("implementation-workspaces",),
-                    ("inspect-subject", "build-direct-challenger", "run-independent-checks", "record-evidence"),
-                    ("subject-inspector", "candidate-workspace", "test-runner", "evidence-writer"),
+                    (
+                        "inspect-subject",
+                        "build-direct-challenger",
+                        "run-independent-checks",
+                        "record-evidence",
+                    ),
+                    (
+                        "subject-inspector",
+                        "candidate-workspace",
+                        "test-runner",
+                        "evidence-writer",
+                    ),
                     authority_id,
                     f"route-{route}",
                     evidence_ids,

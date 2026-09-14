@@ -41,7 +41,9 @@ def classify_effect(value: str) -> EffectClass:
     try:
         return EffectClass(value)
     except ValueError as error:
-        raise ContractViolation("effect_class is not in the closed V1 vocabulary") from error
+        raise ContractViolation(
+            "effect_class is not in the closed V1 vocabulary"
+        ) from error
 
 
 def requires_external_authority(value: str) -> bool:
