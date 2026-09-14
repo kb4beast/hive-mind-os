@@ -52,5 +52,5 @@ class T(unittest.TestCase):
   next_state=state.apply(p,pairs,{frozenset((pairs[0].left,pairs[0].right)):"LEFT"},admission=admission);self.assertEqual(next_state.losses[pairs[0].right],1)
   r=p.recipe("MB0");seal=VariantSeal(p.protocol_digest,"MB0",canonical_digest({f:r[f] for f in RECIPE_FIELDS}),D,"eval","original",D,"fixture", "1");p.validate_seals((seal,),admission=admission)
   with self.assertRaises(CampaignMetricsError):state.schedule(p)
-  with self.assertRaises(CampaignMetricsError):p.validate_seals((seal,),admission=AdmittedProtocol(p,evidence,"sha256:"+"0"*64))
+  with self.assertRaises(CampaignMetricsError):AdmittedProtocol(p,evidence,"sha256:"+"0"*64)
 if __name__=="__main__":unittest.main()

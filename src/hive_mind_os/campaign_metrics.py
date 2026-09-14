@@ -46,9 +46,16 @@ class IssuedReceipt:
 def reject_receipt_replay(receipts:Iterable[IssuedReceipt])->None:
  rows=tuple(receipts)
  if len({x.identity for x in rows})!=len(rows):raise CampaignMetricsError("receipt replay")
-@dataclass(frozen=True,slots=True)
+_ADMISSION_TOKEN=object()
 class AdmittedProtocol:
- protocol:object;stage_evidence:StageEvidence;admission_digest:str
+ """Host-issued opaque capability; public construction is refused."""
+ __slots__=("protocol","stage_evidence","admission_digest","_token")
+ def __init__(self,protocol,stage_evidence,admission_digest,*,_token=None):
+  if _token is not _ADMISSION_TOKEN:raise CampaignMetricsError("admission receipts are host-issued")
+  self.protocol=protocol;self.stage_evidence=stage_evidence;self.admission_digest=admission_digest;self._token=_token
+ def __setattr__(self,name,value):
+  if hasattr(self,name):raise CampaignMetricsError("admission receipt is immutable")
+  object.__setattr__(self,name,value)
 def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,fixture_hmac_key:bytes|None=None,builder_ids:Sequence[str]=())->AdmittedProtocol:
  """Only execution-facing gateway; OPEN/deferred or unverified evidence cannot pass."""
  if not isinstance(protocol,MatchProtocol):raise CampaignMetricsError("inspection is not executable")
@@ -63,9 +70,9 @@ def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,fixture_hmac_k
  for recipe in (*protocol.entrant_recipes.values(),*protocol.hybrid_recipes.values()):
   if recipe.get("availability")!="available" or "provenance_digest" not in recipe:raise CampaignMetricsError("recipe is deferred or lacks provenance")
   _digest(recipe["provenance_digest"],"recipe provenance")
- return AdmittedProtocol(protocol,stage_evidence,canonical_digest([protocol.protocol_digest,stage_evidence.block_digest,stage_evidence.evaluator.payload_digest]))
+ return AdmittedProtocol(protocol,stage_evidence,canonical_digest([protocol.protocol_digest,stage_evidence.block_digest,stage_evidence.evaluator.payload_digest]),_token=_ADMISSION_TOKEN)
 def _require_admission(protocol:object,admission:AdmittedProtocol|None,*,stage:str|None)->None:
- if not isinstance(admission,AdmittedProtocol) or admission.protocol is not protocol:raise CampaignMetricsError("missing or foreign admission receipt")
+ if not isinstance(admission,AdmittedProtocol) or admission._token is not _ADMISSION_TOKEN or admission.protocol is not protocol:raise CampaignMetricsError("missing or foreign admission receipt")
  if admission.admission_digest!=canonical_digest([protocol.protocol_digest,admission.stage_evidence.block_digest,admission.stage_evidence.evaluator.payload_digest]):raise CampaignMetricsError("stale admission receipt")
  if stage is not None and admission.stage_evidence.stage!=stage:raise CampaignMetricsError("admission stage mismatch")
 def canonical_digest(v:object)->str:
