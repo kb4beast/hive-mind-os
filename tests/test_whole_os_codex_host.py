@@ -72,6 +72,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
             "scripts/whole-os/Invoke-WholeOSCodexService.ps1",
             "src/hive_mind_os/cortex/repository/mission_bindings.py",
             "src/hive_mind_os/local_codex_worker.py",
+            "src/hive_mind_os/scheduler.py",
             "src/hive_mind_os/whole_os_bootstrap.py",
             "src/hive_mind_os/whole_os_codex_host.py",
             "src/hive_mind_os/whole_os_composition.py",
