@@ -287,6 +287,7 @@ class CohortAssuranceRuntime:
         initial_evidence = (
             assessments[-1].evidence if assessments else self._retained_evidence(run_id)
         )
+        audit_initial = self._retained_initial(run_id, initial.kickoff) or initial
         retained_repair = self._retained_repair(run_id)
         retained_completed = self._retained_completed(run_id)
         if initial.status is CohortRunStatus.SUCCEEDED and initial_evidence is None:
@@ -301,7 +302,7 @@ class CohortAssuranceRuntime:
         ):
             self.runtime.record_completion(initial)
             return AssuredCohortResult(
-                initial,
+                audit_initial,
                 initial.status,
                 initial.package_results,
                 initial.convergence,
@@ -314,7 +315,7 @@ class CohortAssuranceRuntime:
         if directive is None:
             self.runtime.record_completion(initial)
             return AssuredCohortResult(
-                initial,
+                audit_initial,
                 initial.status,
                 initial.package_results,
                 initial.convergence,
@@ -330,6 +331,7 @@ class CohortAssuranceRuntime:
                 {
                     "package_ids": list(directive.package_ids),
                     "instruction": directive.instruction,
+                    "initial": self._run_document(initial),
                 },
             )
         by_id = {package.package_id: package for package in graph.packages}
@@ -438,7 +440,7 @@ class CohortAssuranceRuntime:
         )
         self.runtime.record_completion(final_run)
         return AssuredCohortResult(
-            initial,
+            audit_initial,
             final_status,
             final_results,
             final_convergence,
@@ -464,6 +466,58 @@ class CohortAssuranceRuntime:
                 if not isinstance(package_ids, tuple) or type(instruction) is not str:
                     raise CohortAssuranceError("retained repair directive is invalid")
                 return RepairDirective(package_ids, instruction)
+        return None
+
+    def _retained_initial(
+        self, run_id: str, kickoff: CohortKickoff
+    ) -> CohortRunResult | None:
+        for event in self._events(run_id):
+            if event.kind is not CohortJournalEventKind.REPAIR_ATTEMPT:
+                continue
+            document = event.payload.get("initial")
+            if not isinstance(document, Mapping):
+                raise CohortAssuranceError("retained pre-repair snapshot is invalid")
+            try:
+                package_documents = document["package_results"]
+                batches = document["dispatch_batches"]
+                if not isinstance(package_documents, tuple) or not isinstance(
+                    batches, tuple
+                ):
+                    raise TypeError("snapshot collections must be arrays")
+                package_results = tuple(
+                    self._package_from_document(item) for item in package_documents
+                )
+                dispatch_batches = tuple(tuple(batch) for batch in batches)
+                convergence = self._convergence_from_document(document["convergence"])
+                verification = self._verification_from_document(
+                    document["verification"]
+                )
+                status = CohortRunStatus(document["status"])
+                max_parallelism = document["max_parallelism"]
+            except (KeyError, TypeError, ValueError) as error:
+                raise CohortAssuranceError(
+                    "retained pre-repair snapshot is invalid"
+                ) from error
+            if (
+                any(
+                    any(type(item) is not str for item in batch)
+                    for batch in dispatch_batches
+                )
+                or type(max_parallelism) is not int
+                or max_parallelism < 0
+                or status is not _status(package_results, convergence, verification)
+            ):
+                raise CohortAssuranceError("retained pre-repair snapshot is invalid")
+            return CohortRunResult(
+                run_id,
+                status,
+                kickoff,
+                package_results,
+                convergence,
+                verification,
+                dispatch_batches,
+                max_parallelism,
+            )
         return None
 
     def _retained_completed(self, run_id: str) -> bool:
@@ -498,6 +552,27 @@ class CohortAssuranceRuntime:
         }
 
     @staticmethod
+    def _package_from_document(document: object) -> PackageRunResult:
+        if not isinstance(document, Mapping):
+            raise CohortAssuranceError("retained package snapshot is invalid")
+        try:
+            evidence_refs = document["evidence_refs"]
+            output = document["output"]
+            if not isinstance(evidence_refs, tuple) or not isinstance(output, Mapping):
+                raise TypeError("package snapshot collections are invalid")
+            return PackageRunResult(
+                str(document["package_id"]),
+                PackageRunState(document["state"]),
+                output,
+                evidence_refs,
+                str(document["message"]),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise CohortAssuranceError(
+                "retained package snapshot is invalid"
+            ) from error
+
+    @staticmethod
     def _convergence_document(result: ConvergenceResult) -> dict[str, object]:
         return {
             "accepted": result.accepted,
@@ -506,11 +581,56 @@ class CohortAssuranceRuntime:
         }
 
     @staticmethod
+    def _convergence_from_document(document: object) -> ConvergenceResult:
+        if not isinstance(document, Mapping):
+            raise CohortAssuranceError("retained convergence snapshot is invalid")
+        try:
+            output = document["output"]
+            if not isinstance(output, Mapping):
+                raise TypeError("convergence output must be an object")
+            return ConvergenceResult(
+                document["accepted"], output, str(document["message"])
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise CohortAssuranceError(
+                "retained convergence snapshot is invalid"
+            ) from error
+
+    @staticmethod
     def _verification_document(result: VerificationResult) -> dict[str, object]:
         return {
             "passed": result.passed,
             "checks": list(result.checks),
             "message": result.message,
+        }
+
+    @staticmethod
+    def _verification_from_document(document: object) -> VerificationResult:
+        if not isinstance(document, Mapping):
+            raise CohortAssuranceError("retained verification snapshot is invalid")
+        try:
+            checks = document["checks"]
+            if not isinstance(checks, tuple):
+                raise TypeError("verification checks must be an array")
+            return VerificationResult(
+                document["passed"], checks, str(document["message"])
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise CohortAssuranceError(
+                "retained verification snapshot is invalid"
+            ) from error
+
+    @classmethod
+    def _run_document(cls, result: CohortRunResult) -> dict[str, object]:
+        return {
+            "status": result.status.value,
+            "package_results": [
+                cls._package_document(item) for item in result.package_results
+            ],
+            "convergence": cls._convergence_document(result.convergence),
+            "verification": cls._verification_document(result.verification),
+            "dispatch_batches": [list(batch) for batch in result.dispatch_batches],
+            "max_parallelism": result.max_parallelism,
         }
 
     @staticmethod

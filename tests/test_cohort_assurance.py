@@ -251,6 +251,8 @@ class CohortAssuranceTests(unittest.TestCase):
             )
             self.assertEqual(resumed.status, CohortRunStatus.SUCCEEDED)
             self.assertTrue(resumed.repair_attempted)
+            self.assertEqual(resumed, result)
+            self.assertEqual(resumed.initial.status, CohortRunStatus.FAILED)
             self.assertEqual(calls, before)
             kinds = tuple(event.kind for event in journal.events("durable"))
             self.assertEqual(kinds.count(CohortJournalEventKind.REPAIR_ATTEMPT), 1)
