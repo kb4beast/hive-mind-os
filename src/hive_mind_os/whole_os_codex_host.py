@@ -21,7 +21,6 @@ import os
 import platform
 import re
 import subprocess
-import sys
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -46,6 +45,7 @@ from .delivery_broker import DeliveryBroker
 from .discovery_backlog import BacklogCandidate, DiscoveryBacklog, DiscoverySignal
 from .local_codex_worker import CodexLocalWorker, resolve_codex_executable
 from .outcome_graph import OutcomeWorkPackage, compile_outcome_graph
+from .receipts import filesystem_path
 from .repository_profile import (
     CapabilityGrant,
     CapabilityReport,
@@ -55,7 +55,6 @@ from .repository_profile import (
     ProfileCapability,
     RepositoryProfile,
 )
-from .receipts import filesystem_path
 from .runtime_contracts import canonical_json_bytes, raw_sha256
 from .scoped_learning import LearningScope
 from .verification_adapters import (
@@ -78,7 +77,6 @@ from .whole_os_composition import (
 )
 from .whole_os_qualification import CapabilityDeclaration, CompositionManifest
 from .whole_os_service import WholeOSServiceConfig
-
 
 PROVIDER_ID = "codex-local-whole-os"
 PROVIDER_VERSION = "v1"

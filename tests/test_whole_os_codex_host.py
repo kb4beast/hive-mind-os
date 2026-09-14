@@ -10,9 +10,8 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from hive_mind_os.runtime_contracts import canonical_json_bytes
-from hive_mind_os.runtime_contracts import raw_sha256
 from hive_mind_os.receipts import filesystem_path
+from hive_mind_os.runtime_contracts import canonical_json_bytes, raw_sha256
 from hive_mind_os.whole_os_bootstrap import (
     WholeOSHostFactoryRegistration,
     run_registered_whole_os,
