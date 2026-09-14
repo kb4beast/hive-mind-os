@@ -1,9 +1,13 @@
 # Whole-OS service composition
 
 The implementation composes repository bindings, a versioned outcome graph, the
-durable scheduler, a host-owned package executor, independent qualification, lesson
-routing, delivery, and benchmark adapters. The public composition root is
-`hive_mind_os.whole_os_service.WholeOSService`.
+durable scheduler, independent qualification, lesson routing, delivery, and
+benchmark adapters. `hive_mind_os.whole_os_service.WholeOSService` is the public
+durable scheduling root. A configured installation supplies
+`hive_mind_os.whole_os_composition.WholeOSCompositionHost` to explicitly compose
+discovery, bounded building, qualification, idempotent delivery, PR feedback,
+and scoped learning inside each package. The stock CLI remains inert because it
+does not own those host capabilities.
 
 ## Operator CLI
 
@@ -69,6 +73,10 @@ Hive, its scheduler, state path, or evidence store at runtime.
 
 ## Current evidence state
 
-The software composition is implemented. Real host configuration, production
-adapter attestations, external delivery grants, and fresh-process integration
-receipts are not present in this repository and remain typed qualification inputs.
+The generic scheduling and configured-host composition are implemented. Synthetic
+tests prove the typed protocol and target-runtime independence; they do not prove
+live PR publication, hostile-code isolation, Roblox Studio/device execution, or a
+measured tournament. Real host configuration, production adapter attestations,
+external delivery grants, and fresh-process receipts remain typed qualification
+inputs. See `docs/execution/WHOLE_OS_COMPOSITION_HOST.md` for the configured host
+boundary and its explicit incomplete-capability behavior.
