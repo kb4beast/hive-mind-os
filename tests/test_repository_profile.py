@@ -7,6 +7,9 @@ from hive_mind_os.brain_kernel.authority import AuthorityRegistry
 from hive_mind_os.brain_kernel.contracts import Budget, ConstraintEnvelope
 
 D = "sha256:" + "a" * 64
+class FixtureRegistry:
+    def verify_profile(self, **kwargs): return kwargs["registry_handle"] == "fixture"
+REGISTRY = FixtureRegistry()
 
 def profile(root, **changes):
     base = dict(profile_id="host.profile", identity=HostIdentity("tenant.one", "repo.one", "host.issuer", D), repository_root=str(root), workspace_root=str(root.parent / "work"), state_root=str(root.parent / "state"), cache_root=str(root.parent / "cache"), grants=(CapabilityGrant(ProfileCapability.LOCAL_BUILD, "grant.build", D),), tools=(HostToolBinding("oci.runner", "absent", None, None, "linux", ("oci", "{workspace}"), ("{workspace}",), status=CapabilityStatus.UNAVAILABLE), HostToolBinding("rojo.cli", "absent", None, None, "windows", ("rojo", "build"), (), status=CapabilityStatus.UNAVAILABLE), HostToolBinding("studio.vm", "absent", None, None, "windows", ("studio",), (), status=CapabilityStatus.UNAVAILABLE)), reports=(CapabilityReport("oci.runner", CapabilityStatus.UNAVAILABLE, "not installed"),CapabilityReport("rojo.cli", CapabilityStatus.UNAVAILABLE, "not installed"),CapabilityReport("studio.vm", CapabilityStatus.UNAVAILABLE, "not installed")), external_destinations=(), sensitivity="unknown", generation=1)
@@ -15,7 +18,7 @@ def profile(root, **changes):
     registry = AuthorityRegistry(); registry.mint_root(env, issuer="owner.fixture", authority_ref="authority.one", recorded_at="2026-01-01T00:00:00Z")
     token = registry.authorize(env.digest_value,"write","src/profile.py",now="2027-01-01T00:00:00Z")
     identity = base["identity"]; base["identity"] = HostIdentity(identity.tenant_id, identity.repository_id, identity.issuer_id, env.digest_value)
-    return HostProfileIssuer().issue(authority=registry, token=token, **base)
+    return HostProfileIssuer().issue(registry_handle="fixture", **base)
 
 class RepositoryProfileTests(unittest.TestCase):
     def test_host_identity_digest_and_read_only_plan(self):
@@ -51,10 +54,10 @@ class RepositoryProfileTests(unittest.TestCase):
             self.assertFalse(item.allows(ProfileCapability.CODE_PR))
     def test_atomic_store_never_activates_partial_write(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / "target"; root.mkdir(); store = RepositoryProfileStore(Path(temp) / "host-profiles", repository_root=root); item = profile(root)
+            root = Path(temp) / "target"; root.mkdir(); store = RepositoryProfileStore(Path(temp) / "host-profiles", repository_root=root, registry=REGISTRY); item = profile(root)
             stored = store.write(item); self.assertTrue(stored.is_file()); self.assertEqual(store.read_document(item.profile_id)["profile_digest"], item.profile_digest)
             self.assertFalse(any(path.suffix == ".tmp" for path in stored.parent.iterdir()))
-            with self.assertRaises(Exception): RepositoryProfileStore(root / "host-profiles", repository_root=root)
+            with self.assertRaises(Exception): RepositoryProfileStore(root / "host-profiles", repository_root=root, registry=REGISTRY)
     def test_unsigned_profile_shell_env_and_unknown_tool_fields_reject(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "target"; root.mkdir()
@@ -63,7 +66,7 @@ class RepositoryProfileTests(unittest.TestCase):
             with self.assertRaises(RepositoryProfileError): RepositoryProfile.from_document(document)
     def test_store_rejects_cross_tenant_replacement_and_projection_is_read_only(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / "target"; root.mkdir(); store = RepositoryProfileStore(Path(temp) / "host", repository_root=root); first = profile(root); store.write(first)
+            root = Path(temp) / "target"; root.mkdir(); store = RepositoryProfileStore(Path(temp) / "host", repository_root=root, registry=REGISTRY); first = profile(root); store.write(first)
             second = profile(root, identity=HostIdentity("tenant.two", "repo.two", "host.issuer", D), generation=2)
             with self.assertRaises(RepositoryProfileError): store.write(second)
             projection = first.projection()

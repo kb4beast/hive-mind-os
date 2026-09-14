@@ -14,7 +14,7 @@ import threading
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 
 from .path_boundary import ExternalPathRequired, is_within, require_external_path, resolved_path
 from .runtime_contracts import canonical_digest, strict_json_object
@@ -24,7 +24,6 @@ _ID = re.compile(r"^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _ENV = re.compile(r"^[A-Z][A-Z0-9_]{0,127}$")
 _PLACEHOLDER = re.compile(r"^\{[a-z][a-z0-9_]*\}$")
-_HOST_WITNESS_KEY = os.urandom(32).hex()
 _SAFE_ENVIRONMENT = frozenset({"LANG", "LC_ALL", "TZ", "SOURCE_DATE_EPOCH"})
 _ALLOWED_PLACEHOLDERS = frozenset({"{workspace}", "{state}", "{cache}", "{output}"})
 _SHELLS = frozenset({"cmd", "cmd.exe", "powershell", "powershell.exe", "sh", "bash", "python", "python.exe", "pwsh", "pwsh.exe"})
@@ -51,8 +50,9 @@ class ProfileCapability(StrEnum):
     DEPLOYMENT = "deployment"
 
 
-def _host_witness(payload: Mapping[str, Any]) -> str:
-    return canonical_digest({"profile": payload, "host_issuance_key": _HOST_WITNESS_KEY})
+class HostProfileRegistry(Protocol):
+    """Composition-injected, persistent host custody boundary (never a module key)."""
+    def verify_profile(self, *, registry_handle: str, profile_digest: str, tenant_id: str, repository_id: str, authority_digest: str, generation: int) -> bool: ...
 
 
 def _raw_absolute(value: str, label: str) -> Path:
@@ -214,7 +214,7 @@ class RepositoryProfile:
     reports: tuple[CapabilityReport, ...]
     external_destinations: tuple[str, ...] = ()
     sensitivity: str = "unknown"
-    issuer_witness: str = ""
+    registry_handle: str = ""
     generation: int = 0
     profile_digest: str = ""
 
@@ -246,33 +246,33 @@ class RepositoryProfile:
         if any(type(v) is not str or not v.startswith("https://") or "?" in v or "#" in v for v in self.external_destinations): raise RepositoryProfileError("external destination is not admitted")
         if self.sensitivity not in {"unknown", "private", "public"}: raise RepositoryProfileError("sensitivity is unknown, private, or public")
         if type(self.generation) is not int or isinstance(self.generation, bool) or self.generation < 1: raise RepositoryProfileError("generation must be positive")
-        sealed = self.to_document(include_digest=False); sealed.pop("issuer_witness")
+        sealed = self.to_document(include_digest=False); sealed.pop("registry_handle")
         expected = canonical_digest(sealed)
         if not self.profile_digest: object.__setattr__(self, "profile_digest", expected)
         elif self.profile_digest != expected: raise RepositoryProfileError("profile_digest does not seal profile fields")
-        if self.issuer_witness != _host_witness({"profile_digest": self.profile_digest, "tenant_id": self.identity.tenant_id, "repository_id": self.identity.repository_id, "generation": self.generation, "authority_digest": self.identity.authority_digest}): raise RepositoryProfileError("profile is not issued by the trusted host registry")
+        if type(self.registry_handle) is not str or not self.registry_handle.strip() or self.registry_handle != self.registry_handle.strip(): raise RepositoryProfileError("profile requires an opaque host registry handle")
 
     def to_document(self, *, include_digest: bool = True) -> dict[str, Any]:
-        result = {"profile_id": self.profile_id, "identity": {"tenant_id":self.identity.tenant_id,"repository_id":self.identity.repository_id,"issuer_id":self.identity.issuer_id,"authority_digest":self.identity.authority_digest}, "repository_root":self.repository_root,"workspace_root":self.workspace_root,"state_root":self.state_root,"cache_root":self.cache_root,"grants":[{"capability":g.capability.value,"grant_id":g.grant_id,"grant_digest":g.grant_digest,"revoked":g.revoked} for g in self.grants], "tools":[{"adapter_id":t.adapter_id,"version":t.version,"executable_path":t.executable_path,"binary_digest":t.binary_digest,"platform":t.platform,"fixed_argv":list(t.fixed_argv),"placeholders":list(t.placeholders),"safe_environment_names":list(t.safe_environment_names),"secret_handles":list(t.secret_handles),"timeout_seconds":t.timeout_seconds,"status":t.status.value,"probe_receipt_digest":t.probe_receipt_digest,"host_receipt_witness":t.host_receipt_witness} for t in self.tools], "reports":[{"adapter_id":r.adapter_id,"status":r.status.value,"reason":r.reason,"receipt_digest":r.receipt_digest} for r in self.reports], "external_destinations":list(self.external_destinations),"sensitivity":self.sensitivity,"issuer_witness":self.issuer_witness,"generation":self.generation}
+        result = {"profile_id": self.profile_id, "identity": {"tenant_id":self.identity.tenant_id,"repository_id":self.identity.repository_id,"issuer_id":self.identity.issuer_id,"authority_digest":self.identity.authority_digest}, "repository_root":self.repository_root,"workspace_root":self.workspace_root,"state_root":self.state_root,"cache_root":self.cache_root,"grants":[{"capability":g.capability.value,"grant_id":g.grant_id,"grant_digest":g.grant_digest,"revoked":g.revoked} for g in self.grants], "tools":[{"adapter_id":t.adapter_id,"version":t.version,"executable_path":t.executable_path,"binary_digest":t.binary_digest,"platform":t.platform,"fixed_argv":list(t.fixed_argv),"placeholders":list(t.placeholders),"safe_environment_names":list(t.safe_environment_names),"secret_handles":list(t.secret_handles),"timeout_seconds":t.timeout_seconds,"status":t.status.value,"probe_receipt_digest":t.probe_receipt_digest,"host_receipt_witness":t.host_receipt_witness} for t in self.tools], "reports":[{"adapter_id":r.adapter_id,"status":r.status.value,"reason":r.reason,"receipt_digest":r.receipt_digest} for r in self.reports], "external_destinations":list(self.external_destinations),"sensitivity":self.sensitivity,"registry_handle":self.registry_handle,"generation":self.generation}
         if include_digest: result["profile_digest"] = self.profile_digest
         return result
 
     def allows(self, capability: ProfileCapability, *, destination: str | None = None) -> bool:
         capability = ProfileCapability(capability)
-        if capability is ProfileCapability.READ_ONLY_PLAN: return bool(self.issuer_witness)
+        if capability is ProfileCapability.READ_ONLY_PLAN: return True
         grant = next((g for g in self.grants if g.capability is capability), None)
         if grant is None or grant.revoked: return False
-        if capability is ProfileCapability.LEARNING_EXPORT and (destination is None or self.sensitivity == "unknown" or destination not in self.external_destinations): return False
+        if capability in {ProfileCapability.CODE_PR, ProfileCapability.LEARNING_EXPORT, ProfileCapability.DEPLOYMENT} and (destination is None or self.sensitivity == "unknown" or destination not in self.external_destinations): return False
         if destination is not None and (self.sensitivity == "unknown" or destination not in self.external_destinations): return False
         return True
 
     def projection(self) -> Mapping[str, Any]:
         from types import MappingProxyType
-        return MappingProxyType({"profile_id": self.profile_id, "tenant_id": self.identity.tenant_id, "repository_id": self.identity.repository_id, "issuer_id": self.identity.issuer_id, "authority_digest": self.identity.authority_digest, "profile_digest": self.profile_digest, "generation": self.generation, "capabilities": MappingProxyType({c.value: self.allows(c) for c in ProfileCapability})})
+        return MappingProxyType({"profile_id": self.profile_id, "tenant_id": self.identity.tenant_id, "repository_id": self.identity.repository_id, "issuer_id": self.identity.issuer_id, "authority_digest": self.identity.authority_digest, "registry_handle": self.registry_handle, "profile_digest": self.profile_digest, "generation": self.generation, "capabilities": MappingProxyType({c.value: self.allows(c) for c in ProfileCapability})})
 
     @classmethod
     def from_document(cls, document: Mapping[str, Any]) -> "RepositoryProfile":
-        fields = {"profile_id", "identity", "repository_root", "workspace_root", "state_root", "cache_root", "grants", "tools", "reports", "external_destinations", "sensitivity", "issuer_witness", "generation", "profile_digest"}
+        fields = {"profile_id", "identity", "repository_root", "workspace_root", "state_root", "cache_root", "grants", "tools", "reports", "external_destinations", "sensitivity", "registry_handle", "generation", "profile_digest"}
         if not isinstance(document, Mapping) or set(document) != fields:
             raise RepositoryProfileError("repository profile has unknown or missing fields")
         identity = document["identity"]
@@ -283,7 +283,7 @@ class RepositoryProfile:
                 document["profile_id"], HostIdentity(**identity), document["repository_root"], document["workspace_root"], document["state_root"], document["cache_root"],
                 tuple(CapabilityGrant(**item) for item in document["grants"]),
                 tuple(_binding_from_document(item) for item in document["tools"]),
-                tuple(CapabilityReport(**item) for item in document["reports"]), tuple(document["external_destinations"]), document["sensitivity"], document["issuer_witness"], document["generation"], document["profile_digest"])
+                tuple(CapabilityReport(**item) for item in document["reports"]), tuple(document["external_destinations"]), document["sensitivity"], document["registry_handle"], document["generation"], document["profile_digest"])
         except (KeyError, TypeError, ValueError) as error:
             raise RepositoryProfileError("repository profile document is invalid") from error
 
@@ -296,30 +296,18 @@ def _binding_from_document(item: Any) -> HostToolBinding:
 
 
 class HostProfileIssuer:
-    """Host-side issuer: profile admission requires a live kernel capability token."""
-    def issue(self, *, authority: AuthorityRegistry, token: CapabilityToken, profile_id: str, identity: HostIdentity, repository_root: str, workspace_root: str, state_root: str, cache_root: str, grants: tuple[CapabilityGrant, ...], tools: tuple[HostToolBinding, ...], reports: tuple[CapabilityReport, ...], external_destinations: tuple[str, ...] = (), sensitivity: str = "unknown", generation: int = 1) -> RepositoryProfile:
-        if not isinstance(authority, AuthorityRegistry) or not isinstance(token, CapabilityToken) or not token_is_issued(token):
-            raise RepositoryProfileError("profile issuance requires a trusted host authority token")
-        try:
-            authority.envelope(token.envelope_digest)
-        except AuthorityDenied as error:
-            raise RepositoryProfileError("profile authority is revoked or unavailable") from error
-        if identity.authority_digest != token.envelope_digest:
-            raise RepositoryProfileError("profile identity is not bound to the issuing authority")
-        provisional = RepositoryProfile.__new__(RepositoryProfile)
-        # Build once with a deterministic placeholder so the sealed digest excludes witness.
-        values = dict(profile_id=profile_id, identity=identity, repository_root=repository_root, workspace_root=workspace_root, state_root=state_root, cache_root=cache_root, grants=grants, tools=tools, reports=reports, external_destinations=external_destinations, sensitivity=sensitivity, issuer_witness="", generation=generation, profile_digest="")
-        # calculate sealed bytes without allowing an unsigned object to escape
-        for key, value in values.items(): object.__setattr__(provisional, key, value)
-        sealed = provisional.to_document(include_digest=False); sealed.pop("issuer_witness")
-        digest = canonical_digest(sealed)
-        witness = _host_witness({"profile_digest": digest, "tenant_id": identity.tenant_id, "repository_id": identity.repository_id, "generation": generation, "authority_digest": identity.authority_digest})
-        return RepositoryProfile(**{**values, "profile_digest": digest, "issuer_witness": witness})
+    """Pure assembler; host composition supplies the opaque persistent registry handle."""
+    def issue(self, **values: Any) -> RepositoryProfile:
+        if "registry_handle" not in values:
+            raise RepositoryProfileError("host issuer must supply a registry handle")
+        return RepositoryProfile(**values)
 
 
 class RepositoryProfileStore:
     """Atomic host-side storage; the target repository is never a valid store."""
-    def __init__(self, directory: str | Path, *, repository_root: str | Path) -> None:
+    def __init__(self, directory: str | Path, *, repository_root: str | Path, registry: HostProfileRegistry) -> None:
+        if registry is None or not callable(getattr(registry, "verify_profile", None)): raise RepositoryProfileError("store requires injected host profile registry")
+        self.registry = registry
         try:
             self.directory = require_external_path(directory, repository_root, label="profile store")
         except ExternalPathRequired as error:
@@ -328,6 +316,7 @@ class RepositoryProfileStore:
     def write(self, profile: RepositoryProfile) -> Path:
         if type(profile) is not RepositoryProfile:
             raise RepositoryProfileError("profile store requires an exact issued RepositoryProfile")
+        if not self.registry.verify_profile(registry_handle=profile.registry_handle, profile_digest=profile.profile_digest, tenant_id=profile.identity.tenant_id, repository_id=profile.identity.repository_id, authority_digest=profile.identity.authority_digest, generation=profile.generation): raise RepositoryProfileError("host registry did not authenticate profile")
         if is_within(self.directory, profile.repository_root): raise RepositoryProfileError("profile store overlaps target repository")
         target = self.directory / f"{profile.profile_id}.{profile.profile_digest[7:]}.json"
         pointer = self.directory / f"{profile.profile_id}.active.json"
@@ -365,17 +354,22 @@ class RepositoryProfileStore:
             raise RepositoryProfileError("profile record must not be linked or redirected")
         return strict_json_object(path.read_bytes())
     def load(self, profile_id: str) -> RepositoryProfile:
-        return RepositoryProfile.from_document(self.read_document(profile_id))
+        profile = RepositoryProfile.from_document(self.read_document(profile_id))
+        if not self.registry.verify_profile(registry_handle=profile.registry_handle, profile_digest=profile.profile_digest, tenant_id=profile.identity.tenant_id, repository_id=profile.identity.repository_id, authority_digest=profile.identity.authority_digest, generation=profile.generation): raise RepositoryProfileError("stored profile is not current in host registry")
+        return profile
 
 
 class ProfileEffectAuthorizer:
     """The required just-before-effect check for a worker projection."""
     def require(self, projection: Mapping[str, Any], *, store: RepositoryProfileStore, authority: AuthorityRegistry, capability: ProfileCapability, destination: str | None = None) -> RepositoryProfile:
         if not isinstance(projection, Mapping): raise RepositoryProfileError("effect requires an authenticated profile projection")
+        required = {"profile_id", "tenant_id", "repository_id", "issuer_id", "authority_digest", "registry_handle", "profile_digest", "generation", "capabilities"}
+        if set(projection) != required: raise RepositoryProfileError("projection is incomplete or substituted")
         profile_id = projection.get("profile_id"); digest = projection.get("profile_digest"); generation = projection.get("generation")
         if type(profile_id) is not str or type(digest) is not str or type(generation) is not int: raise RepositoryProfileError("projection is incomplete")
         current = store.load(profile_id)
         if current.profile_digest != digest or current.generation != generation: raise RepositoryProfileError("projection is stale or substituted")
+        if projection != current.projection(): raise RepositoryProfileError("projection does not bind current host profile")
         try: authority.envelope(current.identity.authority_digest)
         except AuthorityDenied as error: raise RepositoryProfileError("profile authority is revoked") from error
         if not current.allows(capability, destination=destination): raise RepositoryProfileError("capability is absent, revoked, or route-denied")
