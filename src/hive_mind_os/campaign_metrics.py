@@ -205,8 +205,8 @@ class TaskBinding:
         _id(self.task_id, "task"); _id(self.family_id, "family")
         if not self.strata or any(value not in REQUIRED_STRATA for value in self.strata) or len(set(self.strata)) != len(self.strata):
             raise CampaignMetricsError("task has invalid strata")
-        if not self.repetition_seeds or any(type(seed) is not int for seed in self.repetition_seeds):
-            raise CampaignMetricsError("task requires integer repetition seeds")
+        if not self.repetition_seeds or any(type(seed) is not int for seed in self.repetition_seeds) or len(set(self.repetition_seeds)) != len(self.repetition_seeds):
+            raise CampaignMetricsError("task requires distinct integer repetition seeds")
     def to_document(self) -> Mapping[str, object]:
         return {"task_id": self.task_id, "family_id": self.family_id, "strata": self.strata, "repetition_seeds": self.repetition_seeds}
 
@@ -220,13 +220,13 @@ class AuthorityBinding:
             _id(getattr(self, name), name)
         for name in ("builder_ids", "affected_champion_ids"):
             values = tuple(getattr(self, name))
-            if len(values) != len(set(values)):
+            if not values or len(values) != len(set(values)):
                 raise CampaignMetricsError(f"duplicate {name}")
             for value in values:
                 _id(value, name)
             object.__setattr__(self, name, values)
-        excluded = set(self.builder_ids) | set(self.affected_champion_ids)
-        if self.evaluator_id in excluded or self.custodian_id in excluded or self.evaluator_id == self.custodian_id:
+        identities = (self.evaluator_id, self.custodian_id, *self.builder_ids, *self.affected_champion_ids)
+        if len(set(identities)) != len(identities):
             raise CampaignMetricsError("evaluator/custodian independence violated")
     def to_document(self) -> Mapping[str, object]:
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
@@ -456,13 +456,13 @@ class AdmissionSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class RoundPlanEntry:
-    admission_digest: str; protocol_digest: str; stage: str; round_number: int; pair_index: int
+    admission_digest: str; protocol_digest: str; bracket_digest: str; stage: str; round_number: int; pair_index: int
     left: str; right: str | None; bye: bool; track: str; regime_id: str; block_id: str; block_digest: str
     task_id: str; family_id: str; repetition: int; seed: int; evaluator_id: str; custodian_id: str
     def __post_init__(self) -> None:
         if self.bye != (self.right is None) or self.right == self.left:
             raise CampaignMetricsError("invalid pair/bye")
-        for name in ("admission_digest", "protocol_digest", "block_digest"):
+        for name in ("admission_digest", "protocol_digest", "bracket_digest", "block_digest"):
             _digest(getattr(self, name), name)
         for name in ("left", "track", "regime_id", "block_id", "task_id", "family_id", "evaluator_id", "custodian_id"):
             _id(getattr(self, name), name)
@@ -501,7 +501,8 @@ class ReceiptOutcome:
 
 @dataclass(frozen=True, slots=True)
 class ConsumeRoundRequest:
-    admission_digest: str; protocol_digest: str; stage: str; round_number: int; results: tuple[ReceiptOutcome, ...]
+    admission_digest: str; protocol_digest: str; stage: str; round_number: int
+    expected_bracket_digest: str; results: tuple[ReceiptOutcome, ...]; transition: "BracketTransition"
 
 
 @dataclass(frozen=True, slots=True)
@@ -518,12 +519,14 @@ class FamilyObservation:
 
 @dataclass(frozen=True, slots=True)
 class AggregateEvidence:
-    admission_digest: str; protocol_digest: str; stage: str; metric: str; left: str; right: str
-    observation_digest: str; interval: DescriptiveInterval; left_hard_gates: bool; right_hard_gates: bool
+    admission_digest: str; protocol_digest: str; stage: str; track: str; regime_id: str
+    block_digest: str; task_manifest_digest: str; family_manifest_digest: str
+    metric: str; left: str; right: str; observation_digest: str; interval: DescriptiveInterval
+    left_hard_gates: bool; right_hard_gates: bool
     def __post_init__(self) -> None:
-        for name in ("admission_digest", "protocol_digest", "observation_digest"):
+        for name in ("admission_digest", "protocol_digest", "block_digest", "task_manifest_digest", "family_manifest_digest", "observation_digest"):
             _digest(getattr(self, name), name)
-        for name in ("metric", "left", "right"):
+        for name in ("track", "regime_id", "metric", "left", "right"):
             _id(getattr(self, name), name)
         if self.stage not in STAGES or self.left == self.right or type(self.left_hard_gates) is not bool or type(self.right_hard_gates) is not bool:
             raise CampaignMetricsError("invalid aggregate binding")
@@ -543,9 +546,12 @@ class AggregateReceipt:
 class AdmissionRegistry(Protocol):
     """Host-owned authority boundary; implementations are outside this module."""
     def resolve(self, handle: object, use: AdmissionUse) -> AdmissionSnapshot: ...
+    def open_bracket(self, handle: object, protocol_digest: str, stage: str, track: str) -> "BracketState": ...
+    def resolve_bracket(self, handle: object, state_handle: object, protocol_digest: str, operation: str) -> "BracketSnapshot": ...
     def issue_round(self, handle: object, plans: tuple[RoundPlanEntry, ...]) -> tuple[IssuedReceipt, ...]: ...
-    def consume_round(self, handle: object, request: ConsumeRoundRequest) -> None: ...
-    def append_seals(self, handle: object, expected_history_digest: str, seals: tuple[VariantSeal, ...]) -> None: ...
+    def consume_round(self, handle: object, state_handle: object, request: ConsumeRoundRequest) -> "BracketState": ...
+    def commit_bracket(self, handle: object, state_handle: object, expected_bracket_digest: str, transition: "BracketTransition") -> "BracketState": ...
+    def append_seals(self, handle: object, expected_history_digest: str, expected_observed_at: int, seals: tuple[VariantSeal, ...]) -> None: ...
     def record_aggregate(self, handle: object, evidence: AggregateEvidence, observations: tuple[FamilyObservation, ...]) -> AggregateReceipt: ...
     def resolve_aggregate(self, handle: object, receipt: AggregateReceipt) -> AggregateEvidence: ...
 
@@ -592,8 +598,11 @@ def _resolve(registry: AdmissionRegistry, handle: object, protocol: MatchProtoco
         raise CampaignMetricsError("stage task membership outside protocol")
     if evidence.stage_opened_at > snapshot.observed_at:
         raise CampaignMetricsError("stage has not opened at trusted registry time")
-    if evidence.stage == "final" and operation != "seal" and snapshot.observed_at < evidence.holdout_opened_at:  # type: ignore[operator]
-        raise CampaignMetricsError("promotion holdout has not opened")
+    if evidence.stage == "final":
+        if operation == "seal" and snapshot.observed_at >= evidence.holdout_opened_at:  # type: ignore[operator]
+            raise CampaignMetricsError("final seal window closed when holdout opened")
+        if operation != "seal" and snapshot.observed_at < evidence.holdout_opened_at:  # type: ignore[operator]
+            raise CampaignMetricsError("promotion holdout has not opened")
     _validate_final_binding(protocol, evidence, snapshot.seal_history, require_final_seals=operation != "seal")
     return snapshot
 
@@ -656,15 +665,8 @@ def _maximum_pairs(protocol: MatchProtocol, ordered: tuple[str, ...], inconclusi
 
 
 @dataclass(frozen=True, slots=True)
-class BracketSchedule:
-    receipts: tuple[IssuedReceipt, ...]; terminal: str | None = None
-    def __post_init__(self) -> None:
-        if self.terminal is not None and (self.terminal not in TERMINALS or self.receipts):
-            raise CampaignMetricsError("invalid terminal schedule")
-
-
-@dataclass(frozen=True, slots=True)
-class BracketState:
+class BracketSnapshot:
+    """Registry-authenticated bracket history; callers never submit this to execute."""
     protocol_digest: str; admission_digest: str; stage: str; track: str; round_number: int = 0
     losses: Mapping[str, int] = field(default_factory=dict); byes: Mapping[str, int] = field(default_factory=dict)
     inconclusive: Mapping[frozenset[str], int] = field(default_factory=dict); quarantined: frozenset[str] = frozenset()
@@ -672,10 +674,10 @@ class BracketState:
     def __post_init__(self) -> None:
         _digest(self.protocol_digest, "protocol"); _digest(self.admission_digest, "admission")
         if self.stage not in STAGES:
-            raise CampaignMetricsError("invalid stage")
+            raise CampaignMetricsError("invalid bracket stage")
         _id(self.track, "track")
         if type(self.round_number) is not int or not 0 <= self.round_number <= 24 or self.terminal is not None and self.terminal not in TERMINALS:
-            raise CampaignMetricsError("invalid round/terminal")
+            raise CampaignMetricsError("invalid bracket round/terminal")
         for name in ("losses", "byes"):
             mapping = dict(getattr(self, name))
             for variant, count in mapping.items():
@@ -692,53 +694,96 @@ class BracketState:
         for digest in digests:
             _digest(digest, "applied receipt")
         object.__setattr__(self, "applied_receipt_digests", digests)
-    def _snapshot(self, registry: AdmissionRegistry, handle: object, protocol: MatchProtocol, operation: str) -> AdmissionSnapshot:
-        if self.protocol_digest != protocol.protocol_digest:
-            raise CampaignMetricsError("foreign protocol")
-        return _resolve(registry, handle, protocol, self.stage, operation, self.admission_digest)
-    def schedule(self, protocol: MatchProtocol, *, registry: AdmissionRegistry, admission_handle: object) -> BracketSchedule:
+    @property
+    def bracket_digest(self) -> str:
+        return canonical_digest(self.to_document())
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
+class BracketTransition:
+    round_number: int; losses: Mapping[str, int]; byes: Mapping[str, int]
+    inconclusive: Mapping[frozenset[str], int]; quarantined: frozenset[str]
+    terminal: str | None; applied_receipt_digests: frozenset[str]
+    def __post_init__(self) -> None:
+        # Reuse the strict snapshot validator with inert canonical identities.
+        BracketSnapshot(DUMMY_DIGEST, DUMMY_DIGEST, "original", "validation", self.round_number, self.losses, self.byes, self.inconclusive, self.quarantined, self.terminal, self.applied_receipt_digests)
+    def to_document(self) -> Mapping[str, object]:
+        return {name: getattr(self, name) for name in self.__dataclass_fields__}
+
+
+DUMMY_DIGEST = "sha256:" + "0" * 64
+
+
+@dataclass(frozen=True, slots=True)
+class BracketState:
+    """Opaque registry-owned bracket handle; it carries no caller-editable history."""
+    opaque_handle: object = field(repr=False, compare=False)
+    def __post_init__(self) -> None:
+        if self.opaque_handle is None:
+            raise CampaignMetricsError("bracket requires opaque registry handle")
+    def _snapshots(self, registry: AdmissionRegistry, admission_handle: object, protocol: MatchProtocol, operation: str) -> tuple[BracketSnapshot, AdmissionSnapshot]:
+        bracket = registry.resolve_bracket(admission_handle, self.opaque_handle, protocol.protocol_digest, operation)
+        if not isinstance(bracket, BracketSnapshot) or bracket.protocol_digest != protocol.protocol_digest:
+            raise CampaignMetricsError("registry returned foreign bracket state")
+        admission = _resolve(registry, admission_handle, protocol, bracket.stage, operation, bracket.admission_digest)
+        active = set(_active_variants(protocol, admission.stage_evidence, bracket.track))
+        referenced = set(bracket.losses) | set(bracket.byes) | set(bracket.quarantined) | {variant for pair in bracket.inconclusive for variant in pair}
+        if not referenced <= active:
+            raise CampaignMetricsError("registry bracket references ineligible entrant")
+        return bracket, admission
+    def _terminal(self, registry: AdmissionRegistry, admission_handle: object, bracket: BracketSnapshot, reason: str) -> "BracketState":
+        transition = BracketTransition(bracket.round_number, bracket.losses, bracket.byes, bracket.inconclusive, bracket.quarantined, reason, bracket.applied_receipt_digests)
+        state = registry.commit_bracket(admission_handle, self.opaque_handle, bracket.bracket_digest, transition)
+        if not isinstance(state, BracketState):
+            raise CampaignMetricsError("registry failed bracket terminal commit")
+        return state
+    def schedule(self, protocol: MatchProtocol, *, registry: AdmissionRegistry, admission_handle: object) -> "BracketSchedule":
         try:
-            snapshot = self._snapshot(registry, admission_handle, protocol, "schedule")
+            bracket, snapshot = self._snapshots(registry, admission_handle, protocol, "schedule")
         except LeaseExhausted:
-            return BracketSchedule((), "lease_exhausted")
-        if self.terminal:
-            return BracketSchedule((), self.terminal)
-        if self.round_number >= protocol.max_rounds:
-            return BracketSchedule((), "max_rounds")
+            bracket = registry.resolve_bracket(admission_handle, self.opaque_handle, protocol.protocol_digest, "schedule")
+            return BracketSchedule((), "lease_exhausted", self._terminal(registry, admission_handle, bracket, "lease_exhausted"))
+        if bracket.terminal:
+            return BracketSchedule((), bracket.terminal, self)
+        if bracket.round_number >= protocol.max_rounds:
+            return BracketSchedule((), "max_rounds", self._terminal(registry, admission_handle, bracket, "max_rounds"))
         evidence = snapshot.stage_evidence
-        eligible = [variant for variant in _active_variants(protocol, evidence, self.track) if variant not in self.quarantined and self.losses.get(variant, 0) < protocol.elimination_losses]
+        eligible = [variant for variant in _active_variants(protocol, evidence, bracket.track) if variant not in bracket.quarantined and bracket.losses.get(variant, 0) < protocol.elimination_losses]
         if len(eligible) == 1:
-            return BracketSchedule((), "one_survivor")
+            return BracketSchedule((), "one_survivor", self._terminal(registry, admission_handle, bracket, "one_survivor"))
         if not eligible:
-            return BracketSchedule((), "no_schedulable_pairs")
-        ordered = sorted(eligible, key=lambda variant: (self.losses.get(variant, 0), variant)); rotation = self.round_number % len(ordered); ordered = ordered[rotation:] + ordered[:rotation]
+            return BracketSchedule((), "no_schedulable_pairs", self._terminal(registry, admission_handle, bracket, "no_schedulable_pairs"))
+        ordered = sorted(eligible, key=lambda variant: (bracket.losses.get(variant, 0), variant)); rotation = bracket.round_number % len(ordered); ordered = ordered[rotation:] + ordered[:rotation]
         bye = None
         if len(ordered) % 2:
-            bye = min(ordered, key=lambda variant: (self.byes.get(variant, 0), variant)); ordered.remove(bye)
-        pairs = _maximum_pairs(protocol, tuple(ordered), self.inconclusive)
+            bye = min(ordered, key=lambda variant: (bracket.byes.get(variant, 0), variant)); ordered.remove(bye)
+        pairs = _maximum_pairs(protocol, tuple(ordered), bracket.inconclusive)
         if not pairs:
-            return BracketSchedule((), "no_schedulable_pairs")
+            return BracketSchedule((), "no_schedulable_pairs", self._terminal(registry, admission_handle, bracket, "no_schedulable_pairs"))
         items: tuple[tuple[str, str | None], ...] = (((bye, None),) + pairs) if bye is not None else pairs
         entries = []
         for pair_index, (left, right) in enumerate(items):
-            task = evidence.tasks[(self.round_number + pair_index) % len(evidence.tasks)]; repetition = self.round_number % evidence.repetitions; recipe = protocol.recipe(left); assert recipe is not None
-            entries.append(RoundPlanEntry(snapshot.admission_digest, protocol.protocol_digest, self.stage, self.round_number + 1, pair_index, left, right, right is None, self.track, str(recipe["regime_id"]), evidence.block_id, evidence.block_digest, task.task_id, task.family_id, repetition, task.repetition_seeds[repetition], evidence.principals.evaluator_id, evidence.principals.custodian_id))
+            task = evidence.tasks[(bracket.round_number + pair_index) % len(evidence.tasks)]; repetition = bracket.round_number % evidence.repetitions; recipe = protocol.recipe(left); assert recipe is not None
+            entries.append(RoundPlanEntry(snapshot.admission_digest, protocol.protocol_digest, bracket.bracket_digest, bracket.stage, bracket.round_number + 1, pair_index, left, right, right is None, bracket.track, str(recipe["regime_id"]), evidence.block_id, evidence.block_digest, task.task_id, task.family_id, repetition, task.repetition_seeds[repetition], evidence.principals.evaluator_id, evidence.principals.custodian_id))
         receipts = tuple(registry.issue_round(admission_handle, tuple(entries)))
         if len(receipts) != len(entries) or any(not isinstance(receipt, IssuedReceipt) or receipt.plan != entry or not snapshot.observed_at <= receipt.issued_at < snapshot.lease.expires_at for receipt, entry in zip(receipts, entries)) or len({id(receipt.opaque_handle) for receipt in receipts}) != len(receipts):
             raise CampaignMetricsError("registry did not issue one exact unique receipt per pair/bye")
-        return BracketSchedule(receipts)
+        return BracketSchedule(receipts, None, self)
     def apply(self, protocol: MatchProtocol, results: Sequence[ReceiptOutcome], *, registry: AdmissionRegistry, admission_handle: object) -> "BracketState":
         try:
-            self._snapshot(registry, admission_handle, protocol, "apply")
+            bracket, _ = self._snapshots(registry, admission_handle, protocol, "apply")
         except LeaseExhausted:
             if results:
                 raise CampaignMetricsError("expired lease cannot consume results")
-            return BracketState(self.protocol_digest, self.admission_digest, self.stage, self.track, self.round_number, self.losses, self.byes, self.inconclusive, self.quarantined, "lease_exhausted", self.applied_receipt_digests)
+            bracket = registry.resolve_bracket(admission_handle, self.opaque_handle, protocol.protocol_digest, "apply")
+            return self._terminal(registry, admission_handle, bracket, "lease_exhausted")
         scheduled = self.schedule(protocol, registry=registry, admission_handle=admission_handle)
         if scheduled.terminal is not None:
             if results:
                 raise CampaignMetricsError("terminal schedule cannot accept results")
-            return BracketState(self.protocol_digest, self.admission_digest, self.stage, self.track, self.round_number, self.losses, self.byes, self.inconclusive, self.quarantined, scheduled.terminal, self.applied_receipt_digests)
+            return scheduled.state
         submitted = tuple(results); expected = {id(receipt.opaque_handle): receipt for receipt in scheduled.receipts}
         if len(submitted) != len(scheduled.receipts) or len({id(result.receipt.opaque_handle) for result in submitted}) != len(submitted) or {id(result.receipt.opaque_handle) for result in submitted} != set(expected):
             raise CampaignMetricsError("results must exactly cover every unique issued receipt")
@@ -746,8 +791,7 @@ class BracketState:
             issued = expected[id(result.receipt.opaque_handle)]
             if result.receipt.plan != issued.plan or result.receipt.receipt_digest != issued.receipt_digest:
                 raise CampaignMetricsError("receipt mutated or substituted")
-        registry.consume_round(admission_handle, ConsumeRoundRequest(self.admission_digest, self.protocol_digest, self.stage, self.round_number + 1, submitted))
-        losses = dict(self.losses); byes = dict(self.byes); inconclusive = dict(self.inconclusive); quarantined = set(self.quarantined)
+        losses = dict(bracket.losses); byes = dict(bracket.byes); inconclusive = dict(bracket.inconclusive); quarantined = set(bracket.quarantined)
         for result in submitted:
             plan = result.receipt.plan
             if result.outcome == "BYE":
@@ -759,8 +803,21 @@ class BracketState:
             elif result.outcome == "QUARANTINE_RIGHT": quarantined.add(plan.right)
             elif result.outcome == "QUARANTINE_BOTH": quarantined.update((plan.left, plan.right))
             else: inconclusive[key] = inconclusive.get(key, 0) + 1
-        next_round = self.round_number + 1; terminal = "max_rounds" if next_round >= protocol.max_rounds else None
-        return BracketState(self.protocol_digest, self.admission_digest, self.stage, self.track, next_round, losses, byes, inconclusive, frozenset(quarantined), terminal, self.applied_receipt_digests | frozenset(result.receipt.receipt_digest for result in submitted))
+        next_round = bracket.round_number + 1; terminal = "max_rounds" if next_round >= protocol.max_rounds else None
+        transition = BracketTransition(next_round, losses, byes, inconclusive, frozenset(quarantined), terminal, bracket.applied_receipt_digests | frozenset(result.receipt.receipt_digest for result in submitted))
+        request = ConsumeRoundRequest(bracket.admission_digest, bracket.protocol_digest, bracket.stage, bracket.round_number + 1, bracket.bracket_digest, submitted, transition)
+        state = registry.consume_round(admission_handle, self.opaque_handle, request)
+        if not isinstance(state, BracketState):
+            raise CampaignMetricsError("registry failed atomic receipt/state commit")
+        return state
+
+
+@dataclass(frozen=True, slots=True)
+class BracketSchedule:
+    receipts: tuple[IssuedReceipt, ...]; terminal: str | None; state: BracketState
+    def __post_init__(self) -> None:
+        if self.terminal is not None and (self.terminal not in TERMINALS or self.receipts):
+            raise CampaignMetricsError("invalid terminal schedule")
 
 
 def validate_and_append_seals(protocol: MatchProtocol, seals: Sequence[VariantSeal], *, registry: AdmissionRegistry, admission_handle: object) -> None:
@@ -786,7 +843,7 @@ def validate_and_append_seals(protocol: MatchProtocol, seals: Sequence[VariantSe
                 raise CampaignMetricsError("final seal changed pair or followed holdout open")
     if evidence.stage == "final" and {seal.variant_id for seal in rows} != {entry.variant_id for entry in evidence.final_pair}:
         raise CampaignMetricsError("final seals must append exact pair together")
-    registry.append_seals(admission_handle, canonical_digest(history), rows)
+    registry.append_seals(admission_handle, canonical_digest(history), snapshot.observed_at, rows)
 
 
 def _stage_from_handle(registry: AdmissionRegistry, handle: object, protocol: MatchProtocol, operation: str) -> str:
@@ -805,15 +862,28 @@ def stage_paired_bootstrap(protocol: MatchProtocol, metric: str, left: str, righ
     if type(left_hard_gates) is not bool or type(right_hard_gates) is not bool:
         raise CampaignMetricsError("hard gates must be booleans")
     _id(metric, "metric")
-    if left == right or protocol.recipe(left) is None or protocol.recipe(right) is None:
+    left_recipe = protocol.recipe(left); right_recipe = protocol.recipe(right)
+    if left == right or left_recipe is None or right_recipe is None:
         raise CampaignMetricsError("invalid aggregate pair")
+    active = set(_active_variants(protocol, evidence, str(left_recipe["track"])))
+    if left not in active or right not in active or left_recipe["track"] != right_recipe["track"] or left_recipe["regime_id"] != right_recipe["regime_id"]:
+        raise CampaignMetricsError("aggregate pair is outside admitted stage/track/regime")
+    if stage == "final" and (left, right) != tuple(entry.variant_id for entry in evidence.final_pair):
+        raise CampaignMetricsError("final aggregate pair differs from admitted finalists")
     rows = tuple(observations); expected = {(task.family_id, task.task_id, repetition) for task in evidence.tasks for repetition in range(evidence.repetitions)}; actual = {(row.family_id, row.task_id, row.repetition) for row in rows}
     if len(actual) != len(rows) or actual != expected or len({row.receipt_digest for row in rows}) != len(rows):
         raise CampaignMetricsError("observations do not exactly match admitted family/task repetitions")
     grouped: dict[str, list[float]] = {}
-    for row in rows: grouped.setdefault(row.family_id, []).append(row.value)
+    for row in rows:
+        if metric == "success_difference" and not -1 <= row.value <= 1:
+            raise CampaignMetricsError("success differences must be within [-1, 1]")
+        if metric in {"cost_ratio", "time_ratio"} and row.value <= 0:
+            raise CampaignMetricsError("cost/time ratios must be strictly positive")
+        if metric not in {"success_difference", "cost_ratio", "time_ratio"}:
+            raise CampaignMetricsError("unknown qualification metric")
+        grouped.setdefault(row.family_id, []).append(row.value)
     interval = paired_family_bootstrap(grouped, seed=evidence.seed)
-    record = AggregateEvidence(snapshot.admission_digest, protocol.protocol_digest, stage, metric, left, right, canonical_digest(rows), interval, left_hard_gates, right_hard_gates)
+    record = AggregateEvidence(snapshot.admission_digest, protocol.protocol_digest, stage, str(left_recipe["track"]), str(left_recipe["regime_id"]), evidence.block_digest, evidence.task_manifest_digest, evidence.family_manifest_digest, metric, left, right, canonical_digest(rows), interval, left_hard_gates, right_hard_gates)
     receipt = registry.record_aggregate(admission_handle, record, rows)
     if not isinstance(receipt, AggregateReceipt) or receipt.aggregate_digest != canonical_digest(record):
         raise CampaignMetricsError("registry returned invalid aggregate receipt")
@@ -826,12 +896,21 @@ def decide_match(protocol: MatchProtocol, success: AggregateReceipt, cost_ratio:
     stage = _stage_from_handle(registry, admission_handle, protocol, "decide"); snapshot = _resolve(registry, admission_handle, protocol, stage, "decide")
     aggregates = tuple(registry.resolve_aggregate(admission_handle, receipt) for receipt in (success, cost_ratio, time_ratio)); expected_metrics = ("success_difference", "cost_ratio", "time_ratio"); first = aggregates[0]
     for aggregate, metric in zip(aggregates, expected_metrics):
-        if not isinstance(aggregate, AggregateEvidence) or aggregate.metric != metric or aggregate.admission_digest != snapshot.admission_digest or aggregate.protocol_digest != protocol.protocol_digest or aggregate.stage != stage or (aggregate.left, aggregate.right) != (first.left, first.right) or aggregate.left_hard_gates != first.left_hard_gates or aggregate.right_hard_gates != first.right_hard_gates:
+        if not isinstance(aggregate, AggregateEvidence) or aggregate.metric != metric or aggregate.admission_digest != snapshot.admission_digest or aggregate.protocol_digest != protocol.protocol_digest or aggregate.stage != stage or aggregate.track != first.track or aggregate.regime_id != first.regime_id or aggregate.block_digest != snapshot.stage_evidence.block_digest or aggregate.task_manifest_digest != snapshot.stage_evidence.task_manifest_digest or aggregate.family_manifest_digest != snapshot.stage_evidence.family_manifest_digest or (aggregate.left, aggregate.right) != (first.left, first.right) or aggregate.left_hard_gates != first.left_hard_gates or aggregate.right_hard_gates != first.right_hard_gates:
             raise CampaignMetricsError("qualification aggregates are not co-bound")
+    left_recipe = protocol.recipe(first.left); right_recipe = protocol.recipe(first.right)
+    if left_recipe is None or right_recipe is None or first.track != left_recipe["track"] or first.track != right_recipe["track"] or first.regime_id != left_recipe["regime_id"] or first.regime_id != right_recipe["regime_id"]:
+        raise CampaignMetricsError("aggregate receipt has invalid track/regime")
+    if stage == "final" and (first.left, first.right) != tuple(entry.variant_id for entry in snapshot.stage_evidence.final_pair):
+        raise CampaignMetricsError("decision pair differs from admitted finalists")
+    success_i, cost_i, time_i = (item.interval for item in aggregates)
+    if success_i.lower is not None and (success_i.lower < -1 or success_i.upper > 1):  # type: ignore[operator]
+        raise CampaignMetricsError("success interval outside probability-difference domain")
+    if any(value is not None and value <= 0 for interval in (cost_i, time_i) for value in (interval.estimate, interval.lower, interval.upper)):
+        raise CampaignMetricsError("cost/time ratio intervals must be strictly positive")
     if not first.left_hard_gates and not first.right_hard_gates: return "QUARANTINE_BOTH"
     if not first.left_hard_gates: return "QUARANTINE_LEFT"
     if not first.right_hard_gates: return "QUARANTINE_RIGHT"
-    success_i, cost_i, time_i = (item.interval for item in aggregates)
     if success_i.lower is None: return "INCONCLUSIVE"
     if success_i.lower > 0: return "LEFT"
     if success_i.upper < 0: return "RIGHT"  # type: ignore[operator]
@@ -844,7 +923,7 @@ def decide_match(protocol: MatchProtocol, success: AggregateReceipt, cost_ratio:
 
 __all__ = [
     "AdmissionRegistry", "AdmissionSnapshot", "AdmissionUse", "AggregateEvidence", "AggregateReceipt",
-    "AttemptMetric", "AuthorityBinding", "BracketSchedule", "BracketState", "CampaignMetricsError",
+    "AttemptMetric", "AuthorityBinding", "BracketSchedule", "BracketSnapshot", "BracketState", "BracketTransition", "CampaignMetricsError",
     "ConsumeRoundRequest", "DescriptiveInterval", "FamilyObservation", "FinalistBinding", "IssuedReceipt",
     "LeaseExhausted", "LeaseRecord", "MatchProtocol", "MatchProtocolInspection", "RECIPE_FIELDS", "REQUIRED_STRATA",
     "ReceiptOutcome", "RoundPlanEntry", "StageEvidence", "TaskBinding", "VariantSeal", "canonical_digest",

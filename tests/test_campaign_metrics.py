@@ -60,8 +60,8 @@ def protocol():
         "registry-authenticated-append-only-stage-seal",
         tuple(f"task-{index:02d}" for index in range(30)),
         ("development-screening", "harder-hybrid-development", "promotion_holdout"),
-        "loss-id-rotate-odd-bye-two-inconclusive",
-        "registry-bound-paired-bootstrap-hard-gates", hybrids, manifest,
+        "registry-state-cas-loss-id-rotate-odd-bye-two-inconclusive",
+        "registry-bound-stage-pair-positive-ratio-bootstrap-hard-gates", hybrids, manifest,
         "closure:fixture-only", 3, "N30-bounded-lease-required", 24,
         ("one_survivor", "no_schedulable_pairs", "max_rounds", "lease_exhausted"),
     )
@@ -130,6 +130,7 @@ class _FixtureRegistry:
         self.aggregate_by_handle = {}
         self.measurement_receipts = set()
         self.resolve_calls = []
+        self.brackets = {}
 
     def _check(self, handle):
         if handle is not self.handle:
@@ -144,6 +145,46 @@ class _FixtureRegistry:
         self.resolve_calls.append(use.operation)
         return replace(self.snapshot, seal_history=self.snapshot.seal_history)
 
+    def open_bracket(self, handle, protocol_digest, stage, track):
+        self._check(handle)
+        if protocol_digest != self.snapshot.protocol_digest or stage != self.snapshot.stage_evidence.stage:
+            raise CampaignMetricsError("foreign bracket open")
+        return self.fixture_state(stage=stage, track=track)
+
+    def fixture_state(self, *, stage=None, track=None, **changes):
+        bracket = BracketSnapshot(
+            self.snapshot.protocol_digest, self.snapshot.admission_digest,
+            stage or self.snapshot.stage_evidence.stage, track or ("builder-component" if self.snapshot.stage_evidence.stage == "original" else "whole-campaign"),
+            **changes,
+        )
+        opaque = _Handle(); self.brackets[id(opaque)] = [opaque, bracket, True]
+        return BracketState(opaque)
+
+    def bracket_snapshot(self, state):
+        record = self.brackets.get(id(state.opaque_handle))
+        if record is None:
+            raise CampaignMetricsError("unknown bracket")
+        return record[1]
+
+    def resolve_bracket(self, handle, state_handle, protocol_digest, operation):
+        self._check(handle); record = self.brackets.get(id(state_handle))
+        if record is None or record[0] is not state_handle or not record[2]:
+            raise CampaignMetricsError("foreign, forged, or superseded bracket handle")
+        bracket = record[1]
+        if bracket.protocol_digest != protocol_digest:
+            raise CampaignMetricsError("foreign bracket protocol")
+        return bracket
+
+    def commit_bracket(self, handle, state_handle, expected_bracket_digest, transition):
+        self._check(handle); record = self.brackets.get(id(state_handle))
+        if record is None or record[0] is not state_handle or not record[2] or record[1].bracket_digest != expected_bracket_digest:
+            raise CampaignMetricsError("bracket compare-and-swap failed")
+        prior = record[1]
+        next_snapshot = BracketSnapshot(prior.protocol_digest, prior.admission_digest, prior.stage, prior.track, transition.round_number, transition.losses, transition.byes, transition.inconclusive, transition.quarantined, transition.terminal, transition.applied_receipt_digests)
+        record[2] = False
+        opaque = _Handle(); self.brackets[id(opaque)] = [opaque, next_snapshot, True]
+        return BracketState(opaque)
+
     def issue_round(self, handle, plans):
         self._check(handle)
         results = []
@@ -156,10 +197,16 @@ class _FixtureRegistry:
             results.append(self.issued[key])
         return tuple(results)
 
-    def consume_round(self, handle, request):
+    def consume_round(self, handle, state_handle, request):
         self._check(handle)
+        record = self.brackets.get(id(state_handle))
+        if record is None or record[0] is not state_handle or not record[2]:
+            raise CampaignMetricsError("foreign, forged, or superseded bracket handle")
+        bracket = record[1]
+        if (request.admission_digest, request.protocol_digest, request.stage, request.expected_bracket_digest) != (bracket.admission_digest, bracket.protocol_digest, bracket.stage, bracket.bracket_digest):
+            raise CampaignMetricsError("round consumption is not bound to bracket state")
         submitted = {id(result.receipt.opaque_handle): result.receipt for result in request.results}
-        issued = {id(receipt.opaque_handle): receipt for receipt in self.issued.values() if receipt.plan.round_number == request.round_number}
+        issued = {id(receipt.opaque_handle): receipt for receipt in self.issued.values() if receipt.plan.round_number == request.round_number and receipt.plan.bracket_digest == request.expected_bracket_digest}
         if set(submitted) != set(issued):
             raise CampaignMetricsError("registry exact-set mismatch")
         for receipt_handle, receipt in submitted.items():
@@ -168,13 +215,18 @@ class _FixtureRegistry:
                 raise CampaignMetricsError("registry receipt substitution")
             if receipt_handle in self.consumed:
                 raise CampaignMetricsError("append-only receipt replay")
+        next_state = self.commit_bracket(handle, state_handle, request.expected_bracket_digest, request.transition)
         self.consumed.update(submitted)
         self.measurement_receipts.update(receipt.receipt_digest for receipt in submitted.values())
+        return next_state
 
-    def append_seals(self, handle, expected_history_digest, seals):
+    def append_seals(self, handle, expected_history_digest, expected_observed_at, seals):
         self._check(handle)
-        if expected_history_digest != canonical_digest(self.snapshot.seal_history):
+        if expected_history_digest != canonical_digest(self.snapshot.seal_history) or expected_observed_at != self.snapshot.observed_at:
             raise CampaignMetricsError("seal compare-and-swap failed")
+        evidence = self.snapshot.stage_evidence
+        if evidence.stage == "final" and self.snapshot.observed_at >= evidence.holdout_opened_at:
+            raise CampaignMetricsError("registry final seal window closed")
         self.snapshot = replace(self.snapshot, seal_history=self.snapshot.seal_history + tuple(seals))
 
     def record_aggregate(self, handle, evidence, observations):
@@ -192,11 +244,19 @@ class _FixtureRegistry:
             raise CampaignMetricsError("foreign aggregate")
         return evidence
 
+    def fixture_aggregate(self, evidence):
+        """Install malicious host-returned evidence for decision-boundary tests."""
+        opaque = _Handle()
+        receipt = AggregateReceipt(opaque, canonical_digest(evidence))
+        self.aggregate_by_handle[id(opaque)] = evidence
+        return receipt
+
 
 def admitted(stage="original", *, p=None, evidence=None, lease_record=None, observed_at=20, history=()):
     p = p or protocol(); evidence = evidence or stage_evidence(p, stage); lease_record = lease_record or lease(p, stage)
     registry = _FixtureRegistry(p, evidence, lease_record, observed_at=observed_at, history=history)
-    return p, evidence, registry, BracketState(p.protocol_digest, registry.snapshot.admission_digest, stage, "builder-component" if stage == "original" else "whole-campaign")
+    state = registry.open_bracket(registry.handle, p.protocol_digest, stage, "builder-component" if stage == "original" else "whole-campaign")
+    return p, evidence, registry, state
 
 
 class CampaignMetricsTests(unittest.TestCase):
@@ -210,6 +270,10 @@ class CampaignMetricsTests(unittest.TestCase):
             {"custodian_id": "builder:b"},
             {"evaluator_id": "champion:current"},
             {"custodian_id": PRINCIPALS.evaluator_id},
+            {"builder_ids": ()},
+            {"affected_champion_ids": ()},
+            {"builder_ids": ("builder:a", "champion:current")},
+            {"affected_champion_ids": ("champion:current", "builder:a")},
         ):
             with self.assertRaises(CampaignMetricsError):
                 replace(PRINCIPALS, **changes)
@@ -236,7 +300,7 @@ class CampaignMetricsTests(unittest.TestCase):
             path.write_text(json.dumps(document), encoding="utf-8")
             loaded = load_match_protocol(path)
         self.assertEqual(loaded.protocol_digest, p.protocol_digest)
-        state = BracketState(loaded.protocol_digest, digest("caller-made-admission"), "original", "builder-component")
+        state = BracketState(object())
         with self.assertRaises(CampaignMetricsError):
             state.schedule(loaded, registry=_FixtureRegistry(p, stage_evidence(p, "original"), lease(p, "original")), admission_handle=object())
 
@@ -274,6 +338,27 @@ class CampaignMetricsTests(unittest.TestCase):
         with self.assertRaises(CampaignMetricsError):
             state.schedule(p, registry=other, admission_handle=registry.handle)
 
+    def test_bracket_progress_is_registry_owned_and_rewind_or_field_forgery_rejects(self):
+        p, _, registry, state = admitted()
+        self.assertEqual(tuple(BracketState.__dataclass_fields__), ("opaque_handle",))
+        for changes in (
+            {"losses": {"MB0": 3}},
+            {"quarantined": frozenset(p.entrant_recipes)},
+            {"round_number": 24},
+            {"terminal": "one_survivor"},
+        ):
+            with self.assertRaises(TypeError):
+                BracketState(object(), **changes)
+        with self.assertRaises(CampaignMetricsError):
+            BracketState(object()).schedule(p, registry=registry, admission_handle=registry.handle)
+        scheduled = state.schedule(p, registry=registry, admission_handle=registry.handle)
+        advanced = state.apply(p, tuple(ReceiptOutcome(receipt, "DRAW") for receipt in scheduled.receipts), registry=registry, admission_handle=registry.handle)
+        self.assertEqual(registry.bracket_snapshot(advanced).round_number, 1)
+        with self.assertRaises(CampaignMetricsError):
+            state.schedule(p, registry=registry, admission_handle=registry.handle)
+        with self.assertRaises(CampaignMetricsError):
+            state.apply(p, tuple(ReceiptOutcome(receipt, "DRAW") for receipt in scheduled.receipts), registry=registry, admission_handle=registry.handle)
+
     def test_full_admission_identity_and_revalidation(self):
         p, evidence, registry, state = admitted()
         self.assertTrue(state.schedule(p, registry=registry, admission_handle=registry.handle).receipts)
@@ -304,7 +389,7 @@ class CampaignMetricsTests(unittest.TestCase):
         )
         for record, now, error in cases:
             registry = _FixtureRegistry(p, evidence, record, observed_at=now)
-            state = BracketState(p.protocol_digest, registry.snapshot.admission_digest, "original", "builder-component")
+            state = registry.open_bracket(registry.handle, p.protocol_digest, "original", "builder-component")
             if error:
                 with self.assertRaises(error):
                     state.schedule(p, registry=registry, admission_handle=registry.handle)
@@ -325,6 +410,7 @@ class CampaignMetricsTests(unittest.TestCase):
             replace(first.plan, seed=first.plan.seed + 1),
             replace(first.plan, evaluator_id="evaluator:other"),
             replace(first.plan, custodian_id="custodian:other"),
+            replace(first.plan, bracket_digest=digest("other bracket")),
             replace(first.plan, block_digest=digest("other block")),
             replace(first.plan, task_id="task-29"),
         ):
@@ -338,7 +424,7 @@ class CampaignMetricsTests(unittest.TestCase):
             state.apply(p, substituted, registry=registry, admission_handle=registry.handle)
         outcomes = tuple(ReceiptOutcome(receipt, "LEFT") for receipt in scheduled.receipts)
         next_state = state.apply(p, outcomes, registry=registry, admission_handle=registry.handle)
-        self.assertEqual(next_state.round_number, 1)
+        self.assertEqual(registry.bracket_snapshot(next_state).round_number, 1)
         with self.assertRaises(CampaignMetricsError):
             state.apply(p, outcomes, registry=registry, admission_handle=registry.handle)
         tampered_plan = replace(scheduled.receipts[0].plan, task_id="task-29")
@@ -348,25 +434,25 @@ class CampaignMetricsTests(unittest.TestCase):
 
     def test_zero_odd_bye_no_schedulable_and_one_survivor(self):
         p, _, registry, state = admitted("hybrid")
-        zero = replace(state, quarantined=frozenset(p.hybrid_recipes))
+        zero = registry.fixture_state(quarantined=frozenset(p.hybrid_recipes))
         self.assertEqual(zero.schedule(p, registry=registry, admission_handle=registry.handle).terminal, "no_schedulable_pairs")
-        one = replace(state, quarantined=frozenset(("MH2", "MH3", "MH4")))
+        one = registry.fixture_state(quarantined=frozenset(("MH2", "MH3", "MH4")))
         self.assertEqual(one.schedule(p, registry=registry, admission_handle=registry.handle).terminal, "one_survivor")
-        odd = replace(state, quarantined=frozenset(("MH4",)))
+        odd = registry.fixture_state(quarantined=frozenset(("MH4",)))
         scheduled = odd.schedule(p, registry=registry, admission_handle=registry.handle)
         self.assertEqual(sum(receipt.plan.bye for receipt in scheduled.receipts), 1)
         results = tuple(ReceiptOutcome(receipt, "BYE" if receipt.plan.bye else "INCONCLUSIVE") for receipt in scheduled.receipts)
         advanced = odd.apply(p, results, registry=registry, admission_handle=registry.handle)
-        self.assertEqual(sum(advanced.byes.values()), 1)
+        self.assertEqual(sum(registry.bracket_snapshot(advanced).byes.values()), 1)
         meetings = {frozenset(pair): 2 for pair in (("MH1","MH2"),("MH1","MH3"),("MH1","MH4"),("MH2","MH3"),("MH2","MH4"),("MH3","MH4"))}
-        stopped = replace(state, inconclusive=meetings)
+        stopped = registry.fixture_state(inconclusive=meetings)
         self.assertEqual(stopped.schedule(p, registry=registry, admission_handle=registry.handle).terminal, "no_schedulable_pairs")
 
     def test_quarantine_both_and_third_loss(self):
         p, _, registry, state = admitted()
         with self.assertRaises(CampaignMetricsError):
-            replace(state, losses={"MB0": -1})
-        state = replace(state, losses={"MB1": 2})
+            registry.fixture_state(losses={"MB0": -1})
+        state = registry.fixture_state(losses={"MB1": 2})
         scheduled = state.schedule(p, registry=registry, admission_handle=registry.handle)
         outcomes = []
         for receipt in scheduled.receipts:
@@ -375,8 +461,9 @@ class CampaignMetricsTests(unittest.TestCase):
             else: outcome = "QUARANTINE_BOTH"
             outcomes.append(ReceiptOutcome(receipt, outcome))
         advanced = state.apply(p, outcomes, registry=registry, admission_handle=registry.handle)
-        self.assertEqual(advanced.losses.get("MB1"), 3)
-        self.assertTrue(advanced.quarantined)
+        advanced_snapshot = registry.bracket_snapshot(advanced)
+        self.assertEqual(advanced_snapshot.losses.get("MB1"), 3)
+        self.assertTrue(advanced_snapshot.quarantined)
         self.assertNotIn("MB1", {r.plan.left for r in advanced.schedule(p, registry=registry, admission_handle=registry.handle).receipts})
 
     def test_final_requires_prior_qualification_same_regime_and_preopen_seals(self):
@@ -395,7 +482,7 @@ class CampaignMetricsTests(unittest.TestCase):
         registry = _FixtureRegistry(p, final_evidence, lease(p, "final"), observed_at=15, history=(original_seal, hybrid_seal))
         validate_and_append_seals(p, (final_a, final_b), registry=registry, admission_handle=registry.handle)
         registry.snapshot = replace(registry.snapshot, observed_at=21)
-        state = BracketState(p.protocol_digest, registry.snapshot.admission_digest, "final", "whole-campaign")
+        state = registry.open_bracket(registry.handle, p.protocol_digest, "final", "whole-campaign")
         scheduled = state.schedule(p, registry=registry, admission_handle=registry.handle)
         self.assertEqual({scheduled.receipts[0].plan.left, scheduled.receipts[0].plan.right}, {"MC0", "MH1"})
         self.assertEqual(scheduled.receipts[0].plan.block_digest, final_evidence.block_digest)
@@ -407,17 +494,68 @@ class CampaignMetricsTests(unittest.TestCase):
                 final_rows.append(FamilyObservation(task.family_id, task.task_id, repetition, receipt_digest, 0.0))
         aggregate = stage_paired_bootstrap(p, "success_difference", "MC0", "MH1", final_rows, left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle)
         self.assertIsInstance(aggregate, AggregateReceipt)
+        for wrong_pair in (("MC1", "MH2"), ("MB0", "MH1")):
+            with self.assertRaises(CampaignMetricsError):
+                stage_paired_bootstrap(p, "success_difference", *wrong_pair, final_rows, left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle)
+        for left, right, track, regime in (
+            ("MC1", "MH2", "whole-campaign", "whole-default"),
+            ("MB0", "MH1", "builder-component", "component-default"),
+        ):
+            wrong_evidence = AggregateEvidence(
+                registry.snapshot.admission_digest, p.protocol_digest, "final", track, regime,
+                final_evidence.block_digest, final_evidence.task_manifest_digest, final_evidence.family_manifest_digest,
+                "success_difference", left, right, digest(["wrong-final-observations", left, right]), DescriptiveInterval(0.1, 0.01, 0.2, 30), True, True,
+            )
+            wrong_receipts = []
+            for metric, interval in (
+                ("success_difference", wrong_evidence.interval),
+                ("cost_ratio", DescriptiveInterval(0.8, 0.7, 0.9, 30)),
+                ("time_ratio", DescriptiveInterval(0.8, 0.7, 0.9, 30)),
+            ):
+                wrong_receipts.append(registry.fixture_aggregate(replace(wrong_evidence, metric=metric, interval=interval)))
+            with self.assertRaises(CampaignMetricsError):
+                decide_match(p, *wrong_receipts, registry=registry, admission_handle=registry.handle)
         bad_pair = (replace(finalists[0], variant_id="MB0"), finalists[1])
         bad_evidence = stage_evidence(p, "final", final_pair=bad_pair, stage_opened_at=10, holdout_opened_at=20)
         bad_registry = _FixtureRegistry(p, bad_evidence, lease(p, "final"), observed_at=15, history=(original_seal, hybrid_seal, final_a, final_b))
-        bad_state = BracketState(p.protocol_digest, bad_registry.snapshot.admission_digest, "final", "whole-campaign")
+        bad_state = bad_registry.open_bracket(bad_registry.handle, p.protocol_digest, "final", "whole-campaign")
         with self.assertRaises(CampaignMetricsError):
             bad_state.schedule(p, registry=bad_registry, admission_handle=bad_registry.handle)
         same = replace(finalists[1], variant_id="MC0", qualification_stage="original", qualification_seal_digest=original_seal.seal_digest, recipe_digest=original_seal.recipe_digest, candidate_digest=original_seal.candidate_digest)
         same_evidence = stage_evidence(p, "final", final_pair=(finalists[0], same), stage_opened_at=10, holdout_opened_at=20)
         same_registry = _FixtureRegistry(p, same_evidence, lease(p, "final"), observed_at=15, history=(original_seal, hybrid_seal, final_a, final_b))
         with self.assertRaises(CampaignMetricsError):
-            BracketState(p.protocol_digest, same_registry.snapshot.admission_digest, "final", "whole-campaign").schedule(p, registry=same_registry, admission_handle=same_registry.handle)
+            same_registry.open_bracket(same_registry.handle, p.protocol_digest, "final", "whole-campaign").schedule(p, registry=same_registry, admission_handle=same_registry.handle)
+
+    def test_final_seal_operation_rejects_trusted_time_at_or_after_holdout_open(self):
+        p = protocol()
+        original_evidence = stage_evidence(p, "original", stage_opened_at=2)
+        hybrid_evidence = stage_evidence(p, "hybrid", stage_opened_at=3)
+        original_seal = seal_for(p, original_evidence, "MC0", 1, digest("candidate-MC0"), 5)
+        hybrid_seal = seal_for(p, hybrid_evidence, "MH1", 2, digest("candidate-MH1"), 6)
+        finalists = (
+            FinalistBinding("MC0", original_seal.candidate_digest, original_seal.recipe_digest, "whole-default", "original", original_seal.seal_digest),
+            FinalistBinding("MH1", hybrid_seal.candidate_digest, hybrid_seal.recipe_digest, "whole-default", "hybrid", hybrid_seal.seal_digest),
+        )
+        evidence = stage_evidence(p, "final", final_pair=finalists, stage_opened_at=10, holdout_opened_at=20)
+        late_registry = _FixtureRegistry(p, evidence, lease(p, "final"), observed_at=21, history=(original_seal, hybrid_seal))
+        backdated = (
+            seal_for(p, evidence, "MC0", 3, original_seal.candidate_digest, 11),
+            seal_for(p, evidence, "MH1", 4, hybrid_seal.candidate_digest, 12),
+        )
+        with self.assertRaises(CampaignMetricsError):
+            validate_and_append_seals(p, backdated, registry=late_registry, admission_handle=late_registry.handle)
+        self.assertEqual(late_registry.snapshot.seal_history, (original_seal, hybrid_seal))
+
+        class _OpeningRaceRegistry(_FixtureRegistry):
+            def append_seals(self, handle, expected_history_digest, expected_observed_at, seals):
+                self.snapshot = replace(self.snapshot, observed_at=20)
+                return super().append_seals(handle, expected_history_digest, expected_observed_at, seals)
+
+        racing_registry = _OpeningRaceRegistry(p, evidence, lease(p, "final"), observed_at=19, history=(original_seal, hybrid_seal))
+        with self.assertRaises(CampaignMetricsError):
+            validate_and_append_seals(p, backdated, registry=racing_registry, admission_handle=racing_registry.handle)
+        self.assertEqual(racing_registry.snapshot.seal_history, (original_seal, hybrid_seal))
 
     def test_seals_require_order_time_evaluator_stage_block_and_custody(self):
         p, evidence, registry, _ = admitted()
@@ -452,6 +590,10 @@ class CampaignMetricsTests(unittest.TestCase):
         self.assertEqual(decide_match(p, *receipts, registry=registry, admission_handle=registry.handle), "LEFT")
         with self.assertRaises(CampaignMetricsError):
             stage_paired_bootstrap(p, "success_difference", "MB0", "MB1", observations[:-1], left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle)
+        for metric in ("cost_ratio", "time_ratio"):
+            for invalid in (0.0, -2.0):
+                with self.assertRaises(CampaignMetricsError):
+                    stage_paired_bootstrap(p, metric, "MB0", "MB1", tuple(replace(row, value=invalid) for row in observations), left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle)
         raw = paired_family_bootstrap({task.family_id:(0.0,) for task in evidence.tasks}, seed=1)
         with self.assertRaises((CampaignMetricsError, AttributeError)):
             decide_match(p, raw, raw, raw, registry=registry, admission_handle=registry.handle)
@@ -460,35 +602,43 @@ class CampaignMetricsTests(unittest.TestCase):
             decide_match(p, raw_final_like, raw_final_like, raw_final_like, registry=registry, admission_handle=registry.handle)
 
     def test_registry_bound_decision_symmetry_noninferiority_and_quarantine(self):
-        p, _, registry, _ = admitted()
+        p, evidence, registry, _ = admitted()
         def decision(success_i, cost_i, time_i, gates=(True, True)):
             receipts = []
             for metric, interval in (("success_difference", success_i), ("cost_ratio", cost_i), ("time_ratio", time_i)):
-                evidence = AggregateEvidence(registry.snapshot.admission_digest, p.protocol_digest, "original", metric, "MB0", "MB1", digest([metric, interval.to_document(), gates]), interval, *gates)
-                opaque = _Handle(); receipt = AggregateReceipt(opaque, canonical_digest(evidence)); registry.aggregate_by_handle[id(opaque)] = evidence; receipts.append(receipt)
+                aggregate = AggregateEvidence(registry.snapshot.admission_digest, p.protocol_digest, "original", "builder-component", "component-default", evidence.block_digest, evidence.task_manifest_digest, evidence.family_manifest_digest, metric, "MB0", "MB1", digest([metric, interval.to_document(), gates]), interval, *gates)
+                opaque = _Handle(); receipt = AggregateReceipt(opaque, canonical_digest(aggregate)); registry.aggregate_by_handle[id(opaque)] = aggregate; receipts.append(receipt)
             return decide_match(p, *receipts, registry=registry, admission_handle=registry.handle)
         symmetric = DescriptiveInterval(0, -0.04, 0.04, 12)
         self.assertEqual(decision(DescriptiveInterval(0, -0.04, 0.20, 12), DescriptiveInterval(0.8, 0.7, 0.9, 12), DescriptiveInterval(1.0, 0.9, 1.05, 12)), "DRAW")
         self.assertEqual(decision(symmetric, DescriptiveInterval(1.0, 0.9, 1.1, 12), DescriptiveInterval(0.8, 0.7, 0.9, 12)), "LEFT")
         self.assertEqual(decision(symmetric, DescriptiveInterval(1.2, 1.1, 1.3, 12), DescriptiveInterval(1.0, 0.95, 1.05, 12)), "RIGHT")
         self.assertEqual(decision(symmetric, DescriptiveInterval(1.0, 0.9, 1.1, 12), DescriptiveInterval(1.0, 0.9, 1.1, 12), (False, False)), "QUARANTINE_BOTH")
+        for invalid in (
+            DescriptiveInterval(-2.0, -3.0, -1.0, 12),
+            DescriptiveInterval(0.0, 0.0, 0.0, 12),
+        ):
+            with self.assertRaises(CampaignMetricsError):
+                decision(symmetric, invalid, DescriptiveInterval(1.0, 0.9, 1.1, 12))
 
     def test_every_execution_surface_revalidates_lease(self):
         p, evidence, registry, state = admitted()
         scheduled = state.schedule(p, registry=registry, admission_handle=registry.handle)
         outcomes = tuple(ReceiptOutcome(receipt, "DRAW") for receipt in scheduled.receipts)
-        state.apply(p, outcomes, registry=registry, admission_handle=registry.handle)
+        state = state.apply(p, outcomes, registry=registry, admission_handle=registry.handle)
         seal = seal_for(p, evidence, "MB0", 1, digest("candidate"), 20)
         validate_and_append_seals(p, (seal,), registry=registry, admission_handle=registry.handle)
         receipt_digests = {task.task_id: digest(["measurement", task.task_id]) for task in evidence.tasks}
         registry.measurement_receipts.update(receipt_digests.values())
         rows = tuple(FamilyObservation(task.family_id, task.task_id, 0, receipt_digests[task.task_id], 0.0) for task in evidence.tasks)
-        aggregates = [stage_paired_bootstrap(p, metric, "MB0", "MB1", rows, left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle) for metric in ("success_difference", "cost_ratio", "time_ratio")]
+        aggregates = [stage_paired_bootstrap(p, metric, "MB0", "MB1", tuple(replace(row, value=0.0 if metric == "success_difference" else 1.0) for row in rows), left_hard_gates=True, right_hard_gates=True, registry=registry, admission_handle=registry.handle) for metric in ("success_difference", "cost_ratio", "time_ratio")]
         decide_match(p, *aggregates, registry=registry, admission_handle=registry.handle)
         self.assertTrue(set(("schedule", "apply", "seal", "aggregate", "decide")) <= set(registry.resolve_calls))
         registry.snapshot = replace(registry.snapshot, observed_at=registry.snapshot.lease.expires_at)
-        self.assertEqual(state.schedule(p, registry=registry, admission_handle=registry.handle).terminal, "lease_exhausted")
-        self.assertEqual(state.apply(p, (), registry=registry, admission_handle=registry.handle).terminal, "lease_exhausted")
+        expired_schedule = state.schedule(p, registry=registry, admission_handle=registry.handle)
+        self.assertEqual(expired_schedule.terminal, "lease_exhausted")
+        expired_state = expired_schedule.state.apply(p, (), registry=registry, admission_handle=registry.handle)
+        self.assertEqual(registry.bracket_snapshot(expired_state).terminal, "lease_exhausted")
         with self.assertRaises(LeaseExhausted):
             validate_and_append_seals(p, (replace(seal, sequence=2, sealed_at=22),), registry=registry, admission_handle=registry.handle)
         with self.assertRaises(LeaseExhausted):
@@ -501,6 +651,8 @@ class CampaignMetricsTests(unittest.TestCase):
         # The StageEvidence constructor itself rejects any claimed final 30x1 shape.
         with self.assertRaises(CampaignMetricsError):
             replace(stage_evidence(p, "original"), stage="final", tasks=task_bindings("final"), repetitions=1, final_pair=(), holdout_opened_at=20)
+        with self.assertRaises(CampaignMetricsError):
+            replace(task_bindings("final")[0], repetition_seeds=(7, 7, 7))
 
     def test_raw_bootstrap_repeated_seed_is_byte_equal_but_inert(self):
         pairs = {f"family-{index}": (float(index),) for index in range(12)}

@@ -20,6 +20,7 @@ Only that host can:
 
 - authenticate evaluator, custodian, builders, affected champion and lease issuer;
 - resolve a registry-instance-bound opaque admission handle;
+- open and resolve registry-instance-bound opaque bracket-state handles;
 - attest immutable recipes and disjoint task/family/block manifests;
 - issue one opaque receipt per exact pair or bye;
 - atomically consume receipts in an append-only replay ledger;
@@ -35,7 +36,10 @@ the canonical digest of the complete protocol digest, complete `StageEvidence`, 
 complete `LeaseRecord`. Stage evidence binds recipe, task, family and block manifest
 digests; task/family/repetition/seed membership; all thirteen strata; manifest
 signature reference; evaluator/custodian/builders/affected champion identities;
-stage and opening times; and, for final, both exact finalist bindings. The lease
+stage and opening times; and, for final, both exact finalist bindings. Builder and
+affected-champion sets must both be nonempty, and evaluator, custodian, every builder
+and every affected champion must be pairwise distinct. Each stochastic task's
+declared repetition seeds must be distinct. The lease
 binds protocol, stage, budget, issuer, issue/expiry/revocation times and permitted
 operations. The library rejects an untrusted issuer, wrong scope, future, expired,
 revoked, or operation-ineligible lease on every use. Schedule/apply convert a valid
@@ -78,8 +82,13 @@ exact equality with the authenticated task/family/repetition manifest: 12 distin
 families × one declared repetition for original/hybrid, or 30 distinct families ×
 three declared repetitions for final. Every row carries a distinct execution
 receipt digest; the registry verifies it against durable consumed evidence and
-returns an opaque `AggregateReceipt`. `decide_match` accepts only three co-bound
-registry aggregate receipts for success difference, cost ratio and time ratio.
+returns an opaque `AggregateReceipt`. Aggregate evidence binds the exact admitted
+stage, pair, track, regime, block, task manifest and family manifest. Final
+aggregation accepts only the ordered finalist pair recorded in the admitted final
+evidence. `decide_match` accepts only three co-bound registry aggregate receipts for
+success difference, cost ratio and time ratio. Success observations and intervals
+must remain in [-1, 1]; cost and time observations and every known interval endpoint
+must be finite and strictly positive.
 
 Success noninferiority requires each directional lower bound to be strictly greater
 than -0.05 and both hard gates. A strictly positive/negative success interval wins
@@ -99,8 +108,15 @@ implicit win. If no pair exists, the explicit partial terminal is
 `no_schedulable_pairs`; zero entrants have the same terminal and one has
 `one_survivor`.
 
+`BracketState` contains only an opaque registry-owned state handle. Before scheduling,
+applying or stopping, the module resolves the exact authenticated bracket snapshot,
+including round, losses, byes, inconclusive meetings, quarantine set, terminal and
+applied-receipt ledger. Every transition is a compare-and-swap against that snapshot;
+the old handle is superseded, so rewind, skipped-round and caller-field mutation
+attempts reject.
+
 The registry issues exactly one opaque `IssuedReceipt` for every scheduled pair and
-bye. Each canonical plan binds admission/protocol/stage, round/index/orientation,
+bye. Each canonical plan binds admission/protocol/bracket-state/stage, round/index/orientation,
 track/regime, actual block ID/digest, task/family/repetition/seed,
 evaluator/custodian, and issuance time. `apply` requires exact set equality: zero,
 partial, duplicate, substituted or extra results reject. A bye requires `BYE`.
@@ -120,7 +136,9 @@ principals and manifests, correct stage/variant class, and an immutable recipe.
 Final admission references the exact original and hybrid qualification seal digests.
 Both prior seals must precede final-stage admission. The registry must then contain
 exactly two final pair seals, unchanged and sealed after final admission but before
-the recorded holdout-open time. Final scheduling rechecks this history and uses the
+the recorded holdout-open time. A final seal operation itself is allowed only while
+the registry's trusted observed time is still before holdout opening, preventing
+post-open backdating. Final scheduling rechecks this history and uses the
 actual external holdout digest. A cross-track, cross-regime, late, changed,
 unqualified or builder/custodian-substituted pair rejects.
 
