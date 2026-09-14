@@ -17,7 +17,7 @@ from pathlib import Path
 from random import Random
 from statistics import mean
 from types import MappingProxyType
-from typing import Iterable, Mapping, Protocol, Sequence
+from typing import Any, Iterable, Mapping, Protocol, Sequence, cast
 
 BOOTSTRAP_RESAMPLES = 10_000
 CONFIDENCE = 0.95
@@ -621,8 +621,12 @@ class MatchProtocol:
             or set(self.terminal_rules) != set(TERMINALS)
         ):
             raise CampaignMetricsError("closed tournament rules required")
-        entrants = _freeze(self.entrant_recipes)
-        hybrids = _freeze(self.hybrid_recipes)
+        entrants = cast(
+            Mapping[str, Mapping[str, object]], _freeze(self.entrant_recipes)
+        )
+        hybrids = cast(
+            Mapping[str, Mapping[str, object]], _freeze(self.hybrid_recipes)
+        )
         object.__setattr__(self, "entrant_recipes", entrants)
         object.__setattr__(self, "hybrid_recipes", hybrids)
         object.__setattr__(
@@ -761,9 +765,10 @@ def _read_protocol_document(path: str | Path) -> Mapping[str, object]:
 
 def load_match_protocol_for_inspection(path: str | Path) -> MatchProtocolInspection:
     document = _read_protocol_document(path)
+    obligations = cast(Iterable[object], document.get("external_evidence_obligations", ()))
     blockers = tuple(
         sorted(
-            str(value) for value in document.get("external_evidence_obligations", ())
+            str(value) for value in obligations
         )
     )
     return MatchProtocolInspection(
@@ -784,7 +789,7 @@ def load_match_protocol(path: str | Path) -> MatchProtocol:
     if document.pop("external_evidence_obligations", None):
         raise CampaignMetricsError("closed candidate retains open obligations")
     declared = document.pop("protocol_digest", None)
-    protocol = MatchProtocol(**document)
+    protocol = MatchProtocol(**cast(Any, document))
     if declared is not None and declared != protocol.protocol_digest:
         raise CampaignMetricsError("protocol digest mismatch")
     return protocol
@@ -1147,10 +1152,10 @@ def _resolve(
         raise CampaignMetricsError("state admission binding changed")
     expected = {
         "recipe_manifest_digest": manifest["recipe_manifest_digest"],
-        "block_digest": manifest["block_manifest_digests"][stage],
-        "task_manifest_digest": manifest["task_manifest_digests"][stage],
-        "family_manifest_digest": manifest["family_manifest_digests"][stage],
-        "manifest_signature_ref": manifest["manifest_signature_refs"][stage],
+        "block_digest": cast(Mapping[str, object], manifest["block_manifest_digests"])[stage],
+        "task_manifest_digest": cast(Mapping[str, object], manifest["task_manifest_digests"])[stage],
+        "family_manifest_digest": cast(Mapping[str, object], manifest["family_manifest_digests"])[stage],
+        "manifest_signature_ref": cast(Mapping[str, object], manifest["manifest_signature_refs"])[stage],
     }
     if any(getattr(evidence, name) != value for name, value in expected.items()):
         raise CampaignMetricsError("admitted manifests/signature do not match protocol")
@@ -1181,6 +1186,9 @@ def _resolve(
     if evidence.stage_opened_at > snapshot.observed_at:
         raise CampaignMetricsError("stage has not opened at trusted registry time")
     if evidence.stage == "final":
+        holdout_opened_at = evidence.holdout_opened_at
+        if holdout_opened_at is None:
+            raise CampaignMetricsError("final stage requires holdout opening time")
         if operation == "seal" and snapshot.observed_at >= evidence.holdout_opened_at:  # type: ignore[operator]
             raise CampaignMetricsError("final seal window closed when holdout opened")
         if operation != "seal" and snapshot.observed_at < evidence.holdout_opened_at:  # type: ignore[operator]
@@ -1203,6 +1211,9 @@ def _validate_final_binding(
 ) -> None:
     if evidence.stage != "final":
         return
+    holdout_opened_at = evidence.holdout_opened_at
+    if holdout_opened_at is None:
+        raise CampaignMetricsError("final stage requires holdout opening time")
     finalists = evidence.final_pair
     if finalists[0].variant_id == finalists[1].variant_id:
         raise CampaignMetricsError("finalists must be distinct")
@@ -1248,11 +1259,11 @@ def _validate_final_binding(
             or prior.recipe_digest != entry.recipe_digest
             or prior.regime_id != entry.regime_id
             or prior.block_digest
-            != protocol.experiment_manifest["block_manifest_digests"][expected_stage]
+            != cast(Mapping[str, object], protocol.experiment_manifest["block_manifest_digests"])[expected_stage]
             or prior.task_manifest_digest
-            != protocol.experiment_manifest["task_manifest_digests"][expected_stage]
+            != cast(Mapping[str, object], protocol.experiment_manifest["task_manifest_digests"])[expected_stage]
             or prior.family_manifest_digest
-            != protocol.experiment_manifest["family_manifest_digests"][expected_stage]
+            != cast(Mapping[str, object], protocol.experiment_manifest["family_manifest_digests"])[expected_stage]
             or prior.evaluator_id != evidence.principals.evaluator_id
             or prior.custodian_id != evidence.principals.custodian_id
             or prior.sealed_at >= evidence.stage_opened_at
@@ -1266,7 +1277,7 @@ def _validate_final_binding(
     if (
         [seal.sequence for seal in history] != list(range(1, len(history) + 1))
         or any(a.sealed_at >= b.sealed_at for a, b in zip(history, history[1:]))
-        or any(seal.sealed_at > evidence.holdout_opened_at for seal in history)
+        or any(seal.sealed_at > holdout_opened_at for seal in history)
     ):  # type: ignore[operator]
         raise CampaignMetricsError("seal registry history is out of order")
     for entry in finalists:
@@ -1286,7 +1297,7 @@ def _validate_final_binding(
             or final.evaluator_id != evidence.principals.evaluator_id
             or final.custodian_id != evidence.principals.custodian_id
             or final.sealed_at < evidence.stage_opened_at
-            or final.sealed_at >= evidence.holdout_opened_at
+            or final.sealed_at >= holdout_opened_at
         ):  # type: ignore[operator]
             raise CampaignMetricsError("final pair changed, late, or outside custody")
 
@@ -1807,13 +1818,16 @@ def validate_and_append_seals(
         ):
             raise CampaignMetricsError("seal variant/stage mismatch")
         if evidence.stage == "final":
+            holdout_opened_at = evidence.holdout_opened_at
+            if holdout_opened_at is None:
+                raise CampaignMetricsError("final stage requires holdout opening time")
             finalists = {entry.variant_id: entry for entry in evidence.final_pair}
             entry = finalists.get(seal.variant_id)
             if (
                 entry is None
                 or seal.candidate_digest != entry.candidate_digest
                 or seal.recipe_digest != entry.recipe_digest
-                or seal.sealed_at >= evidence.holdout_opened_at
+                or seal.sealed_at >= holdout_opened_at
             ):  # type: ignore[operator]
                 raise CampaignMetricsError(
                     "final seal changed pair or followed holdout open"
@@ -2017,23 +2031,33 @@ def decide_match(
         return "QUARANTINE_RIGHT"
     if success_i.lower is None:
         return "INCONCLUSIVE"
-    if success_i.lower > 0:
-        return "LEFT"
-    if success_i.upper < 0:
-        return "RIGHT"  # type: ignore[operator]
-    if not (
-        success_i.lower > NONINFERIORITY_MARGIN
-        and -success_i.upper > NONINFERIORITY_MARGIN
-    ):
-        return "DRAW"  # type: ignore[operator]
-    if None in (cost_i.lower, cost_i.upper, time_i.lower, time_i.upper):
+    success_lower = success_i.lower
+    success_upper = success_i.upper
+    if success_upper is None:
         return "INCONCLUSIVE"
-    if (cost_i.upper < 1 and time_i.upper <= 1.10) or (
-        time_i.upper < 1 and cost_i.upper <= 1.10
+    if success_lower > 0:
+        return "LEFT"
+    if success_upper < 0:
+        return "RIGHT"
+    if not (
+        success_lower > NONINFERIORITY_MARGIN
+        and -success_upper > NONINFERIORITY_MARGIN
+    ):
+        return "DRAW"
+    cost_lower = cost_i.lower
+    cost_upper = cost_i.upper
+    time_lower = time_i.lower
+    time_upper = time_i.upper
+    if None in (cost_lower, cost_upper, time_lower, time_upper):
+        return "INCONCLUSIVE"
+    assert cost_lower is not None and cost_upper is not None
+    assert time_lower is not None and time_upper is not None
+    if (cost_upper < 1 and time_upper <= 1.10) or (
+        time_upper < 1 and cost_upper <= 1.10
     ):
         return "LEFT"
-    if (cost_i.lower > 1 and time_i.lower >= 1 / 1.10) or (
-        time_i.lower > 1 and cost_i.lower >= 1 / 1.10
+    if (cost_lower > 1 and time_lower >= 1 / 1.10) or (
+        time_lower > 1 and cost_lower >= 1 / 1.10
     ):
         return "RIGHT"
     return "DRAW"
