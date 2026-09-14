@@ -93,6 +93,14 @@ from .scheduler import Scheduler
 from .source_docket import load_source_docket
 from .verify import VerificationError, verify_repository
 from .workers import serve
+from .whole_os_service import (
+    PackageExecutionResult,
+    PackageStatus,
+    ServiceError,
+    WholeOSService,
+    load_service_config,
+)
+from .cortex.repository.mission_bindings import ConfiguredMissionBindingsProvider
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -759,6 +767,79 @@ def build_autonomous_parser() -> argparse.ArgumentParser:
     requirements.add_argument("--run-id", required=True)
     requirements.add_argument("--state-dir", default=".hive-mind-state/autonomous")
     return parser
+
+
+def build_whole_os_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind whole-os",
+        description="Operate one configured, durable Whole-OS campaign.",
+    )
+    commands = parser.add_subparsers(dest="whole_os_command", required=True)
+    for name, help_text in (
+        ("inspect", "Inspect the inert configuration and sealed graph"),
+        ("status", "Read durable campaign status"),
+        ("run-once", "Run one queued package using the configured host boundary"),
+        ("resume", "Resume the campaign by running one queued package"),
+    ):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument("--config", required=True, help="Closed JSON service configuration")
+        command.add_argument("--json", action="store_true", dest="json_output")
+    return parser
+
+
+class _UnconfiguredHost:
+    """Explicitly incomplete CLI host; credentials and adapters stay host-owned."""
+    def execute_package(self, package, bindings, payload):
+        return PackageExecutionResult(
+            package.package_id, PackageStatus.BLOCKED_CAPABILITY, None, (),
+            "no host executor is configured for this process",
+        )
+
+
+def _observation_document(observation) -> dict[str, object]:
+    result = observation.last_result
+    return {
+        "campaign_id": observation.campaign_id, "status": observation.status,
+        "completed_packages": list(observation.completed_packages),
+        "pending_packages": list(observation.pending_packages),
+        "blocked_packages": list(observation.blocked_packages),
+        "last_result": None if result is None else {
+            "package_id": result.package_id, "status": result.status.value,
+            "candidate_digest": result.candidate_digest,
+            "evidence_refs": list(result.evidence_refs), "message": result.message,
+        },
+    }
+
+
+def _run_whole_os(args: argparse.Namespace) -> int:
+    try:
+        config = load_service_config(args.config)
+        if args.whole_os_command == "inspect":
+            document = {
+                "campaign_id": config.campaign_id, "tenant_id": config.tenant_id,
+                "repository_id": config.repository_id, "state_dir": str(config.state_dir),
+                "binding_descriptor_digest": config.binding_descriptor.digest,
+                "graph_digest": config.graph.digest,
+                "package_ids": [package.package_id for package in config.graph.packages],
+            }
+            print(json.dumps(document, indent=2, sort_keys=True) if args.json_output else
+                  f"{config.campaign_id}: {len(config.graph.packages)} packages")
+            return 0
+        provider = ConfiguredMissionBindingsProvider(
+            config.binding_descriptor, lambda descriptor, payload, root: (None, None)
+        )
+        service = WholeOSService(config, provider, _UnconfiguredHost())
+        try:
+            observation = service.observe() if args.whole_os_command == "status" else service.run_once()
+        finally:
+            service.close()
+        document = _observation_document(observation)
+        print(json.dumps(document, indent=2, sort_keys=True) if args.json_output else
+              f"{observation.campaign_id}: {observation.status}")
+        return 0
+    except (ServiceError, OSError, ValueError, TypeError) as error:
+        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        return 2
 
 
 async def _run(args: argparse.Namespace) -> int:
@@ -1904,6 +1985,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "autonomous":
         args = build_autonomous_parser().parse_args(arguments[1:])
         raise SystemExit(_run_autonomous(args))
+    if arguments and arguments[0] == "whole-os":
+        args = build_whole_os_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_whole_os(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 

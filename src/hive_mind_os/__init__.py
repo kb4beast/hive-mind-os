@@ -176,6 +176,18 @@ from .source_docket import (
     load_source_docket,
 )
 from .workers import Worker, serve
+from .whole_os_service import (
+    PackageExecutionResult,
+    PackageStatus,
+    ServiceError,
+    ServiceObservation,
+    WholeOSHost,
+    WholeOSService,
+    WholeOSServiceConfig,
+    graph_from_document,
+    load_graph,
+    load_service_config,
+)
 
 __all__ = [
     "ActionKind",
@@ -302,6 +314,13 @@ __all__ = [
     "CheckResult",
     "VisionComplianceGate",
     "Worker",
+    "PackageExecutionResult",
+    "PackageStatus",
+    "ServiceError",
+    "ServiceObservation",
+    "WholeOSHost",
+    "WholeOSService",
+    "WholeOSServiceConfig",
     "WAR_ROOM_PROJECTION_SCHEMA_VERSION",
     "WorkflowManifest",
     "WorkflowTransition",
@@ -335,5 +354,8 @@ __all__ = [
     "validate_schema_catalog",
     "verify_audit_artifact",
     "write_audit_artifact",
+    "graph_from_document",
+    "load_graph",
+    "load_service_config",
 ]
 __version__ = "0.6.0"
