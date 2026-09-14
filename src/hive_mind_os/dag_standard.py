@@ -241,6 +241,8 @@ def _validate_source_namespace(
             "portable work packages use an unknown source inventory"
         )
     inventory_id = inventory.get("inventory_id")
+    if not isinstance(inventory_id, str):
+        raise ContractViolation("source inventory_id must be a string")
     require_identifier(inventory_id, "source inventory_id")
     inventory_digest = raw_sha256(source_inventory_bytes)
     if (

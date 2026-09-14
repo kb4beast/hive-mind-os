@@ -784,7 +784,7 @@ def _binding_from_document(
             safe_environment_names=tuple(item["safe_environment_names"]),
             secret_handles=tuple(item["secret_handles"]),
             timeout_seconds=item["timeout_seconds"],
-            status="untested",
+            status=CapabilityStatus.UNTESTED,
             probe_receipt_digest=item["probe_receipt_digest"],
             host_receipt_witness=item["host_receipt_witness"],
         )
@@ -801,7 +801,7 @@ def _binding_from_document(
         safe_environment_names=tuple(item["safe_environment_names"]),
         secret_handles=tuple(item["secret_handles"]),
         timeout_seconds=item["timeout_seconds"],
-        status=item["status"],
+        status=CapabilityStatus(item["status"]),
         probe_receipt_digest=item["probe_receipt_digest"],
         host_receipt_witness=item["host_receipt_witness"],
     )

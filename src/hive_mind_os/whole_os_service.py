@@ -297,6 +297,13 @@ def graph_from_document(document: Mapping[str, object]) -> OutcomeGraphSpec:
     }
     if set(document) != allowed or not isinstance(document["packages"], list):
         raise ServiceError("graph document has an unknown shape")
+    contract_version = document["contract_version"]
+    maximum_concurrent = document["maximum_concurrent"]
+    if (
+        type(contract_version) is not int
+        or type(maximum_concurrent) is not int
+    ):
+        raise ServiceError("graph contract version and concurrency must be integers")
     packages = []
     for raw in document["packages"]:
         if not isinstance(raw, dict):
@@ -329,8 +336,8 @@ def graph_from_document(document: Mapping[str, object]) -> OutcomeGraphSpec:
         OutcomeGraphSpec(
             packages=tuple(packages),
             base_snapshot=str(document["base_snapshot"]),
-            contract_version=int(document["contract_version"]),
-            maximum_concurrent=int(document["maximum_concurrent"]),
+            contract_version=contract_version,
+            maximum_concurrent=maximum_concurrent,
             court_receipt=str(document["court_receipt"]),
         )
     )
