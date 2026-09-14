@@ -1,3 +1,7 @@
+param(
+    [switch]$RequireLiveCheckoutMatch
+)
+
 $ErrorActionPreference = "Stop"
 
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
@@ -24,13 +28,21 @@ foreach ($entry in $manifest.files) {
 }
 
 $local = Read-Json (Join-Path $handoff "local-source-manifest.json")
+$pinnedTree = (git -C $repo rev-parse "$($local.commit)^{tree}").Trim()
+Require ($LASTEXITCODE -eq 0) "missing pinned local-source commit: $($local.commit)"
+Require ($pinnedTree -eq $local.tree) "wrong pinned local-source tree: $($local.commit)"
 foreach ($entry in $local.files) {
-    $path = Join-Path $repo $entry.path
-    Require (Test-Path -LiteralPath $path) "missing local source: $($entry.path)"
-    $digest = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-    Require ($digest -eq $entry.checkout_sha256) "wrong local source digest: $($entry.path)"
-    $blob = (git -C $repo hash-object -- $path).Trim()
-    Require ($blob -eq $entry.git_blob) "wrong local source blob: $($entry.path)"
+    $blob = (git -C $repo rev-parse "$($local.commit):$($entry.path)").Trim()
+    Require ($LASTEXITCODE -eq 0) "missing pinned local source: $($entry.path)"
+    Require ($blob -eq $entry.git_blob) "wrong pinned local source blob: $($entry.path)"
+    if ($RequireLiveCheckoutMatch) {
+        $path = Join-Path $repo $entry.path
+        Require (Test-Path -LiteralPath $path) "missing live local source: $($entry.path)"
+        $digest = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        Require ($digest -eq $entry.checkout_sha256) "live local source drift: $($entry.path)"
+        $liveBlob = (git -C $repo hash-object -- $path).Trim()
+        Require ($liveBlob -eq $entry.git_blob) "live local source blob drift: $($entry.path)"
+    }
 }
 
 $inventory = Read-Json (Join-Path $candidate "source-inventory.json")
@@ -53,8 +65,8 @@ $requiredAdrs = 74..78 | ForEach-Object { "GOV-ADR-{0:D3}" -f $_ }
 foreach ($id in $requiredAdrs) {
     $record = @($inventory.sources | Where-Object id -eq $id)
     Require ($record.Count -eq 1) "missing ADR source: $id"
-    $path = Join-Path $repo $record[0].locator
-    $blob = (git -C $repo hash-object -- $path).Trim()
+    $blob = (git -C $repo rev-parse "$($inventory.repository.handoff_commit):$($record[0].locator)").Trim()
+    Require ($LASTEXITCODE -eq 0) "missing pinned ADR source: $id"
     Require ($blob -eq $record[0].git_blob) "wrong ADR blob: $id"
 }
 
@@ -105,6 +117,7 @@ foreach ($entry in $symbols.nodes) {
     result = "PASS"
     handoff_manifest_files = $manifest.files.Count
     local_source_paths = $local.files.Count
+    local_source_mode = $(if ($RequireLiveCheckoutMatch) { "pinned_and_live" } else { "pinned_snapshot" })
     successor_sources = $sourceIds.Count
     founding_sources = $foundingIds.Count
     requirements = $requirementIds.Count
