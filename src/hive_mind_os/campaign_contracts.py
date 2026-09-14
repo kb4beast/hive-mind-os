@@ -58,17 +58,21 @@ class AcceptanceBinding:
  def to_document(self):return {"acceptance_id":self.acceptance_id,"capability":self.capability,"artifact_ref":self.artifact_ref,"result":self.result,"owner":self.owner,"claim_level":self.claim_level.value,"evidence_digest":self.evidence_digest}
 @dataclass(frozen=True,slots=True)
 class CandidateCompletion:
- mission_id:str;package_id:str;authority_digest:str;base_commit_sha:str;base_tree_digest:str;commit_sha:str;tree_digest:str;output_receipts:tuple[tuple[str,str],...];acceptance_receipts:tuple[tuple[str,str],...];disposition:str
+ mission_id:str;package_id:str;authority_digest:str;base_commit_sha:str;base_tree_digest:str;commit_sha:str;tree_digest:str;output_receipts:tuple[tuple[str,str],...];acceptance_receipts:tuple[tuple[str,str],...];disposition:str;package_revision:int=0;objective_digest:str=""
  def __post_init__(self):
   for x,n in ((self.mission_id,"mission"),(self.package_id,"package")):_id(x,n)
   for x,n in ((self.authority_digest,"authority"),(self.base_tree_digest,"base tree"),(self.tree_digest,"tree")):_dg(x,n)
   _sha(self.base_commit_sha,"base commit");_sha(self.commit_sha,"commit")
   if self.disposition not in {"implemented","no-change"}:_fail(CampaignContractErrorCode.INVALID,"disposition")
+  if type(self.package_revision)is not int or self.package_revision<1:_fail(CampaignContractErrorCode.INVALID,"package_revision")
+  _dg(self.objective_digest,"objective_digest")
   for xs,n in ((self.output_receipts,"outputs"),(self.acceptance_receipts,"acceptance")):
    if type(xs)is not tuple or not xs or any(type(x)is not tuple or len(x)!=2 or any(type(y)is not str for y in x) for x in xs) or len({x[0] for x in xs})!=len(xs):_fail(CampaignContractErrorCode.INVALID,n)
    for a,b in xs:_id(a,n);_dg(b,n)
   object.__setattr__(self,"output_receipts",tuple(tuple(x) for x in self.output_receipts));object.__setattr__(self,"acceptance_receipts",tuple(tuple(x) for x in self.acceptance_receipts))
-  if self.disposition=="no-change" and (self.base_commit_sha!=self.commit_sha or self.base_tree_digest!=self.tree_digest):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"no-change equality")
+ if self.disposition=="no-change" and (self.base_commit_sha!=self.commit_sha or self.base_tree_digest!=self.tree_digest):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"no-change equality")
+ @property
+ def digest(self):return canonical_digest({"mission_id":self.mission_id,"package_id":self.package_id,"authority_digest":self.authority_digest,"package_revision":self.package_revision,"objective_digest":self.objective_digest,"base_commit_sha":self.base_commit_sha,"base_tree_digest":self.base_tree_digest,"commit_sha":self.commit_sha,"tree_digest":self.tree_digest,"output_receipts":self.output_receipts,"acceptance_receipts":self.acceptance_receipts,"disposition":self.disposition})
 @dataclass(frozen=True,slots=True)
 class WorkPackage:
  schema_version:int;revision:int;package_id:str;mission_id:str;objective:str;target_boundary:str;requirement_ids:tuple[str,...];dependencies:tuple[str,...];capabilities:tuple[str,...];acceptance:tuple[AcceptanceBinding,...];risk:str;resources:ResourceAllocation;outputs:tuple[str,...];rollback:str;authority_digest:str;state:PackageState;created_at:str;completion:CandidateCompletion|None=None
@@ -89,7 +93,7 @@ class WorkPackage:
   if terminal != (self.completion is not None):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"terminal")
   if self.completion:
    c=self.completion
-   if (c.mission_id,c.package_id,c.authority_digest)!=(self.mission_id,self.package_id,self.authority_digest) or set(x[0] for x in c.output_receipts)!=set(self.outputs) or set(x[0] for x in c.acceptance_receipts)!={x.acceptance_id for x in self.acceptance} or (self.state is PackageState.NO_CHANGE)!=(c.disposition=="no-change"):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completion binding")
+   if (c.mission_id,c.package_id,c.authority_digest,c.package_revision,c.objective_digest)!=(self.mission_id,self.package_id,self.authority_digest,self.revision,canonical_digest(self.objective)) or set(x[0] for x in c.output_receipts)!=set(self.outputs) or set(x[0] for x in c.acceptance_receipts)!={x.acceptance_id for x in self.acceptance} or (self.state is PackageState.NO_CHANGE)!=(c.disposition=="no-change"):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completion binding")
    if self.state is PackageState.COMPLETED and any(x.result not in {"passed","observed"} for x in self.acceptance):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completed package requires passing acceptance")
  def to_document(self):return {"schema_version":self.schema_version,"revision":self.revision,"package_id":self.package_id,"mission_id":self.mission_id,"objective":self.objective,"target_boundary":self.target_boundary,"requirement_ids":list(self.requirement_ids),"dependencies":list(self.dependencies),"capabilities":list(self.capabilities),"acceptance":[x.to_document() for x in self.acceptance],"risk":self.risk,"resources":self.resources.to_document(),"outputs":list(self.outputs),"rollback":self.rollback,"authority_digest":self.authority_digest,"state":self.state.value,"created_at":self.created_at,"completion":None if self.completion is None else {"mission_id":self.completion.mission_id,"package_id":self.completion.package_id,"authority_digest":self.completion.authority_digest,"base_commit_sha":self.completion.base_commit_sha,"base_tree_digest":self.completion.base_tree_digest,"commit_sha":self.completion.commit_sha,"tree_digest":self.completion.tree_digest,"output_receipts":[list(x) for x in self.completion.output_receipts],"acceptance_receipts":[list(x) for x in self.completion.acceptance_receipts],"disposition":self.completion.disposition}}
 @dataclass(frozen=True,slots=True)
