@@ -149,6 +149,13 @@ def paired_family_bootstrap(pairs:Mapping[str,Sequence[float]],*,seed:int,resamp
 def noninferior(i:PairedInterval,*,hard_gates_pass:bool)->bool:
  if type(hard_gates_pass)is not bool:raise CampaignMetricsError("hard gates must be boolean")
  return hard_gates_pass and i.lower is not None and i.lower>NONINFERIORITY_MARGIN
+def stage_paired_bootstrap(admission:AdmittedProtocol,pairs:Mapping[str,Sequence[float]])->PairedInterval:
+ """Only aggregation gateway for admitted stage evidence."""
+ if not isinstance(admission,AdmittedProtocol) or admission._token is not _ADMISSION_TOKEN:raise CampaignMetricsError("unadmitted calculation")
+ evidence=admission.stage_evidence
+ if set(pairs)!=set(pairs):raise CampaignMetricsError("invalid family mapping")
+ if len(pairs)!=evidence.families or any(len(tuple(v))!=evidence.repetitions for v in pairs.values()):raise CampaignMetricsError("stage family/repetition mismatch")
+ return paired_family_bootstrap(pairs,seed=evidence.seed)
 @dataclass(frozen=True,slots=True)
 class VariantSeal:
  protocol_digest:str;variant_id:str;recipe_digest:str;candidate_digest:str;evaluator_id:str;stage:str;block_digest:str;regime_id:str;sealed_at:str
@@ -285,4 +292,4 @@ def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:Pai
  if(cost_ratio.upper<1 and time_ratio.upper<=1.1)or(time_ratio.upper<1 and cost_ratio.upper<=1.1):return"LEFT"
  if(cost_ratio.lower>1 and time_ratio.lower>=1/1.1)or(time_ratio.lower>1 and cost_ratio.lower>=1/1.1):return"RIGHT"
  return"DRAW"
-__all__=["AdmittedProtocol","AttemptMetric","BracketState","CampaignMetricsError","IssuedReceipt","LeaseRecord","MatchProtocol","MatchProtocolInspection","PairedInterval","RECIPE_FIELDS","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","admit_protocol","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","summarize_attempts"]
+__all__=["AdmittedProtocol","AttemptMetric","BracketState","CampaignMetricsError","EvidenceVerifier","IssuedReceipt","LeaseRecord","MatchProtocol","MatchProtocolInspection","PairedInterval","RECIPE_FIELDS","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","admit_protocol","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","stage_paired_bootstrap","summarize_attempts"]
