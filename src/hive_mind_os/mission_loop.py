@@ -34,6 +34,7 @@ from typing import Callable, Mapping, Sequence
 from uuid import uuid4
 
 from .acceptance import AcceptanceSpecification, normalize_acceptance_specifications
+from .cohort_assurance import TerminalEvidence
 from .cohort_policy import CohortExecutionMode
 from .model_action_adapter import ModelActionProposal, ModelProviderActionAdapter
 from .models import AutonomyLevel, RiskTier, Role
@@ -880,6 +881,7 @@ class MissionReport:
     events: tuple[MissionEvent, ...]
     receipts: tuple[ToolReceipt, ...]
     curator: CuratorResult
+    terminal_evidence: TerminalEvidence | None
 
 
 def _git_environment() -> dict[str, str]:
@@ -961,6 +963,7 @@ class MissionLoop:
         self._discovery: DiscoveryReport | None = None
         self._design: ArchitectDesign | None = None
         self._curator: CuratorResult | None = None
+        self._terminal_evidence: TerminalEvidence | None = None
         self._terminal_convergence_used = False
         self._record(MissionEvent("mission.intake", Role.ORCHESTRATOR, 0, {"objective_ref": objective.digest}))
         self._record(
@@ -1916,6 +1919,40 @@ class MissionLoop:
             result = CuratorResult("ADOPT", self._candidate, candidate_tree, curator_output, tuple(findings))
             self._curator = result
             self._complete_role(Role.CURATOR, item, f"curator:{_digest(result.to_dict())}")
+            if self.execution_mode is CohortExecutionMode.COHORT:
+                candidate_digest = _digest(
+                    {
+                        "candidate_commit": result.candidate_commit,
+                        "candidate_tree": result.candidate_tree,
+                    }
+                )
+                review_refs = tuple(
+                    f"{receipt.ref}:candidate:{candidate_digest}"
+                    for receipt in self._receipts
+                    if receipt.role is Role.CURATOR
+                    and receipt.action == "verify_candidate"
+                    and receipt.details.get("candidate_commit") == result.candidate_commit
+                )
+                verification_refs = tuple(
+                    f"verification:{specification.identifier}:"
+                    f"{sha256_digest(report.report_path.read_bytes())}:"
+                    f"candidate:{candidate_digest}"
+                    for specification, report in zip(
+                        self.objective.acceptance, reports, strict=True
+                    )
+                )
+                self._terminal_evidence = TerminalEvidence(
+                    candidate_digest=candidate_digest,
+                    producer_identity=Role.BUILDER.value,
+                    reviewer_identity=Role.CURATOR.value,
+                    review_refs=review_refs,
+                    aggregate_refs=(
+                        "mission-events:"
+                        + sha256(_canonical([event.to_dict() for event in self._events])).hexdigest()
+                        + f":candidate:{candidate_digest}",
+                    ),
+                    verification_refs=verification_refs,
+                )
             return result
         result = CuratorResult("REMAND_BUILDER", self._candidate, candidate_tree, curator_output if curator_output.exists() else None, tuple(findings or ("sealed acceptance did not adopt candidate",)))
         self._curator = result
@@ -1995,6 +2032,8 @@ class MissionLoop:
     def complete(self) -> MissionReport:
         if self._curator is None or self._curator.verdict != "ADOPT":
             raise MissionLoopError("mission cannot complete without Curator adoption")
+        if self.execution_mode is CohortExecutionMode.COHORT and self._terminal_evidence is None:
+            raise MissionLoopError("cohort mission cannot complete without typed terminal evidence")
         if self.plan.human_gates:
             raise MissionLoopError(
                 "mission completion is blocked by required human gates: "
@@ -2018,6 +2057,23 @@ class MissionLoop:
             (stage / "cohort-kickoff.json").write_bytes(
                 _canonical(self.kickoff.to_dict())
             )
+            if self.execution_mode is CohortExecutionMode.COHORT:
+                assert self._terminal_evidence is not None
+                (stage / "terminal-assurance.json").write_bytes(
+                    _canonical(
+                        {
+                            "evidence": self._terminal_evidence.to_document(),
+                            "repair": {
+                                "attempted": False,
+                                "directive": None,
+                                "reason": (
+                                    "the repository MissionLoop has no authorized repair callback; "
+                                    "it records Curator remand without inventing implementation actions"
+                                ),
+                            },
+                        }
+                    )
+                )
             (stage / "events.json").write_bytes(_canonical([event.to_dict() for event in self._events]))
             (stage / "tool-receipts.json").write_bytes(_canonical([receipt.to_dict() for receipt in self._receipts]))
             if self._discovery is not None:
@@ -2045,6 +2101,7 @@ class MissionLoop:
             tuple(self._events),
             tuple(self._receipts),
             self._curator,
+            self._terminal_evidence,
         )
 
     @staticmethod
@@ -2077,6 +2134,44 @@ class MissionLoop:
             raise MissionLoopError(f"mission state is unavailable: {error}") from None
         if state.get("status") != MissionStatus.SUCCEEDED.value:
             raise MissionLoopError("published mission bundle is not successful")
+        try:
+            execution = json.loads((root / "execution-mode.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as error:
+            raise MissionLoopError(f"mission execution-mode evidence is invalid: {error}") from None
+        if execution.get("execution_mode") == CohortExecutionMode.COHORT.value:
+            try:
+                assurance = json.loads((root / "terminal-assurance.json").read_text(encoding="utf-8"))
+                raw_evidence = assurance["evidence"]
+                if not isinstance(raw_evidence, Mapping):
+                    raise TypeError("terminal evidence must be an object")
+                evidence = TerminalEvidence.from_document(raw_evidence)
+                curator = json.loads((root / "curator.json").read_text(encoding="utf-8"))
+                repair = assurance["repair"]
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                raise MissionLoopError(f"typed terminal assurance is invalid: {error}") from None
+            expected_candidate_digest = _digest(
+                {
+                    "candidate_commit": curator.get("candidate_commit"),
+                    "candidate_tree": curator.get("candidate_tree"),
+                }
+            )
+            if evidence.candidate_digest != expected_candidate_digest:
+                raise MissionLoopError("terminal assurance is not bound to the Curator candidate")
+            if (
+                evidence.producer_identity != Role.BUILDER.value
+                or evidence.reviewer_identity != Role.CURATOR.value
+            ):
+                raise MissionLoopError(
+                    "terminal assurance does not preserve Builder/Curator independence"
+                )
+            if (
+                not isinstance(repair, Mapping)
+                or repair.get("attempted") is not False
+                or repair.get("directive") is not None
+                or not isinstance(repair.get("reason"), str)
+                or not str(repair["reason"]).strip()
+            ):
+                raise MissionLoopError("terminal assurance must record the no-repair directive")
         try:
             raw_budget = state["budgets"]
             reconstructed = MissionState.intake(

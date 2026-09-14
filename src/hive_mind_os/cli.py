@@ -47,9 +47,14 @@ from .brain_kernel.planner import (
     persist_plan,
 )
 from .brain_kernel.store import KernelIntegrityError, KernelStore
+from .cohort_assurance import (
+    CohortAssuranceRuntime,
+    TerminalAssessment,
+    TerminalEvidence,
+    convergence_candidate_digest,
+)
 from .cohort_policy import CohortExecutionMode, CohortExecutionPolicy, EffectClass
 from .cohort_runtime import (
-    CohortRuntime,
     ConvergenceResult,
     PackageRunResult,
     PackageRunState,
@@ -973,7 +978,7 @@ def _run_unconfigured_cohort(config, execution: dict[str, object]) -> dict[str, 
     if not isinstance(maximum, int):
         raise ServiceError("cohort parallelism must be an integer")
     policy = CohortExecutionPolicy(CohortExecutionMode.COHORT, maximum)
-    runtime = CohortRuntime(policy)
+    runtime = CohortAssuranceRuntime(policy)
 
     def execute_package(package, kickoff, dependencies):
         return PackageRunResult(
@@ -981,6 +986,27 @@ def _run_unconfigured_cohort(config, execution: dict[str, object]) -> dict[str, 
             PackageRunState.BLOCKED_POLICY,
             {},
             message="no host executor is configured for this process",
+        )
+
+    def assess(kickoff, packages, convergence):
+        candidate_digest = convergence_candidate_digest(convergence)
+        evidence = TerminalEvidence(
+            candidate_digest=candidate_digest,
+            producer_identity="whole-os-cli-unconfigured-host",
+            reviewer_identity="whole-os-cli-terminal-curator",
+            review_refs=(f"review:blocked-capability:{candidate_digest}",),
+            aggregate_refs=(f"aggregate:{kickoff.context_digest}:{candidate_digest}",),
+            verification_refs=(
+                f"verification:typed-capability-blockers:{candidate_digest}",
+            ),
+        )
+        return TerminalAssessment(
+            VerificationResult(
+                True,
+                ("typed-capability-blockers-recorded",),
+                "no implementation was claimed without a configured host",
+            ),
+            evidence,
         )
 
     result = runtime.execute(
@@ -1004,10 +1030,15 @@ def _run_unconfigured_cohort(config, execution: dict[str, object]) -> dict[str, 
             },
             "capability blockers retained at cohort convergence",
         ),
-        verify=lambda kickoff, packages, convergence: VerificationResult(
-            True,
-            ("typed-capability-blockers-recorded",),
-            "no implementation was claimed without a configured host",
+        assess=assess,
+        plan_repair=lambda initial: None,
+        execute_repair=lambda package, kickoff, dependencies, directive: (
+            PackageRunResult(
+                package.package_id,
+                PackageRunState.FAILED,
+                {},
+                message="unreachable: missing authority cannot be repaired",
+            )
         ),
         effect_classes={
             package.package_id: EffectClass.MISSING_AUTHORITY
@@ -1029,12 +1060,44 @@ def _run_unconfigured_cohort(config, execution: dict[str, object]) -> dict[str, 
         "last_result": None,
         "execution": execution,
         "cohort": {
-            "run_id": result.run_id,
-            "kickoff_digest": result.kickoff.context_digest,
-            "dispatch_batches": [list(batch) for batch in result.dispatch_batches],
-            "max_parallelism": result.max_parallelism,
+            "run_id": result.initial.run_id,
+            "kickoff_digest": result.initial.kickoff.context_digest,
+            "dispatch_batches": [
+                list(batch) for batch in result.initial.dispatch_batches
+            ],
+            "max_parallelism": result.initial.max_parallelism,
             "convergence_rounds": 1,
             "verification_rounds": 1,
+        },
+        "terminal_assurance": {
+            "candidate_digest": (
+                None if result.evidence is None else result.evidence.candidate_digest
+            ),
+            "producer_identity": (
+                None if result.evidence is None else result.evidence.producer_identity
+            ),
+            "reviewer_identity": (
+                None if result.evidence is None else result.evidence.reviewer_identity
+            ),
+            "review_refs": (
+                [] if result.evidence is None else list(result.evidence.review_refs)
+            ),
+            "aggregate_refs": (
+                [] if result.evidence is None else list(result.evidence.aggregate_refs)
+            ),
+            "verification_refs": (
+                []
+                if result.evidence is None
+                else list(result.evidence.verification_refs)
+            ),
+            "repair": {
+                "attempted": result.repair_attempted,
+                "directive": None,
+                "reason": (
+                    "missing host authority is hard-gated and cannot be repaired "
+                    "inside this process"
+                ),
+            },
         },
     }
 

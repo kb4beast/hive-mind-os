@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -219,7 +220,42 @@ class MissionLoopCohortTests(unittest.TestCase):
         self.assertEqual(event_types.count("role.started"), 4)
         self.assertTrue((report.bundle / "cohort-kickoff.json").is_file())
         self.assertTrue((report.bundle / "execution-mode.json").is_file())
+        self.assertTrue((report.bundle / "terminal-assurance.json").is_file())
+        self.assertIsNotNone(report.terminal_evidence)
+        assert report.terminal_evidence is not None
+        self.assertEqual(report.terminal_evidence.producer_identity, Role.BUILDER.value)
+        self.assertEqual(report.terminal_evidence.reviewer_identity, Role.CURATOR.value)
+        assurance = json.loads(
+            (report.bundle / "terminal-assurance.json").read_text(encoding="utf-8")
+        )
+        self.assertFalse(assurance["repair"]["attempted"])
+        self.assertIsNone(assurance["repair"]["directive"])
+        self.assertIn("no authorized repair callback", assurance["repair"]["reason"])
         self.assertFalse(any("push" in event.event_type for event in report.events))
+
+        assurance["evidence"]["candidate_digest"] = "sha256:" + "0" * 64
+        for name in ("review_refs", "aggregate_refs", "verification_refs"):
+            assurance["evidence"][name] = [
+                reference.replace(
+                    report.terminal_evidence.candidate_digest,
+                    assurance["evidence"]["candidate_digest"],
+                )
+                for reference in assurance["evidence"][name]
+            ]
+        (report.bundle / "terminal-assurance.json").write_text(
+            json.dumps(assurance, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        (report.bundle / "integrity.json").write_text(
+            json.dumps(
+                MissionLoop._integrity_manifest(report.bundle),
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(MissionLoopError, "not bound"):
+            MissionLoop.verify_bundle(report.bundle)
 
     def test_terminal_convergence_is_not_a_tit_for_tat_retry_loop(self) -> None:
         loop = self._loop("remanded-bundle")
