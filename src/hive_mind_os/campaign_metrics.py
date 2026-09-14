@@ -26,7 +26,7 @@ def _num(v:object,n:str,nullable=True,nonnegative=True)->None:
  if v is None and nullable:return
  if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or (nonnegative and v<0):raise CampaignMetricsError(f"{n} must be finite" + (" and nonnegative" if nonnegative else ""))
 def _freeze(v:object)->object:
- if isinstance(v,Mapping):return MappingProxyType({str(k):_freeze(x) for k,x in v.items()})
+ if isinstance(v,Mapping):return MappingProxyType({k:_freeze(x) for k,x in v.items()})
  if isinstance(v,(list,tuple)):return tuple(_freeze(x) for x in v)
  return v
 
@@ -131,13 +131,23 @@ def _load_match_protocol(path:str|Path,*,allow_unsealed:bool)->MatchProtocol:
   d["entrant_recipes"]={x:recipe(x,"builder-component") for x in ("MB0","MB1","MB2","MB3")}|{x:recipe(x,"whole-campaign") for x in ("MC0","MC1")}
   d["hybrid_recipes"]={x:recipe(x,"whole-campaign") for x in ("MH1","MH2","MH3","MH4")}
  return MatchProtocol(**d)
-def load_match_protocol_for_inspection(path:str|Path)->MatchProtocol:
- """Parse deferred metadata for tests/audit only; never admits an execution stage."""
- return _load_match_protocol(path,allow_unsealed=True)
+@dataclass(frozen=True,slots=True)
+class MatchProtocolInspection:
+ """Opaque audit projection; deliberately has no schedule, seal, or recipe API."""
+ protocol_digest:str
+ status:str
+ blockers:tuple[str,...]
+ document_digest:str
+def load_match_protocol_for_inspection(path:str|Path)->MatchProtocolInspection:
+ """Parse only enough deferred metadata to audit blockers; never returns a protocol."""
+ raw=Path(path).read_bytes();d=json.loads(raw)
+ manifest=d.get("experiment_manifest",{})
+ return MatchProtocolInspection(canonical_digest(d),str(d.get("status","UNKNOWN")),tuple(sorted(k for k,v in manifest.items() if v is None or (isinstance(v,str) and v.startswith("OPEN_")))),canonical_digest(raw.decode("utf-8")))
 @dataclass(frozen=True,slots=True)
 class ScheduledPair:left:str;right:str|None;bye:bool=False;block_id:str|None=None
 def schedule_round(entrants:Sequence[str],losses:Mapping[str,int],byes:Mapping[str,int],*,round_number:int,inconclusive_meetings:Mapping[frozenset[str],int]|None=None,blocks:Sequence[str]=())->tuple[ScheduledPair,...]:
  if round_number<1 or round_number>24:raise CampaignMetricsError("round outside bound")
+ if len(set(entrants))!=len(entrants):raise CampaignMetricsError("duplicate entrant")
  a=sorted(set(entrants),key=lambda x:(losses.get(x,0),x));r=(round_number-1)%len(a)if a else 0;a=a[r:]+a[:r];out=[]
  if len(a)%2:b=min(a,key=lambda x:(byes.get(x,0),x));a.remove(b);out.append(ScheduledPair(b,None,True))
  prior=inconclusive_meetings or {}
@@ -190,4 +200,4 @@ def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:Pai
  if(cost_ratio.upper<1 and time_ratio.upper<=1.1)or(time_ratio.upper<1 and cost_ratio.upper<=1.1):return"LEFT"
  if(cost_ratio.lower>1 and time_ratio.lower>=1/1.1)or(time_ratio.lower>1 and cost_ratio.lower>=1/1.1):return"RIGHT"
  return"DRAW"
-__all__=["AttemptMetric","BracketState","CampaignMetricsError","MatchProtocol","PairedInterval","ScheduledPair","VariantSeal","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","schedule_round","summarize_attempts"]
+__all__=["AttemptMetric","BracketState","CampaignMetricsError","MatchProtocol","MatchProtocolInspection","PairedInterval","ScheduledPair","VariantSeal","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","schedule_round","summarize_attempts"]
