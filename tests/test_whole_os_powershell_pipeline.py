@@ -33,6 +33,7 @@ class WholeOSPowerShellPipelineTests(unittest.TestCase):
         self.assertIn('"--output-schema", $schema', text)
         self.assertIn('"--ask-for-approval", "never"', text)
         self.assertIn('"--sandbox", "danger-full-access"', text)
+        self.assertLess(text.index('"--ask-for-approval"'), text.index('"exec",'))
         for forbidden in (
             "dangerously-bypass-approvals-and-sandbox",
             "dangerously-bypass-hook-trust",

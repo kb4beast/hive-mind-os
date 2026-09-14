@@ -70,23 +70,32 @@ runtime, or external receipt. Never convert a synthetic fixture into a real rece
 $fullPrompt = $instructions + $runtimeContext
 
 $arguments = @(
-    "exec",
-    "--ephemeral",
-    "--json",
-    "--color", "never",
     "--ask-for-approval", "never",
     "--sandbox", "danger-full-access",
     "--model", $Model,
     "--config", "model_reasoning_effort=`"$ReasoningEffort`"",
     "--cd", $repositoryRoot,
+    "exec",
+    "--ephemeral",
+    "--json",
+    "--color", "never",
     "--output-schema", $schema,
     "--output-last-message", $lastMessage,
     "-"
 )
 
 Write-Host "WHOLE-OS STAGE START: $Stage at $headBefore"
-$fullPrompt | & $codex @arguments *> $eventLog
-$codexExit = $LASTEXITCODE
+$priorErrorAction = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $fullPrompt | & $codex @arguments *> $eventLog
+    $codexExit = $LASTEXITCODE
+} catch {
+    $_ | Out-File -LiteralPath $eventLog -Append -Encoding UTF8
+    $codexExit = 1
+} finally {
+    $ErrorActionPreference = $priorErrorAction
+}
 $headAfter = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 
 if ($codexExit -eq 0 -and (Test-Path -LiteralPath $lastMessage -PathType Leaf)) {
