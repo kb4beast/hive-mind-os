@@ -5,7 +5,7 @@ import asyncio
 import io
 import json
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -291,9 +291,12 @@ class WholeOSCohortCLITests(unittest.TestCase):
         with (
             patch.object(cli, "load_service_config", return_value=config),
             patch.object(cli, "WholeOSService") as service_type,
-            redirect_stderr(error),
         ):
-            exit_code = cli._run_whole_os(args, host_factories=registry)
+            exit_code = cli._run_whole_os(
+                args,
+                host_factories=registry,
+                error_stream=error,
+            )
 
         self.assertEqual(exit_code, 2)
         document = json.loads(error.getvalue())

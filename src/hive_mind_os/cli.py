@@ -10,7 +10,7 @@ import tempfile
 from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
-from typing import Sequence, cast
+from typing import Sequence, TextIO, cast
 
 from .acceptance import (
     AcceptanceSpecification,
@@ -1115,7 +1115,9 @@ def _run_whole_os(
     args: argparse.Namespace,
     *,
     host_factories: WholeOSHostFactoryRegistry | None = None,
+    error_stream: TextIO | None = None,
 ) -> int:
+    diagnostic_stream = error_stream if error_stream is not None else sys.stderr
     try:
         config = load_service_config(args.config)
         execution = _whole_os_execution_document(
@@ -1195,7 +1197,7 @@ def _run_whole_os(
                 },
                 indent=2,
             ),
-            file=sys.stderr,
+            file=diagnostic_stream,
         )
         return 2
     except (ServiceError, OSError, ValueError, TypeError) as error:
@@ -1204,7 +1206,7 @@ def _run_whole_os(
                 {"status": "failed", "error": f"{type(error).__name__}: {error}"},
                 indent=2,
             ),
-            file=sys.stderr,
+            file=diagnostic_stream,
         )
         return 2
 
