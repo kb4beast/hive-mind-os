@@ -6,7 +6,7 @@ facts; the resulting packet contains no authority to fetch arbitrary repository 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 from .context_capsule import ColdContextReference, ContextBody, NodeDelta, RoundCapsule
 from .runtime_contracts import canonical_digest, require_digest, require_identifier
@@ -39,6 +39,9 @@ class ContextSelectionReceipt:
     @property
     def digest(self) -> str: return canonical_digest(self.__dict__ if hasattr(self, '__dict__') else {"request_digest":self.request_digest,"selected_ids":self.selected_ids,"cold_ids":self.cold_ids,"omitted_ids":self.omitted_ids,"reason":self.reason})
 
+    def to_document(self) -> dict[str, Any]:
+        return {"schema_version": 1, "request_digest": self.request_digest, "selected_ids": list(self.selected_ids), "cold_ids": list(self.cold_ids), "omitted_ids": list(self.omitted_ids), "reason": self.reason, "receipt_digest": self.digest}
+
 def assemble_campaign_delta(capsule: RoundCapsule, request: CampaignContextRequest) -> tuple[NodeDelta, ContextSelectionReceipt]:
     if capsule.subject_id != request.subject_id or capsule.subject_snapshot_digest != request.subject_snapshot_digest:
         raise CampaignContextError("cross-subject or stale snapshot context request")
@@ -53,4 +56,5 @@ def expand_cold_reference(delta: NodeDelta, reference: ColdContextReference, bod
     """Return a new delta only when a content-addressed cold object was supplied."""
     if not reason.strip() or reference.context_id not in {x.context_id for x in delta.cold_references}: raise CampaignContextError("cold reference is not admitted for this delta")
     if reference.context_id != body.context_id or reference.digest != body.digest or reference.byte_count != len(body.body): raise CampaignContextError("cold body does not match its reference")
+    if body.context_id in {x.context_id for x in delta.direct_bodies}: raise CampaignContextError("cold body was already expanded")
     return NodeDelta(delta.node_id, delta.capsule_digest, delta.generation_id, delta.subject_id, delta.authority_digest, delta.model_route_digest, delta.budget_digest, delta.node_contract_digest, delta.objective_digest, delta.shared_body_digest, delta.direct_bodies + (body,), tuple(x for x in delta.cold_references if x.context_id != reference.context_id), delta.omitted_context_ids)

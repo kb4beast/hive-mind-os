@@ -5,6 +5,8 @@ payloads can select a descriptor but cannot contain executable configuration.
 """
 from __future__ import annotations
 import json
+import os
+import tempfile
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -40,6 +42,9 @@ class ConfiguredMissionBindingsProvider:
     def __init__(self, descriptor:MissionBindingDescriptor, resolver:BindingResolver): self.descriptor=descriptor; self._resolver=resolver
     def resolve(self,payload:Mapping[str,Any],host_root:Path)->tuple[Any,Any]:
         if payload.get("tenant_id") != self.descriptor.tenant_id or payload.get("repository_id") != self.descriptor.repository_id: raise MissionBindingError("BLOCKED: payload tenant or repository differs from admitted descriptor")
+        # Existing service envelopes call this field configuration_digest; it is
+        # the digest of the complete admitted descriptor, not a model-supplied
+        # configuration label.
         if payload.get("configuration_digest") != self.descriptor.digest: raise MissionBindingError("BLOCKED: descriptor digest mismatch")
         root=host_root.resolve()
         if not root.is_dir(): raise MissionBindingError("BLOCKED: host state root is unavailable")
@@ -51,3 +56,18 @@ def load_descriptor(path:Path)->MissionBindingDescriptor:
     except (OSError,UnicodeError,ValueError,TypeError) as error: raise MissionBindingError("BLOCKED: descriptor cannot be read") from error
     if canonical_digest(descriptor.to_document()) != descriptor.digest: raise MissionBindingError("BLOCKED: descriptor digest mismatch")
     return descriptor
+
+
+def persist_descriptor(path: Path, descriptor: MissionBindingDescriptor) -> Path:
+    """Atomically persist an inert descriptor; never activate partial JSON."""
+    if not isinstance(path, Path) or not isinstance(descriptor, MissionBindingDescriptor): raise MissionBindingError("BLOCKED: invalid descriptor persistence request")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    document = descriptor.to_document()
+    fd, temporary = tempfile.mkstemp(prefix=".mission-binding-", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(document, stream, sort_keys=True, separators=(",", ":")); stream.flush(); os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+    return path
