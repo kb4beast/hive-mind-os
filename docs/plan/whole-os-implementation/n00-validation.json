@@ -1,0 +1,50 @@
+{
+  "schema": "whole-os-n00-validation/v2",
+  "observed_at": "2026-09-14T02:44:00Z",
+  "method": "powershell -NoProfile -File docs/plan/whole-os-implementation/verify_n00.ps1",
+  "checker_sha256": "7227e840296d2f61309a36b52f45eb65fdbdf0de24ad2ab7034b3e7692022a68",
+  "candidate": {
+    "source_inventory_sha256": "39109ae21cc5d55b7fa85506ffc18920701e2e89db77949aa191021d7b85d127",
+    "successor_node_map_sha256": "aeb3d9dd35c28bf431a187b8aa60e51c9ea6531fb265b40f59056b12b0b6cc4b",
+    "symbol_classification_sha256": "89f70a0b50cf84b7a2e7fa1be4e07ac58ebcc8638f8405a9658b9e3e724857b0",
+    "reconciliation_report_sha256": "feb58b630627d0bd56d9a4d538b530b9f9b5e4d3f9a5853805d07d6a888f3f52"
+  },
+  "checks": {
+    "handoff_manifest_files": 15,
+    "handoff_manifest_bytes_and_sha256_match": true,
+    "local_source_manifest_paths": 53,
+    "local_paths_blobs_and_checkout_sha256_match": true,
+    "inventory_source_records": 32,
+    "inventory_source_ids_unique": true,
+    "inventory_source_locators_resolve": true,
+    "adr_074_through_078_distinct_and_blob_bound": true,
+    "ex09_through_ex16_provenance_fields_retained": true,
+    "external_sources_not_marked_completely_ingested": true,
+    "founding_source_records": 15,
+    "founding_source_ids_unique": true,
+    "pending_and_partial_founding_sources_not_widened": true,
+    "campaign_requirements": 18,
+    "campaign_requirement_ids_unique": true,
+    "campaign_requirement_ids_equal_handoff": true,
+    "campaign_requirement_locators_resolve": true,
+    "successor_nodes": 34,
+    "successor_node_ids_unique": true,
+    "successor_node_ids_equal_handoff_dag": true,
+    "symbol_classifications": 34,
+    "symbol_classification_ids_equal_handoff_dag": true,
+    "origin_main_equals_inspected_baseline": true,
+    "handoff_parent_equals_inspected_baseline": true
+  },
+  "negative_controls": {
+    "status": "specified_not_executed_in_N00",
+    "cases": [
+      "deleted source ID must reject",
+      "wrong Git blob or content digest must reject",
+      "stale receipt must reject",
+      "dirty baseline represented as committed must reject",
+      "duplicate requirement ID must reject"
+    ]
+  },
+  "scope": "deterministic N00 inventory, path, Git identity, and digest validation; not product runtime validation",
+  "result": "PASS_PENDING_INDEPENDENT_CURATOR"
+}

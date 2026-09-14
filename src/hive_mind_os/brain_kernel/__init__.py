@@ -1,5 +1,18 @@
 """Additive, repository-neutral primitives for the Verifiable Hive Kernel."""
 
+from importlib import import_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .closeout import (
+        TechnicalCloseoutError,
+        declare_closeout_obligations,
+        derive_technical_closeout,
+        integrate_verified_work,
+        record_evaluation_bundle,
+        technical_closeout_digest,
+    )
+
 from .canonical import canonical_bytes, canonical_digest
 from .context import (
     CompiledContext,
@@ -100,12 +113,11 @@ _CLOSEOUT_EXPORTS = frozenset(
 
 
 def __getattr__(name: str):
+    """Load closeout operations only when callers request them explicitly."""
+
     if name in _CLOSEOUT_EXPORTS:
-        from . import closeout
-
-        return getattr(closeout, name)
+        return getattr(import_module(f"{__name__}.closeout"), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 __all__ = (
     "Budget",

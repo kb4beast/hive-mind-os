@@ -1,0 +1,88 @@
+{
+  "schema": "whole-os-handoff-manifest/v1",
+  "generated_at": "2026-09-14T02:13:05.411809+00:00",
+  "baseline_commit": "d980a9cfe39f68b3de86ea0530234b3ab4e91390",
+  "self_excluded": true,
+  "signature": null,
+  "meaning": "content integrity only; no authority or promotion attestation",
+  "files": [
+    {
+      "path": "dag-index.json",
+      "bytes": 42262,
+      "sha256": "928b388c2c58603ea254d6528b2ea2bcec001cf8b463889b9549dbb7eeb9c4d0"
+    },
+    {
+      "path": "local-source-manifest.json",
+      "bytes": 12375,
+      "sha256": "4951e6baa893cfefcd9e9f199b11236fc7347e4c690a0a0cd0e322222ea4f5c1"
+    },
+    {
+      "path": "NODES-EXECUTION.md",
+      "bytes": 46574,
+      "sha256": "f4bbcece25929c686e620a922da841ce7ec7d452c0fdff3cd5f1b88cc2d8de50"
+    },
+    {
+      "path": "NODES-FOUNDATION.md",
+      "bytes": 31310,
+      "sha256": "31b0f436910c714018de5aa7bfefe86e3767afd3d94aad893ed506f0bf23e2ee"
+    },
+    {
+      "path": "NODES-LEARNING.md",
+      "bytes": 48101,
+      "sha256": "a35710da3a855847bf8b8deafa845f7fbcabf9887e0f5352c90cb0e06534729b"
+    },
+    {
+      "path": "NODES-QUALIFICATION.md",
+      "bytes": 22633,
+      "sha256": "2e146b7733b92017ce1ffa95faac467bc3d04d34c2e0ea82020a08fb4dbe0bd4"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3728,
+      "sha256": "5e13916b88f7e1d9facf88280eec4425fe0594ea78605206c111d09f42a42d31"
+    },
+    {
+      "path": "requirements.json",
+      "bytes": 7455,
+      "sha256": "5c49bc3f9c818b6adfb326adb08bc103abd6f7e84feeebe74bdbe4f782d4b7d5"
+    },
+    {
+      "path": "REVIEW.md",
+      "bytes": 12255,
+      "sha256": "df235269fc3c39cdb2700f1a5104115f804264ba06ac5ec3147cf8445255075c"
+    },
+    {
+      "path": "RUNBOOK.md",
+      "bytes": 34638,
+      "sha256": "504f8fe9048023283aff3da5c62b35a1283cc8f8d1499fda0cf14a008dc19326"
+    },
+    {
+      "path": "SOURCES.md",
+      "bytes": 38195,
+      "sha256": "35d16f44158d5ecb37cba6330edfe4603f38f1503d9185b873a86b409ef49303"
+    },
+    {
+      "path": "tournament-record.json",
+      "bytes": 32623,
+      "sha256": "9f6ad9feafa48f8275c932649b24c29e5a8500ed0574d4c7d047d7a131f6c611"
+    },
+    {
+      "path": "TOURNAMENT.md",
+      "bytes": 35573,
+      "sha256": "75b8af2819202ac6046afe7b7a5cd499a5e88deb0d2dd009103a53edea075262"
+    },
+    {
+      "path": "USER_REQUEST.md",
+      "bytes": 2204,
+      "sha256": "47360b2f0d5718ff36829e1d1df649db2a3eef65b06882c05a94c90353f681ff"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 1063,
+      "sha256": "9745997df179d94cb5f71671196d6f793950689cc7455afe4b3c5dd00bb8edbe"
+    }
+  ],
+  "pre_commit_manifest_sha256": "e2e01ccb23367f65ddb7464ab54c1b53d003f2595a6253940edd75577d43661f",
+  "original_archive_sha256": "7950ea9ac1a39561f0fcdf80497159193dc11b166759c5518e46702c2ec85afc",
+  "serialization_note": "Committed text uses LF. One extra blank line after USER_REQUEST metadata removed; substantive owner text and design preserved. Original pre-commit ZIP remains unchanged."
+}

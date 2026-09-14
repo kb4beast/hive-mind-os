@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Mapping
 
 from .authority import (
     AuthorityDenied,
@@ -17,6 +17,8 @@ from .canonical import canonical_digest
 from .contracts import EffectIntent, EffectReceipt
 
 if TYPE_CHECKING:
+    from hive_mind_os.repository_profile import RepositoryProfileStore
+
     from .store import KernelStore
 
 
@@ -163,8 +165,7 @@ def build_effect_receipt(
         ended_at,
         adapter_identity,
         adapter_version,
-        observed_precondition_digest
-        or canonical_digest(intent.expected_preconditions),
+        observed_precondition_digest or canonical_digest(intent.expected_preconditions),
         status,
         None,
         None,
@@ -245,6 +246,46 @@ class EffectGateway:
             raise AuthorityDenied("adapter is not registered")
         with _authorized_effect_execution(intent):
             adapter(intent)
-        result = EffectResult(intent.intent_digest, canonical_digest({"intent": intent.intent_digest, "status": "SUCCEEDED"}), "SUCCEEDED")
+        result = EffectResult(
+            intent.intent_digest,
+            canonical_digest({"intent": intent.intent_digest, "status": "SUCCEEDED"}),
+            "SUCCEEDED",
+        )
         self._receipts[intent.idempotency_key] = result
         return result
+
+    def execute_profiled(
+        self,
+        intent: EffectIntent,
+        token: CapabilityToken,
+        *,
+        projection: Mapping[str, Any],
+        profile_store: RepositoryProfileStore,
+        capability: object,
+        destination: str | None = None,
+    ) -> EffectResult:
+        """Host-profile gate for profile-bound adapters; authorize before dispatch."""
+        from hive_mind_os.repository_profile import (
+            ProfileCapability,
+            ProfileEffectAuthorizer,
+        )
+
+        if self._authority is None:
+            raise AuthorityDenied("profiled execution requires live authority")
+        expected = (
+            ProfileCapability.READ_ONLY_PLAN
+            if intent.action == "read"
+            else ProfileCapability.LOCAL_BUILD
+        )
+        if ProfileCapability(capability) is not expected:
+            raise AuthorityDenied("profile capability does not bind effect action")
+        profile = ProfileEffectAuthorizer().require(
+            projection,
+            store=profile_store,
+            authority=self._authority,
+            capability=expected,
+            destination=destination,
+        )
+        if intent.target_adapter not in {tool.adapter_id for tool in profile.tools}:
+            raise AuthorityDenied("effect adapter is not bound in repository profile")
+        return self.execute(intent, token)

@@ -105,6 +105,14 @@ The eight roles remain independent agents aligned around customer value:
 
 Workflow patterns are first-class objects: sequential, parallel, handoff, group collaboration, adversarial debate, courtroom review, map-reduce research, incident response, and champion/challenger evaluation.
 
+The default implementation topology is an end-loaded cohort. All independent
+specialists receive one immutable kickoff context, runnable work fills the available
+capacity continuously, and the complete candidate is reconciled in one convergence
+round followed by one terminal verification round. Sequential role-by-role execution
+is an explicit compatibility mode, not the default. Routine reversible assurance is
+batched at convergence; secrets, missing authority, destructive or irreversible
+effects, spending, deployment, and protected merges still stop before the effect.
+
 Parallel subagents require bounded leases, deduplication keys, shared artifact contracts, and a deterministic merge step. Chat history is never the sole handoff mechanism.
 
 ## Execution plane

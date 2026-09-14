@@ -16,6 +16,9 @@ from .runtime_contracts import (
     canonical_digest,
     raw_sha256,
     require_digest,
+    require_identifier,
+    requires_external_authority,
+    strict_json_object,
 )
 
 STANDARD_VERSION = 2
@@ -30,6 +33,38 @@ COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
     "standard_version": STANDARD_VERSION,
 }
 COMPILER_PACKAGE_DIGEST = canonical_digest(COMPILER_PACKAGE_DESCRIPTOR)
+WORK_PACKAGE_COMPILER_PACKAGE_ID = "hive-mind-portable-compiler-v2"
+WORK_PACKAGE_SOURCE_INVENTORY_ID = "WOS-N00-20260914-01"
+WORK_PACKAGE_SOURCE_INVENTORY_PATH = (
+    "docs/plan/whole-os-implementation/source-inventory.json"
+)
+WORK_PACKAGE_SOURCE_INVENTORY_DIGEST = (
+    "sha256:39109ae21cc5d55b7fa85506ffc18920701e2e89db77949aa191021d7b85d127"
+)
+WORK_PACKAGE_REQUIREMENTS_PATH = (
+    "docs/plan/whole-os-tournament-2026-09-13/requirements.json"
+)
+WORK_PACKAGE_REQUIREMENTS_DIGEST = (
+    "sha256:5c49bc3f9c818b6adfb326adb08bc103abd6f7e84feeebe74bdbe4f782d4b7d5"
+)
+WORK_PACKAGE_REQUIREMENT_IDS = tuple(f"R{index:02d}" for index in range(1, 19))
+WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
+    "algorithm": "canonical-kahn-lock-aware-first-fit-v2",
+    "canonical_json": "utf8-sorted-compact-v1",
+    "conflicts": "resource-semantic-write-path-v2",
+    "package_id": WORK_PACKAGE_COMPILER_PACKAGE_ID,
+    "plan_schema_version": 2,
+    "source_inventory_digest": WORK_PACKAGE_SOURCE_INVENTORY_DIGEST,
+    "source_inventory_id": WORK_PACKAGE_SOURCE_INVENTORY_ID,
+    "source_inventory_path": WORK_PACKAGE_SOURCE_INVENTORY_PATH,
+    "requirements_digest": WORK_PACKAGE_REQUIREMENTS_DIGEST,
+    "requirements_path": WORK_PACKAGE_REQUIREMENTS_PATH,
+    "requirement_ids": list(WORK_PACKAGE_REQUIREMENT_IDS),
+    "standard_version": STANDARD_VERSION,
+}
+WORK_PACKAGE_COMPILER_PACKAGE_DIGEST = canonical_digest(
+    WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR
+)
 
 REQUIRED_ROLES = frozenset(
     {
@@ -96,7 +131,9 @@ class CompilationReceipt:
 
     def __post_init__(self) -> None:
         if self.lint_errors or self.lint_warnings:
-            raise ContractViolation("a compilation receipt cannot contain lint findings")
+            raise ContractViolation(
+                "a compilation receipt cannot contain lint findings"
+            )
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -134,6 +171,8 @@ def load_bound_plan(
     standard_bytes: bytes,
     expected_request_id: str | None = None,
     expected_subject_id: str | None = None,
+    source_inventory_bytes: bytes | None = None,
+    requirements_bytes: bytes | None = None,
 ) -> PortablePlanBundle:
     """Parse one canonical plan and authenticate every compiler binding."""
 
@@ -142,19 +181,28 @@ def load_bound_plan(
     if plan_bytes != plan.canonical_bytes():
         raise ContractViolation("portable plan bytes are not in canonical form")
     if plan.digest() != expected_plan_digest:
-        raise ContractViolation("portable plan digest does not match caller expectation")
+        raise ContractViolation(
+            "portable plan digest does not match caller expectation"
+        )
     if expected_request_id is not None:
         require_digest(expected_request_id, "expected request_id")
         if plan.request_id != expected_request_id:
-            raise ContractViolation("portable plan request binding is stale or substituted")
+            raise ContractViolation(
+                "portable plan request binding is stale or substituted"
+            )
     if expected_subject_id is not None:
         require_digest(expected_subject_id, "expected subject_id")
         if plan.subject.subject_id != expected_subject_id:
-            raise ContractViolation("portable plan subject binding is stale or substituted")
+            raise ContractViolation(
+                "portable plan subject binding is stale or substituted"
+            )
     if type(standard_bytes) is not bytes:
         raise ContractViolation("standard input must be immutable bytes")
     standard = plan.standard
-    if standard.version != STANDARD_VERSION or standard.source_path != STANDARD_SOURCE_PATH:
+    if (
+        standard.version != STANDARD_VERSION
+        or standard.source_path != STANDARD_SOURCE_PATH
+    ):
         raise ContractViolation("portable plan uses an unsupported authoring standard")
     if standard.raw_sha256 != raw_sha256(standard_bytes):
         raise ContractViolation("authoring-standard raw digest mismatch")
@@ -162,16 +210,139 @@ def load_bound_plan(
         raise ContractViolation("authoring-standard byte count mismatch")
     if standard.git_blob != git_blob_id(standard_bytes):
         raise ContractViolation("authoring-standard Git blob mismatch")
-    if (
-        standard.package_id != COMPILER_PACKAGE_ID
-        or standard.package_digest != COMPILER_PACKAGE_DIGEST
-    ):
+    expected_compiler = (
+        (COMPILER_PACKAGE_ID, COMPILER_PACKAGE_DIGEST)
+        if plan.schema_version == 1
+        else (
+            WORK_PACKAGE_COMPILER_PACKAGE_ID,
+            WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
+        )
+    )
+    if (standard.package_id, standard.package_digest) != expected_compiler:
         raise ContractViolation("canonical compiler package identity mismatch")
-    _validate_governance_coverage(plan)
+    _validate_governance_coverage(
+        plan,
+        source_inventory_bytes=source_inventory_bytes,
+        requirements_bytes=requirements_bytes,
+    )
     return plan
 
 
-def _validate_governance_coverage(plan: PortablePlanBundle) -> None:
+def _validate_source_namespace(
+    plan: PortablePlanBundle, source_inventory_bytes: bytes | None
+) -> None:
+    if source_inventory_bytes is None:
+        raise ContractViolation(
+            "portable work packages require pinned source-inventory bytes"
+        )
+    inventory = strict_json_object(source_inventory_bytes, maximum_bytes=1_000_000)
+    if inventory.get("schema") != "whole-os-source-inventory/v1":
+        raise ContractViolation(
+            "portable work packages use an unknown source inventory"
+        )
+    inventory_id = inventory.get("inventory_id")
+    if not isinstance(inventory_id, str):
+        raise ContractViolation("source inventory_id must be a string")
+    require_identifier(inventory_id, "source inventory_id")
+    inventory_digest = raw_sha256(source_inventory_bytes)
+    if (
+        inventory_id != WORK_PACKAGE_SOURCE_INVENTORY_ID
+        or inventory_digest != WORK_PACKAGE_SOURCE_INVENTORY_DIGEST
+    ):
+        raise ContractViolation(
+            "portable work-package source namespace is not accepted N00"
+        )
+    sources = inventory.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise ContractViolation("source inventory requires a non-empty sources list")
+    admitted_source_ids: list[str] = []
+    for source in sources:
+        if not isinstance(source, Mapping) or "id" not in source:
+            raise ContractViolation("source inventory entry lacks an id")
+        source_id = source["id"]
+        require_identifier(source_id, "source inventory source id")
+        admitted_source_ids.append(source_id)
+    if len(set(admitted_source_ids)) != len(admitted_source_ids):
+        raise ContractViolation("source inventory contains duplicate source ids")
+    inventory_evidence = tuple(
+        item for item in plan.evidence if item.evidence_id == "accepted-n00-inventory"
+    )
+    if (
+        len(inventory_evidence) != 1
+        or inventory_evidence[0].digest != inventory_digest
+        or inventory_evidence[0].source != WORK_PACKAGE_SOURCE_INVENTORY_PATH
+        or inventory_evidence[0].claim_ids != ("N00-ACCEPTED",)
+    ):
+        raise ContractViolation(
+            "portable work-package source namespace lacks accepted N00 evidence"
+        )
+    admitted = set(admitted_source_ids)
+    for node in plan.nodes:
+        unknown = set(node.work_package.source_ids) - admitted  # type: ignore[union-attr]
+        if unknown:
+            raise ContractViolation(
+                f"node {node.node_id} cites unadmitted source id(s): "
+                + ", ".join(sorted(unknown))
+            )
+
+
+def _validate_requirement_namespace(
+    plan: PortablePlanBundle, requirements_bytes: bytes | None
+) -> None:
+    if requirements_bytes is None:
+        raise ContractViolation(
+            "portable work packages require pinned requirements bytes"
+        )
+    if raw_sha256(requirements_bytes) != WORK_PACKAGE_REQUIREMENTS_DIGEST:
+        raise ContractViolation(
+            "portable work-package requirements are not the accepted N00 bytes"
+        )
+    document = strict_json_object(requirements_bytes, maximum_bytes=1_000_000)
+    if document.get("schema") != "whole-os-handoff-requirements/v1":
+        raise ContractViolation("portable work packages use unknown requirements")
+    requirements = document.get("requirements")
+    if not isinstance(requirements, list):
+        raise ContractViolation("requirements inventory must contain a list")
+    requirement_ids: list[str] = []
+    for requirement in requirements:
+        if not isinstance(requirement, Mapping) or "id" not in requirement:
+            raise ContractViolation("requirements inventory entry lacks an id")
+        requirement_id = requirement["id"]
+        require_identifier(requirement_id, "requirements inventory id")
+        requirement_ids.append(requirement_id)
+    if tuple(requirement_ids) != WORK_PACKAGE_REQUIREMENT_IDS:
+        raise ContractViolation("requirements inventory ids are not accepted R01-R18")
+    evidence = tuple(
+        item
+        for item in plan.evidence
+        if item.evidence_id == "accepted-n00-requirements"
+    )
+    if (
+        len(evidence) != 1
+        or evidence[0].digest != WORK_PACKAGE_REQUIREMENTS_DIGEST
+        or evidence[0].source != WORK_PACKAGE_REQUIREMENTS_PATH
+        or evidence[0].claim_ids != WORK_PACKAGE_REQUIREMENT_IDS
+    ):
+        raise ContractViolation(
+            "portable work-package requirement namespace lacks accepted N00 evidence"
+        )
+    observed = {
+        requirement_id
+        for node in plan.nodes
+        for requirement_id in node.work_package.requirement_ids  # type: ignore[union-attr]
+    }
+    if observed != set(WORK_PACKAGE_REQUIREMENT_IDS):
+        raise ContractViolation(
+            "portable work packages lose or substitute accepted requirements"
+        )
+
+
+def _validate_governance_coverage(
+    plan: PortablePlanBundle,
+    *,
+    source_inventory_bytes: bytes | None,
+    requirements_bytes: bytes | None,
+) -> None:
     roles: set[str] = set()
     stages: set[str] = set()
     for node in plan.nodes:
@@ -202,6 +373,47 @@ def _validate_governance_coverage(plan: PortablePlanBundle) -> None:
             "portable plan omits required lifecycle stage(s): "
             + ", ".join(sorted(missing_stages))
         )
+    if plan.schema_version == 2:
+        _validate_source_namespace(plan, source_inventory_bytes)
+        _validate_requirement_namespace(plan, requirements_bytes)
+        authorities = {item.authority_id: item for item in plan.authority}
+        for capability in plan.capabilities:
+            authority = authorities[capability.authority_id]
+            if (
+                capability.operation not in authority.allowed_actions
+                or capability.operation in authority.denied_actions
+            ):
+                raise ContractViolation(
+                    "portable work package capability is not explicitly granted"
+                )
+            if (
+                requires_external_authority(capability.effect_class)
+                and not authority.external_effects
+            ):
+                raise ContractViolation(
+                    "portable work package external effect lacks authority"
+                )
+            if capability.operation in {"merge", "protected-merge"}:
+                raise ContractViolation("protected merge is never delegated")
+
+
+def _paths_overlap(left: str, right: str) -> bool:
+    left_parts = left.split("/")
+    right_parts = right.split("/")
+    common = min(len(left_parts), len(right_parts))
+    return left_parts[:common] == right_parts[:common]
+
+
+def _nodes_conflict(left: PortableNode, right: PortableNode) -> bool:
+    if left.work_package is None or right.work_package is None:
+        return False
+    if set(left.work_package.semantic_locks) & set(right.work_package.semantic_locks):
+        return True
+    return any(
+        _paths_overlap(left_path, right_path)
+        for left_path in left.work_package.write_paths
+        for right_path in right.work_package.write_paths
+    )
 
 
 def graph_metrics(plan: PortablePlanBundle) -> GraphMetrics:
@@ -241,7 +453,9 @@ def _dependency_levels(by_id: Mapping[str, PortableNode]) -> dict[str, int]:
     def level(node_id: str) -> int:
         if node_id not in levels:
             dependencies = by_id[node_id].dependencies
-            levels[node_id] = 0 if not dependencies else 1 + max(level(item) for item in dependencies)
+            levels[node_id] = (
+                0 if not dependencies else 1 + max(level(item) for item in dependencies)
+            )
         return levels[node_id]
 
     for node_id in sorted(by_id):
@@ -253,7 +467,9 @@ def _worker_limit(plan: PortablePlanBundle, requested: int | None) -> int:
     budgets = {item.budget_id: item.policy for item in plan.budgets}
     declared = [budgets[node.budget_id].concurrent_workers for node in plan.nodes]
     if not declared or min(declared) < 1:
-        raise ContractViolation("every scheduled node requires a positive worker allowance")
+        raise ContractViolation(
+            "every scheduled node requires a positive worker allowance"
+        )
     limit = min(declared)
     if requested is not None:
         if type(requested) is not int or requested < 1:
@@ -269,21 +485,32 @@ def _compile_rounds(
 ) -> tuple[DispatchRound, ...]:
     by_id = {node.node_id: node for node in plan.nodes}
     levels = _dependency_levels(by_id)
-    capacities = {resource.resource_id: resource.quantity for resource in plan.resources}
+    capacities = {
+        resource.resource_id: resource.quantity for resource in plan.resources
+    }
     result: list[DispatchRound] = []
     for dependency_level in range(max(levels.values(), default=-1) + 1):
-        members = sorted(node_id for node_id, value in levels.items() if value == dependency_level)
+        members = sorted(
+            node_id for node_id, value in levels.items() if value == dependency_level
+        )
         batches: list[list[str]] = []
         usages: list[dict[str, int]] = []
         for node_id in members:
             node = by_id[node_id]
             if any(capacities[resource_id] < 1 for resource_id in node.resource_ids):
-                raise ContractViolation(f"node {node_id} requires an unavailable resource")
+                raise ContractViolation(
+                    f"node {node_id} requires an unavailable resource"
+                )
             placed = False
             for batch, usage in zip(batches, usages, strict=True):
                 if len(batch) >= maximum_workers:
                     continue
-                if any(usage.get(resource_id, 0) + 1 > capacities[resource_id] for resource_id in node.resource_ids):
+                if any(_nodes_conflict(node, by_id[member]) for member in batch):
+                    continue
+                if any(
+                    usage.get(resource_id, 0) + 1 > capacities[resource_id]
+                    for resource_id in node.resource_ids
+                ):
                     continue
                 batch.append(node_id)
                 for resource_id in node.resource_ids:
@@ -313,6 +540,8 @@ def compile_plan(
     expected_request_id: str | None = None,
     expected_subject_id: str | None = None,
     maximum_workers: int | None = None,
+    source_inventory_bytes: bytes | None = None,
+    requirements_bytes: bytes | None = None,
 ) -> CompilationReceipt:
     """Authenticate and compile one plan without performing any host effect."""
 
@@ -322,6 +551,8 @@ def compile_plan(
         standard_bytes=standard_bytes,
         expected_request_id=expected_request_id,
         expected_subject_id=expected_subject_id,
+        source_inventory_bytes=source_inventory_bytes,
+        requirements_bytes=requirements_bytes,
     )
     worker_limit = _worker_limit(plan, maximum_workers)
     rounds = _compile_rounds(plan, maximum_workers=worker_limit)
@@ -330,8 +561,8 @@ def compile_plan(
         request_id=plan.request_id,
         subject_id=plan.subject.subject_id,
         standard_digest=plan.standard.raw_sha256,
-        compiler_package_id=COMPILER_PACKAGE_ID,
-        compiler_package_digest=COMPILER_PACKAGE_DIGEST,
+        compiler_package_id=plan.standard.package_id,
+        compiler_package_digest=plan.standard.package_digest,
         maximum_workers=worker_limit,
         metrics=graph_metrics(plan),
         rounds=rounds,
@@ -349,6 +580,15 @@ __all__ = [
     "REQUIRED_ROLES",
     "STANDARD_SOURCE_PATH",
     "STANDARD_VERSION",
+    "WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR",
+    "WORK_PACKAGE_COMPILER_PACKAGE_DIGEST",
+    "WORK_PACKAGE_COMPILER_PACKAGE_ID",
+    "WORK_PACKAGE_SOURCE_INVENTORY_DIGEST",
+    "WORK_PACKAGE_SOURCE_INVENTORY_ID",
+    "WORK_PACKAGE_SOURCE_INVENTORY_PATH",
+    "WORK_PACKAGE_REQUIREMENTS_DIGEST",
+    "WORK_PACKAGE_REQUIREMENTS_PATH",
+    "WORK_PACKAGE_REQUIREMENT_IDS",
     "compile_plan",
     "git_blob_id",
     "graph_metrics",

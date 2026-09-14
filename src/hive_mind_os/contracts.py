@@ -40,6 +40,7 @@ EXTENSION_SCHEMA_NAMES = (
     "hive-cortex-consultation",
     "ooda-state",
     "war-room-event",
+    "repository-profile",
 )
 KERNEL_SCHEMA_NAMES = (
     "brain-kernel-event",
@@ -55,7 +56,31 @@ KERNEL_SCHEMA_NAMES = (
     "brain-kernel-historical-evidence-reference",
     "brain-kernel-technical-closeout-report",
 )
-SCHEMA_NAMES = (*LEGACY_SCHEMA_NAMES, *EXTENSION_SCHEMA_NAMES, *KERNEL_SCHEMA_NAMES)
+CAMPAIGN_SCHEMA_NAMES = (
+    "campaign-mission",
+    "cohort-execution-policy",
+    "work-package",
+    "whole-os-service-config",
+)
+LEARNING_SCHEMA_NAMES = (
+    "endpoint-episode",
+    "endpoint-seal",
+    "functional-evaluation",
+    "isolation-attestation",
+    "learning-route",
+    "lesson-delivery-obligation",
+    "lesson-draft",
+    "roblox-profile",
+    "roblox-runtime-evidence",
+    "subject-memory-boundary",
+)
+SCHEMA_NAMES = (
+    *LEGACY_SCHEMA_NAMES,
+    *EXTENSION_SCHEMA_NAMES,
+    *KERNEL_SCHEMA_NAMES,
+    *CAMPAIGN_SCHEMA_NAMES,
+    *LEARNING_SCHEMA_NAMES,
+)
 ROLE_NAMES = frozenset(
     {
         "orchestrator",
@@ -211,7 +236,11 @@ def _validate_node(
             issues.append(f"{path}: number must be finite")
             return
         minimum = schema.get("minimum")
-        if isinstance(minimum, (int, float)) and not isinstance(minimum, bool) and value < minimum:
+        if (
+            isinstance(minimum, (int, float))
+            and not isinstance(minimum, bool)
+            and value < minimum
+        ):
             issues.append(f"{path}: number is below minimum {minimum}")
 
     if isinstance(value, list):
@@ -272,8 +301,17 @@ def validate_contract(name: str, document: Any) -> ContractValidation:
     try:
         schema = load_schema(name)
     except (KeyError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
-        return ContractValidation(False, (f"schema unavailable: {type(error).__name__}: {error}",))
+        return ContractValidation(
+            False, (f"schema unavailable: {type(error).__name__}: {error}",)
+        )
     _validate_node(document, schema, "$", issues)
+    if name == "repository-profile" and not issues:
+        try:
+            from .repository_profile import RepositoryProfile
+
+            RepositoryProfile.from_document(document)
+        except (TypeError, ValueError) as error:
+            issues.append(f"$: repository profile runtime validation: {error}")
     return ContractValidation(not issues, tuple(dict.fromkeys(issues)))
 
 
@@ -408,7 +446,9 @@ def validate_runtime_state(
 
     verification = document.get("independent_verification")
     verifier_ids: set[str] = set()
-    if isinstance(verification, Sequence) and not isinstance(verification, (str, bytes)):
+    if isinstance(verification, Sequence) and not isinstance(
+        verification, (str, bytes)
+    ):
         verifier_ids = {
             item["actor_id"]
             for item in verification

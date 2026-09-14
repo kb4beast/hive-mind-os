@@ -14,6 +14,25 @@ from .autonomy import (
     EvolutionArena,
     MissionCharter,
 )
+from .cohort_policy import (
+    CheckpointDecision,
+    CheckpointDisposition,
+    CohortExecutionMode,
+    CohortExecutionPolicy,
+    CohortPhase,
+    EffectClass,
+)
+from .cohort_runtime import (
+    CohortKickoff,
+    CohortRunResult,
+    CohortRunStatus,
+    CohortRuntime,
+    CohortRuntimeError,
+    ConvergenceResult,
+    PackageRunResult,
+    PackageRunState,
+    VerificationResult,
+)
 from .contracts import (
     ContractValidation,
     load_schema,
@@ -168,12 +187,24 @@ from .reference.package_system import (
 )
 from .reference.vision import HardenedVisionContract, VisionComplianceGate
 from .repository_learning import RepositoryLearningCurriculum, RepositoryScout
-from .runtime import HiveKernel
+from .runtime import ExecutionStrategy, HiveKernel
 from .scheduler import Job, ManualClock, Scheduler, StaleLeaseError, SystemClock
 from .source_docket import (
     FoundingSourceDocket,
     load_default_source_docket,
     load_source_docket,
+)
+from .whole_os_service import (
+    PackageExecutionResult,
+    PackageStatus,
+    ServiceError,
+    ServiceObservation,
+    WholeOSHost,
+    WholeOSService,
+    WholeOSServiceConfig,
+    graph_from_document,
+    load_graph,
+    load_service_config,
 )
 from .workers import Worker, serve
 
@@ -300,8 +331,31 @@ __all__ = [
     "ToolManifest",
     "TrustState",
     "CheckResult",
+    "CheckpointDecision",
+    "CheckpointDisposition",
+    "CohortExecutionMode",
+    "CohortExecutionPolicy",
+    "CohortKickoff",
+    "CohortPhase",
+    "CohortRunResult",
+    "CohortRunStatus",
+    "CohortRuntime",
+    "CohortRuntimeError",
+    "ConvergenceResult",
+    "EffectClass",
+    "ExecutionStrategy",
+    "PackageRunResult",
+    "PackageRunState",
+    "VerificationResult",
     "VisionComplianceGate",
     "Worker",
+    "PackageExecutionResult",
+    "PackageStatus",
+    "ServiceError",
+    "ServiceObservation",
+    "WholeOSHost",
+    "WholeOSService",
+    "WholeOSServiceConfig",
     "WAR_ROOM_PROJECTION_SCHEMA_VERSION",
     "WorkflowManifest",
     "WorkflowTransition",
@@ -335,5 +389,8 @@ __all__ = [
     "validate_schema_catalog",
     "verify_audit_artifact",
     "write_audit_artifact",
+    "graph_from_document",
+    "load_graph",
+    "load_service_config",
 ]
 __version__ = "0.6.0"

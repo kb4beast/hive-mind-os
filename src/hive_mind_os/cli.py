@@ -47,12 +47,21 @@ from .brain_kernel.planner import (
     persist_plan,
 )
 from .brain_kernel.store import KernelIntegrityError, KernelStore
+from .cohort_policy import CohortExecutionMode, CohortExecutionPolicy, EffectClass
+from .cohort_runtime import (
+    CohortRuntime,
+    ConvergenceResult,
+    PackageRunResult,
+    PackageRunState,
+    VerificationResult,
+)
 from .continuation import (
     ContinuationPacketError,
     export_packet,
     validate_packet,
     write_packet,
 )
+from .cortex.repository.mission_bindings import ConfiguredMissionBindingsProvider
 from .courtroom import CaseParticipants
 from .current_state_audit import (
     collect_current_state_audit,
@@ -88,23 +97,46 @@ from .repository_compatibility import (
     resolve_runtime_route,
     runtime_identity,
 )
-from .runtime import HiveKernel
+from .runtime import ExecutionStrategy, HiveKernel
 from .scheduler import Scheduler
 from .source_docket import load_source_docket
 from .verify import VerificationError, verify_repository
+from .whole_os_service import (
+    PackageExecutionResult,
+    PackageStatus,
+    ServiceError,
+    WholeOSService,
+    load_service_config,
+)
 from .workers import serve
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="hive-mind", description="Run the Hive Mind OS bootstrap kernel")
+    parser = argparse.ArgumentParser(
+        prog="hive-mind", description="Run the Hive Mind OS bootstrap kernel"
+    )
     parser.add_argument("goal", help="Outcome for the specialist agent team")
     parser.add_argument("--repository", help="Optional owner/repository target")
-    parser.add_argument("--criterion", action="append", default=[], help="Acceptance criterion; repeatable")
+    parser.add_argument(
+        "--criterion",
+        action="append",
+        default=[],
+        help="Acceptance criterion; repeatable",
+    )
     parser.add_argument(
         "--backend",
         choices=("deterministic", "model"),
         default="deterministic",
         help="Agent backend (default: deterministic offline backend)",
+    )
+    parser.add_argument(
+        "--execution-mode",
+        choices=("cohort", "strict"),
+        default="cohort",
+        help=(
+            "cohort runs specialists together with one convergence pass; "
+            "strict preserves the legacy sequential lifecycle"
+        ),
     )
     return parser
 
@@ -145,18 +177,26 @@ def build_autopilot_parser() -> argparse.ArgumentParser:
         description="Initialize or operate a reusable intent-driven repository DAG.",
     )
     commands = parser.add_subparsers(dest="autopilot_command", required=True)
-    init = commands.add_parser("init", help="Record a portable governed DAG-build request")
+    init = commands.add_parser(
+        "init", help="Record a portable governed DAG-build request"
+    )
     init.add_argument("--repository", default=".")
     init.add_argument("--objective", default=DEFAULT_OBJECTIVE)
     init.add_argument("--target-branch", default=DEFAULT_TARGET_BRANCH)
-    init.add_argument("--remote", default="origin", help="Git remote to identify, or an empty value for local-only use")
+    init.add_argument(
+        "--remote",
+        default="origin",
+        help="Git remote to identify, or an empty value for local-only use",
+    )
     init.add_argument(
         "--protected-branch",
         action="append",
         default=[],
         help="Additional protected branch name; repeat for repository-specific policy",
     )
-    inspect = commands.add_parser("inspect", help="Infer intent and emit the next orchestration contract")
+    inspect = commands.add_parser(
+        "inspect", help="Infer intent and emit the next orchestration contract"
+    )
     inspect.add_argument("--repository", default=".")
     inspect.add_argument("--request", default="")
     inspect.add_argument("--actor", default="hive-mind:portable-orchestrator")
@@ -268,12 +308,17 @@ def build_kernel_parser() -> argparse.ArgumentParser:
     )
     status.add_argument("--json", action="store_true", dest="json_output")
     plan = commands.add_parser(
-        "plan", help="Persist a deterministic fixture plan for an existing kernel mission."
+        "plan",
+        help="Persist a deterministic fixture plan for an existing kernel mission.",
     )
     plan.add_argument("mission_id", help="Kernel mission identifier")
-    plan.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
     plan.add_argument(
-        "--fixture", choices=("bugfix", "feature", "refactor", "docs", "integration"), required=True
+        "--charter", required=True, help="Canonical mission charter JSON file"
+    )
+    plan.add_argument(
+        "--fixture",
+        choices=("bugfix", "feature", "refactor", "docs", "integration"),
+        required=True,
     )
     plan.add_argument("--state-dir", default=".hive-mind-kernel-state")
     plan.add_argument("--json", action="store_true", dest="json_output")
@@ -281,7 +326,9 @@ def build_kernel_parser() -> argparse.ArgumentParser:
         "graph", help="Render a read-only, event-derived kernel work graph."
     )
     graph.add_argument("mission_id", help="Kernel mission identifier")
-    graph.add_argument("--charter", required=True, help="Canonical mission charter JSON file")
+    graph.add_argument(
+        "--charter", required=True, help="Canonical mission charter JSON file"
+    )
     graph.add_argument("--state-dir", default=".hive-mind-kernel-state")
     graph.add_argument("--json", action="store_true", dest="json_output")
     closeout = commands.add_parser(
@@ -299,7 +346,9 @@ def build_kernel_parser() -> argparse.ArgumentParser:
     closeout.add_argument("--json", action="store_true", dest="json_output")
     memory = commands.add_parser("memory", help="Inspect bounded local kernel memory.")
     memory_commands = memory.add_subparsers(dest="memory_command", required=True)
-    search = memory_commands.add_parser("search", help="Rank scoped memory from a durable snapshot.")
+    search = memory_commands.add_parser(
+        "search", help="Rank scoped memory from a durable snapshot."
+    )
     search.add_argument("--snapshot", required=True, help="Memory snapshot digest")
     search.add_argument("--mission", required=True)
     search.add_argument("--work", required=True)
@@ -307,22 +356,30 @@ def build_kernel_parser() -> argparse.ArgumentParser:
     search.add_argument("--query", required=True)
     search.add_argument("--now", required=True, help="RFC 3339 retrieval time")
     search.add_argument("--data-scope", action="append", default=[])
-    search.add_argument("--sensitivity-scope", action="append", default=["public", "internal"])
+    search.add_argument(
+        "--sensitivity-scope", action="append", default=["public", "internal"]
+    )
     search.add_argument("--require-sensitivity", action="append", default=[])
     search.add_argument("--repository-key")
     search.add_argument("--state-dir", default=".hive-mind-kernel-state")
     search.add_argument("--json", action="store_true", dest="json_output")
-    inspect = memory_commands.add_parser("inspect", help="Inspect memory metadata without reading its body.")
+    inspect = memory_commands.add_parser(
+        "inspect", help="Inspect memory metadata without reading its body."
+    )
     inspect.add_argument("record_id")
     inspect.add_argument("--snapshot", required=True, help="Memory snapshot digest")
     inspect.add_argument("--state-dir", default=".hive-mind-kernel-state")
     inspect.add_argument("--json", action="store_true", dest="json_output")
-    expire = memory_commands.add_parser("expire", help="Append expiration facts and save a successor snapshot.")
+    expire = memory_commands.add_parser(
+        "expire", help="Append expiration facts and save a successor snapshot."
+    )
     expire.add_argument("--snapshot", required=True, help="Memory snapshot digest")
     expire.add_argument("--now", required=True, help="RFC 3339 maintenance time")
     expire.add_argument("--state-dir", default=".hive-mind-kernel-state")
     expire.add_argument("--json", action="store_true", dest="json_output")
-    context = commands.add_parser("context", help="Inspect one persisted kernel context manifest.")
+    context = commands.add_parser(
+        "context", help="Inspect one persisted kernel context manifest."
+    )
     context.add_argument("--manifest", required=True, help="Context manifest digest")
     context.add_argument("--state-dir", default=".hive-mind-kernel-state")
     context.add_argument("--json", action="store_true", dest="json_output")
@@ -334,9 +391,13 @@ def build_ingest_parser() -> argparse.ArgumentParser:
         prog="hive-mind ingest",
         description="Capture one human-supplied source exhibit without adjudicating it",
     )
-    parser.add_argument("--source", required=True, help="Existing source id, such as SRC-005")
+    parser.add_argument(
+        "--source", required=True, help="Existing source id, such as SRC-005"
+    )
     parser.add_argument("--file", required=True, help="Human-supplied exhibit file")
-    parser.add_argument("--locator", required=True, help="Exact source URI and fragment/timestamp")
+    parser.add_argument(
+        "--locator", required=True, help="Exact source URI and fragment/timestamp"
+    )
     parser.add_argument("--media-type", required=True, help="IANA-style media type")
     parser.add_argument(
         "--license",
@@ -353,8 +414,12 @@ def build_ingest_parser() -> argparse.ArgumentParser:
         choices=("human-provided-file", "agent-derived"),
         default="human-provided-file",
     )
-    parser.add_argument("--parent-digest", help="Required SHA-256 digest for derived artifacts")
-    parser.add_argument("--expected-digest", help="Optional independently supplied SHA-256")
+    parser.add_argument(
+        "--parent-digest", help="Required SHA-256 digest for derived artifacts"
+    )
+    parser.add_argument(
+        "--expected-digest", help="Optional independently supplied SHA-256"
+    )
     parser.add_argument(
         "--evidence-root",
         default="evidence/sources",
@@ -375,8 +440,12 @@ def build_defer_parser() -> argparse.ArgumentParser:
         help="Existing source id; repeat for an aggregate obligation",
     )
     parser.add_argument("--obligation", help="Stable obligation id")
-    parser.add_argument("--reason", required=True, help="Specific uncaptured evidence obligation")
-    parser.add_argument("--review-by", required=True, help="Future review date (YYYY-MM-DD)")
+    parser.add_argument(
+        "--reason", required=True, help="Specific uncaptured evidence obligation"
+    )
+    parser.add_argument(
+        "--review-by", required=True, help="Future review date (YYYY-MM-DD)"
+    )
     parser.add_argument("--advocate", default="source-evidence-advocate")
     parser.add_argument("--cross-examiner", default="source-evidence-cross-examiner")
     parser.add_argument("--judge", default="source-evidence-judge")
@@ -685,11 +754,19 @@ def build_continuation_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="action", required=True)
     export = commands.add_parser("export")
     export.add_argument("--repository", required=True, help="Clean local Git worktree")
-    export.add_argument("--input", required=True, help="Short structured packet source JSON")
-    export.add_argument("--output", required=True, help="New packet path outside the repository")
+    export.add_argument(
+        "--input", required=True, help="Short structured packet source JSON"
+    )
+    export.add_argument(
+        "--output", required=True, help="New packet path outside the repository"
+    )
     validate = commands.add_parser("validate")
-    validate.add_argument("--repository", required=True, help="Bound local Git worktree")
-    validate.add_argument("--packet", required=True, help="Existing continuation packet JSON")
+    validate.add_argument(
+        "--repository", required=True, help="Bound local Git worktree"
+    )
+    validate.add_argument(
+        "--packet", required=True, help="Existing continuation packet JSON"
+    )
     return parser
 
 
@@ -699,23 +776,37 @@ def build_autonomous_parser() -> argparse.ArgumentParser:
         description="Run a governed, host-neutral autonomous repository worktree",
     )
     commands = parser.add_subparsers(dest="action", required=True)
-    kickoff = commands.add_parser("kickoff", help="Create an isolated branch from one user prompt")
-    kickoff.add_argument("--repository", required=True, help="Clean local Git repository")
-    kickoff.add_argument("--prompt", required=True, help="Kickoff objective; safe text only")
-    kickoff.add_argument("--host", choices=tuple(item.value for item in HostKind), required=True)
+    kickoff = commands.add_parser(
+        "kickoff", help="Create an isolated branch from one user prompt"
+    )
+    kickoff.add_argument(
+        "--repository", required=True, help="Clean local Git repository"
+    )
+    kickoff.add_argument(
+        "--prompt", required=True, help="Kickoff objective; safe text only"
+    )
+    kickoff.add_argument(
+        "--host", choices=tuple(item.value for item in HostKind), required=True
+    )
     kickoff.add_argument("--run-id", help="Optional stable run identifier")
     kickoff.add_argument("--allow-remote-push", action="store_true")
     kickoff.add_argument("--allow-pr-comments", action="store_true")
     kickoff.add_argument("--state-dir", default=".hive-mind-state/autonomous")
-    turn = commands.add_parser("turn", help="Run the selected signed-in coding host locally")
+    turn = commands.add_parser(
+        "turn", help="Run the selected signed-in coding host locally"
+    )
     turn.add_argument("--run-id", required=True)
     turn.add_argument("--state-dir", default=".hive-mind-state/autonomous")
-    register = commands.add_parser("register-pr", help="Bind this run to its own draft PR")
+    register = commands.add_parser(
+        "register-pr", help="Bind this run to its own draft PR"
+    )
     register.add_argument("--run-id", required=True)
     register.add_argument("--number", required=True, type=int)
     register.add_argument("--url", required=True)
     register.add_argument("--state-dir", default=".hive-mind-state/autonomous")
-    open_pr = commands.add_parser("open-draft-pr", help="Push the run branch and open a draft PR")
+    open_pr = commands.add_parser(
+        "open-draft-pr", help="Push the run branch and open a draft PR"
+    )
     open_pr.add_argument("--run-id", required=True)
     open_pr.add_argument("--owner", required=True)
     open_pr.add_argument("--repository", required=True)
@@ -724,17 +815,23 @@ def build_autonomous_parser() -> argparse.ArgumentParser:
     open_pr.add_argument("--body", required=True)
     open_pr.add_argument("--token-env", default="GITHUB_TOKEN")
     open_pr.add_argument("--state-dir", default=".hive-mind-state/autonomous")
-    poll = commands.add_parser("poll-pr", help="Handle new conversation comments on the bound PR")
+    poll = commands.add_parser(
+        "poll-pr", help="Handle new conversation comments on the bound PR"
+    )
     poll.add_argument("--run-id", required=True)
     poll.add_argument("--owner", required=True)
     poll.add_argument("--repository", required=True)
     poll.add_argument("--token-env", default="GITHUB_TOKEN")
     poll.add_argument("--state-dir", default=".hive-mind-state/autonomous")
-    push = commands.add_parser("push", help="Push only the run's own non-protected branch")
+    push = commands.add_parser(
+        "push", help="Push only the run's own non-protected branch"
+    )
     push.add_argument("--run-id", required=True)
     push.add_argument("--remote", default="origin")
     push.add_argument("--state-dir", default=".hive-mind-state/autonomous")
-    learn = commands.add_parser("learn", help="PIT-grade every human commit after the run start")
+    learn = commands.add_parser(
+        "learn", help="PIT-grade every human commit after the run start"
+    )
     learn.add_argument("--run-id", required=True)
     learn.add_argument("--human-final-commit", required=True)
     learn.add_argument("--state-dir", default=".hive-mind-state/autonomous")
@@ -749,7 +846,9 @@ def build_autonomous_parser() -> argparse.ArgumentParser:
     supervise.add_argument("--repository")
     supervise.add_argument("--token-env", default="GITHUB_TOKEN")
     supervise.add_argument("--state-dir", default=".hive-mind-state/autonomous")
-    events = commands.add_parser("events", help="Print the run's safe append-only event ledger")
+    events = commands.add_parser(
+        "events", help="Print the run's safe append-only event ledger"
+    )
     events.add_argument("--run-id", required=True)
     events.add_argument("--state-dir", default=".hive-mind-state/autonomous")
     requirements = commands.add_parser(
@@ -759,6 +858,258 @@ def build_autonomous_parser() -> argparse.ArgumentParser:
     requirements.add_argument("--run-id", required=True)
     requirements.add_argument("--state-dir", default=".hive-mind-state/autonomous")
     return parser
+
+
+def build_whole_os_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hive-mind whole-os",
+        description="Operate one configured, durable Whole-OS campaign.",
+    )
+    commands = parser.add_subparsers(dest="whole_os_command", required=True)
+    for name, help_text in (
+        ("inspect", "Inspect the inert configuration and sealed graph"),
+        ("status", "Read durable campaign status"),
+        ("run-once", "Run one queued package using the configured host boundary"),
+        ("resume", "Resume the campaign by running one queued package"),
+    ):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument(
+            "--config", required=True, help="Closed JSON service configuration"
+        )
+        command.add_argument(
+            "--execution-mode",
+            choices=("strict", "cohort"),
+            default="cohort",
+            help=(
+                "Execution topology: strict preserves package-at-a-time behavior; "
+                "cohort groups dependency-ready work behind shared checkpoints"
+            ),
+        )
+        command.add_argument(
+            "--max-parallel-packages",
+            "--cohort-size",
+            dest="max_parallel_packages",
+            type=_positive_integer,
+            help=(
+                "Maximum packages in a cohort (defaults to the graph limit; "
+                "only valid with --execution-mode cohort)"
+            ),
+        )
+        command.add_argument("--json", action="store_true", dest="json_output")
+    return parser
+
+
+def _positive_integer(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def _whole_os_execution_document(
+    args: argparse.Namespace, *, graph_maximum: int
+) -> dict[str, object]:
+    mode = str(args.execution_mode)
+    requested = args.max_parallel_packages
+    if mode == "strict":
+        if requested is not None:
+            raise ServiceError(
+                "--max-parallel-packages requires --execution-mode cohort"
+            )
+        maximum = 1
+        checkpoint = "per_package"
+    else:
+        maximum = graph_maximum if requested is None else min(requested, graph_maximum)
+        checkpoint = "cohort_boundary"
+    policy = CohortExecutionPolicy(CohortExecutionMode(mode), maximum)
+    return {
+        "mode": mode,
+        "max_parallel_packages": maximum,
+        "checkpoint": checkpoint,
+        "policy_digest": policy.digest,
+    }
+
+
+class _UnconfiguredHost:
+    """Explicitly incomplete CLI host; credentials and adapters stay host-owned."""
+
+    def execute_package(self, package, bindings, payload):
+        return PackageExecutionResult(
+            package.package_id,
+            PackageStatus.BLOCKED_CAPABILITY,
+            None,
+            (),
+            "no host executor is configured for this process",
+        )
+
+
+def _observation_document(observation) -> dict[str, object]:
+    result = observation.last_result
+    return {
+        "campaign_id": observation.campaign_id,
+        "status": observation.status,
+        "completed_packages": list(observation.completed_packages),
+        "pending_packages": list(observation.pending_packages),
+        "blocked_packages": list(observation.blocked_packages),
+        "last_result": None
+        if result is None
+        else {
+            "package_id": result.package_id,
+            "status": result.status.value,
+            "candidate_digest": result.candidate_digest,
+            "evidence_refs": list(result.evidence_refs),
+            "message": result.message,
+        },
+    }
+
+
+def _run_unconfigured_cohort(config, execution: dict[str, object]) -> dict[str, object]:
+    """Exercise the real cohort route while retaining the CLI capability boundary."""
+
+    maximum = execution["max_parallel_packages"]
+    if not isinstance(maximum, int):
+        raise ServiceError("cohort parallelism must be an integer")
+    policy = CohortExecutionPolicy(CohortExecutionMode.COHORT, maximum)
+    runtime = CohortRuntime(policy)
+
+    def execute_package(package, kickoff, dependencies):
+        return PackageRunResult(
+            package.package_id,
+            PackageRunState.BLOCKED_POLICY,
+            {},
+            message="no host executor is configured for this process",
+        )
+
+    result = runtime.execute(
+        graph=config.graph,
+        run_id=f"{config.campaign_id}:cli",
+        kickoff_context={
+            "campaign_id": config.campaign_id,
+            "tenant_id": config.tenant_id,
+            "repository_id": config.repository_id,
+            "binding_descriptor_digest": config.binding_descriptor.digest,
+        },
+        execute_package=execute_package,
+        converge=lambda kickoff, packages: ConvergenceResult(
+            True,
+            {
+                "blocked_packages": [
+                    package.package_id
+                    for package in packages
+                    if package.state is PackageRunState.BLOCKED_POLICY
+                ]
+            },
+            "capability blockers retained at cohort convergence",
+        ),
+        verify=lambda kickoff, packages, convergence: VerificationResult(
+            True,
+            ("typed-capability-blockers-recorded",),
+            "no implementation was claimed without a configured host",
+        ),
+        effect_classes={
+            package.package_id: EffectClass.MISSING_AUTHORITY
+            for package in config.graph.packages
+        },
+    )
+    blocked_packages = [
+        package.package_id
+        for package in result.package_results
+        if package.state is PackageRunState.BLOCKED_POLICY
+    ]
+    return {
+        "campaign_id": config.campaign_id,
+        "status": result.status.value,
+        "completed_packages": [],
+        "pending_packages": blocked_packages,
+        "blocked_packages": blocked_packages,
+        "blocker": "blocked_capability",
+        "last_result": None,
+        "execution": execution,
+        "cohort": {
+            "run_id": result.run_id,
+            "kickoff_digest": result.kickoff.context_digest,
+            "dispatch_batches": [list(batch) for batch in result.dispatch_batches],
+            "max_parallelism": result.max_parallelism,
+            "convergence_rounds": 1,
+            "verification_rounds": 1,
+        },
+    }
+
+
+def _run_whole_os(args: argparse.Namespace) -> int:
+    try:
+        config = load_service_config(args.config)
+        execution = _whole_os_execution_document(
+            args, graph_maximum=config.graph.maximum_concurrent
+        )
+        if args.whole_os_command == "inspect":
+            document = {
+                "campaign_id": config.campaign_id,
+                "tenant_id": config.tenant_id,
+                "repository_id": config.repository_id,
+                "state_dir": str(config.state_dir),
+                "binding_descriptor_digest": config.binding_descriptor.digest,
+                "graph_digest": config.graph.digest,
+                "package_ids": [
+                    package.package_id for package in config.graph.packages
+                ],
+                "execution": execution,
+            }
+            print(
+                json.dumps(document, indent=2, sort_keys=True)
+                if args.json_output
+                else (
+                    f"{config.campaign_id}: {len(config.graph.packages)} packages "
+                    f"[{execution['mode']}, parallel={execution['max_parallel_packages']}]"
+                )
+            )
+            return 0
+        if execution["mode"] == "cohort" and args.whole_os_command != "status":
+            document = _run_unconfigured_cohort(config, execution)
+            print(
+                json.dumps(document, indent=2, sort_keys=True)
+                if args.json_output
+                else (
+                    f"{config.campaign_id}: {document['status']} "
+                    f"[cohort, parallel={execution['max_parallel_packages']}]"
+                )
+            )
+            return 0
+        provider = ConfiguredMissionBindingsProvider(
+            config.binding_descriptor, lambda descriptor, payload, root: (None, None)
+        )
+        service = WholeOSService(config, provider, _UnconfiguredHost())
+        try:
+            observation = (
+                service.observe()
+                if args.whole_os_command == "status"
+                else service.run_once()
+            )
+        finally:
+            service.close()
+        document = _observation_document(observation)
+        document["execution"] = execution
+        print(
+            json.dumps(document, indent=2, sort_keys=True)
+            if args.json_output
+            else (
+                f"{observation.campaign_id}: {observation.status} "
+                f"[{execution['mode']}, parallel={execution['max_parallel_packages']}]"
+            )
+        )
+        return 0
+    except (ServiceError, OSError, ValueError, TypeError) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        return 2
 
 
 async def _run(args: argparse.Namespace) -> int:
@@ -774,18 +1125,26 @@ async def _run(args: argparse.Namespace) -> int:
             backend = ModelBackend(
                 provider_from_env(),
                 ledger=ledger,
-                role_providers={
-                    Role.CURATOR: provider_from_env(role=Role.CURATOR)
-                },
+                role_providers={Role.CURATOR: provider_from_env(role=Role.CURATOR)},
             )
         except (ModelProviderError, ValueError) as error:
             raise SystemExit(f"model backend configuration failed: {error}") from None
-    report = await HiveKernel(backend=backend, ledger=ledger).run_objective(objective)
+    execution_strategy = (
+        ExecutionStrategy.COHORT
+        if args.execution_mode == "cohort"
+        else ExecutionStrategy.SEQUENTIAL
+    )
+    report = await HiveKernel(
+        backend=backend,
+        ledger=ledger,
+        execution_strategy=execution_strategy,
+    ).run_objective(objective)
     print(
         json.dumps(
             {
                 "run_id": report.run_id,
                 "status": report.status.value,
+                "execution_mode": args.execution_mode,
                 "roles_completed": [result.role.value for result in report.results],
                 "evidence_count": report.evidence_count,
             },
@@ -999,11 +1358,17 @@ def _missing_model_configuration(args: argparse.Namespace) -> tuple[str, ...]:
                     return scoped
             return os.environ.get(name)
 
-        provider = args.provider or configured("HIVE_MIND_MODEL_PROVIDER") or "openai_compatible"
+        provider = (
+            args.provider
+            or configured("HIVE_MIND_MODEL_PROVIDER")
+            or "openai_compatible"
+        )
         if provider not in defaults:
             continue
-        model = args.model or configured("HIVE_MIND_MODEL_MODEL") or configured(
-            "HIVE_MIND_MODEL_ID"
+        model = (
+            args.model
+            or configured("HIVE_MIND_MODEL_MODEL")
+            or configured("HIVE_MIND_MODEL_ID")
         )
         if not model or not model.strip():
             name = "HIVE_MIND_MODEL_MODEL (or HIVE_MIND_MODEL_ID)"
@@ -1226,9 +1591,7 @@ def _run_enqueue(args: argparse.Namespace) -> int:
     except ValueError as error:
         raise SystemExit(f"acceptance specification is invalid: {error}") from None
     declared_criteria = tuple(args.criterion)
-    specification_criteria = tuple(
-        item.criterion for item in acceptance_specifications
-    )
+    specification_criteria = tuple(item.criterion for item in acceptance_specifications)
     if not acceptance_specifications:
         raise SystemExit(
             "queued repository missions require at least one typed executable "
@@ -1261,9 +1624,7 @@ def _run_enqueue(args: argparse.Namespace) -> int:
     ).encode("utf-8")
     mission_id = f"M-{sha256(encoded).hexdigest()[:32]}"
     try:
-        route = resolve_runtime_route(
-            getattr(args, "compatibility_mode", "canonical")
-        )
+        route = resolve_runtime_route(getattr(args, "compatibility_mode", "canonical"))
     except RuntimeRouteError as error:
         raise SystemExit(f"compatibility mode is invalid: {error}") from None
     scheduler = Scheduler(args.state_dir)
@@ -1377,14 +1738,20 @@ def _run_continuation(args: argparse.Namespace) -> int:
         validation = validate_packet(packet, args.repository)
         print(
             json.dumps(
-                {"status": "valid" if validation.valid else "rejected", "issues": list(validation.issues)},
+                {
+                    "status": "valid" if validation.valid else "rejected",
+                    "issues": list(validation.issues),
+                },
                 indent=2,
                 sort_keys=True,
             )
         )
         return 0 if validation.valid else 1
     except ContinuationPacketError as error:
-        print(json.dumps({"status": "rejected", "error": str(error)}, indent=2), file=sys.stderr)
+        print(
+            json.dumps({"status": "rejected", "error": str(error)}, indent=2),
+            file=sys.stderr,
+        )
         return 1
 
 
@@ -1400,14 +1767,22 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                     allow_remote_push=args.allow_remote_push,
                     allow_pr_comments=args.allow_pr_comments,
                 )
-                print(json.dumps({"status": "prepared", "run": contract}, indent=2, sort_keys=True))
+                print(
+                    json.dumps(
+                        {"status": "prepared", "run": contract},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
                 return 0
             if args.action == "turn":
                 result = brain.run_host_turn(args.run_id)
                 print(
                     json.dumps(
                         {
-                            "status": "completed" if result.returncode == 0 else "blocked",
+                            "status": "completed"
+                            if result.returncode == 0
+                            else "blocked",
                             "run_id": result.run_id,
                             "action": result.action,
                             "reply": result.reply,
@@ -1421,7 +1796,16 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                 return 0 if result.returncode == 0 else 1
             if args.action == "register-pr":
                 brain.register_pull_request(args.run_id, args.number, args.url)
-                print(json.dumps({"status": "registered", "run_id": args.run_id, "number": args.number}, indent=2))
+                print(
+                    json.dumps(
+                        {
+                            "status": "registered",
+                            "run_id": args.run_id,
+                            "number": args.number,
+                        },
+                        indent=2,
+                    )
+                )
                 return 0
             if args.action == "open-draft-pr":
                 result = brain.open_draft_pull_request(
@@ -1433,7 +1817,16 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                     body=args.body,
                     gateway=GitHubRestCommentGateway(args.token_env),
                 )
-                print(json.dumps({"status": "opened", "run_id": args.run_id, "pull_request": result}, indent=2))
+                print(
+                    json.dumps(
+                        {
+                            "status": "opened",
+                            "run_id": args.run_id,
+                            "pull_request": result,
+                        },
+                        indent=2,
+                    )
+                )
                 return 0
             if args.action == "poll-pr":
                 results = brain.handle_pull_request_feedback(
@@ -1456,7 +1849,12 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                 return 0
             if args.action == "push":
                 head = brain.push_own_branch(args.run_id, remote=args.remote)
-                print(json.dumps({"status": "pushed", "run_id": args.run_id, "head": head}, indent=2))
+                print(
+                    json.dumps(
+                        {"status": "pushed", "run_id": args.run_id, "head": head},
+                        indent=2,
+                    )
+                )
                 return 0
             if args.action == "learn":
                 records = brain.learn_from_human_outcome_with_host(
@@ -1464,16 +1862,26 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                 )
                 print(
                     json.dumps(
-                        {"status": "graded", "run_id": args.run_id, "iterations": list(records)},
+                        {
+                            "status": "graded",
+                            "run_id": args.run_id,
+                            "iterations": list(records),
+                        },
                         indent=2,
                         sort_keys=True,
                     )
                 )
                 return 0
             if args.action == "supervise":
-                feedback_requested = args.owner is not None or args.repository is not None
-                if feedback_requested and (args.owner is None or args.repository is None):
-                    raise AutonomousRunError("supervision owner and repository must be supplied together")
+                feedback_requested = (
+                    args.owner is not None or args.repository is not None
+                )
+                if feedback_requested and (
+                    args.owner is None or args.repository is None
+                ):
+                    raise AutonomousRunError(
+                        "supervision owner and repository must be supplied together"
+                    )
                 result = brain.supervise(
                     args.run_id,
                     max_polls=args.polls,
@@ -1486,7 +1894,11 @@ def _run_autonomous(args: argparse.Namespace) -> int:
                         else None
                     ),
                 )
-                print(json.dumps({"status": "supervised", **result}, indent=2, sort_keys=True))
+                print(
+                    json.dumps(
+                        {"status": "supervised", **result}, indent=2, sort_keys=True
+                    )
+                )
                 return 0
             if args.action == "requirements":
                 print(
@@ -1505,7 +1917,10 @@ def _run_autonomous(args: argparse.Namespace) -> int:
             return 1
     except (AutonomousRunError, OSError, RuntimeError, ValueError) as error:
         print(
-            json.dumps({"status": "blocked", "error": f"{type(error).__name__}: {error}"}, indent=2),
+            json.dumps(
+                {"status": "blocked", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
             file=sys.stderr,
         )
         return 1
@@ -1513,8 +1928,12 @@ def _run_autonomous(args: argparse.Namespace) -> int:
 
 def _run_audit(args: argparse.Namespace, invocation: Sequence[str]) -> int:
     if bool(args.signing_key_file) != bool(args.signing_key_id):
-        raise SystemExit("--signing-key-file and --signing-key-id must be supplied together")
-    signing_key = Path(args.signing_key_file).read_bytes() if args.signing_key_file else None
+        raise SystemExit(
+            "--signing-key-file and --signing-key-id must be supplied together"
+        )
+    signing_key = (
+        Path(args.signing_key_file).read_bytes() if args.signing_key_file else None
+    )
     audit = collect_current_state_audit(
         args.repository,
         run_tests=not args.skip_tests,
@@ -1619,11 +2038,32 @@ def _run_kernel_plan(args: argparse.Namespace) -> int:
             sequences = persist_plan(store, plan)
         finally:
             store.close()
-    except (FileNotFoundError, KernelIntegrityError, OSError, ValueError, KeyError, sqlite3.Error) as error:
-        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+    except (
+        FileNotFoundError,
+        KernelIntegrityError,
+        OSError,
+        ValueError,
+        KeyError,
+        sqlite3.Error,
+    ) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 1
-    report = {"mission_id": args.mission_id, "plan_digest": plan.digest, "sequences": sequences}
-    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else plan.digest)
+    report = {
+        "mission_id": args.mission_id,
+        "plan_digest": plan.digest,
+        "sequences": sequences,
+    }
+    print(
+        json.dumps(report, indent=2, sort_keys=True)
+        if args.json_output
+        else plan.digest
+    )
     return 0
 
 
@@ -1635,8 +2075,21 @@ def _run_kernel_graph(args: argparse.Namespace) -> int:
             graph = graph_from_events(charter, store.events())
         finally:
             store.close()
-    except (FileNotFoundError, KernelIntegrityError, OSError, ValueError, KeyError, sqlite3.Error) as error:
-        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+    except (
+        FileNotFoundError,
+        KernelIntegrityError,
+        OSError,
+        ValueError,
+        KeyError,
+        sqlite3.Error,
+    ) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 1
     report = {
         "mission_id": args.mission_id,
@@ -1644,7 +2097,11 @@ def _run_kernel_graph(args: argparse.Namespace) -> int:
         "ready_work_ids": [item.work_id for item in graph.ready_items()],
         "work_items": [item.to_document() for item in graph.ordered_items()],
     }
-    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else graph.digest)
+    print(
+        json.dumps(report, indent=2, sort_keys=True)
+        if args.json_output
+        else graph.digest
+    )
     return 0
 
 
@@ -1655,8 +2112,15 @@ def _run_kernel_closeout(args: argparse.Namespace) -> int:
         directories: dict[str, str] = {}
         for value in args.bundle_ref:
             reference, separator, directory = value.partition("=")
-            if not separator or not reference or not directory or reference in directories:
-                raise ValueError("bundle references must use unique REFERENCE=PATH values")
+            if (
+                not separator
+                or not reference
+                or not directory
+                or reference in directories
+            ):
+                raise ValueError(
+                    "bundle references must use unique REFERENCE=PATH values"
+                )
             directories[reference] = directory
         store = KernelStore(_kernel_database_or_error(args.state_dir), read_only=True)
         try:
@@ -1665,11 +2129,29 @@ def _run_kernel_closeout(args: argparse.Namespace) -> int:
             )
         finally:
             store.close()
-    except (FileNotFoundError, KernelIntegrityError, TechnicalCloseoutError, OSError, ValueError, KeyError, sqlite3.Error) as error:
-        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+    except (
+        FileNotFoundError,
+        KernelIntegrityError,
+        TechnicalCloseoutError,
+        OSError,
+        ValueError,
+        KeyError,
+        sqlite3.Error,
+    ) as error:
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 1
     document = report.to_document()
-    print(json.dumps(document, indent=2, sort_keys=True) if args.json_output else f"{report.mission_id}: {report.state}")
+    print(
+        json.dumps(document, indent=2, sort_keys=True)
+        if args.json_output
+        else f"{report.mission_id}: {report.state}"
+    )
     return 0
 
 
@@ -1681,23 +2163,42 @@ def _run_kernel_memory_search(args: argparse.Namespace) -> int:
     try:
         catalog = _memory_catalog(args)
         request = RetrievalRequest(
-            args.mission, args.work, args.role, args.query, args.now,
-            tuple(args.data_scope), repository_key=args.repository_key,
+            args.mission,
+            args.work,
+            args.role,
+            args.query,
+            args.now,
+            tuple(args.data_scope),
+            repository_key=args.repository_key,
             sensitivity_scopes=tuple(args.sensitivity_scope),
             required_sensitivities=tuple(args.require_sensitivity),
         )
         ranked = catalog.rank(request)
     except (KeyError, MemoryDenied, OSError, ValueError) as error:
-        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 1
     report = {
         "snapshot": args.snapshot,
         "records": [
-            {"record": item.entry.record.to_document(), "score": item.score, "terms": asdict(item.terms)}
+            {
+                "record": item.entry.record.to_document(),
+                "score": item.score,
+                "terms": asdict(item.terms),
+            }
             for item in ranked
         ],
     }
-    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else "\n".join(item.entry.record.record_id for item in ranked))
+    print(
+        json.dumps(report, indent=2, sort_keys=True)
+        if args.json_output
+        else "\n".join(item.entry.record.record_id for item in ranked)
+    )
     return 0
 
 
@@ -1705,14 +2206,28 @@ def _run_kernel_memory_inspect(args: argparse.Namespace) -> int:
     try:
         entry, state = _memory_catalog(args).inspect(args.record_id)
     except (KeyError, MemoryDenied, OSError, ValueError) as error:
-        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 1
     report = {
         "record": entry.record.to_document(),
-        "access": {"roles": entry.access.roles, "data_scopes": entry.access.data_scopes, "evaluator_visible": entry.access.evaluator_visible},
+        "access": {
+            "roles": entry.access.roles,
+            "data_scopes": entry.access.data_scopes,
+            "evaluator_visible": entry.access.evaluator_visible,
+        },
         "derived_state": state.value,
     }
-    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else f"{entry.record.record_id}: {state.value}")
+    print(
+        json.dumps(report, indent=2, sort_keys=True)
+        if args.json_output
+        else f"{entry.record.record_id}: {state.value}"
+    )
     return 0
 
 
@@ -1723,10 +2238,21 @@ def _run_kernel_memory_expire(args: argparse.Namespace) -> int:
         events = catalog.expire(now=args.now)
         successor = store.persist(catalog)
     except (KeyError, MemoryDenied, OSError, ValueError) as error:
-        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 1
-    report = {"snapshot": successor, "expired_record_ids": [event.record_id for event in events]}
-    print(json.dumps(report, indent=2, sort_keys=True) if args.json_output else successor)
+    report = {
+        "snapshot": successor,
+        "expired_record_ids": [event.record_id for event in events],
+    }
+    print(
+        json.dumps(report, indent=2, sort_keys=True) if args.json_output else successor
+    )
     return 0
 
 
@@ -1736,9 +2262,19 @@ def _run_kernel_context(args: argparse.Namespace) -> int:
         manifests.restore()
         manifest = manifests.get(args.manifest)
     except (KeyError, OSError, ValueError) as error:
-        print(json.dumps({"status": "failed", "error": f"{type(error).__name__}: {error}"}, indent=2), file=sys.stderr)
+        print(
+            json.dumps(
+                {"status": "failed", "error": f"{type(error).__name__}: {error}"},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 1
-    print(json.dumps(manifest.to_document(), indent=2, sort_keys=True) if args.json_output else manifest.manifest_digest)
+    print(
+        json.dumps(manifest.to_document(), indent=2, sort_keys=True)
+        if args.json_output
+        else manifest.manifest_digest
+    )
     return 0
 
 
@@ -1904,6 +2440,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments and arguments[0] == "autonomous":
         args = build_autonomous_parser().parse_args(arguments[1:])
         raise SystemExit(_run_autonomous(args))
+    if arguments and arguments[0] == "whole-os":
+        args = build_whole_os_parser().parse_args(arguments[1:])
+        raise SystemExit(_run_whole_os(args))
     args = build_parser().parse_args(arguments)
     raise SystemExit(asyncio.run(_run(args)))
 
