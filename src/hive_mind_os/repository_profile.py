@@ -91,22 +91,24 @@ def _git_control_paths(root: Path) -> tuple[Path, ...]:
             line = dot_git.read_text(encoding="utf-8").splitlines()[0]
             if line.startswith("gitdir: "):
                 paths.append(resolved_path(root / line[8:]))
-        except (OSError, IndexError, UnicodeError):
-            pass
+        except (OSError, IndexError, UnicodeError) as error:
+            raise RepositoryProfileError("malformed Git control metadata") from error
+        if not line.startswith("gitdir: ") or not line[8:].strip():
+            raise RepositoryProfileError("malformed Git control metadata")
     git_dir = next((p for p in paths if p.is_dir()), dot_git)
     common = git_dir / "commondir"
     if common.is_file():
         try:
             paths.append(resolved_path(git_dir / common.read_text(encoding="utf-8").strip()))
-        except (OSError, UnicodeError):
-            pass
+        except (OSError, UnicodeError) as error:
+            raise RepositoryProfileError("malformed Git common-dir metadata") from error
     for base in tuple(paths):
         alternate_file = base / "objects" / "info" / "alternates"
         if alternate_file.is_file():
             try:
                 paths.extend(resolved_path((base / "objects") / line.strip()) for line in alternate_file.read_text(encoding="utf-8").splitlines() if line.strip())
-            except (OSError, UnicodeError):
-                pass
+            except (OSError, UnicodeError) as error:
+                raise RepositoryProfileError("malformed Git alternates metadata") from error
     return tuple(paths)
 
 
@@ -242,6 +244,7 @@ class RepositoryProfile:
         if type(self.tools) is not tuple or len({t.adapter_id for t in self.tools}) != len(self.tools): raise RepositoryProfileError("tools must have unique admitted adapter IDs")
         if any(type(t) is not HostToolBinding for t in self.tools): raise RepositoryProfileError("tools must be typed")
         if type(self.reports) is not tuple or any(type(r) is not CapabilityReport for r in self.reports): raise RepositoryProfileError("reports must be typed")
+        if len({report.adapter_id for report in self.reports}) != len(self.reports): raise RepositoryProfileError("reports must be unique per tool")
         if {report.adapter_id for report in self.reports} != {tool.adapter_id for tool in self.tools}: raise RepositoryProfileError("reports must exactly cover tool bindings")
         if any(next(tool for tool in self.tools if tool.adapter_id == report.adapter_id).status is not report.status for report in self.reports): raise RepositoryProfileError("capability report contradicts tool binding")
         if type(self.external_destinations) is not tuple or self.external_destinations != tuple(sorted(set(self.external_destinations))): raise RepositoryProfileError("external_destinations must be sorted immutable")
