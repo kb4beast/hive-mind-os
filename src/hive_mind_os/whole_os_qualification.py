@@ -170,8 +170,8 @@ class AdversarialReport:
             raise QualificationError("failure evidence targets another candidate")
         if any(not row.healthy_path_passed or not row.negative_control_rejected or row.resulting_effect_count > 1 for row in self.observations):
             raise QualificationError("adversarial acceptance failed")
-        if not self.attempted_boundaries:
-            raise QualificationError("adversarial boundary inventory is required")
+        if not self.attempted_boundaries or len(set(self.attempted_boundaries)) != len(self.attempted_boundaries):
+            raise QualificationError("adversarial boundary inventory is required and unique")
 
 
 @dataclass(frozen=True, slots=True)

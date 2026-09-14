@@ -26,6 +26,9 @@ class PilotPlan:
     authority_digest: str
 
     def __post_init__(self) -> None:
+        for name in ("pilot_id", "candidate_digest", "authority_digest"):
+            if not isinstance(getattr(self, name), str) or not getattr(self, name).strip():
+                raise ValueError(f"{name} is required")
         if self.mode not in {"self", "external", "roblox"}:
             raise ValueError("invalid pilot mode")
         if not self.subject_ids or len(set(self.subject_ids)) != len(self.subject_ids):
@@ -35,6 +38,8 @@ class PilotPlan:
         for value in (self.maximum_concurrent, self.daily_resource_limit, self.delivery_rate_limit):
             if type(value) is not int or value < 1:
                 raise ValueError("pilot limits must be positive integers")
+        if self.ends_at - self.starts_at < 72 * 60 * 60:
+            raise ValueError("pilot window must cover the required 72-hour observation")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,11 +127,23 @@ class PilotController:
             raise ValueError("attempt is outside the pilot subject/candidate")
         def apply(state: PilotState) -> PilotState:
             if any(row.attempt_id == attempt.attempt_id for row in state.attempts):
-                return PilotState(state.plan, state.attempts, state.restart_exercised, state.duplicate_effects,
-                                  state.avoidable_owner_questions, state.rollback_evidence, state.obligations, state.revision + 1)
+                existing = next(row for row in state.attempts if row.attempt_id == attempt.attempt_id)
+                if existing != attempt:
+                    raise ValueError("attempt identity already has different content")
+                return state
+            if len(state.attempts) >= state.plan.daily_resource_limit:
+                raise ValueError("pilot daily resource limit exhausted")
+            if attempt.status == "accepted" and sum(row.status == "accepted" for row in state.attempts) >= state.plan.delivery_rate_limit:
+                raise ValueError("pilot delivery rate limit exhausted")
             return PilotState(state.plan, (*state.attempts, attempt), state.restart_exercised,
                               state.duplicate_effects, state.avoidable_owner_questions,
                               state.rollback_evidence, state.obligations, state.revision + 1)
+        state = self.store.load()
+        if any(row.attempt_id == attempt.attempt_id for row in state.attempts):
+            existing = next(row for row in state.attempts if row.attempt_id == attempt.attempt_id)
+            if existing != attempt:
+                raise ValueError("attempt identity already has different content")
+            return state
         return self._update(apply)
 
     def record_controls(
