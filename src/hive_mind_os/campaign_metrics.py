@@ -46,6 +46,24 @@ class IssuedReceipt:
 def reject_receipt_replay(receipts:Iterable[IssuedReceipt])->None:
  rows=tuple(receipts)
  if len({x.identity for x in rows})!=len(rows):raise CampaignMetricsError("receipt replay")
+@dataclass(frozen=True,slots=True)
+class AdmittedProtocol:
+ protocol:object;stage_evidence:StageEvidence;admission_digest:str
+def admit_protocol(protocol:object,stage_evidence:StageEvidence,*,fixture_hmac_key:bytes|None=None,builder_ids:Sequence[str]=())->AdmittedProtocol:
+ """Only execution-facing gateway; OPEN/deferred or unverified evidence cannot pass."""
+ if not isinstance(protocol,MatchProtocol):raise CampaignMetricsError("inspection is not executable")
+ if not stage_evidence.evaluator.verify_fixture_hmac(fixture_hmac_key or b""):raise CampaignMetricsError("unauthenticated evaluator signature")
+ if stage_evidence.evaluator.signer_id in set(builder_ids):raise CampaignMetricsError("evaluator is not independent")
+ manifest=protocol.experiment_manifest
+ for key in ("selection_seed","bootstrap_seed","retry_rule"):
+  if key not in manifest:raise CampaignMetricsError("missing frozen experiment field")
+ if manifest.get("holdout_manifest_digest") is None or any(str(manifest.get(k,"" )).startswith("OPEN_") for k in ("task_manifest_status","family_split_status","custody_status","holdout_signature_status")):raise CampaignMetricsError("open external evidence")
+ _digest(manifest["holdout_manifest_digest"],"holdout manifest")
+ if stage_evidence.stage=="final" and stage_evidence.block_digest!=manifest["holdout_manifest_digest"]:raise CampaignMetricsError("final holdout mismatch")
+ for recipe in (*protocol.entrant_recipes.values(),*protocol.hybrid_recipes.values()):
+  if recipe.get("availability")!="available" or "provenance_digest" not in recipe:raise CampaignMetricsError("recipe is deferred or lacks provenance")
+  _digest(recipe["provenance_digest"],"recipe provenance")
+ return AdmittedProtocol(protocol,stage_evidence,canonical_digest([protocol.protocol_digest,stage_evidence.block_digest,stage_evidence.evaluator.payload_digest]))
 def canonical_digest(v:object)->str:
  def plain(x):
   if isinstance(x,Mapping):return {str(k):plain(y)for k,y in x.items()}
@@ -238,4 +256,4 @@ def decide_match(success:PairedInterval,cost_ratio:PairedInterval,time_ratio:Pai
  if(cost_ratio.upper<1 and time_ratio.upper<=1.1)or(time_ratio.upper<1 and cost_ratio.upper<=1.1):return"LEFT"
  if(cost_ratio.lower>1 and time_ratio.lower>=1/1.1)or(time_ratio.lower>1 and cost_ratio.lower>=1/1.1):return"RIGHT"
  return"DRAW"
-__all__=["AttemptMetric","BracketState","CampaignMetricsError","IssuedReceipt","MatchProtocol","MatchProtocolInspection","PairedInterval","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","summarize_attempts"]
+__all__=["AdmittedProtocol","AttemptMetric","BracketState","CampaignMetricsError","IssuedReceipt","MatchProtocol","MatchProtocolInspection","PairedInterval","REQUIRED_STRATA","ScheduledPair","SignedCustodyEnvelope","StageEvidence","VariantSeal","admit_protocol","canonical_digest","decide_match","load_match_protocol","load_match_protocol_for_inspection","noninferior","paired_family_bootstrap","reject_receipt_replay","schedule_round","summarize_attempts"]
