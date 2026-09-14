@@ -1,7 +1,236 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hive-mind-os.invalid/schemas/v1/roblox-runtime-evidence.schema.json",
+  "title": "RobloxRuntimeEvidence",
   "type": "object",
   "additionalProperties": false,
-  "title": "RobloxRuntimeEvidence",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hive-mind-os.invalid/schemas/v1/roblox-runtime-evidence.schema.json"
+  "required": [
+    "candidate_digest",
+    "profile_digest",
+    "project_manifest_digest",
+    "platform_tool_version",
+    "studio_tool_receipt_ref",
+    "environment_id",
+    "scenario_manifest_digest",
+    "account_capability_refs",
+    "runtime_receipts",
+    "performance_samples",
+    "persistence_results",
+    "security_results",
+    "asset_results",
+    "cleanup_receipt",
+    "verdict",
+    "missing_obligations"
+  ],
+  "properties": {
+    "candidate_digest": {
+      "type": "string",
+      "pattern": "^(?:unknown|sha256:[0-9a-f]{64})$"
+    },
+    "profile_digest": {
+      "type": "string",
+      "pattern": "^(?:unknown|sha256:[0-9a-f]{64})$"
+    },
+    "project_manifest_digest": {
+      "type": "string",
+      "pattern": "^(?:unknown|sha256:[0-9a-f]{64})$"
+    },
+    "platform_tool_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "studio_tool_receipt_ref": {
+      "type": "string",
+      "pattern": "^(?:none|ref:[A-Za-z0-9][A-Za-z0-9._:/-]{0,511})$"
+    },
+    "environment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "scenario_manifest_digest": {
+      "type": "string",
+      "pattern": "^(?:unknown|sha256:[0-9a-f]{64})$"
+    },
+    "account_capability_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._:/-]{0,511}$"
+      }
+    },
+    "runtime_receipts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._:/-]{0,511}$"
+      }
+    },
+    "performance_samples": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "persistence_results": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(?:PASS|FAIL|NOT_APPLICABLE:.+)$"
+      }
+    },
+    "security_results": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(?:PASS|FAIL|NOT_APPLICABLE:.+)$"
+      }
+    },
+    "asset_results": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(?:PASS|FAIL|NOT_APPLICABLE:.+)$"
+      }
+    },
+    "cleanup_receipt": {
+      "type": "string",
+      "pattern": "^(?:none|ref:[A-Za-z0-9][A-Za-z0-9._:/-]{0,511})$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "RUNTIME_VALIDATED",
+        "PRODUCTION_CANDIDATE",
+        "BLOCKED_RUNTIME",
+        "FAILED",
+        "INCONCLUSIVE"
+      ]
+    },
+    "missing_obligations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "obligation_id",
+          "kind",
+          "description",
+          "blocks_claims"
+        ],
+        "properties": {
+          "obligation_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "BLOCKED_CAPABILITY",
+              "BLOCKED_SOURCE",
+              "BLOCKED_AUTHORITY"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "blocks_claims": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "enum": ["RUNTIME_VALIDATED", "PRODUCTION_CANDIDATE"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "candidate_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "profile_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "project_manifest_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "scenario_manifest_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "studio_tool_receipt_ref": {
+            "type": "string",
+            "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._:/-]{0,511}$"
+          },
+          "account_capability_refs": {
+            "type": "array",
+            "minItems": 1
+          },
+          "runtime_receipts": {
+            "type": "array",
+            "minItems": 1
+          },
+          "performance_samples": {
+            "type": "array",
+            "minItems": 1
+          },
+          "persistence_results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^(?:PASS|NOT_APPLICABLE:.+)$"
+            }
+          },
+          "security_results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^(?:PASS|NOT_APPLICABLE:.+)$"
+            }
+          },
+          "asset_results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^(?:PASS|NOT_APPLICABLE:.+)$"
+            }
+          },
+          "cleanup_receipt": {
+            "type": "string",
+            "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._:/-]{0,511}$"
+          },
+          "missing_obligations": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
 }
