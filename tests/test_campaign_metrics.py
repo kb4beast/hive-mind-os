@@ -49,7 +49,7 @@ class T(unittest.TestCase):
   p=MatchProtocol("fixture","1","fixture",entrants,{},"seal",tuple(f"t{i}" for i in range(12)),("development-screening","harder-hybrid-development","promotion_holdout"),"pair","decide",hybrids,manifest,3,"lease",24,("one_survivor","no_schedulable_pairs","max_rounds","lease_exhausted"))
   evidence=StageEvidence("original",D,D,D,D,env,REQUIRED_STRATA,12,1,1);admission=admit_protocol(p,evidence,lease=LeaseRecord(D,p.protocol_id,99,"host"),fixture_hmac_key=key,builder_ids=("builder",))
   state=BracketState(p.protocol_digest,"original","builder-component");pairs=state.schedule(p,admission=admission);self.assertTrue(pairs)
-  issued=IssuedReceipt("original",1,pairs[0].left,pairs[0].right,D,"task",1,"eval",D)
+  issued=IssuedReceipt("original",1,pairs[0].left,pairs[0].right,D,"t0",1,"eval",D)
   next_state=state.apply(p,pairs,{frozenset((pairs[0].left,pairs[0].right)):"LEFT"},receipt=issued,admission=admission);self.assertEqual(next_state.losses[pairs[0].right],1)
   with self.assertRaises(CampaignMetricsError):next_state.apply(p,pairs,{frozenset((pairs[0].left,pairs[0].right)):"LEFT"},receipt=issued,admission=admission)
   r=p.recipe("MB0");seal=VariantSeal(p.protocol_digest,"MB0",canonical_digest({f:r[f] for f in RECIPE_FIELDS}),D,"eval","original",D,"fixture", "1");p.validate_seals((seal,),admission=admission)

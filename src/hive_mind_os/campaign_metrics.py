@@ -255,6 +255,7 @@ class BracketState:
   if not lease_active:return BracketState(self.protocol_digest,self.stage,self.track,self.round_number,self.losses,self.byes,self.inconclusive,self.quarantined,"lease_exhausted")
   l=dict(self.losses);b=dict(self.byes);i=dict(self.inconclusive);q=set(self.quarantined)
   issued=tuple(self.schedule(p,admission=admission,lease_active=True));allowed={x.left if x.right is None else (x.left,x.right,x.bye,x.block_id) for x in issued}
+  if not issued or issued[0].right is None or (receipt.left,receipt.right)!=(issued[0].left,issued[0].right) or receipt.seed!=admission.stage_evidence.seed or receipt.task_id not in p.scenario_task_ids:raise CampaignMetricsError("receipt does not bind issued task/orientation/seed")
   if len(pairs)!=len(set((x.left,x.right,x.bye,x.block_id) for x in pairs)):raise CampaignMetricsError("duplicate issued pair")
   for x in pairs:
    if (x.left if x.right is None else (x.left,x.right,x.bye,x.block_id)) not in allowed:raise CampaignMetricsError("pair was not issued")
