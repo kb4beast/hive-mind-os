@@ -22,9 +22,9 @@ def _id(v:object,n:str)->None:
  if not isinstance(v,str) or not v or any(c.isspace() for c in v):raise CampaignMetricsError(f"{n} must be a stable identifier")
 def _digest(v:object,n:str)->None:
  if not isinstance(v,str) or len(v)!=71 or not v.startswith("sha256:") or any(c not in "0123456789abcdef" for c in v[7:]):raise CampaignMetricsError(f"{n} must be lowercase sha256")
-def _num(v:object,n:str,nullable=True)->None:
+def _num(v:object,n:str,nullable=True,nonnegative=True)->None:
  if v is None and nullable:return
- if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v):raise CampaignMetricsError(f"{n} must be finite")
+ if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or (nonnegative and v<0):raise CampaignMetricsError(f"{n} must be finite" + (" and nonnegative" if nonnegative else ""))
 def _freeze(v:object)->object:
  if isinstance(v,Mapping):return MappingProxyType({str(k):_freeze(x) for k,x in v.items()})
  if isinstance(v,(list,tuple)):return tuple(_freeze(x) for x in v)
@@ -41,10 +41,12 @@ class AttemptMetric:
   for n in ("active_seconds","queue_seconds","wall_seconds","usage_units","provider_cost","input_usage","output_usage","cache_read_usage","cache_write_usage","reasoning_usage","avoided_work_units"):_num(getattr(self,n),n)
   if self.usage_basis not in {"measured","estimated","unknown"} or self.provider_cost_basis not in {"billed","estimated","unknown"}:raise CampaignMetricsError("invalid measurement basis")
   if (self.usage_basis=="unknown") != (self.usage_units is None) or (self.provider_cost_basis=="unknown") != (self.provider_cost is None):raise CampaignMetricsError("unknown must be null and known must have basis")
+  if self.usage_units is None and any(x is not None for x in (self.input_usage,self.output_usage,self.cache_read_usage,self.cache_write_usage,self.reasoning_usage)):raise CampaignMetricsError("unknown total usage cannot contain detailed usage")
   if self.provider_available not in {"available","unavailable","unknown"}:raise CampaignMetricsError("invalid availability")
   for n in ("context_retransmissions","redundant_checks","model_calls"):
    v=getattr(self,n)
    if v is not None and(type(v)is not int or v<0):raise CampaignMetricsError(f"{n} must be nonnegative integer")
+  for n in ("checks","defects","recovery_events","disclosure_events"):object.__setattr__(self,n,tuple(getattr(self,n)))
 def summarize_attempts(rows:Iterable[AttemptMetric])->dict[str,int]:
  rows=tuple(rows);out={"records":len(rows)}
  for e in ("eligible","ineligible","unknown"):
@@ -55,11 +57,11 @@ def summarize_attempts(rows:Iterable[AttemptMetric])->dict[str,int]:
 class PairedInterval:
  estimate:float|None;lower:float|None;upper:float|None;family_count:int;resamples:int=BOOTSTRAP_RESAMPLES;confidence:float=CONFIDENCE
  def __post_init__(self):
-  if (self.estimate is None)!=(self.lower is None or self.upper is None):raise CampaignMetricsError("interval wholly known or unknown")
-  for n in ("estimate","lower","upper"):_num(getattr(self,n),n)
+  if (self.estimate is None) != (self.lower is None and self.upper is None):raise CampaignMetricsError("interval wholly known or unknown")
+  for n in ("estimate","lower","upper"):_num(getattr(self,n),n,nonnegative=False)
   if self.lower is not None and not self.lower<=self.estimate<=self.upper:raise CampaignMetricsError("invalid interval ordering")
-  if type(self.family_count)is not int or self.family_count<0 or self.resamples!=BOOTSTRAP_RESAMPLES or self.confidence!=CONFIDENCE:raise CampaignMetricsError("unfrozen interval")
-def paired_family_bootstrap(pairs:Mapping[str,Sequence[float]],*,seed:int,resamples:int=BOOTSTRAP_RESAMPLES,minimum_families:int=0)->PairedInterval:
+  if type(self.family_count)is not int or self.family_count<0 or (self.estimate is not None and self.family_count<1) or self.resamples!=BOOTSTRAP_RESAMPLES or self.confidence!=CONFIDENCE:raise CampaignMetricsError("unfrozen interval")
+def paired_family_bootstrap(pairs:Mapping[str,Sequence[float]],*,seed:int,resamples:int=BOOTSTRAP_RESAMPLES,minimum_families:int=SCREENING_FAMILIES)->PairedInterval:
  if resamples!=BOOTSTRAP_RESAMPLES or type(seed)is not int:raise CampaignMetricsError("frozen bootstrap parameters")
  fs=sorted(pairs)
  if len(fs)<minimum_families:raise CampaignMetricsError("undersized family sample")
@@ -68,7 +70,7 @@ def paired_family_bootstrap(pairs:Mapping[str,Sequence[float]],*,seed:int,resamp
  for f in fs:
   _id(f,"family");xs=tuple(pairs[f])
   if not xs:raise CampaignMetricsError("unpaired family")
-  for x in xs:_num(x,"paired observation",False)
+  for x in xs:_num(x,"paired observation",False,False)
   vals.append(mean(xs))
  rng=Random(seed);s=sorted(mean(vals[rng.randrange(len(vals))]for _ in vals)for _ in range(BOOTSTRAP_RESAMPLES));return PairedInterval(mean(vals),s[249],s[9749],len(vals))
 def noninferior(i:PairedInterval,*,hard_gates_pass:bool)->bool:
@@ -139,17 +141,28 @@ def schedule_round(entrants:Sequence[str],losses:Mapping[str,int],byes:Mapping[s
 @dataclass(frozen=True,slots=True)
 class BracketState:
  protocol_digest:str;stage:str;track:str;round_number:int=0;losses:Mapping[str,int]=field(default_factory=dict);byes:Mapping[str,int]=field(default_factory=dict);inconclusive:Mapping[frozenset[str],int]=field(default_factory=dict);quarantined:frozenset[str]=frozenset();terminal:str|None=None
+ def __post_init__(self):
+  for n in ("protocol_digest","stage","track"):_id(getattr(self,n),n)
+  if type(self.round_number)is not int or self.round_number<0 or self.round_number>24:raise CampaignMetricsError("invalid round")
+  for n in ("losses","byes","inconclusive"):object.__setattr__(self,n,_freeze(getattr(self,n)))
  def schedule(self,p:MatchProtocol,*,lease_active=True):
-  if self.protocol_digest!=p.protocol_digest or self.terminal or not lease_active or self.round_number>=p.max_rounds:return ()
+  if self.protocol_digest!=p.protocol_digest:raise CampaignMetricsError("foreign protocol")
+  if self.terminal:return ()
+  if not lease_active:object.__setattr__(self,"terminal","lease_exhausted");return ()
+  if self.round_number>=p.max_rounds:object.__setattr__(self,"terminal","max_rounds");return ()
   ids=[x for x,r in{**dict(p.entrant_recipes),**dict(p.hybrid_recipes)}.items()if r["track"]==self.track and x not in self.quarantined and self.losses.get(x,0)<3]
+  if len(ids)==1:object.__setattr__(self,"terminal","one_survivor");return ()
   return schedule_round(ids,self.losses,self.byes,round_number=self.round_number+1,inconclusive_meetings=self.inconclusive,blocks=p.dataset_block_ids)
  def apply(self,p:MatchProtocol,pairs:Sequence[ScheduledPair],outcomes:Mapping[frozenset[str],str],*,lease_active=True):
   if not lease_active:return BracketState(self.protocol_digest,self.stage,self.track,self.round_number,self.losses,self.byes,self.inconclusive,self.quarantined,"lease_exhausted")
   l=dict(self.losses);b=dict(self.byes);i=dict(self.inconclusive);q=set(self.quarantined)
+  allowed={x.left if x.right is None else frozenset((x.left,x.right)) for x in self.schedule(p,lease_active=True)}
   for x in pairs:
+   if (x.left if x.right is None else frozenset((x.left,x.right))) not in allowed:raise CampaignMetricsError("pair was not issued")
    if x.bye:b[x.left]=b.get(x.left,0)+1;continue
    if x.right is None:continue
    o=outcomes.get(frozenset((x.left,x.right)),"INCONCLUSIVE");k=frozenset((x.left,x.right))
+   if o not in {"LEFT","RIGHT","DRAW","INCONCLUSIVE","QUARANTINE_LEFT","QUARANTINE_RIGHT"}:raise CampaignMetricsError("unknown outcome")
    if o=="LEFT":l[x.right]=l.get(x.right,0)+1
    elif o=="RIGHT":l[x.left]=l.get(x.left,0)+1
    elif o=="QUARANTINE_LEFT":q.add(x.left)
