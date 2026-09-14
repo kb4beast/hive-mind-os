@@ -40,6 +40,7 @@ EXTENSION_SCHEMA_NAMES = (
     "hive-cortex-consultation",
     "ooda-state",
     "war-room-event",
+    "repository-profile",
 )
 KERNEL_SCHEMA_NAMES = (
     "brain-kernel-event",
