@@ -90,6 +90,7 @@ class WorkPackage:
   if self.completion:
    c=self.completion
    if (c.mission_id,c.package_id,c.authority_digest)!=(self.mission_id,self.package_id,self.authority_digest) or set(x[0] for x in c.output_receipts)!=set(self.outputs) or set(x[0] for x in c.acceptance_receipts)!={x.acceptance_id for x in self.acceptance} or (self.state is PackageState.NO_CHANGE)!=(c.disposition=="no-change"):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completion binding")
+   if self.state is PackageState.COMPLETED and any(x.result not in {"passed","observed"} for x in self.acceptance):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completed package requires passing acceptance")
  def to_document(self):return {"schema_version":self.schema_version,"revision":self.revision,"package_id":self.package_id,"mission_id":self.mission_id,"objective":self.objective,"target_boundary":self.target_boundary,"requirement_ids":list(self.requirement_ids),"dependencies":list(self.dependencies),"capabilities":list(self.capabilities),"acceptance":[x.to_document() for x in self.acceptance],"risk":self.risk,"resources":self.resources.to_document(),"outputs":list(self.outputs),"rollback":self.rollback,"authority_digest":self.authority_digest,"state":self.state.value,"created_at":self.created_at,"completion":None if self.completion is None else {"mission_id":self.completion.mission_id,"package_id":self.completion.package_id,"authority_digest":self.completion.authority_digest,"base_commit_sha":self.completion.base_commit_sha,"base_tree_digest":self.completion.base_tree_digest,"commit_sha":self.completion.commit_sha,"tree_digest":self.completion.tree_digest,"output_receipts":[list(x) for x in self.completion.output_receipts],"acceptance_receipts":[list(x) for x in self.completion.acceptance_receipts],"disposition":self.completion.disposition}}
 @dataclass(frozen=True,slots=True)
 class CampaignMission:
@@ -110,6 +111,9 @@ class CampaignMission:
    for k in ready:del pending[k]
    for v in pending.values():v.difference_update(ready)
   if self.parent_digest is not None:_dg(self.parent_digest,"parent")
+  terminal={PackageState.COMPLETED,PackageState.NO_CHANGE,PackageState.FAILED,PackageState.CANCELLED,PackageState.SUPERSEDED}
+  if self.state is CampaignState.COMPLETED and (any(x.state is not PackageState.COMPLETED for x in self.packages)):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"completed mission requires completed packages")
+  if self.state is CampaignState.NO_CHANGE and (any(x.state is not PackageState.NO_CHANGE for x in self.packages)):_fail(CampaignContractErrorCode.RECEIPT_INCONSISTENT,"no-change mission requires no-change packages")
  def to_document(self):return {"schema_version":self.schema_version,"revision":self.revision,"mission_id":self.mission_id,"objective":self.objective,"target_boundary":self.target_boundary,"requirement_ids":list(self.requirement_ids),"packages":[x.to_document() for x in self.packages],"authority_digest":self.authority_digest,"state":self.state.value,"created_at":self.created_at,"parent_digest":self.parent_digest}
  @property
  def digest(self):return canonical_digest(self.to_document())

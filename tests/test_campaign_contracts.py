@@ -39,4 +39,8 @@ class TestCampaign(unittest.TestCase):
   p=WorkPackage(1,1,"PKG-one","MISSION-one","objective","src",("R01",),(),("test",),(AcceptanceBinding("A01","test","receipt","passed","curator",ClaimLevel.RUNTIME),),"T2",ResourceAllocation(1,1,1),("receipt",),"rollback",D,PackageState.COMPLETED,T,c)
   self.assertEqual(p.to_document()["completion"]["commit_sha"],S)
   self.assertIsInstance(c.output_receipts[0],tuple)
+ def test_terminal_claim_consistency(self):
+  c=CandidateCompletion("MISSION-one","PKG-one",D,S,D,S,D,(("receipt",D),),(("A01",D),),"implemented")
+  bad=AcceptanceBinding("A01","test","receipt","failed","curator",ClaimLevel.RUNTIME)
+  with self.assertRaises(CampaignContractError):WorkPackage(1,1,"PKG-one","MISSION-one","objective","src",("R01",),(),("test",),(bad,),"T2",ResourceAllocation(1,1,1),("receipt",),"rollback",D,PackageState.COMPLETED,T,c)
 if __name__=="__main__":unittest.main()
