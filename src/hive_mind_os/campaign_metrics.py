@@ -171,7 +171,8 @@ class MatchProtocol:
   prior={};finals=[]
   for s in seals:
    if s.protocol_digest!=self.protocol_digest or self.recipe(s.variant_id)is None or s.stage not in {"original","hybrid","final"}:raise CampaignMetricsError("unknown variant/protocol/stage")
-   if evaluator_id is not None and s.evaluator_id!=evaluator_id:raise CampaignMetricsError("wrong evaluator")
+   if s.evaluator_id!=admission.stage_evidence.evaluator.signer_id or (evaluator_id is not None and s.evaluator_id!=evaluator_id):raise CampaignMetricsError("wrong evaluator")
+   if s.stage!=admission.stage_evidence.stage or s.block_digest!=admission.stage_evidence.block_digest:raise CampaignMetricsError("seal stage/block mismatch")
    expected=canonical_digest({f:self.recipe(s.variant_id)[f]for f in RECIPE_FIELDS})
    if s.recipe_digest!=expected:raise CampaignMetricsError("seal recipe mismatch")
    if(s.variant_id,s.stage)in prior:raise CampaignMetricsError("stage rebinding")
