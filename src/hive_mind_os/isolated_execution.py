@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, Sequence
+from .durable_contracts import ContractStore
 from .brain_kernel.canonical import canonical_digest
 
 class ProbeResult(StrEnum): ENFORCED="ENFORCED"; FAILED="FAILED"; UNAVAILABLE="UNAVAILABLE"
@@ -21,6 +22,14 @@ class IsolationAttestation:
     @property
     def digest(self): return canonical_digest(self)
     def admits_untrusted(self): return self.probe_result is ProbeResult.ENFORCED
+    def to_dict(self):
+        from .brain_kernel.canonical import canonical_document
+        return canonical_document(self)
+    @classmethod
+    def from_dict(cls, value):
+        required = {"backend_id","backend_version","image_digest","tenant_id","repository_id","filesystem_scope","network_policy_digest","credential_policy_digest","writable_mounts","resource_limits","probe_suite_digest","probe_result","expires_at"}
+        if set(value) != required: raise IsolationError("closed attestation schema")
+        return cls(**{**value, "probe_result": ProbeResult(value["probe_result"]), "writable_mounts": tuple(value["writable_mounts"])})
 @dataclass(frozen=True, slots=True)
 class ExecutionResult:
     exit_status:int|None; timed_out:bool; cleanup_receipt:str; artifact_refs:tuple[str,...]=(); error_code:str|None=None
@@ -36,3 +45,11 @@ class UnavailableIsolationBackend:
 
 def require_attested(attestation:IsolationAttestation)->None:
     if not attestation.admits_untrusted(): raise IsolationError("untrusted execution requires ENFORCED isolation attestation")
+
+class IsolationRegistry:
+    """Durable backend attestations, keyed by tenant/repository/backend."""
+    def __init__(self, path): self._store = ContractStore(path, IsolationAttestation.from_dict)
+    def register(self, attestation):
+        if attestation.probe_result is ProbeResult.ENFORCED and not attestation.image_digest: raise IsolationError("enforced backend requires pinned image")
+        return self._store.put(f"{attestation.tenant_id}:{attestation.repository_id}:{attestation.backend_id}", attestation)
+    def get(self, tenant_id, repository_id, backend_id): return self._store.get(f"{tenant_id}:{repository_id}:{backend_id}")
