@@ -51,7 +51,7 @@ REQUIRED_STRATA = (
 )
 STAGES = ("original", "hybrid", "final")
 TERMINALS = ("one_survivor", "no_schedulable_pairs", "max_rounds", "lease_exhausted")
-OPERATIONS = ("schedule", "apply", "seal", "aggregate", "decide")
+OPERATIONS = ("schedule", "execute", "apply", "seal", "aggregate", "decide")
 
 
 class CampaignMetricsError(ValueError):
@@ -1200,6 +1200,33 @@ def _resolve(
         require_final_seals=operation != "seal",
     )
     return snapshot
+
+
+def resolve_execution_admission(
+    protocol: MatchProtocol,
+    *,
+    registry: AdmissionRegistry,
+    admission_handle: object,
+    stage: str,
+    state_admission_digest: str | None = None,
+) -> AdmissionSnapshot:
+    """Revalidate the host-owned admission immediately before adapter execution.
+
+    This is deliberately the only public bridge from the inert N02 protocol to an
+    execution adapter.  It does not construct a registry, mint a lease, or turn a
+    protocol document into authority.  The opaque handle must resolve to the exact
+    protocol, stage evidence, signed manifests, trusted active lease, and seal
+    history required by :func:`_resolve`.
+    """
+
+    return _resolve(
+        registry,
+        admission_handle,
+        protocol,
+        stage,
+        "execute",
+        state_admission_digest,
+    )
 
 
 def _validate_final_binding(
