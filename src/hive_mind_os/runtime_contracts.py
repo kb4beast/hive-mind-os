@@ -229,6 +229,10 @@ def require_time(value: str, label: str) -> datetime:
 def portable_path(value: str) -> str:
     if type(value) is not str or not value:
         raise ContractViolation("path is required")
+    if not value.isascii():
+        raise ContractViolation("path must contain ASCII characters only")
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ContractViolation("path contains a control character")
     candidate = value.replace("\\", "/")
     if candidate.startswith("/") or re.match(r"^[A-Za-z]:", candidate):
         raise ContractViolation("path must be repository-relative")

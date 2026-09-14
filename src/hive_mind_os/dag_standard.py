@@ -16,7 +16,9 @@ from .runtime_contracts import (
     canonical_digest,
     raw_sha256,
     require_digest,
+    require_identifier,
     requires_external_authority,
+    strict_json_object,
 )
 
 STANDARD_VERSION = 2
@@ -32,12 +34,18 @@ COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
 }
 COMPILER_PACKAGE_DIGEST = canonical_digest(COMPILER_PACKAGE_DESCRIPTOR)
 WORK_PACKAGE_COMPILER_PACKAGE_ID = "hive-mind-portable-compiler-v2"
+WORK_PACKAGE_SOURCE_INVENTORY_ID = "WOS-N00-20260914-01"
+WORK_PACKAGE_SOURCE_INVENTORY_DIGEST = (
+    "sha256:39109ae21cc5d55b7fa85506ffc18920701e2e89db77949aa191021d7b85d127"
+)
 WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR: Mapping[str, Any] = {
     "algorithm": "canonical-kahn-lock-aware-first-fit-v2",
     "canonical_json": "utf8-sorted-compact-v1",
     "conflicts": "resource-semantic-write-path-v2",
     "package_id": WORK_PACKAGE_COMPILER_PACKAGE_ID,
     "plan_schema_version": 2,
+    "source_inventory_digest": WORK_PACKAGE_SOURCE_INVENTORY_DIGEST,
+    "source_inventory_id": WORK_PACKAGE_SOURCE_INVENTORY_ID,
     "standard_version": STANDARD_VERSION,
 }
 WORK_PACKAGE_COMPILER_PACKAGE_DIGEST = canonical_digest(
@@ -147,6 +155,7 @@ def load_bound_plan(
     standard_bytes: bytes,
     expected_request_id: str | None = None,
     expected_subject_id: str | None = None,
+    source_inventory_bytes: bytes | None = None,
 ) -> PortablePlanBundle:
     """Parse one canonical plan and authenticate every compiler binding."""
 
@@ -185,11 +194,68 @@ def load_bound_plan(
     )
     if (standard.package_id, standard.package_digest) != expected_compiler:
         raise ContractViolation("canonical compiler package identity mismatch")
-    _validate_governance_coverage(plan)
+    _validate_governance_coverage(
+        plan, source_inventory_bytes=source_inventory_bytes
+    )
     return plan
 
 
-def _validate_governance_coverage(plan: PortablePlanBundle) -> None:
+def _validate_source_namespace(
+    plan: PortablePlanBundle, source_inventory_bytes: bytes | None
+) -> None:
+    if source_inventory_bytes is None:
+        raise ContractViolation(
+            "portable work packages require pinned source-inventory bytes"
+        )
+    inventory = strict_json_object(source_inventory_bytes, maximum_bytes=1_000_000)
+    if inventory.get("schema") != "whole-os-source-inventory/v1":
+        raise ContractViolation("portable work packages use an unknown source inventory")
+    inventory_id = inventory.get("inventory_id")
+    require_identifier(inventory_id, "source inventory_id")
+    inventory_digest = raw_sha256(source_inventory_bytes)
+    if (
+        inventory_id != WORK_PACKAGE_SOURCE_INVENTORY_ID
+        or inventory_digest != WORK_PACKAGE_SOURCE_INVENTORY_DIGEST
+    ):
+        raise ContractViolation(
+            "portable work-package source namespace is not accepted N00"
+        )
+    sources = inventory.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise ContractViolation("source inventory requires a non-empty sources list")
+    admitted_source_ids: list[str] = []
+    for source in sources:
+        if not isinstance(source, Mapping) or "id" not in source:
+            raise ContractViolation("source inventory entry lacks an id")
+        source_id = source["id"]
+        require_identifier(source_id, "source inventory source id")
+        admitted_source_ids.append(source_id)
+    if len(set(admitted_source_ids)) != len(admitted_source_ids):
+        raise ContractViolation("source inventory contains duplicate source ids")
+    inventory_evidence = tuple(
+        item for item in plan.evidence if item.evidence_id == "accepted-n00-inventory"
+    )
+    if (
+        len(inventory_evidence) != 1
+        or inventory_evidence[0].digest != inventory_digest
+        or inventory_evidence[0].claim_ids != ("N00-ACCEPTED",)
+    ):
+        raise ContractViolation(
+            "portable work-package source namespace lacks accepted N00 evidence"
+        )
+    admitted = set(admitted_source_ids)
+    for node in plan.nodes:
+        unknown = set(node.work_package.source_ids) - admitted  # type: ignore[union-attr]
+        if unknown:
+            raise ContractViolation(
+                f"node {node.node_id} cites unadmitted source id(s): "
+                + ", ".join(sorted(unknown))
+            )
+
+
+def _validate_governance_coverage(
+    plan: PortablePlanBundle, *, source_inventory_bytes: bytes | None
+) -> None:
     roles: set[str] = set()
     stages: set[str] = set()
     for node in plan.nodes:
@@ -221,6 +287,7 @@ def _validate_governance_coverage(plan: PortablePlanBundle) -> None:
             + ", ".join(sorted(missing_stages))
         )
     if plan.schema_version == 2:
+        _validate_source_namespace(plan, source_inventory_bytes)
         authorities = {item.authority_id: item for item in plan.authority}
         for capability in plan.capabilities:
             authority = authorities[capability.authority_id]
@@ -384,6 +451,7 @@ def compile_plan(
     expected_request_id: str | None = None,
     expected_subject_id: str | None = None,
     maximum_workers: int | None = None,
+    source_inventory_bytes: bytes | None = None,
 ) -> CompilationReceipt:
     """Authenticate and compile one plan without performing any host effect."""
 
@@ -393,6 +461,7 @@ def compile_plan(
         standard_bytes=standard_bytes,
         expected_request_id=expected_request_id,
         expected_subject_id=expected_subject_id,
+        source_inventory_bytes=source_inventory_bytes,
     )
     worker_limit = _worker_limit(plan, maximum_workers)
     rounds = _compile_rounds(plan, maximum_workers=worker_limit)
@@ -401,8 +470,8 @@ def compile_plan(
         request_id=plan.request_id,
         subject_id=plan.subject.subject_id,
         standard_digest=plan.standard.raw_sha256,
-        compiler_package_id=COMPILER_PACKAGE_ID,
-        compiler_package_digest=COMPILER_PACKAGE_DIGEST,
+        compiler_package_id=plan.standard.package_id,
+        compiler_package_digest=plan.standard.package_digest,
         maximum_workers=worker_limit,
         metrics=graph_metrics(plan),
         rounds=rounds,
@@ -423,6 +492,8 @@ __all__ = [
     "WORK_PACKAGE_COMPILER_PACKAGE_DESCRIPTOR",
     "WORK_PACKAGE_COMPILER_PACKAGE_DIGEST",
     "WORK_PACKAGE_COMPILER_PACKAGE_ID",
+    "WORK_PACKAGE_SOURCE_INVENTORY_DIGEST",
+    "WORK_PACKAGE_SOURCE_INVENTORY_ID",
     "compile_plan",
     "git_blob_id",
     "graph_metrics",

@@ -527,6 +527,7 @@ def main() -> None:
         standard_bytes=standard.content,
         expected_request_id=request.request_id,
         expected_subject_id=request.subject_id,
+        source_inventory_bytes=(OUTPUT / "source-inventory.json").read_bytes(),
     )
     if receipt.metrics.node_count != 34:
         raise ValueError("compiled successor does not contain all 34 nodes")
@@ -540,6 +541,7 @@ def main() -> None:
             "src/hive_mind_os/dag_standard.py",
             "src/hive_mind_os/node_prompt_renderer.py",
             "src/hive_mind_os/plan_generation.py",
+            "src/hive_mind_os/runtime_contracts.py",
             "src/hive_mind_os/tournament_plan_factory.py",
             "scripts/generate_whole_os_plan_artifacts.py",
         )
@@ -568,6 +570,7 @@ def main() -> None:
 
     prompt_path = OUTPUT / "NODE_PROMPT.md"
     renderer_path = ROOT / "src/hive_mind_os/node_prompt_renderer.py"
+    source_inventory_path = OUTPUT / "source-inventory.json"
     dispatcher = {
         "schema": "whole-os-dispatcher-entry/v2",
         "status": "INACTIVE",
@@ -583,6 +586,8 @@ def main() -> None:
         "node_prompt_digest": raw_sha256(prompt_path.read_bytes()),
         "node_prompt_renderer_path": "src/hive_mind_os/node_prompt_renderer.py",
         "node_prompt_renderer_digest": raw_sha256(renderer_path.read_bytes()),
+        "source_inventory_path": "docs/plan/whole-os-implementation/source-inventory.json",
+        "source_inventory_digest": raw_sha256(source_inventory_path.read_bytes()),
         "dispatch_policy": {
             "dependency_ready_only": True,
             "semantic_and_write_locks_required": True,

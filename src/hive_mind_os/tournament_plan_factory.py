@@ -17,6 +17,8 @@ from .dag_standard import (
     STANDARD_VERSION,
     WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
     WORK_PACKAGE_COMPILER_PACKAGE_ID,
+    WORK_PACKAGE_SOURCE_INVENTORY_DIGEST,
+    WORK_PACKAGE_SOURCE_INVENTORY_ID,
     git_blob_id,
 )
 from .plan_generation import (
@@ -759,6 +761,13 @@ class WholeOSPlanFactory:
         }:
             raise ContractViolation("whole-OS source inventory binding is incomplete")
         require_digest(source_inventory["sha256"], "whole-OS source inventory digest")
+        if (
+            source_inventory["inventory_id"] != WORK_PACKAGE_SOURCE_INVENTORY_ID
+            or source_inventory["sha256"] != WORK_PACKAGE_SOURCE_INVENTORY_DIGEST
+        ):
+            raise ContractViolation(
+                "whole-OS source namespace is not the accepted N00 inventory"
+            )
         if not any(
             item.evidence_id == "accepted-n00-inventory"
             and item.digest == source_inventory["sha256"]
@@ -848,4 +857,7 @@ class WholeOSPlanFactory:
         return tuple(result)
 
 
-__all__ = ["TournamentPlanFactory", "WholeOSPlanFactory"]
+__all__ = [
+    "TournamentPlanFactory",
+    "WholeOSPlanFactory",
+]

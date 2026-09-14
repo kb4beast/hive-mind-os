@@ -6,7 +6,11 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from hive_mind_os.dag_standard import compile_plan
+from hive_mind_os.dag_standard import (
+    WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
+    WORK_PACKAGE_COMPILER_PACKAGE_ID,
+    compile_plan,
+)
 from hive_mind_os.plan_generation import PinnedArtifact, PlanGenerationRequest
 from hive_mind_os.plan_lineage import ActivationMaterial
 from hive_mind_os.portable_plan import PortablePlanBundle
@@ -22,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs/plan/whole-os-implementation"
 HANDOFF = ROOT / "docs/plan/whole-os-tournament-2026-09-13"
 STANDARD = (ROOT / "docs/execution/DAG_AUTHORING_STANDARD_V2.md").read_bytes()
+SOURCE_INVENTORY = (OUTPUT / "source-inventory.json").read_bytes()
 
 
 def load_plan() -> PortablePlanBundle:
@@ -38,8 +43,14 @@ class WholeOSPlanContractTests(unittest.TestCase):
             standard_bytes=STANDARD,
             expected_request_id=plan.request_id,
             expected_subject_id=plan.subject.subject_id,
+            source_inventory_bytes=SOURCE_INVENTORY,
         )
         self.assertEqual(2, plan.schema_version)
+        self.assertEqual(WORK_PACKAGE_COMPILER_PACKAGE_ID, receipt.compiler_package_id)
+        self.assertEqual(
+            WORK_PACKAGE_COMPILER_PACKAGE_DIGEST,
+            receipt.compiler_package_digest,
+        )
         self.assertEqual(34, receipt.metrics.node_count)
         self.assertEqual(
             {item["id"]: tuple(item["dependencies"]) for item in dag["nodes"]},
@@ -87,6 +98,19 @@ class WholeOSPlanContractTests(unittest.TestCase):
             node_contracts=contracts,
         )
         self.assertEqual(plan.canonical_bytes(), rebuilt.canonical_bytes())
+
+        substituted_inventory = json.loads(json.dumps(contracts))
+        substituted_inventory["source_inventory"]["sha256"] = raw_sha256(
+            b"substituted inventory"
+        )
+        with self.assertRaisesRegex(ContractViolation, "accepted N00 inventory"):
+            WholeOSPlanFactory().build(
+                generation_request,
+                standard=PinnedArtifact.pin("dag-standard-v2", STANDARD),
+                authority=plan.authority[0],
+                evidence=plan.evidence,
+                node_contracts=substituted_inventory,
+            )
 
         compatibility = TournamentPlanFactory().build(
             request(),
@@ -147,6 +171,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             plan.canonical_bytes(),
             expected_plan_digest=plan.digest(),
             standard_bytes=STANDARD,
+            source_inventory_bytes=SOURCE_INVENTORY,
         )
         rounds = {
             node_id: item.round_index
@@ -181,6 +206,20 @@ class WholeOSPlanContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractViolation, "outputs do not match"):
             PortablePlanBundle.from_document(mismatched_output)
 
+        control_path = json.loads(json.dumps(base))
+        control_path["nodes"][0]["work_package"]["write_paths"][0] = (
+            "docs/plan\u0000injected.md"
+        )
+        with self.assertRaisesRegex(ContractViolation, "control character"):
+            PortablePlanBundle.from_document(control_path)
+
+        unicode_path = json.loads(json.dumps(base))
+        unicode_path["nodes"][0]["work_package"]["write_paths"][0] = (
+            "docs/caf\u00e9.md"
+        )
+        with self.assertRaisesRegex(ContractViolation, "ASCII"):
+            PortablePlanBundle.from_document(unicode_path)
+
         unknown_route = json.loads(json.dumps(base))
         unknown_route["nodes"][0]["work_package"]["minimum_route"] = "T4"
         with self.assertRaisesRegex(ContractViolation, "minimum route"):
@@ -199,6 +238,39 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 candidate.canonical_bytes(),
                 expected_plan_digest=candidate.digest(),
                 standard_bytes=STANDARD,
+                source_inventory_bytes=SOURCE_INVENTORY,
+            )
+
+        bogus_source = json.loads(json.dumps(base))
+        bogus_source["nodes"][1]["work_package"]["source_ids"].append(
+            "BOGUS-SOURCE-99"
+        )
+        candidate = PortablePlanBundle.from_document(bogus_source)
+        with self.assertRaisesRegex(ContractViolation, "unadmitted source"):
+            compile_plan(
+                candidate.canonical_bytes(),
+                expected_plan_digest=candidate.digest(),
+                standard_bytes=STANDARD,
+                source_inventory_bytes=SOURCE_INVENTORY,
+            )
+
+        with self.assertRaisesRegex(ContractViolation, "source-inventory bytes"):
+            compile_plan(
+                load_plan().canonical_bytes(),
+                expected_plan_digest=load_plan().digest(),
+                standard_bytes=STANDARD,
+            )
+
+        substituted_sources = json.loads(SOURCE_INVENTORY)
+        substituted_sources["sources"][0]["id"] = "SUBSTITUTED-SOURCE"
+        with self.assertRaisesRegex(ContractViolation, "accepted N00"):
+            compile_plan(
+                load_plan().canonical_bytes(),
+                expected_plan_digest=load_plan().digest(),
+                standard_bytes=STANDARD,
+                source_inventory_bytes=(
+                    json.dumps(substituted_sources, sort_keys=True).encode("utf-8")
+                ),
             )
 
     def test_altered_standard_and_unauthorized_effect_reject(self) -> None:
@@ -208,6 +280,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 plan.canonical_bytes(),
                 expected_plan_digest=plan.digest(),
                 standard_bytes=STANDARD + b"altered",
+                source_inventory_bytes=SOURCE_INVENTORY,
             )
         unauthorized = replace(
             plan,
@@ -221,6 +294,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
                 unauthorized.canonical_bytes(),
                 expected_plan_digest=unauthorized.digest(),
                 standard_bytes=STANDARD,
+                source_inventory_bytes=SOURCE_INVENTORY,
             )
 
     def test_generation_and_dispatcher_are_permanent_inert_artifacts(self) -> None:
@@ -260,6 +334,7 @@ class WholeOSPlanContractTests(unittest.TestCase):
             ("node_contracts_path", "node_contracts_digest"),
             ("node_prompt_path", "node_prompt_digest"),
             ("node_prompt_renderer_path", "node_prompt_renderer_digest"),
+            ("source_inventory_path", "source_inventory_digest"),
         ):
             self.assertEqual(
                 dispatcher[digest_key], raw_sha256((ROOT / dispatcher[path_key]).read_bytes())

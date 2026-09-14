@@ -1,6 +1,6 @@
 # Whole-OS successor implementation plan — N01 Advocate candidate
 
-Status: **inactive N01 implementation candidate; Cross-Examiner ADAPT repaired; Witness and Judge pending**
+Status: **inactive N01 implementation candidate; Cross-Examiner and preliminary Expert ADAPT findings repaired; formal Witness and Judge artifacts pending**
 
 Base commit: `7dff0a807936b5be33099bdaa5c242674c624776`  
 Base tree: `682619e74077e9d0bbc4486dd7e219a8d282d347`  
@@ -54,8 +54,8 @@ These are N01 Advocate recommendations, not independent judgments.
 ## Compiled artifacts and compatibility
 
 - `whole-os-node-contracts-v1.json` contains all N00–N33 objectives/dependencies plus exact contract-section digests, requirement/source bindings, routes, acceptance/output contracts, semantic locks, normalized POSIX write paths, review obligations, publication stages, completion, and rollback. It contains no `planning_group` field.
-- `whole-os-plan-v2.json` is canonical portable-plan schema v2. Digest: `sha256:7a52c0a98a8b9b20f5f63191c2b02ac2d9ea2fba90ff19f69ef5939e272583a9`.
-- `generation-manifest.json` is the existing closed external-generation format. Generation: `sha256:ef684707714f91faf6002055494865a5e8b455183fccaba7a160016841553648`. It requires a distinct host signature and contains none.
+- `whole-os-plan-v2.json` is canonical portable-plan schema v2. Digest: `sha256:a18ac06db92edd7bedcb5e1bad5d4b359ac95615f17068fa0f98f79c2946a5bb`.
+- `generation-manifest.json` is the existing closed external-generation format. Generation: `sha256:38f4e7d416926ade40ccd30a5326d993e2dbea93c718f6421979a709073f6616`. It requires a distinct host signature and contains none.
 - `DISPATCHER.json` is the permanent inactive dispatcher entry. It binds the exact plan, generation, node-contract, and node-prompt bytes and says `planning_group_is_lock=false`.
 - `NODE_PROMPT.md` is the permanent worker-boundary specification derived from RUNBOOK section 8. It is never interpolated. `node_prompt_renderer.py` accepts only a closed canonical request, copies exact sealed node values, structurally separates fixed instructions from data, and returns a digest for the node-admission record.
 - `scripts/generate_whole_os_plan_artifacts.py` deterministically reconstructs the artifacts and performs an inert compilation. Before importing compiler modules it places this checkout's `src` first and fails closed unless every compiler module resolves within that directory. It has no activation/signing/publication path.
@@ -69,6 +69,8 @@ The N01 Architect also acted as Advocate/Builder and therefore does not approve 
 1. A separate Cross-Examiner produced `N01_EXAMINER_REVIEW.md` at review commit `78d0f32bfb6b47912e6d06ae33ed94d7647cf2d4` against candidate `eb506932e34ed631acb72b77872b72f7d2a0bfe9`. It returned ADAPT: CE-01 required self-verifying generator import provenance and CE-02 required a closed, injection-safe renderer. This successor repair implements both; CE-03/CE-04 controls and CE-05 deferred claims remain unchanged. The review artifact must be retained when commits are composed.
 2. A separate expert witness (Integrator/Steward with portable compiler and recovery expertise) must produce `docs/plan/whole-os-implementation/N01_EXPERT_TESTIMONY.md`, reproduce all 34 mappings, v1 compatibility, deterministic generation, lock-aware rounds, source/authority closure, migration, and rollback on the exact repaired composition.
 3. A Judge distinct from N00 Explorer/Curator, the Cross-Examiner, and this N01 Architect/Advocate/Builder must produce `docs/plan/whole-os-implementation/N01_JUDGE_VERDICT.md` with one disposition per material ADR and requirement family. The Judge must not infer production, efficiency, Roblox, learning, or superiority from this compilation.
+
+Preliminary Expert review of repair `1f7557f2c91fbaadba67387275390e33dfa9d262` returned ADAPT on three technical points without issuing the requested final testimony: the schema-v2 compilation receipt named the v1 compiler, source IDs lacked runtime namespace closure, and control/Unicode path characters were admitted. This successor repair derives receipt identity from the authenticated standard binding, requires exact accepted-N00 inventory bytes for v2 compilation, closes every work-package source ID against that inventory, pins the Whole-OS factory to the accepted inventory ID/digest, and rejects non-ASCII/control path characters at the shared portable-path boundary. Existing external-defer claims remain unchanged.
 
 Until those exact-candidate artifacts exist, N01 is an implementation candidate awaiting independent disposition and must not be represented as accepted, activated, signed, published, or complete under the repository's full-autonomy definition.
 
