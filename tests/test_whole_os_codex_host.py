@@ -21,8 +21,10 @@ from hive_mind_os.whole_os_codex_host import (
     AUTHORITY_REF,
     PROVIDER_ID,
     PROVIDER_VERSION,
+    CodexHostBootstrapError,
     build_deployment_bundle,
     compose_factory,
+    execute_trusted_launcher,
 )
 
 
@@ -68,6 +70,8 @@ class WholeOSCodexHostTests(unittest.TestCase):
         for relative in (
             "AGENTS.md",
             "scripts/whole-os/Invoke-WholeOSCodexService.ps1",
+            "src/hive_mind_os/cortex/repository/mission_bindings.py",
+            "src/hive_mind_os/local_codex_worker.py",
             "src/hive_mind_os/whole_os_bootstrap.py",
             "src/hive_mind_os/whole_os_codex_host.py",
             "src/hive_mind_os/whole_os_composition.py",
@@ -161,7 +165,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
             observation = json.loads(output.getvalue())
 
             self.assertEqual(code, 0)
-            self.assertEqual(observation["status"], "complete")
+            self.assertEqual(observation["status"], "complete", observation)
             self.assertEqual(observation["completed_packages"], ["host-bootstrap-startup"])
             self.assertEqual(len(worker.calls), 1)
             self.assertFalse(worker.calls[0]["writable"])
@@ -182,6 +186,25 @@ class WholeOSCodexHostTests(unittest.TestCase):
                     tenant_id="tenant-test",
                     repository_id="repository-test",
                 )
+
+    def test_launcher_rejects_repository_state_before_writing(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = self._repository(root)
+            rejected_state = repository / "state"
+
+            with self.assertRaisesRegex(
+                CodexHostBootstrapError, "no receipt was written"
+            ):
+                execute_trusted_launcher(
+                    repository=repository,
+                    state_root=rejected_state,
+                    tenant_id="tenant-test",
+                    repository_id="repository-test",
+                    timeout_seconds=60,
+                )
+
+            self.assertFalse(rejected_state.exists())
 
 
 if __name__ == "__main__":

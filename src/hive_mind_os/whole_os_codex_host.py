@@ -376,6 +376,7 @@ def build_deployment_bundle(
             "sandbox": "trusted-local-process-only",
             "tests": [
                 "tests/test_whole_os_bootstrap.py",
+                "tests/test_whole_os_codex_host.py",
                 "tests/test_whole_os_powershell_pipeline.py",
             ],
         }
@@ -563,6 +564,8 @@ def _source_packet(
         "AGENTS.md",
         "docs/plan/whole-os-tournament-2026-09-13/NODES-QUALIFICATION.md",
         "scripts/whole-os/Invoke-WholeOSCodexService.ps1",
+        "src/hive_mind_os/cortex/repository/mission_bindings.py",
+        "src/hive_mind_os/local_codex_worker.py",
         "src/hive_mind_os/whole_os_bootstrap.py",
         "src/hive_mind_os/whole_os_codex_host.py",
         "src/hive_mind_os/whole_os_composition.py",
@@ -587,6 +590,27 @@ def _source_packet(
         raise CodexHostBootstrapError(
             "repository identity changed while materializing the source packet"
         )
+    focused_output: dict[str, Any] = {}
+    for channel in ("stdout", "stderr"):
+        evidence = focused_receipt.get(channel)
+        if not isinstance(evidence, Mapping):
+            continue
+        evidence_path = evidence.get("path")
+        if not isinstance(evidence_path, str):
+            continue
+        path = Path(evidence_path)
+        try:
+            body = path.read_bytes()
+        except OSError:
+            continue
+        if evidence.get("digest") != raw_sha256(body):
+            raise CodexHostBootstrapError(
+                f"focused verification {channel} evidence changed"
+            )
+        focused_output[channel] = {
+            "digest": evidence["digest"],
+            "content": body.decode("utf-8", "replace"),
+        }
     return {
         "schema_version": 1,
         "kind": "whole-os-host-source-packet-v1",
@@ -597,9 +621,13 @@ def _source_packet(
         "branch": branch,
         "clean": True,
         "host_seal_digest": bundle.seal_digest,
+        "state_root": str(bundle.state_root),
         "service_config_digest": raw_sha256(bundle.config_path.read_bytes()),
+        "service_config_path": str(bundle.config_path),
         "service_config": json.loads(bundle.config_path.read_text(encoding="utf-8")),
+        "codex_tool_probe": json.loads(bundle.probe_path.read_text(encoding="utf-8")),
         "focused_verification": dict(focused_receipt),
+        "focused_verification_output": focused_output,
         "files": files,
     }
 
@@ -894,6 +922,7 @@ def _focused_verification(bundle: DeploymentBundle, attempt_id: str) -> tuple[di
         evidence_directory=directory,
         selected_paths=(
             "tests/test_whole_os_bootstrap.py",
+            "tests/test_whole_os_codex_host.py",
             "tests/test_whole_os_powershell_pipeline.py",
         ),
         adapter_id="python-unittest",
@@ -1014,14 +1043,22 @@ def execute_trusted_launcher(
     tenant_id: str = "local-operator",
     repository_id: str = "hive-mind-os",
     timeout_seconds: float = 900,
-    worker: CodexLocalWorker | None = None,
     executable: Path | None = None,
 ) -> tuple[int, dict[str, Any]]:
     """Execute the real trusted launcher and persist an append-only receipt."""
 
     started_at = _utc_now()
     attempt_id = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{uuid4().hex[:8]}"
+    repository = repository.resolve(strict=True)
     state_root = state_root.resolve()
+    try:
+        state_root.relative_to(repository)
+    except ValueError:
+        pass
+    else:
+        raise CodexHostBootstrapError(
+            "host state must remain outside the repository; no receipt was written"
+        )
     state_root.mkdir(parents=True, exist_ok=True)
     bundle: DeploymentBundle | None = None
     focused_path: Path | None = None
@@ -1048,7 +1085,7 @@ def execute_trusted_launcher(
             raise CodexHostBootstrapError(
                 "focused trusted-local verification did not pass"
             )
-        actual_worker = worker or CodexLocalWorker(executable=native)
+        actual_worker = CodexLocalWorker(executable=native)
         admission, admission_path = _admission_review(
             bundle, actual_worker, focused, attempt_id, timeout_seconds
         )
