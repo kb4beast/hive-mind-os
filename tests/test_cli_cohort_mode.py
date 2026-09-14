@@ -129,6 +129,28 @@ class WholeOSCohortCLITests(unittest.TestCase):
         self.assertEqual(set(blocked), {"a", "b"})
         self.assertEqual(cohort["convergence_rounds"], 1)
         self.assertEqual(cohort["verification_rounds"], 1)
+        assurance = document["terminal_assurance"]
+        self.assertIsInstance(assurance, dict)
+        assert isinstance(assurance, dict)
+        self.assertRegex(str(assurance["candidate_digest"]), r"^sha256:[0-9a-f]{64}$")
+        self.assertEqual(
+            assurance["producer_identity"], "whole-os-cli-unconfigured-host"
+        )
+        self.assertEqual(
+            assurance["reviewer_identity"], "whole-os-cli-terminal-curator"
+        )
+        self.assertNotEqual(
+            assurance["producer_identity"], assurance["reviewer_identity"]
+        )
+        self.assertTrue(assurance["review_refs"])
+        self.assertTrue(assurance["aggregate_refs"])
+        self.assertTrue(assurance["verification_refs"])
+        repair = assurance["repair"]
+        self.assertIsInstance(repair, dict)
+        assert isinstance(repair, dict)
+        self.assertFalse(repair["attempted"])
+        self.assertIsNone(repair["directive"])
+        self.assertIn("hard-gated", str(repair["reason"]))
 
     def test_help_exposes_mode_and_concurrency_selection(self) -> None:
         parser = cli.build_whole_os_parser()

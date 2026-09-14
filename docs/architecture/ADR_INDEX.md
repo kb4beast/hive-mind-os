@@ -58,9 +58,13 @@ evidence. Numeric-only references to ADR-008, ADR-012, ADR-057, or ADR-058 are a
 | `ADR-081`     | [Tenant-bound learning and draft-only cross-repository lessons](ADR-081-WHOLE-OS-TENANT-LEARNING-BOUNDARIES.md) | Whole-OS N01 | proposed by Architect/Advocate; independent court pending |
 | `ADR-082`     | [Endpoint reconstruction alongside strict point-in-time replay](ADR-082-WHOLE-OS-ENDPOINT-RECONSTRUCTION.md) | Whole-OS N01 | proposed by Architect/Advocate; independent court pending |
 | `ADR-083`     | [Risk-based checks, content-bound reuse, and independent qualification](ADR-083-WHOLE-OS-RISK-BASED-QUALIFICATION.md) | Whole-OS N01 | proposed by Architect/Advocate; independent court pending |
+| `ADR-084`     | [End-loaded cohort execution](ADR-084-END-LOADED-COHORT-EXECUTION.md) | Cohort scheduling | adapted implementation candidate; terminal independent qualification pending |
+| `ADR-085`     | [Mission cohort topology](ADR-085-MISSION-COHORT-TOPOLOGY.md) | Repository mission runtime | adapted implementation candidate; integrated qualification pending |
+| `ADR-086`     | [Bounded cohort repair and efficiency receipts](ADR-086-BOUNDED-COHORT-REPAIR-AND-EFFICIENCY.md) | Cohort assurance | adapted implementation candidate; production superiority unclaimed |
+| `ADR-087`     | [Durable cohort journal](ADR-087-DURABLE-COHORT-JOURNAL.md) | Cohort continuity | adapted implementation candidate; integrated qualification pending |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-084; it must be unique at creation time.
+is ADR-088; it must be unique at creation time.

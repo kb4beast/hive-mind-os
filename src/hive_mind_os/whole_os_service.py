@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping, Protocol
+from uuid import uuid4
 
+from .cohort_assurance import (
+    TerminalAssessment,
+    TerminalEvidence,
+    convergence_candidate_digest,
+)
+from .cohort_runtime import ConvergenceResult, VerificationResult
 from .cortex.repository.mission_bindings import (
     ConfiguredMissionBindingsProvider,
     MissionBindingDescriptor,
@@ -19,7 +29,8 @@ from .outcome_graph import (
     compile_outcome_graph,
     ready_packages,
 )
-from .scheduler import Job, Scheduler
+from .runtime_contracts import canonical_digest
+from .scheduler import Job, Scheduler, StaleLeaseError
 
 
 class ServiceError(RuntimeError):
@@ -63,6 +74,18 @@ class WholeOSHost(Protocol):
         bindings: tuple[Any, Any],
         payload: Mapping[str, Any],
     ) -> PackageExecutionResult: ...
+
+
+class WholeOSTerminalAssessor(Protocol):
+    """Optional host capability required to complete a successful campaign."""
+
+    def assess_terminal_candidate(
+        self,
+        candidate: ConvergenceResult,
+        payload: Mapping[str, Any],
+    ) -> TerminalAssessment:
+        """Perform the one candidate-bound Curator assessment."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,10 +165,14 @@ class ServiceObservation:
     pending_packages: tuple[str, ...]
     blocked_packages: tuple[str, ...]
     last_result: PackageExecutionResult | None = None
+    recent_results: tuple[PackageExecutionResult, ...] = ()
+    terminal_assessment: TerminalAssessment | None = None
+    terminal_message: str = ""
 
 
 class WholeOSService:
     JOB_KIND = "whole-os-package"
+    TERMINAL_JOB_KIND = "whole-os-terminal-assessment"
 
     def __init__(
         self,
@@ -162,13 +189,46 @@ class WholeOSService:
         self.host = host
         self.scheduler = scheduler or Scheduler(config.state_dir / "queue")
         self.by_id = {package.package_id: package for package in config.graph.packages}
+        self._kickoff = self._build_kickoff()
+        campaign_key = canonical_digest(
+            {
+                "campaign_id": config.campaign_id,
+                "tenant_id": config.tenant_id,
+                "repository_id": config.repository_id,
+            }
+        ).removeprefix("sha256:")
+        self._receipt_dir = config.state_dir / "whole-os-receipts" / campaign_key
+        self._package_receipt_dir = self._receipt_dir / "packages"
         self._enqueue_ready()
+
+    def _build_kickoff(self) -> dict[str, object]:
+        context: dict[str, object] = {
+            "campaign_id": self.config.campaign_id,
+            "tenant_id": self.config.tenant_id,
+            "repository_id": self.config.repository_id,
+            "configuration_digest": self.config.binding_descriptor.digest,
+            "graph_digest": self.config.graph.digest,
+            "base_snapshot": self.config.graph.base_snapshot,
+        }
+        return {
+            "schema_version": 1,
+            "context_digest": canonical_digest(context),
+            "context": context,
+        }
 
     def _jobs(self) -> tuple[Job, ...]:
         return tuple(
             job
             for job in self.scheduler.jobs()
             if job.kind == self.JOB_KIND and job.mission_id == self.config.campaign_id
+        )
+
+    def _terminal_jobs(self) -> tuple[Job, ...]:
+        return tuple(
+            job
+            for job in self.scheduler.jobs()
+            if job.kind == self.TERMINAL_JOB_KIND
+            and job.mission_id == self.config.campaign_id
         )
 
     def _completed(self) -> set[str]:
@@ -193,7 +253,224 @@ class WholeOSService:
             "acceptance_ids": list(package.acceptance_ids),
             "allowed_paths": list(package.allowed_paths),
             "semantic_locks": list(package.semantic_locks),
+            "cohort_kickoff": self._kickoff,
         }
+
+    @staticmethod
+    def _canonical_bytes(document: Mapping[str, object]) -> bytes:
+        return (
+            json.dumps(
+                dict(document),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+
+    @staticmethod
+    def _write_once(path: Path, document: Mapping[str, object]) -> None:
+        """Durably create one canonical receipt, rejecting conflicting replay."""
+        body = WholeOSService._canonical_bytes(document)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            if path.read_bytes() != body:
+                raise ServiceError(
+                    f"durable receipt conflicts with replay: {path.name}"
+                )
+            return
+        temporary = path.with_name(f".{path.name}.{uuid4()}.tmp")
+        try:
+            with temporary.open("xb") as handle:
+                handle.write(body)
+                handle.flush()
+                os.fsync(handle.fileno())
+            # Job leases serialize writers. Replace makes a fully flushed receipt
+            # visible before the corresponding scheduler transition is committed.
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def _package_receipt_path(self, package_id: str) -> Path:
+        key = canonical_digest({"package_id": package_id}).removeprefix("sha256:")
+        return self._package_receipt_dir / f"{key}.json"
+
+    def _package_result_document(
+        self, result: PackageExecutionResult
+    ) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "campaign_id": self.config.campaign_id,
+            "graph_digest": self.config.graph.digest,
+            "package_id": result.package_id,
+            "status": result.status.value,
+            "candidate_digest": result.candidate_digest,
+            "evidence_refs": list(result.evidence_refs),
+            "message": result.message,
+        }
+
+    def _persist_package_result(self, result: PackageExecutionResult) -> None:
+        self._write_once(
+            self._package_receipt_path(result.package_id),
+            self._package_result_document(result),
+        )
+
+    def _load_package_result(self, package_id: str) -> PackageExecutionResult:
+        path = self._package_receipt_path(package_id)
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ServiceError(
+                f"successful package {package_id} lacks a valid durable receipt"
+            ) from exc
+        if not isinstance(document, dict):
+            raise ServiceError(f"package receipt {package_id} is not an object")
+        required = {
+            "schema_version",
+            "campaign_id",
+            "graph_digest",
+            "package_id",
+            "status",
+            "candidate_digest",
+            "evidence_refs",
+            "message",
+        }
+        if (
+            set(document) != required
+            or document["schema_version"] != 1
+            or document["campaign_id"] != self.config.campaign_id
+            or document["graph_digest"] != self.config.graph.digest
+            or document["package_id"] != package_id
+            or not isinstance(document["evidence_refs"], list)
+            or any(type(item) is not str for item in document["evidence_refs"])
+            or type(document["message"]) is not str
+        ):
+            raise ServiceError(f"package receipt {package_id} is invalid")
+        try:
+            result = PackageExecutionResult(
+                package_id,
+                PackageStatus(document["status"]),
+                document["candidate_digest"],
+                tuple(document["evidence_refs"]),
+                document["message"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ServiceError(f"package receipt {package_id} is invalid") from exc
+        if result.status not in {PackageStatus.COMPLETED, PackageStatus.NO_CHANGE}:
+            raise ServiceError(f"package receipt {package_id} is not successful")
+        return result
+
+    def _terminal_candidate(self) -> ConvergenceResult:
+        if len(self._completed()) != len(self.by_id):
+            raise ServiceError("terminal candidate requires all packages to complete")
+        results = tuple(
+            self._load_package_result(package.package_id)
+            for package in self.config.graph.packages
+        )
+        output = {
+            "schema_version": 1,
+            "campaign_id": self.config.campaign_id,
+            "tenant_id": self.config.tenant_id,
+            "repository_id": self.config.repository_id,
+            "graph_digest": self.config.graph.digest,
+            "kickoff_digest": self._kickoff["context_digest"],
+            "packages": [
+                {
+                    "package_id": result.package_id,
+                    "candidate_digest": result.candidate_digest,
+                    "evidence_refs": list(result.evidence_refs),
+                }
+                for result in results
+            ],
+        }
+        return ConvergenceResult(True, output, "whole-OS package candidate converged")
+
+    def _terminal_payload(self, candidate: ConvergenceResult) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "campaign_id": self.config.campaign_id,
+            "tenant_id": self.config.tenant_id,
+            "repository_id": self.config.repository_id,
+            "graph_digest": self.config.graph.digest,
+            "candidate_digest": convergence_candidate_digest(candidate),
+        }
+
+    def _terminal_receipt_path(self, candidate_digest: str) -> Path:
+        return (
+            self._receipt_dir
+            / f"terminal-{candidate_digest.removeprefix('sha256:')}.json"
+        )
+
+    @staticmethod
+    def _verification_document(verification: VerificationResult) -> dict[str, object]:
+        return {
+            "passed": verification.passed,
+            "checks": list(verification.checks),
+            "message": verification.message,
+        }
+
+    def _persist_terminal_assessment(
+        self, candidate: ConvergenceResult, assessment: TerminalAssessment
+    ) -> None:
+        digest = convergence_candidate_digest(candidate)
+        document = {
+            **self._terminal_payload(candidate),
+            "kind": "whole-os-terminal-assessment-v1",
+            "verification": self._verification_document(assessment.verification),
+            "evidence": assessment.evidence.to_document(),
+        }
+        self._write_once(self._terminal_receipt_path(digest), document)
+
+    def _load_terminal_assessment(
+        self, candidate: ConvergenceResult
+    ) -> TerminalAssessment | None:
+        digest = convergence_candidate_digest(candidate)
+        path = self._terminal_receipt_path(digest)
+        if not path.exists():
+            return None
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ServiceError("terminal assessment receipt is unreadable") from exc
+        expected = {
+            *self._terminal_payload(candidate),
+            "kind",
+            "verification",
+            "evidence",
+        }
+        if (
+            not isinstance(document, dict)
+            or set(document) != expected
+            or document.get("kind") != "whole-os-terminal-assessment-v1"
+            or any(
+                document.get(key) != value
+                for key, value in self._terminal_payload(candidate).items()
+            )
+        ):
+            raise ServiceError("terminal assessment receipt is not candidate-bound")
+        verification = document.get("verification")
+        evidence = document.get("evidence")
+        if not isinstance(verification, dict) or not isinstance(evidence, dict):
+            raise ServiceError("terminal assessment receipt is untyped")
+        if set(verification) != {"passed", "checks", "message"} or not isinstance(
+            verification["checks"], list
+        ):
+            raise ServiceError("terminal verification receipt is invalid")
+        try:
+            restored = TerminalAssessment(
+                VerificationResult(
+                    verification["passed"],
+                    tuple(verification["checks"]),
+                    verification["message"],
+                ),
+                TerminalEvidence.from_document(evidence),
+            )
+        except (TypeError, ValueError) as exc:
+            raise ServiceError("terminal assessment receipt is invalid") from exc
+        if restored.evidence.candidate_digest != digest:
+            raise ServiceError("terminal evidence targets another candidate")
+        return restored
 
     def _enqueue_ready(self) -> None:
         completed, enqueued = self._completed(), self._enqueued()
@@ -206,10 +483,86 @@ class WholeOSService:
                     mission_id=self.config.campaign_id,
                 )
 
-    def run_once(self) -> ServiceObservation:
-        job = self.scheduler.claim(f"whole-os:{self.config.campaign_id}")
+    def _enqueue_terminal_ready(self) -> None:
+        if len(self._completed()) != len(self.by_id):
+            return
+        candidate = self._terminal_candidate()
+        payload = self._terminal_payload(candidate)
+        if not any(job.payload == payload for job in self._terminal_jobs()):
+            self.scheduler.enqueue(
+                self.TERMINAL_JOB_KIND,
+                payload,
+                max_attempts=self.config.maximum_attempts,
+                mission_id=self.config.campaign_id,
+            )
+
+    def _run_terminal_assessment_if_ready(self) -> None:
+        """Claim, assess, and durably seal the completed package candidate once."""
+        self._enqueue_terminal_ready()
+        jobs = self._terminal_jobs()
+        if not jobs:
+            return
+        candidate = self._terminal_candidate()
+        payload = self._terminal_payload(candidate)
+        matching = next((job for job in jobs if job.payload == payload), None)
+        if matching is None or matching.state in {"done", "dead-letter"}:
+            return
+        owner = f"whole-os:{self.config.campaign_id}:terminal:{uuid4()}"
+        job = self.scheduler.claim(
+            owner,
+            kind=self.TERMINAL_JOB_KIND,
+            mission_id=self.config.campaign_id,
+            job_id=matching.id,
+            resource_ids=(
+                canonical_digest(
+                    {
+                        "tenant_id": self.config.tenant_id,
+                        "repository_id": self.config.repository_id,
+                        "campaign_id": self.config.campaign_id,
+                        "kind": "terminal-assessment",
+                    }
+                ),
+            ),
+        )
         if job is None:
+            return
+        token = job.lease_token or ""
+        try:
+            retained = self._load_terminal_assessment(candidate)
+            if retained is None:
+                assessor = getattr(self.host, "assess_terminal_candidate", None)
+                if not callable(assessor):
+                    raise ServiceError("host terminal assessor is required")
+                frozen_payload = self._freeze(payload)
+                assert isinstance(frozen_payload, Mapping)
+                assessment = assessor(candidate, frozen_payload)
+                if not isinstance(assessment, TerminalAssessment):
+                    raise ServiceError("host returned an untyped terminal assessment")
+                if assessment.evidence.candidate_digest != (
+                    convergence_candidate_digest(candidate)
+                ):
+                    raise ServiceError(
+                        "terminal evidence does not bind the converged candidate"
+                    )
+                self._persist_terminal_assessment(candidate, assessment)
+            self.scheduler.complete(job.id, token, mission_id=self.config.campaign_id)
+        except Exception as exc:
+            self.scheduler.fail(
+                job.id,
+                token,
+                f"{type(exc).__name__}: {exc}",
+                mission_id=self.config.campaign_id,
+            )
+
+    def run_once(self) -> ServiceObservation:
+        """Execute one package using the original strict compatibility behavior."""
+        jobs = self._claim_cohort(
+            f"whole-os:{self.config.campaign_id}:strict", maximum=1
+        )
+        if not jobs:
+            self._run_terminal_assessment_if_ready()
             return self.observe()
+        job = jobs[0]
         package_id = str(job.payload.get("package_id", ""))
         package = self.by_id.get(package_id)
         if package is None:
@@ -226,9 +579,7 @@ class WholeOSService:
             if result.package_id != package_id:
                 raise ServiceError("host returned a cross-package result")
             if result.status in {PackageStatus.COMPLETED, PackageStatus.NO_CHANGE}:
-                self.scheduler.complete(
-                    job.id, job.lease_token or "", mission_id=self.config.campaign_id
-                )
+                self._persist_result(job, result)
                 self._enqueue_ready()
             else:
                 self.scheduler.fail(
@@ -237,6 +588,7 @@ class WholeOSService:
                     result.status.value + ": " + result.message,
                     mission_id=self.config.campaign_id,
                 )
+            self._run_terminal_assessment_if_ready()
             return self.observe(last_result=result)
         except Exception as exc:
             self.scheduler.fail(
@@ -251,8 +603,238 @@ class WholeOSService:
                 )
             )
 
+    @staticmethod
+    def _freeze(value: Any) -> Any:
+        if isinstance(value, dict):
+            return MappingProxyType(
+                {key: WholeOSService._freeze(item) for key, item in value.items()}
+            )
+        if isinstance(value, list):
+            return tuple(WholeOSService._freeze(item) for item in value)
+        return value
+
+    def _resource_ids(self, package: OutcomeWorkPackage) -> tuple[str, ...]:
+        """Return subject-bound identities for durable scheduler arbitration."""
+        subject = {
+            "tenant_id": self.config.tenant_id,
+            "repository_id": self.config.repository_id,
+        }
+        resources = (
+            *(
+                canonical_digest({**subject, "kind": "write-path", "value": path})
+                for path in package.allowed_paths
+            ),
+            *(
+                canonical_digest({**subject, "kind": "semantic-lock", "value": lock})
+                for lock in package.semantic_locks
+            ),
+        )
+        return tuple(sorted(set(resources)))
+
+    def _claim_cohort(
+        self, owner: str, *, maximum: int | None = None
+    ) -> tuple[Job, ...]:
+        claimed: list[Job] = []
+        paths: set[str] = set()
+        locks: set[str] = set()
+        capacity = maximum or self.config.graph.maximum_concurrent
+        for candidate in self._jobs():
+            if len(claimed) >= capacity:
+                break
+            if candidate.state not in {"ready", "leased"}:
+                continue
+            package = self.by_id.get(str(candidate.payload.get("package_id", "")))
+            if package is not None and (
+                paths.intersection(package.allowed_paths)
+                or locks.intersection(package.semantic_locks)
+            ):
+                continue
+            job = self.scheduler.claim(
+                owner,
+                kind=self.JOB_KIND,
+                mission_id=self.config.campaign_id,
+                job_id=candidate.id,
+                resource_ids=() if package is None else self._resource_ids(package),
+            )
+            if job is None:
+                continue
+            claimed.append(job)
+            if package is not None:
+                paths.update(package.allowed_paths)
+                locks.update(package.semantic_locks)
+        return tuple(claimed)
+
+    def _execute_claimed(self, job: Job) -> PackageExecutionResult:
+        package_id = str(job.payload.get("package_id", ""))
+        package = self.by_id.get(package_id)
+        if package is None:
+            return PackageExecutionResult(
+                package_id or "unknown",
+                PackageStatus.FAILED,
+                None,
+                (),
+                "queued package is absent from the sealed graph",
+            )
+        try:
+            payload = dict(job.payload)
+            # Jobs created before cohort support remain resumable. The kickoff is
+            # deterministic for the sealed campaign and is supplied at execution.
+            payload.setdefault("cohort_kickoff", self._kickoff)
+            if payload != self._payload(package):
+                raise ServiceError("queued package payload differs from sealed graph")
+            frozen_payload = self._freeze(payload)
+            assert isinstance(frozen_payload, Mapping)
+            resolved = self.bindings.resolve(frozen_payload, self.config.state_dir)
+            result = self.host.execute_package(package, resolved, frozen_payload)
+            if not isinstance(result, PackageExecutionResult):
+                raise ServiceError("host returned an untyped package result")
+            if result.package_id != package_id:
+                raise ServiceError("host returned a cross-package result")
+            return result
+        except Exception as exc:
+            return PackageExecutionResult(
+                package_id, PackageStatus.FAILED, None, (), str(exc)
+            )
+
+    def _persist_result(self, job: Job, result: PackageExecutionResult) -> None:
+        token = job.lease_token or ""
+        if result.status in {PackageStatus.COMPLETED, PackageStatus.NO_CHANGE}:
+            self._persist_package_result(result)
+            self.scheduler.complete(job.id, token, mission_id=self.config.campaign_id)
+        elif result.status in {
+            PackageStatus.BLOCKED_AUTHORITY,
+            PackageStatus.BLOCKED_CAPABILITY,
+        }:
+            self.scheduler.dead_letter(
+                job.id,
+                token,
+                result.status.value + ": " + result.message,
+                mission_id=self.config.campaign_id,
+            )
+        else:
+            self.scheduler.fail(
+                job.id,
+                token,
+                result.status.value + ": " + result.message,
+                mission_id=self.config.campaign_id,
+            )
+
+    def run_cohort(self) -> ServiceObservation:
+        """Run one durable, capacity-bounded dependency-ready package wave.
+
+        Every host receives the same digest-bound immutable kickoff in its payload.
+        Scheduler leases are heartbeated while host work is active, and all queue
+        transitions occur on the coordinating thread after execution completes.
+        """
+        self._enqueue_ready()
+        owner = f"whole-os:{self.config.campaign_id}:cohort:{uuid4()}"
+        jobs = self._claim_cohort(owner)
+        if not jobs:
+            self._run_terminal_assessment_if_ready()
+            return self.observe()
+
+        results: dict[str, PackageExecutionResult] = {}
+        stale: set[str] = set()
+        heartbeat_interval = max(0.01, min(10.0, self.scheduler.lease_seconds / 3.0))
+        with ThreadPoolExecutor(
+            max_workers=len(jobs),
+            thread_name_prefix=f"whole-os-{self.config.campaign_id}",
+        ) as pool:
+            active: dict[Future[PackageExecutionResult], Job] = {
+                pool.submit(self._execute_claimed, job): job for job in jobs
+            }
+            while active:
+                completed, _ = wait(
+                    tuple(active),
+                    timeout=heartbeat_interval,
+                    return_when=FIRST_COMPLETED,
+                )
+                for future, job in tuple(active.items()):
+                    if future in completed:
+                        continue
+                    try:
+                        self.scheduler.heartbeat(job.id, job.lease_token or "")
+                    except StaleLeaseError:
+                        stale.add(job.id)
+                for future in completed:
+                    job = active.pop(future)
+                    result = future.result()
+                    if job.id in stale:
+                        result = PackageExecutionResult(
+                            result.package_id,
+                            PackageStatus.FAILED,
+                            None,
+                            result.evidence_refs,
+                            "scheduler lease expired before result persistence",
+                        )
+                    else:
+                        try:
+                            self._persist_result(job, result)
+                        except StaleLeaseError:
+                            result = PackageExecutionResult(
+                                result.package_id,
+                                PackageStatus.FAILED,
+                                None,
+                                result.evidence_refs,
+                                "scheduler lease expired before result persistence",
+                            )
+                    results[result.package_id] = result
+
+        self._enqueue_ready()
+        self._run_terminal_assessment_if_ready()
+        ordered = tuple(
+            results[package.package_id]
+            for package in self.config.graph.packages
+            if package.package_id in results
+        )
+        return self.observe(
+            last_result=ordered[-1] if ordered else None,
+            recent_results=ordered,
+        )
+
+    def run_to_completion(
+        self, *, maximum_cohorts: int | None = None
+    ) -> ServiceObservation:
+        """Run bounded cohort waves until terminal or no immediate progress exists.
+
+        The default bound covers every configured package attempt once. Backoff,
+        active foreign leases, and an explicit lower bound return durable status to
+        the caller instead of spinning or sleeping indefinitely.
+        """
+        if maximum_cohorts is not None and (
+            type(maximum_cohorts) is not int or maximum_cohorts < 1
+        ):
+            raise ServiceError("maximum_cohorts must be a positive integer")
+        limit = maximum_cohorts or max(
+            1, (len(self.by_id) + 1) * self.config.maximum_attempts
+        )
+        all_results: list[PackageExecutionResult] = []
+        observation = self.observe()
+        for _ in range(limit):
+            before = tuple(
+                (job.id, job.state, job.attempts, job.last_error)
+                for job in (*self._jobs(), *self._terminal_jobs())
+            )
+            observation = self.run_cohort()
+            all_results.extend(observation.recent_results)
+            if observation.status in {"complete", "blocked"}:
+                break
+            after = tuple(
+                (job.id, job.state, job.attempts, job.last_error)
+                for job in (*self._jobs(), *self._terminal_jobs())
+            )
+            if before == after:
+                break
+        return self.observe(
+            last_result=all_results[-1] if all_results else observation.last_result,
+            recent_results=tuple(all_results),
+        )
+
     def observe(
-        self, *, last_result: PackageExecutionResult | None = None
+        self,
+        *,
+        last_result: PackageExecutionResult | None = None,
+        recent_results: tuple[PackageExecutionResult, ...] = (),
     ) -> ServiceObservation:
         jobs = self._jobs()
         completed = tuple(
@@ -260,27 +842,68 @@ class WholeOSService:
                 str(job.payload["package_id"]) for job in jobs if job.state == "done"
             )
         )
-        blocked = tuple(
-            sorted(
-                str(job.payload["package_id"])
-                for job in jobs
-                if job.state == "dead-letter"
-            )
-        )
+        blocked_set = {
+            str(job.payload["package_id"]) for job in jobs if job.state == "dead-letter"
+        }
+        changed = True
+        while changed:
+            changed = False
+            for package in self.config.graph.packages:
+                if package.package_id not in blocked_set and blocked_set.intersection(
+                    package.dependencies
+                ):
+                    blocked_set.add(package.package_id)
+                    changed = True
+        blocked = tuple(sorted(blocked_set))
         enqueued = {str(job.payload["package_id"]) for job in jobs}
         pending = tuple(sorted(set(self.by_id) - set(completed)))
-        if blocked:
-            status = "blocked"
-        elif len(completed) == len(self.by_id):
-            status = "complete"
+        terminal_assessment: TerminalAssessment | None = None
+        terminal_message = ""
+        if len(completed) == len(self.by_id):
+            try:
+                candidate = self._terminal_candidate()
+                terminal_assessment = self._load_terminal_assessment(candidate)
+                terminal_jobs = self._terminal_jobs()
+                if terminal_assessment is not None:
+                    if terminal_assessment.verification.passed:
+                        status = "complete"
+                    else:
+                        status = "blocked"
+                        terminal_message = terminal_assessment.verification.message
+                elif any(job.state == "dead-letter" for job in terminal_jobs):
+                    status = "blocked"
+                    terminal_message = next(
+                        (
+                            job.last_error or "terminal assessment failed"
+                            for job in terminal_jobs
+                            if job.state == "dead-letter"
+                        ),
+                        "terminal assessment failed",
+                    )
+                else:
+                    status = "terminal_assessment_pending"
+                    terminal_message = "candidate-bound terminal assessment is pending"
+            except ServiceError as exc:
+                status = "blocked"
+                terminal_message = str(exc)
         elif any(job.state in {"ready", "leased"} for job in jobs):
             status = "ready"
+        elif blocked:
+            status = "blocked"
         elif set(self.by_id) - enqueued:
             status = "dependency_wait"
         else:
             status = "idle"
         return ServiceObservation(
-            self.config.campaign_id, status, completed, pending, blocked, last_result
+            self.config.campaign_id,
+            status,
+            completed,
+            pending,
+            blocked,
+            last_result,
+            recent_results,
+            terminal_assessment,
+            terminal_message,
         )
 
     def close(self) -> None:
@@ -299,10 +922,7 @@ def graph_from_document(document: Mapping[str, object]) -> OutcomeGraphSpec:
         raise ServiceError("graph document has an unknown shape")
     contract_version = document["contract_version"]
     maximum_concurrent = document["maximum_concurrent"]
-    if (
-        type(contract_version) is not int
-        or type(maximum_concurrent) is not int
-    ):
+    if type(contract_version) is not int or type(maximum_concurrent) is not int:
         raise ServiceError("graph contract version and concurrency must be integers")
     packages = []
     for raw in document["packages"]:
@@ -375,6 +995,7 @@ __all__ = [
     "WholeOSHost",
     "WholeOSService",
     "WholeOSServiceConfig",
+    "WholeOSTerminalAssessor",
     "graph_from_document",
     "load_graph",
     "load_service_config",

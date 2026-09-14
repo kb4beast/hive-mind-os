@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from hashlib import sha256
@@ -33,6 +34,8 @@ from typing import Callable, Mapping, Sequence
 from uuid import uuid4
 
 from .acceptance import AcceptanceSpecification, normalize_acceptance_specifications
+from .cohort_assurance import TerminalEvidence
+from .cohort_policy import CohortExecutionMode
 from .model_action_adapter import ModelActionProposal, ModelProviderActionAdapter
 from .models import AutonomyLevel, RiskTier, Role
 from .policy import Action, PolicyEngine
@@ -110,6 +113,8 @@ _EVENT_TYPES = frozenset(
     {
         "mission.intake",
         "mission.planned",
+        "cohort.kickoff",
+        "cohort.converged",
         "work.created",
         "role.started",
         "role.action.proposed",
@@ -398,6 +403,15 @@ def reduce_mission_state(state: MissionState, event: MissionEvent) -> MissionSta
         if any(existing.id == item.id for existing in state.work_items):
             raise MissionLoopError("work item ids are append-only and unique")
         next_state = replace(state, work_items=(*state.work_items, item))
+    elif event.event_type == "cohort.kickoff":
+        kickoff_ref = payload.get("kickoff_ref")
+        if state.status is not MissionStatus.PLANNING or not isinstance(
+            kickoff_ref, str
+        ) or not kickoff_ref:
+            raise MissionLoopError("cohort kickoff requires a planned mission and reference")
+        next_state = replace(
+            state, artifact_refs=(*state.artifact_refs, kickoff_ref)
+        )
     elif event.event_type == "role.started":
         index, item = _find_item(state, str(payload.get("work_item_id", "")))
         if item.role is not event.actor or item.status != "pending":
@@ -516,6 +530,21 @@ def reduce_mission_state(state: MissionState, event: MissionEvent) -> MissionSta
         if state.status is not MissionStatus.INTEGRATING:
             raise MissionLoopError("mission success is not allowed before Curator adoption")
         next_state = replace(state, status=MissionStatus.SUCCEEDED, current_role=None)
+    elif event.event_type == "cohort.converged":
+        convergence_ref = payload.get("convergence_ref")
+        rounds = payload.get("rounds")
+        if (
+            state.status is not MissionStatus.INTEGRATING
+            or rounds != 1
+            or not isinstance(convergence_ref, str)
+            or not convergence_ref
+        ):
+            raise MissionLoopError(
+                "cohort convergence requires one adopted terminal Curator round"
+            )
+        next_state = replace(
+            state, evidence_refs=(*state.evidence_refs, convergence_ref)
+        )
     else:  # pragma: no cover - guarded by the event-type constructor
         raise MissionLoopError("event is not handled by the mission reducer")
     return replace(next_state, revision=state.revision + 1)
@@ -807,6 +836,43 @@ class CuratorResult:
 
 
 @dataclass(frozen=True, slots=True)
+class MissionCohortKickoff:
+    """Immutable shared context for one repository mission cohort."""
+
+    mission_id: str
+    objective_ref: str
+    base_commit: str
+    plan_ref: str
+    roles: tuple[Role, ...]
+    allowed_paths: tuple[str, ...]
+    acceptance_refs: tuple[str, ...]
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.to_dict())
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "mission_id": self.mission_id,
+            "objective_ref": self.objective_ref,
+            "base_commit": self.base_commit,
+            "plan_ref": self.plan_ref,
+            "roles": [role.value for role in self.roles],
+            "allowed_paths": list(self.allowed_paths),
+            "acceptance_refs": list(self.acceptance_refs),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class CohortPlanningResult:
+    """Materialized outputs from the cohort's single shared planning round."""
+
+    kickoff: MissionCohortKickoff
+    discovery: DiscoveryReport
+    design: ArchitectDesign | None
+
+
+@dataclass(frozen=True, slots=True)
 class MissionReport:
     mission_id: str
     status: MissionStatus
@@ -815,6 +881,7 @@ class MissionReport:
     events: tuple[MissionEvent, ...]
     receipts: tuple[ToolReceipt, ...]
     curator: CuratorResult
+    terminal_evidence: TerminalEvidence | None
 
 
 def _git_environment() -> dict[str, str]:
@@ -845,6 +912,7 @@ class MissionLoop:
         builder_limits: BuilderLimits | None = None,
         budget: MissionBudget | None = None,
         policy: PolicyEngine | None = None,
+        execution_mode: CohortExecutionMode | str = CohortExecutionMode.COHORT,
     ) -> None:
         _warn_retired("hive_mind_os.mission_loop.MissionLoop")
         self.repository = Path(repository).resolve()
@@ -866,6 +934,10 @@ class MissionLoop:
         if not self.output.parent.is_dir():
             raise ValueError("mission output parent must exist")
         self.plan = Orchestrator().plan(objective)
+        try:
+            self.execution_mode = CohortExecutionMode(execution_mode)
+        except (TypeError, ValueError) as error:
+            raise ValueError("mission execution mode must be 'cohort' or 'strict'") from error
         self.limits = builder_limits or BuilderLimits()
         # Local commits are required to form an immutable candidate.  This is still
         # repository-scoped authority only: the loop has no push, PR, merge, deploy,
@@ -891,6 +963,8 @@ class MissionLoop:
         self._discovery: DiscoveryReport | None = None
         self._design: ArchitectDesign | None = None
         self._curator: CuratorResult | None = None
+        self._terminal_evidence: TerminalEvidence | None = None
+        self._terminal_convergence_used = False
         self._record(MissionEvent("mission.intake", Role.ORCHESTRATOR, 0, {"objective_ref": objective.digest}))
         self._record(
             MissionEvent(
@@ -906,6 +980,30 @@ class MissionLoop:
                 },
             )
         )
+        plan_ref = self._state.artifact_refs[-1]
+        self.kickoff = MissionCohortKickoff(
+            mission_id=self._state.mission_id,
+            objective_ref=objective.digest,
+            base_commit=self.base_commit,
+            plan_ref=plan_ref,
+            roles=tuple(role for role in self.plan.roles if role is not Role.CURATOR),
+            allowed_paths=self.plan.allowed_paths,
+            acceptance_refs=tuple(item.identifier for item in objective.acceptance),
+        )
+        if self.execution_mode is CohortExecutionMode.COHORT:
+            self._record(
+                MissionEvent(
+                    "cohort.kickoff",
+                    Role.ORCHESTRATOR,
+                    self._state.revision,
+                    {
+                        "kickoff_ref": f"kickoff:{self.kickoff.digest}",
+                        "roles": [role.value for role in self.kickoff.roles],
+                        "shared_context": "immutable",
+                        "convergence_role": Role.CURATOR.value,
+                    },
+                )
+            )
         for role in self.plan.roles:
             if role is Role.ORCHESTRATOR:
                 continue
@@ -930,6 +1028,93 @@ class MissionLoop:
     @property
     def tool_receipts(self) -> tuple[ToolReceipt, ...]:
         return tuple(self._receipts)
+
+    def convene(
+        self,
+        explorer_planner: Callable[
+            [MissionCohortKickoff], Sequence[DiscoveryAction]
+        ],
+        architect_planner: Callable[
+            [MissionCohortKickoff], ArchitectDesign
+        ]
+        | None = None,
+    ) -> CohortPlanningResult:
+        """Generate one shared-context planning round, then materialize it safely.
+
+        In cohort mode the Explorer and Architect generate proposals concurrently
+        from the same immutable kickoff.  Applying repository operations and
+        append-only state transitions stays ordered so scheduling cannot bypass
+        policy, budgets, receipts, or role ownership.  Strict mode retains the
+        former proposal-by-proposal ordering.
+        """
+
+        needs_architect = Role.ARCHITECT in self.plan.roles
+        if needs_architect and architect_planner is None:
+            raise MissionLoopError("the planned cohort requires an Architect proposal")
+        if not callable(explorer_planner) or (
+            architect_planner is not None and not callable(architect_planner)
+        ):
+            raise TypeError("cohort planners must be callable")
+
+        if (
+            self.execution_mode is CohortExecutionMode.COHORT
+            and architect_planner is not None
+        ):
+            with ThreadPoolExecutor(
+                max_workers=2,
+                thread_name_prefix=f"mission-{self._state.mission_id}",
+            ) as pool:
+                explorer_future = pool.submit(explorer_planner, self.kickoff)
+                architect_future = pool.submit(architect_planner, self.kickoff)
+                discovery_actions = tuple(explorer_future.result())
+                design = architect_future.result()
+        else:
+            discovery_actions = tuple(explorer_planner(self.kickoff))
+            discovery = self.discover(discovery_actions)
+            design = None
+            if architect_planner is not None:
+                design = architect_planner(self.kickoff)
+                if needs_architect:
+                    design = self.design(design)
+                else:
+                    raise MissionLoopError(
+                        "the planned cohort has no Architect work item"
+                    )
+            return CohortPlanningResult(self.kickoff, discovery, design)
+
+        discovery = self.discover(discovery_actions)
+        if needs_architect:
+            assert design is not None
+            design = self.design(design)
+        elif design is not None:
+            raise MissionLoopError("the planned cohort has no Architect work item")
+        return CohortPlanningResult(self.kickoff, discovery, design)
+
+    def execute(
+        self,
+        *,
+        explorer_planner: Callable[
+            [MissionCohortKickoff], Sequence[DiscoveryAction]
+        ],
+        architect_planner: Callable[
+            [MissionCohortKickoff], ArchitectDesign
+        ]
+        | None = None,
+        builder_planner: Callable[
+            [MissionCohortKickoff, CohortPlanningResult], Sequence[BuilderAction]
+        ],
+    ) -> MissionReport:
+        """Run the bounded repository mission end to end with one convergence."""
+
+        planning = self.convene(explorer_planner, architect_planner)
+        self.build(tuple(builder_planner(self.kickoff, planning)))
+        curator = self.converge()
+        if curator.verdict != "ADOPT":
+            raise MissionLoopError(
+                "terminal cohort convergence remanded the candidate: "
+                + "; ".join(curator.findings)
+            )
+        return self.complete()
 
     def _record(self, event: MissionEvent) -> MissionState:
         if event.expected_revision != self._state.revision:
@@ -1734,6 +1919,40 @@ class MissionLoop:
             result = CuratorResult("ADOPT", self._candidate, candidate_tree, curator_output, tuple(findings))
             self._curator = result
             self._complete_role(Role.CURATOR, item, f"curator:{_digest(result.to_dict())}")
+            if self.execution_mode is CohortExecutionMode.COHORT:
+                candidate_digest = _digest(
+                    {
+                        "candidate_commit": result.candidate_commit,
+                        "candidate_tree": result.candidate_tree,
+                    }
+                )
+                review_refs = tuple(
+                    f"{receipt.ref}:candidate:{candidate_digest}"
+                    for receipt in self._receipts
+                    if receipt.role is Role.CURATOR
+                    and receipt.action == "verify_candidate"
+                    and receipt.details.get("candidate_commit") == result.candidate_commit
+                )
+                verification_refs = tuple(
+                    f"verification:{specification.identifier}:"
+                    f"{sha256_digest(report.report_path.read_bytes())}:"
+                    f"candidate:{candidate_digest}"
+                    for specification, report in zip(
+                        self.objective.acceptance, reports, strict=True
+                    )
+                )
+                self._terminal_evidence = TerminalEvidence(
+                    candidate_digest=candidate_digest,
+                    producer_identity=Role.BUILDER.value,
+                    reviewer_identity=Role.CURATOR.value,
+                    review_refs=review_refs,
+                    aggregate_refs=(
+                        "mission-events:"
+                        + sha256(_canonical([event.to_dict() for event in self._events])).hexdigest()
+                        + f":candidate:{candidate_digest}",
+                    ),
+                    verification_refs=verification_refs,
+                )
             return result
         result = CuratorResult("REMAND_BUILDER", self._candidate, candidate_tree, curator_output if curator_output.exists() else None, tuple(findings or ("sealed acceptance did not adopt candidate",)))
         self._curator = result
@@ -1785,9 +2004,36 @@ class MissionLoop:
             path.write_bytes(_canonical(specification.to_dict()))
         return path
 
+    def converge(self) -> CuratorResult:
+        """Run the cohort's Curator exactly once at the terminal boundary."""
+
+        if self._terminal_convergence_used:
+            raise MissionLoopError("terminal Curator convergence was already consumed")
+        self._terminal_convergence_used = True
+        result = self.curate()
+        if (
+            self.execution_mode is CohortExecutionMode.COHORT
+            and result.verdict == "ADOPT"
+        ):
+            self._record(
+                MissionEvent(
+                    "cohort.converged",
+                    Role.CURATOR,
+                    self._state.revision,
+                    {
+                        "rounds": 1,
+                        "convergence_ref": f"convergence:{_digest(result.to_dict())}",
+                        "candidate_commit": result.candidate_commit,
+                    },
+                )
+            )
+        return result
+
     def complete(self) -> MissionReport:
         if self._curator is None or self._curator.verdict != "ADOPT":
             raise MissionLoopError("mission cannot complete without Curator adoption")
+        if self.execution_mode is CohortExecutionMode.COHORT and self._terminal_evidence is None:
+            raise MissionLoopError("cohort mission cannot complete without typed terminal evidence")
         if self.plan.human_gates:
             raise MissionLoopError(
                 "mission completion is blocked by required human gates: "
@@ -1798,6 +2044,36 @@ class MissionLoop:
         try:
             (stage / "mission-state.json").write_bytes(_canonical(self._state.to_dict()))
             (stage / "mission-plan.json").write_bytes(_canonical(self.plan.to_dict()))
+            (stage / "execution-mode.json").write_bytes(
+                _canonical(
+                    {
+                        "execution_mode": self.execution_mode.value,
+                        "terminal_convergence_rounds": int(
+                            self._terminal_convergence_used
+                        ),
+                    }
+                )
+            )
+            (stage / "cohort-kickoff.json").write_bytes(
+                _canonical(self.kickoff.to_dict())
+            )
+            if self.execution_mode is CohortExecutionMode.COHORT:
+                assert self._terminal_evidence is not None
+                (stage / "terminal-assurance.json").write_bytes(
+                    _canonical(
+                        {
+                            "evidence": self._terminal_evidence.to_document(),
+                            "repair": {
+                                "attempted": False,
+                                "directive": None,
+                                "reason": (
+                                    "the repository MissionLoop has no authorized repair callback; "
+                                    "it records Curator remand without inventing implementation actions"
+                                ),
+                            },
+                        }
+                    )
+                )
             (stage / "events.json").write_bytes(_canonical([event.to_dict() for event in self._events]))
             (stage / "tool-receipts.json").write_bytes(_canonical([receipt.to_dict() for receipt in self._receipts]))
             if self._discovery is not None:
@@ -1825,6 +2101,7 @@ class MissionLoop:
             tuple(self._events),
             tuple(self._receipts),
             self._curator,
+            self._terminal_evidence,
         )
 
     @staticmethod
@@ -1857,6 +2134,44 @@ class MissionLoop:
             raise MissionLoopError(f"mission state is unavailable: {error}") from None
         if state.get("status") != MissionStatus.SUCCEEDED.value:
             raise MissionLoopError("published mission bundle is not successful")
+        try:
+            execution = json.loads((root / "execution-mode.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as error:
+            raise MissionLoopError(f"mission execution-mode evidence is invalid: {error}") from None
+        if execution.get("execution_mode") == CohortExecutionMode.COHORT.value:
+            try:
+                assurance = json.loads((root / "terminal-assurance.json").read_text(encoding="utf-8"))
+                raw_evidence = assurance["evidence"]
+                if not isinstance(raw_evidence, Mapping):
+                    raise TypeError("terminal evidence must be an object")
+                evidence = TerminalEvidence.from_document(raw_evidence)
+                curator = json.loads((root / "curator.json").read_text(encoding="utf-8"))
+                repair = assurance["repair"]
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                raise MissionLoopError(f"typed terminal assurance is invalid: {error}") from None
+            expected_candidate_digest = _digest(
+                {
+                    "candidate_commit": curator.get("candidate_commit"),
+                    "candidate_tree": curator.get("candidate_tree"),
+                }
+            )
+            if evidence.candidate_digest != expected_candidate_digest:
+                raise MissionLoopError("terminal assurance is not bound to the Curator candidate")
+            if (
+                evidence.producer_identity != Role.BUILDER.value
+                or evidence.reviewer_identity != Role.CURATOR.value
+            ):
+                raise MissionLoopError(
+                    "terminal assurance does not preserve Builder/Curator independence"
+                )
+            if (
+                not isinstance(repair, Mapping)
+                or repair.get("attempted") is not False
+                or repair.get("directive") is not None
+                or not isinstance(repair.get("reason"), str)
+                or not str(repair["reason"]).strip()
+            ):
+                raise MissionLoopError("terminal assurance must record the no-repair directive")
         try:
             raw_budget = state["budgets"]
             reconstructed = MissionState.intake(

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from threading import RLock
-from typing import Any, Mapping, Protocol
+from typing import Any, Iterable, Mapping, Protocol
 from uuid import uuid4
 
 
@@ -120,6 +120,20 @@ class Scheduler:
             );
             CREATE INDEX IF NOT EXISTS jobs_claimable
             ON jobs(state,not_before,lease_expiry,created_at);
+            CREATE TABLE IF NOT EXISTS resource_leases (
+                resource_id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                lease_owner TEXT NOT NULL,
+                lease_token TEXT NOT NULL,
+                lease_expiry REAL NOT NULL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS resource_leases_expiry
+            ON resource_leases(lease_expiry);
+            CREATE INDEX IF NOT EXISTS resource_leases_job
+            ON resource_leases(job_id,lease_token);
             """
         )
 
@@ -169,15 +183,52 @@ class Scheduler:
         assert row is not None
         return self._job(row)
 
-    def claim(self, owner: str) -> Job | None:
+    def claim(
+        self,
+        owner: str,
+        *,
+        kind: str | None = None,
+        mission_id: str | None = None,
+        job_id: str | None = None,
+        resource_ids: Iterable[str] = (),
+    ) -> Job | None:
+        """Claim one eligible job, optionally within a sealed service scope.
+
+        The optional selectors let multiple durable services safely share one
+        scheduler without one service consuming another service's work. Resource
+        identities are acquired atomically with the job lease and retained through
+        heartbeats. Existing callers retain queue-wide behavior by omitting them.
+        """
         if not owner.strip():
             raise ValueError("worker owner is required")
+        supplied_resources = tuple(resource_ids)
+        if any(
+            not isinstance(item, str) or not item.strip() for item in supplied_resources
+        ):
+            raise ValueError("resource identities must be non-empty strings")
+        resources = tuple(sorted(set(supplied_resources)))
         now = self.clock.now()
         token = str(uuid4())
         expiry = now + self.lease_seconds
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
+                # A resource row is authoritative only while its exact job lease is
+                # live. Cleaning stale rows inside the same write transaction makes
+                # reclamation atomic across independent Scheduler connections.
+                self._connection.execute(
+                    """
+                    DELETE FROM resource_leases
+                    WHERE lease_expiry<? OR NOT EXISTS (
+                        SELECT 1 FROM jobs
+                        WHERE jobs.id=resource_leases.job_id
+                          AND jobs.state='leased'
+                          AND jobs.lease_token=resource_leases.lease_token
+                          AND jobs.lease_expiry>=?
+                    )
+                    """,
+                    (now, now),
+                )
                 self._connection.execute(
                     """
                     UPDATE jobs
@@ -190,8 +241,20 @@ class Scheduler:
                         updated_at=?
                     WHERE state='leased' AND lease_expiry<?
                       AND attempts>=max_attempts
+                      AND (? IS NULL OR kind=?)
+                      AND (? IS NULL OR mission_id=?)
+                      AND (? IS NULL OR id=?)
                     """,
-                    (now, now),
+                    (
+                        now,
+                        now,
+                        kind,
+                        kind,
+                        mission_id,
+                        mission_id,
+                        job_id,
+                        job_id,
+                    ),
                 )
                 row = self._connection.execute(
                     """
@@ -201,14 +264,40 @@ class Scheduler:
                         (state='ready' AND not_before<=?)
                         OR (state='leased' AND lease_expiry<?)
                       )
+                      AND (? IS NULL OR kind=?)
+                      AND (? IS NULL OR mission_id=?)
+                      AND (? IS NULL OR id=?)
                     ORDER BY created_at,id
                     LIMIT 1
                     """,
-                    (now, now),
+                    (
+                        now,
+                        now,
+                        kind,
+                        kind,
+                        mission_id,
+                        mission_id,
+                        job_id,
+                        job_id,
+                    ),
                 ).fetchone()
                 if row is None:
                     self._connection.execute("COMMIT")
                     return None
+                if resources:
+                    placeholders = ",".join("?" for _ in resources)
+                    conflict = self._connection.execute(
+                        f"""
+                        SELECT 1 FROM resource_leases
+                        WHERE resource_id IN ({placeholders})
+                          AND lease_expiry>=?
+                        LIMIT 1
+                        """,  # noqa: S608 - placeholders are generated, not supplied
+                        (*resources, now),
+                    ).fetchone()
+                    if conflict is not None:
+                        self._connection.execute("COMMIT")
+                        return None
                 claimed = self._connection.execute(
                     """
                     UPDATE jobs
@@ -223,23 +312,88 @@ class Scheduler:
                     """,
                     (owner, token, expiry, now, row["id"], now, now),
                 ).fetchone()
+                if claimed is not None:
+                    self._connection.executemany(
+                        """
+                        INSERT INTO resource_leases(
+                            resource_id,job_id,lease_owner,lease_token,
+                            lease_expiry,created_at,updated_at
+                        ) VALUES(?,?,?,?,?,?,?)
+                        """,
+                        (
+                            (resource, row["id"], owner, token, expiry, now, now)
+                            for resource in resources
+                        ),
+                    )
                 self._connection.execute("COMMIT")
             except BaseException:
                 self._connection.execute("ROLLBACK")
                 raise
         return None if claimed is None else self._job(claimed)
 
-    def heartbeat(self, job_id: str, lease_token: str) -> Job:
+    def dead_letter(
+        self,
+        job_id: str,
+        lease_token: str,
+        error: str,
+        *,
+        mission_id: str | None = None,
+    ) -> Job:
+        """Persist a non-retryable typed blocker while retaining lease safety."""
         now = self.clock.now()
         with self._lock:
-            row = self._connection.execute(
-                """
-                UPDATE jobs SET lease_expiry=?,updated_at=?
-                WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
-                RETURNING *
-                """,
-                (now + self.lease_seconds, now, job_id, lease_token, now),
-            ).fetchone()
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    UPDATE jobs
+                    SET state='dead-letter',mission_id=COALESCE(?,mission_id),
+                        last_error=?,lease_owner=NULL,lease_token=NULL,
+                        lease_expiry=NULL,updated_at=?
+                    WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
+                    RETURNING *
+                    """,
+                    (mission_id, error, now, job_id, lease_token, now),
+                ).fetchone()
+                if row is not None:
+                    self._connection.execute(
+                        "DELETE FROM resource_leases WHERE job_id=? AND lease_token=?",
+                        (job_id, lease_token),
+                    )
+                self._connection.execute("COMMIT")
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+        if row is None:
+            raise StaleLeaseError("dead-letter rejected for stale lease")
+        return self._job(row)
+
+    def heartbeat(self, job_id: str, lease_token: str) -> Job:
+        now = self.clock.now()
+        expiry = now + self.lease_seconds
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    UPDATE jobs SET lease_expiry=?,updated_at=?
+                    WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
+                    RETURNING *
+                    """,
+                    (expiry, now, job_id, lease_token, now),
+                ).fetchone()
+                if row is not None:
+                    self._connection.execute(
+                        """
+                        UPDATE resource_leases SET lease_expiry=?,updated_at=?
+                        WHERE job_id=? AND lease_token=?
+                        """,
+                        (expiry, now, job_id, lease_token),
+                    )
+                self._connection.execute("COMMIT")
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
         if row is None:
             raise StaleLeaseError("heartbeat rejected for stale lease")
         return self._job(row)
@@ -253,16 +407,27 @@ class Scheduler:
     ) -> Job:
         now = self.clock.now()
         with self._lock:
-            row = self._connection.execute(
-                """
-                UPDATE jobs
-                SET state='done',mission_id=?,lease_owner=NULL,lease_token=NULL,
-                    lease_expiry=NULL,updated_at=?
-                WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
-                RETURNING *
-                """,
-                (mission_id, now, job_id, lease_token, now),
-            ).fetchone()
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    UPDATE jobs
+                    SET state='done',mission_id=?,lease_owner=NULL,lease_token=NULL,
+                        lease_expiry=NULL,updated_at=?
+                    WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
+                    RETURNING *
+                    """,
+                    (mission_id, now, job_id, lease_token, now),
+                ).fetchone()
+                if row is not None:
+                    self._connection.execute(
+                        "DELETE FROM resource_leases WHERE job_id=? AND lease_token=?",
+                        (job_id, lease_token),
+                    )
+                self._connection.execute("COMMIT")
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
         if row is None:
             raise StaleLeaseError("completion rejected for stale lease")
         return self._job(row)
@@ -277,35 +442,52 @@ class Scheduler:
     ) -> Job:
         now = self.clock.now()
         with self._lock:
-            current = self.get(job_id)
-            if (
-                current.state != "leased"
-                or current.lease_token != lease_token
-                or current.lease_expiry is None
-                or current.lease_expiry < now
-            ):
-                raise StaleLeaseError("failure rejected for stale lease")
-            dead = current.attempts >= current.max_attempts
-            not_before = now + self.backoff_seconds * (2 ** (current.attempts - 1))
-            row = self._connection.execute(
-                """
-                UPDATE jobs
-                SET state=?,not_before=?,mission_id=COALESCE(?,mission_id),last_error=?,
-                    lease_owner=NULL,lease_token=NULL,lease_expiry=NULL,updated_at=?
-                WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
-                RETURNING *
-                """,
-                (
-                    "dead-letter" if dead else "ready",
-                    not_before,
-                    mission_id,
-                    error,
-                    now,
-                    job_id,
-                    lease_token,
-                    now,
-                ),
-            ).fetchone()
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                current_row = self._connection.execute(
+                    "SELECT * FROM jobs WHERE id=?", (job_id,)
+                ).fetchone()
+                if current_row is None:
+                    raise KeyError(job_id)
+                current = self._job(current_row)
+                if (
+                    current.state != "leased"
+                    or current.lease_token != lease_token
+                    or current.lease_expiry is None
+                    or current.lease_expiry < now
+                ):
+                    raise StaleLeaseError("failure rejected for stale lease")
+                dead = current.attempts >= current.max_attempts
+                not_before = now + self.backoff_seconds * (2 ** (current.attempts - 1))
+                row = self._connection.execute(
+                    """
+                    UPDATE jobs
+                    SET state=?,not_before=?,mission_id=COALESCE(?,mission_id),
+                        last_error=?,lease_owner=NULL,lease_token=NULL,
+                        lease_expiry=NULL,updated_at=?
+                    WHERE id=? AND state='leased' AND lease_token=? AND lease_expiry>=?
+                    RETURNING *
+                    """,
+                    (
+                        "dead-letter" if dead else "ready",
+                        not_before,
+                        mission_id,
+                        error,
+                        now,
+                        job_id,
+                        lease_token,
+                        now,
+                    ),
+                ).fetchone()
+                if row is not None:
+                    self._connection.execute(
+                        "DELETE FROM resource_leases WHERE job_id=? AND lease_token=?",
+                        (job_id, lease_token),
+                    )
+                self._connection.execute("COMMIT")
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
         if row is None:
             raise StaleLeaseError("failure rejected for stale lease")
         return self._job(row)

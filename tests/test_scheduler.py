@@ -113,6 +113,38 @@ class SchedulerTests(unittest.TestCase):
         self.assertIsNone(self.scheduler.claim("competitor"))
         self.assertEqual(extended.lease_expiry, 119.0)
 
+    def test_resource_lease_is_heartbeated_and_released_with_job(self) -> None:
+        first = self._enqueue("first")
+        second = self._enqueue("second")
+        claimed = self.scheduler.claim(
+            "first-worker", job_id=first.id, resource_ids=("write:path",)
+        )
+        assert claimed is not None and claimed.lease_token is not None
+        self.clock.advance(9)
+        self.scheduler.heartbeat(claimed.id, claimed.lease_token)
+        self.clock.advance(2)
+        competitor = Scheduler(
+            self.root,
+            clock=self.clock,
+            lease_seconds=10,
+            backoff_seconds=2,
+        )
+        try:
+            self.assertIsNone(
+                competitor.claim(
+                    "second-worker", job_id=second.id, resource_ids=("write:path",)
+                )
+            )
+            self.scheduler.complete(
+                claimed.id, claimed.lease_token, mission_id="mission-first"
+            )
+            released = competitor.claim(
+                "second-worker", job_id=second.id, resource_ids=("write:path",)
+            )
+            self.assertIsNotNone(released)
+        finally:
+            competitor.close()
+
     def test_retry_backoff_and_dead_letter_ladder(self) -> None:
         self._enqueue(max_attempts=2)
         first = self.scheduler.claim("worker")
