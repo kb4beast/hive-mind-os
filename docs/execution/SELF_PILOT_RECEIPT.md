@@ -32,6 +32,15 @@ admit a candidate and no live pilot was started.
   logs and completed 2,073 tests in 2,414.515 seconds with 12 skipped and no
   failures. This records one preparation-wrapper failure and one intervention; it is
   not counted as a pilot attempt or pilot outcome.
+- Draft PR CI subsequently passed the Linux 3.11/3.12/3.14, static/type, CodeQL,
+  secret, dependency/license, provenance, and controller jobs. Both Windows Python
+  jobs exposed the same pre-existing host-test fixture defect: the fixture retained a
+  noncanonical spelling of its copied executable path while the production boundary
+  resolves that path before checking the sealed tool probe. Commit
+  `40941e5c936d059fd6bfd7eb44354f7e17f1c543` canonicalizes the fixture path without
+  relaxing the production probe comparison. The 11 focused host/pipeline tests pass
+  locally. The two failed matrix jobs are retained as one root-cause repair outcome,
+  not as N31 attempts.
 
 Current typed blockers:
 
@@ -47,7 +56,8 @@ duplicate effects `0`; avoidable owner questions `0`; failures `0`; intervention
 `0`; unauthorized effects `0`; elapsed pilot observation `0` seconds.
 
 Preparation-only operational counters: command-wrapper timeouts `1`; verification
-interventions `1`; terminal test failures `0`.
+interventions `2`; CI matrix job failures `2` from one fixture root cause; local
+terminal test failures after repair `0`.
 
 Bounded repair delivery: commit
 `9503bb110521ad7886fea238fb551f2e03d1d1b1` on
