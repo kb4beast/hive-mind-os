@@ -5,6 +5,13 @@ admit a candidate and no live pilot was started.
 
 ## Successor observation — 2026-09-15
 
+- At `2026-09-15T03:48Z`, the canonical continuation launcher was invoked again
+  with `-Apply`. Reconciliation succeeded, but publication remained `WITHHELD`:
+  the dispatcher release target was stale and the release was invalidated by both
+  reconciliation and a changed GitHub snapshot. It returned no release ID, released
+  wave, active claim, host binding, or validation lease, so no pilot worker or live
+  effect was started.
+
 - The sealed Whole-OS pipeline supplied the trusted host-bootstrap envelope at
   commit `8f667b6a0bbfed4e674036d0c41127b8751cf218`. Its non-synthetic startup receipt
   reports Codex CLI v0.154.0, one-package concurrency, exact checkout-source
@@ -41,6 +48,11 @@ admit a candidate and no live pilot was started.
   relaxing the production probe comparison. The 11 focused host/pipeline tests pass
   locally. The two failed matrix jobs are retained as one root-cause repair outcome,
   not as N31 attempts.
+- Replacement CI for exact PR head
+  `b83c30e582bab9210dca4350e4e2e098bba95807` is now terminal and green: all 12
+  reported checks passed, including Windows Python 3.12 and 3.14. This closes the
+  preparation repair's CI obligation, but it does not supply an admitted N30
+  candidate, a host delivery grant, or an external supervisor rollback pointer.
 
 Current typed blockers:
 
