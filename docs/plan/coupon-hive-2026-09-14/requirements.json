@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "product": "coupon-hive",
+  "release": "0.1.0",
+  "source_commit": "4a0120a3a564723358f29adb60e34ab34bec5964",
+  "requirements": [
+    {
+      "id": "REQ-CH-001",
+      "sources": ["SRC-CH-001", "SRC-CH-006", "SRC-CH-009"],
+      "text": "Deliver a current skills-only Plugin as the primary Store artifact and a legacy Custom GPT configuration as a compatibility artifact.",
+      "disposition": "adapt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-002",
+      "sources": ["SRC-CH-001"],
+      "text": "Adaptively interview the person and reuse supplied facts before searching.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-003",
+      "sources": ["SRC-CH-001", "SRC-CH-012"],
+      "text": "Support physical consumer goods and non-transactional free public activities while refusing digital goods, services, subscriptions, travel booking, prohibited commerce, abusive requests, unauthorized access, and inaccessible sources.",
+      "disposition": "adapt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-004",
+      "sources": ["SRC-CH-009", "SRC-CH-012"],
+      "text": "Use available authorized web research and respect source access controls and terms.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-005",
+      "sources": ["SRC-CH-014", "SRC-CH-015"],
+      "text": "Verify final pages, timestamp claims, expose hidden conditions, and quarantine common deal and free-prize scam signals.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-006",
+      "sources": ["SRC-CH-001", "SRC-CH-015"],
+      "text": "Classify unconditional free separately from purchase, rebate, trial, BOGO, sample, and sweepstakes conditions.",
+      "disposition": "adapt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-007",
+      "sources": ["SRC-CH-007", "SRC-CH-008", "SRC-CH-011"],
+      "text": "Before any recurrence mutation, bind and confirm the Watch Card, exact host surface and title, prompt-template version and prompt bytes, task ID/action, structured schedule, and lifecycle actions; compare the actual dispatch plan and never claim success without a matching host receipt.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-008",
+      "sources": ["SRC-CH-007", "SRC-CH-008"],
+      "text": "De-duplicate recurring results and stay quiet unless a confirmed material-change rule fires.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-009",
+      "sources": ["SRC-CH-007", "SRC-CH-011", "SRC-CH-012"],
+      "text": "Minimize location and eligibility data and exclude credentials, payment data, identity documents, full addresses, and sensitive task titles.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-010",
+      "sources": ["SRC-CH-011", "SRC-CH-012", "SRC-CH-014", "SRC-CH-015"],
+      "text": "Treat retrieved content as untrusted, resist prompt injection, and refuse coupon abuse or prohibited commerce.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-011",
+      "sources": ["SRC-CH-010"],
+      "text": "Provide manifest, icon, listing, support, privacy, terms, release notes, five positive cases, and four negative cases (exceeding the platform minimum of three).",
+      "disposition": "adopt",
+      "status": "implemented_as_draft"
+    },
+    {
+      "id": "REQ-CH-012",
+      "sources": ["SRC-CH-002"],
+      "text": "Do not make ultimate, best, exhaustive-coverage, or guaranteed-savings claims before a reproducible multi-comparator court.",
+      "disposition": "adapt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-013",
+      "sources": ["SRC-CH-011", "SRC-CH-013"],
+      "text": "Release 0.1.0 without a publisher backend, publisher-added affiliate links, referral compensation, advertising, or user-profile storage.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-014",
+      "sources": ["SRC-CH-006", "SRC-CH-007"],
+      "text": "The legacy GPT must hand off only an inert recurrence draft because Scheduled Tasks do not support GPT conversations; the destination host requires a freshly rendered and confirmed payload.",
+      "disposition": "adapt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-015",
+      "sources": ["SRC-CH-002", "SRC-CH-010"],
+      "text": "Validate manifests, skill metadata, schemas, policy invariants, and submission case inventory with deterministic tests and independent review.",
+      "disposition": "adopt",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CH-016",
+      "sources": ["SRC-CH-002", "SRC-CH-008"],
+      "text": "Provide reversible disable, unpublish, task-cleanup, and future-MCP rollback boundaries.",
+      "disposition": "adopt",
+      "status": "implemented"
+    }
+  ]
+}

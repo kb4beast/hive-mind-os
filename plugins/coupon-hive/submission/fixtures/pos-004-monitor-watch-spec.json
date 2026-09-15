@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "skill_version": "0.1.0",
+  "confirmation": {
+    "confirmed_by_user": true,
+    "confirmed_at": "2026-09-14T15:00:00Z",
+    "watch_card_summary": "New 4K monitor, United States online, USD 250 delivered maximum, daily at 09:00 America/New_York, alert on a new verified match, stop after 90 runs.",
+    "approved_spec_digest": "sha256:5221ac6b9c0eef18660e155955a7dcb5decd656b2ff6324b8e46b99fd3bfaf8c"
+  },
+  "task_binding": {"action": "create", "existing_task_id": null},
+  "host_payload": {
+    "task_title": "Coupon Hive — new 4K monitor watch",
+    "host_surface": "chatgpt_plugin",
+    "prompt_template_id": "coupon-hive-recurring-v1",
+    "recurring_prompt_sha256": "sha256:073791c2ea4747b18821c6e82ee22d42c4f5b004d734e9209ef2b56c7007d30f",
+    "requested_lifecycle_actions": []
+  },
+  "query": {
+    "description": "4K monitor",
+    "category": "physical_goods",
+    "variants": [],
+    "condition": ["new"]
+  },
+  "scope": {
+    "country_code": "US",
+    "currency": "USD",
+    "location_precision": "country",
+    "locality": null,
+    "online_allowed": true,
+    "pickup_allowed": false,
+    "deadline": null
+  },
+  "economics": {
+    "maximum_effective_price": 250,
+    "minimum_discount_percent": null,
+    "free_definition": "not_applicable"
+  },
+  "accepted_offer_types": ["price_drop", "public_coupon"],
+  "conditions": {
+    "purchase_required": false,
+    "rebate": false,
+    "membership": false,
+    "trial": false,
+    "subscription_or_renewal": false,
+    "account_required": false,
+    "marketing_consent": false,
+    "loyalty_points": false,
+    "deposit_or_authorization_hold": false,
+    "app_only": false,
+    "new_customer": false,
+    "eligibility_assertions": []
+  },
+  "sources": {
+    "allowed_merchants": [],
+    "blocked_merchants": [],
+    "access_policy": "host_public_web_only",
+    "allow_unverified_leads": false,
+    "maximum_queries_per_run": 5,
+    "maximum_sources_per_run": 20
+  },
+  "schedule": {
+    "frequency": "daily",
+    "interval": 1,
+    "weekdays": [],
+    "local_time": "09:00",
+    "minute": null,
+    "day_of_month": null,
+    "timezone": "America/New_York",
+    "quiet_hours": null,
+    "ends_at": null,
+    "maximum_runs": 90
+  },
+  "notification": {
+    "events": ["new_verified_match"],
+    "minimum_price_improvement": null,
+    "minimum_percent_improvement": null,
+    "expiry_warning_hours": null,
+    "silent_when_unchanged": true,
+    "include_digest": false
+  },
+  "status": "confirmed"
+}
