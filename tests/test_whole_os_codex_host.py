@@ -95,6 +95,10 @@ class WholeOSCodexHostTests(unittest.TestCase):
             state = root / "external-state"
             executable = root / ("codex-test.exe" if sys.platform == "win32" else "codex-test")
             shutil.copy2(sys.executable, executable)
+            # Match the production boundary, which canonicalizes the executable
+            # before comparing it with the independently retained probe.  Windows
+            # hosted runners can otherwise expose two spellings of the same path.
+            executable = executable.resolve(strict=True)
             probe = {
                 "schema_version": 1,
                 "kind": "whole-os-codex-tool-probe",

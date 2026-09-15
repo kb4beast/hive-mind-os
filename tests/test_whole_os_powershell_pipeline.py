@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -49,6 +50,48 @@ class WholeOSPowerShellPipelineTests(unittest.TestCase):
         self.assertIn("-WindowStyle Hidden", text)
         self.assertIn('"pipeline-process.json"', text)
         self.assertIn("Get-Process -Id", text)
+
+    @unittest.skipUnless(
+        shutil.which("powershell") or shutil.which("pwsh"),
+        "PowerShell is required for dependency-release verification",
+    )
+    def test_completed_stage_with_blockers_cannot_release_dependents(self) -> None:
+        shell = shutil.which("powershell") or shutil.which("pwsh")
+        with tempfile.TemporaryDirectory() as temporary:
+            state_root = Path(temporary)
+            stage_root = state_root / "host-bootstrap"
+            stage_root.mkdir()
+            (stage_root / "stage-current.json").write_text(
+                json.dumps(
+                    {
+                        "agent_result": {
+                            "status": "complete",
+                            "blockers": ["missing-required-receipt"],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    shell,
+                    "-NoProfile",
+                    "-File",
+                    str(PIPELINE),
+                    "-Repository",
+                    str(ROOT),
+                    "-StateRoot",
+                    str(state_root),
+                    "-Once",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 20, result.stderr + result.stdout)
+            self.assertIn("cannot release dependent stages", result.stdout)
+            self.assertFalse((state_root / "n30-tournament").exists())
 
     def test_trusted_codex_host_uses_checkout_source_and_external_state(self) -> None:
         text = CODEX_HOST.read_text(encoding="utf-8")
