@@ -65,6 +65,11 @@ foreach ($stage in $stages) {
     if (Test-Path -LiteralPath $current -PathType Leaf) {
         $retained = Get-Content -LiteralPath $current -Raw | ConvertFrom-Json
         if ([string]$retained.agent_result.status -eq "complete") {
+            $retainedBlockers = @($retained.agent_result.blockers)
+            if ($retainedBlockers.Count -gt 0) {
+                Write-Host "WHOLE-OS PIPELINE BLOCKED: $($stage.id) completed with unresolved blockers and cannot release dependent stages."
+                exit 20
+            }
             Write-Host "WHOLE-OS PIPELINE SKIP COMPLETE: $($stage.id)"
             continue
         }
@@ -74,7 +79,15 @@ foreach ($stage in $stages) {
         $stageScript = Join-Path $PSScriptRoot $stage.script
         & $stageScript -Repository $repositoryRoot -StateRoot $StateRoot -Model $Model -ReasoningEffort $ReasoningEffort
         $stageExit = $LASTEXITCODE
-        if ($stageExit -eq 0) { break }
+        if ($stageExit -eq 0) {
+            $retained = Get-Content -LiteralPath $current -Raw | ConvertFrom-Json
+            $retainedBlockers = @($retained.agent_result.blockers)
+            if ($retainedBlockers.Count -gt 0) {
+                Write-Host "WHOLE-OS PIPELINE BLOCKED: $($stage.id) completed with unresolved blockers and cannot release dependent stages."
+                exit 20
+            }
+            break
+        }
         if ($stageExit -notin @(10, 20)) {
             throw "Whole-OS stage $($stage.id) failed with exit code $stageExit."
         }

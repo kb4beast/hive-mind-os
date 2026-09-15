@@ -16,6 +16,16 @@ publish a game, or infer external authority. The agent remains governed by
 `AGENTS.md`; the flag combination removes routine interactive prompts but does not
 change policy or evidence requirements.
 
+## Dependency-release invariant
+
+A stage may finish its bounded attempt with a terminal non-promotion or other
+evidence-backed disposition while still retaining typed blockers. That terminal
+outcome is durable, but it cannot satisfy a downstream dependency. The pipeline
+therefore exits with the typed blocked code before releasing another stage whenever
+a `complete` envelope has a nonempty blocker list. A successor external receipt may
+supersede the stage envelope; retrying the unchanged dependent stage cannot convert
+the missing evidence into admission.
+
 ## Rationale
 
 The merged Whole-OS service deliberately requires a process-local trusted host. The
@@ -38,6 +48,7 @@ logs, result envelopes, failed attempts, and external obligations intact.
 ## Verification
 
 `tests/test_whole_os_powershell_pipeline.py` checks stage order, fixed prompts, closed
-schema use, hidden-process launch, absence of bypass/eval shortcuts, and PowerShell
-parse validity. Each stage remains responsible for its contract-specific tests and
-the repository CI gate when it changes product bytes.
+schema use, hidden-process launch, dependency release denial for blocker-bearing
+terminal outcomes, absence of bypass/eval shortcuts, and PowerShell parse validity.
+Each stage remains responsible for its contract-specific tests and the repository CI
+gate when it changes product bytes.
