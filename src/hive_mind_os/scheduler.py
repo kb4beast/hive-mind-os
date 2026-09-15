@@ -12,6 +12,8 @@ from threading import RLock
 from typing import Any, Iterable, Mapping, Protocol
 from uuid import uuid4
 
+from .receipts import filesystem_path
+
 
 class Clock(Protocol):
     def now(self) -> float: ...
@@ -85,7 +87,7 @@ class Scheduler:
         self.backoff_seconds = backoff_seconds
         self._lock = RLock()
         self._connection = sqlite3.connect(
-            self.path,
+            filesystem_path(self.path),
             timeout=30.0,
             isolation_level=None,
             check_same_thread=False,

@@ -30,6 +30,7 @@ from .outcome_graph import (
     compile_outcome_graph,
     ready_packages,
 )
+from .receipts import filesystem_path
 from .runtime_contracts import canonical_digest
 from .scheduler import Job, Scheduler, StaleLeaseError
 
@@ -363,14 +364,17 @@ class WholeOSService:
     def _write_once(path: Path, document: Mapping[str, object]) -> None:
         """Durably create one canonical receipt, rejecting conflicting replay."""
         body = WholeOSService._canonical_bytes(document)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists():
-            if path.read_bytes() != body:
+        target = filesystem_path(path)
+        filesystem_path(path.parent).mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            if target.read_bytes() != body:
                 raise ServiceError(
                     f"durable receipt conflicts with replay: {path.name}"
                 )
             return
-        temporary = path.with_name(f".{path.name}.{uuid4()}.tmp")
+        temporary = filesystem_path(
+            path.with_name(f".{path.name}.{uuid4()}.tmp")
+        )
         try:
             with temporary.open("xb") as handle:
                 handle.write(body)
@@ -378,7 +382,7 @@ class WholeOSService:
                 os.fsync(handle.fileno())
             # Job leases serialize writers. Replace makes a fully flushed receipt
             # visible before the corresponding scheduler transition is committed.
-            os.replace(temporary, path)
+            os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -407,7 +411,7 @@ class WholeOSService:
         )
 
     def _load_package_result(self, package_id: str) -> PackageExecutionResult:
-        path = self._package_receipt_path(package_id)
+        path = filesystem_path(self._package_receipt_path(package_id))
         try:
             document = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -455,7 +459,7 @@ class WholeOSService:
         self, package_id: str
     ) -> PackageExecutionResult | None:
         """Inspect the durable effect receipt before any retryable host call."""
-        if not self._package_receipt_path(package_id).exists():
+        if not filesystem_path(self._package_receipt_path(package_id)).exists():
             return None
         return self._load_package_result(package_id)
 
@@ -524,7 +528,7 @@ class WholeOSService:
         self, candidate: ConvergenceResult
     ) -> TerminalAssessment | None:
         digest = convergence_candidate_digest(candidate)
-        path = self._terminal_receipt_path(digest)
+        path = filesystem_path(self._terminal_receipt_path(digest))
         if not path.exists():
             return None
         try:

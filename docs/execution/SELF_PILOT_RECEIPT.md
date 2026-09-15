@@ -1,6 +1,81 @@
 # N31 self-repository pilot receipt
 
-Status: `BLOCKED_AUTHORITY` — preparation completed; no live pilot was started.
+Status: `BLOCKED_SOURCE` — the successor trusted host is available, but N30 did not
+admit a candidate and no live pilot was started.
+
+## Successor observation — 2026-09-15
+
+- At `2026-09-15T03:48Z`, the canonical continuation launcher was invoked again
+  with `-Apply`. Reconciliation succeeded, but publication remained `WITHHELD`:
+  the dispatcher release target was stale and the release was invalidated by both
+  reconciliation and a changed GitHub snapshot. It returned no release ID, released
+  wave, active claim, host binding, or validation lease, so no pilot worker or live
+  effect was started.
+
+- The sealed Whole-OS pipeline supplied the trusted host-bootstrap envelope at
+  commit `8f667b6a0bbfed4e674036d0c41127b8751cf218`. Its non-synthetic startup receipt
+  reports Codex CLI v0.154.0, one-package concurrency, exact checkout-source
+  binding, focused verification, and successful service observation.
+- The immediately preceding N30 court did **not** admit that candidate. Its durable
+  result records `candidate.admitted=false`, zero admitted lanes, zero broker
+  effects, `promotion=false`, and a terminal `defer` disposition. The N30 stage
+  envelope nevertheless used `status=complete` because its prompt allowed terminal
+  non-promotion to close the attempt.
+- N31 cannot reinterpret terminal N30 attempt completion as candidate admission.
+  `PilotPrerequisites.benchmark_candidate` therefore remains unavailable, so the
+  72-hour clock, change-family attempts, restart drill, delivery effects, and
+  supervisor canary were not started.
+- GitHub authentication remains available and the current owner directive permits
+  bounded branch/pull-request delivery for this campaign. The trusted host receipt
+  itself still records `external_delivery_granted=false`; no host grant was
+  manufactured from credential availability.
+- No supervisor release-pointer/champion digest was present. The N30 court records
+  `champion_digest=null`, so a canary restoration drill cannot be started safely.
+- A bounded safety repair makes blocker-bearing terminal stage envelopes stop before
+  releasing dependent stages. Its regression test exercises a completed stage with
+  a retained blocker and proves N30 is not launched.
+- Focused verification passed 8/8 checks. The first full-gate wrapper timed out after
+  904 seconds without a terminal result; a durable successor process retained its
+  logs and completed 2,073 tests in 2,414.515 seconds with 12 skipped and no
+  failures. This records one preparation-wrapper failure and one intervention; it is
+  not counted as a pilot attempt or pilot outcome.
+- Draft PR CI subsequently passed the Linux 3.11/3.12/3.14, static/type, CodeQL,
+  secret, dependency/license, provenance, and controller jobs. Both Windows Python
+  jobs exposed the same pre-existing host-test fixture defect: the fixture retained a
+  noncanonical spelling of its copied executable path while the production boundary
+  resolves that path before checking the sealed tool probe. Commit
+  `40941e5c936d059fd6bfd7eb44354f7e17f1c543` canonicalizes the fixture path without
+  relaxing the production probe comparison. The 11 focused host/pipeline tests pass
+  locally. The two failed matrix jobs are retained as one root-cause repair outcome,
+  not as N31 attempts.
+- Replacement CI for exact PR head
+  `b83c30e582bab9210dca4350e4e2e098bba95807` is now terminal and green: all 12
+  reported checks passed, including Windows Python 3.12 and 3.14. This closes the
+  preparation repair's CI obligation, but it does not supply an admitted N30
+  candidate, a host delivery grant, or an external supervisor rollback pointer.
+
+Current typed blockers:
+
+1. `BLOCKED_SOURCE:MISSING_BENCHMARK_CANDIDATE` — N30 admitted no candidate.
+2. `BLOCKED_AUTHORITY:SUPERVISOR_RELEASE_POINTER` — no externally controlled prior
+   champion pointer and restoration receipt exists.
+3. `BLOCKED_AUTHORITY:HOST_DELIVERY_GRANT` — the trusted host startup receipt retains
+   `external_delivery_granted=false`; direct owner permission supports this bounded
+   evidence repair but is not relabelled as the host's typed pilot grant.
+
+Current counters remain: qualifying attempts `0`; accepted change families `0`;
+duplicate effects `0`; avoidable owner questions `0`; failures `0`; interventions
+`0`; unauthorized effects `0`; elapsed pilot observation `0` seconds.
+
+Preparation-only operational counters: command-wrapper timeouts `1`; verification
+interventions `2`; CI matrix job failures `2` from one fixture root cause; local
+terminal test failures after repair `0`.
+
+Bounded repair delivery: commit
+`9503bb110521ad7886fea238fb551f2e03d1d1b1` on
+`codex/n31-prerequisite-gate-20260915`, pushed to `origin` and opened as draft
+PR `https://github.com/kb4beast/hive-mind-os/pull/190` against
+`codex/whole-os-executable-pipeline`. No protected branch was merged.
 
 ## Reconciled observation
 

@@ -40,6 +40,39 @@ factory in that same process. A deployment console script should call
 the stock shell cannot infer adapters or credentials from a repository or service
 JSON document. `inspect` and `status` remain directly usable from the stock shell.
 
+For the repository-owned Codex deployment host, use the sequential executable
+pipeline. It launches one stage at a time and durably resumes incomplete stages:
+
+```powershell
+powershell -NoProfile -File scripts/whole-os/Invoke-WholeOSPipeline.ps1 -Background
+```
+
+Individual stages can also be invoked directly from `scripts/whole-os/`. Their
+structured receipts default to `%LOCALAPPDATA%\HiveMindOS\whole-os-pipeline`, outside
+the target repository and its application artifacts.
+
+The trusted local Codex composition is a separate launcher. It admits the exact
+clean `codex/` checkout, resolves and hashes the native Codex executable, writes the
+inert service JSON and all runtime evidence outside the repository, obtains a fresh
+read-only Curator session, registers the host factory in-process, and starts
+`WholeOSService`:
+
+```powershell
+powershell -NoProfile -File scripts/whole-os/Invoke-WholeOSCodexService.ps1 `
+  -Repository (Resolve-Path .) `
+  -StateRoot "$env:LOCALAPPDATA\HiveMindOS\whole-os-codex-host"
+```
+
+The bootstrap profile grants trusted-local planning/build only. Its startup mission
+is deliberately read-only and must retain distinct real Codex Curator and Builder
+session IDs before the startup receipt can report `complete`. The service config has
+no import, command, callback, credential, secret, or token field; Codex authentication
+stays in its normal user-owned session store. The launcher does not grant GitHub
+delivery, hostile-code isolation, deployment, spending, merge, or external signing.
+Successful append-only receipts are stored below
+`<StateRoot>\startup-receipts\`; `startup-current.json` is only the replaceable
+operator pointer to the latest attempt.
+
 Configured hosts use `run_cohort()` for one capacity-bounded wave or
 `run_to_completion()` for bounded dependency-aware fanout until the graph is
 terminal or no work is immediately claimable. `run_to_completion()` never sleeps
