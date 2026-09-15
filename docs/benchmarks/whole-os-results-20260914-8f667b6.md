@@ -77,6 +77,23 @@ re-read, the update was retried through `--body-file -`, and the resulting body 
 head commit were reconciled successfully. This delivery retry did not touch a
 benchmark lane or consume an N30 lease.
 
+The append-only launcher log also preserves these non-benchmark operational
+failures and warnings. None reached the execution broker or changed the admission
+result:
+
+- the canonical continuation launcher exited 1 and withheld an unrelated stale
+  dispatcher release after reconciliation and a GitHub-snapshot change;
+- the first collaboration spawn failed because its parent thread had not yet been
+  registered, and the single Curator was then started successfully;
+- one malformed `rg` expression failed during evidence discovery;
+- two attempted admission-probe constructions failed locally, one with a Python
+  `SyntaxError` and one when PowerShell interpreted `p` as a command; the exact
+  successful probe and exit 23 above supersede neither failure's retained log;
+- Codex emitted repeated model-cache load/renew errors for a missing
+  `base_instructions` field and plugin-manifest hook warnings while the stage was
+  starting. The stage continued with its installed runtime, but those diagnostics
+  are not benchmark receipts.
+
 ## Verification and independent review
 
 The current worktree resolved `hive_mind_os` from its own `src` directory under
@@ -97,6 +114,11 @@ non-promotion for this attempt`. The review shares this host and is unauthentica
 so it is not the independently administered evaluator/custodian receipt required
 for a promotion claim. Retained N02 Curator round 8 accepts only the software
 contract and expressly leaves the same external obligations open.
+
+That Curator's first exact-delivery review returned `FAIL` because the draft report
+omitted the non-benchmark launcher/runtime/search/probe failures listed above. This
+successor text preserves the dissent and repairs only the evidence disclosure; it
+does not change the court outcome or manufacture a comparator result.
 
 ## Typed blockers and court disposition
 
