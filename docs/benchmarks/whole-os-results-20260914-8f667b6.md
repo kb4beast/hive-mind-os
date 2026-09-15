@@ -71,6 +71,12 @@ failure is retained in the launcher event log: an initial PowerShell parse of
 exact tree above before the admission probe or any broker effect. No uncertain
 external outcome existed, so no retry was issued.
 
+The first PR-body update passed a multiline value through the native CLI as
+separate arguments and failed without changing PR #189. The live PR body was
+re-read, the update was retried through `--body-file -`, and the resulting body and
+head commit were reconciled successfully. This delivery retry did not touch a
+benchmark lane or consume an N30 lease.
+
 ## Verification and independent review
 
 The current worktree resolved `hive_mind_os` from its own `src` directory under
