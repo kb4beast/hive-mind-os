@@ -33,7 +33,7 @@ class BoundaryContractsTests(unittest.TestCase):
             {},
             "p",
             ProbeResult.UNAVAILABLE,
-            "x",
+            "1970-01-01T00:00:00Z",
         )
         with self.assertRaises(IsolationError):
             require_attested(a)
