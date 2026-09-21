@@ -427,3 +427,57 @@ this dated entry. Local H1 preparation does not grant remote-delivery authority,
 complete H2, admit a pilot, provide hostile isolation, or close production readiness.
 All losing probes and receipt corrections remain in the operator's append-only
 production-closeout evidence bundle.
+
+## Correction 2026-09-21 (Builder local repair): process pipe ownership bounds
+
+The initial GitHub Python 3.14 run reported one failure in
+`ClaudeProcessRunnerTests.test_no_pipe_is_left_open_after_a_deadline_an_output_cap_or_a_normal_exit`
+(run log: `h1-github-linux314-job.log`). The global `gc.collect()` captured four unrelated
+SQLite ResourceWarnings from earlier tests, not from the process runner. The test's
+warnings oracle could not distinguish actual pipe leaks from ambient finalization.
+
+**Repair:** Replaced the global gc/warnings oracle with direct ownership-bound checks
+patterned after `tests/test_docker_verification.py::BoundedRunnerTests`. The new test:
+
+1. Wraps `subprocess.Popen` via `mock.patch` to capture each real child process
+2. Retains the original `Popen` factory and calls it once per test case (three real
+   children: timeout, output-cap, normal exit)
+3. Safely cleans up retained processes in a try-finally block even if assertions fail
+4. Asserts each real child is reaped (`poll()` is not None, `returncode` is not None)
+5. Asserts each pipe handle present (stdin/stdout/stderr) is closed when the reader thread
+   finished and the child was reaped
+
+Expected results (timeout/cap/normal exit) are retained: timeout=True, limited=True,
+code=0. No production `_run_claude_process` behavior changed; the test verifies the
+existing `_close_pipes` implementation closes only after reader termination and reaping.
+
+**Unrun tests:** `ClaudeProcessRunnerTests.test_no_pipe_is_left_open_*`. Root did not
+re-run the full CI after the repair; the separate Curator will validate the closed-handle
+assertions and verify that the three real children exit as expected and no warnings remain.
+No production-worker authority, mission or source changes; the repair is test-only.
+
+### Root correction and independent pipe-test disposition
+
+The Builder's first replacement cleaned up children before inspecting them and
+called `poll()` in the assertion. That could conceal an unreaped child. Root
+revised the test to inspect the exact runner child's already-set `returncode`
+and all three present, closed pipe handles immediately after each runner call,
+before any poll, wait, kill or test cleanup. The finally block cleans up even
+when those observations fail. Exact argv separates the worker child from a
+Windows process-tree termination helper. No production worker code changed.
+
+The independent Curator executed seven controls: the real normal/deadline/cap
+test and genuine unrelated SQLite finalization both pass; deliberately open
+stdout/stderr, open stdin, a genuinely running unreaped child and a corrupted
+raw returncode each fail the intended assertion. All owned children and handles
+were cleaned after observation. Report SHA-256:
+`b8caad3dc26cde492ca46e5f6c12d54e30c9d310956dc452e1f096d25f5e4a51`;
+manifest: `09c122d6d19afb65afdb7f647348bfc31b45fd00e8a273f941a3a3dde30dee36`.
+Root's 20 worker tests pass; Pyright passes. Removing the Builder's unused
+`threading` import then made Ruff pass without a behavioral change.
+
+The original Linux Python 3.14 result is 2,244 tests, one failed cleanup-oracle
+test and 34 skips. The initial local integrated run was deliberately stopped
+after that failure was known; its partial log remains incomplete evidence.
+Both are preserved. A corrected-head full local and GitHub gate remains required;
+neither this correction nor the scoped Curator verdict substitutes for it.

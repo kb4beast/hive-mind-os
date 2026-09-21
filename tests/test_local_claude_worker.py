@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import copy
-import gc
 import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
 import unittest
-import warnings
 from pathlib import Path
+from typing import Any
+from unittest import mock
 
 from hive_mind_os.local_claude_worker import (
     PROTOCOL,
@@ -656,21 +657,56 @@ class ClaudeProcessRunnerTests(_Directory):
         self.assertFalse(timed_out)
         self.assertLessEqual((base / "stdout").stat().st_size, 5_000)
 
+    def _assert_child_reaped_and_pipes_closed(self, proc: subprocess.Popen[Any]) -> None:
+        # Observation only: poll()/wait() here would repair an unreaped child.
+        self.assertIsNotNone(proc.returncode, f"process {proc.pid} was not reaped by the runner")
+        for name in ("stdin", "stdout", "stderr"):
+            pipe = getattr(proc, name)
+            self.assertIsNotNone(pipe, f"runner child has no {name} pipe")
+            self.assertTrue(pipe.closed, f"process {proc.pid} {name} not closed")
+
     def test_no_pipe_is_left_open_after_a_deadline_an_output_cap_or_a_normal_exit(self) -> None:
-        # Regression: a timeout used to leave the stdout/stderr pipe readers open,
-        # which surfaced as ResourceWarning when they were garbage collected.
+        # Retain the real runner child and inspect it before any test cleanup.
+        # Process-global GC is not an ownership-bound leak oracle.
         flood = "import sys\nwhile True:\n    sys.stdout.write('x' * 65536); sys.stdout.flush()\n"
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            (_, timed_out, _), _ = self._run("import time; time.sleep(120)", timeout=1)
-            self.assertTrue(timed_out)
-            (_, _, limited), _ = self._run(flood, timeout=60, cap=2_000)
-            self.assertTrue(limited)
-            (code, _, _), _ = self._run("print('done')", timeout=30)
-            self.assertEqual(code, 0)
-            gc.collect()
-        leaks = [str(item.message) for item in caught if issubclass(item.category, ResourceWarning)]
-        self.assertEqual(leaks, [])
+        cases = (
+            ("deadline", "import time; time.sleep(120)", 1, 1_000_000),
+            ("output_cap", flood, 60, 2_000),
+            ("normal", "print('done')", 30, 1_000_000),
+        )
+        original_popen = subprocess.Popen
+        for name, script, timeout, cap in cases:
+            with self.subTest(name=name):
+                owned: list[subprocess.Popen[Any]] = []
+
+                def capture_popen(*args: Any, **kwargs: Any) -> subprocess.Popen[Any]:
+                    proc = original_popen(*args, **kwargs)
+                    owned.append(proc)
+                    return proc
+
+                try:
+                    with mock.patch("hive_mind_os.local_claude_worker.subprocess.Popen", side_effect=capture_popen):
+                        (code, timed_out, limited), _ = self._run(script, timeout=timeout, cap=cap)
+                    # Windows tree termination may spawn its own helper. Match the
+                    # exact Python child instead of treating that helper as the worker.
+                    children = [p for p in owned if p.args == [sys.executable, "-c", script]]
+                    self.assertEqual(len(children), 1)
+                    self._assert_child_reaped_and_pipes_closed(children[0])
+                    self.assertEqual(timed_out, name == "deadline")
+                    self.assertEqual(limited, name == "output_cap")
+                    if name == "normal":
+                        self.assertEqual(code, 0)
+                finally:
+                    # This runs after the observations, including when they fail.
+                    for proc in owned:
+                        try:
+                            if proc.poll() is None:
+                                proc.kill()
+                            proc.wait(timeout=5)
+                        finally:
+                            for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                                if pipe is not None and not pipe.closed:
+                                    pipe.close()
 
 
 if __name__ == "__main__":
