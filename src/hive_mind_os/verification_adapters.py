@@ -9,6 +9,7 @@ single-operator process boundary is configured.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import platform
 import shutil
@@ -26,6 +27,10 @@ from .runtime_contracts import canonical_json_bytes, raw_sha256
 
 class VerificationError(ValueError):
     pass
+
+
+class SandboxUnavailable(VerificationError):
+    """The configured sandbox could not run; callers must not fall back to another one."""
 
 
 def _copytree_path(path: Path) -> str:
@@ -49,8 +54,13 @@ class VerificationBudget:
 
     def __post_init__(self) -> None:
         values = (self.wall_seconds, self.cpu_seconds, self.memory_bytes, self.disk_bytes, self.max_output_bytes)
-        if any(isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0 for value in values):
-            raise VerificationError("verification budgets must be positive numbers")
+        # NaN and infinity compare false against every bound, so they must be rejected
+        # explicitly or they would silently disable every deadline derived from them.
+        if any(
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0
+            for value in values
+        ):
+            raise VerificationError("verification budgets must be positive finite numbers")
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +87,7 @@ class SandboxCapabilities:
     filesystem_isolation: bool
     process_tree_cleanup: bool
     runtime_identity: str
+    image_identity: str | None = None
 
     def document(self) -> dict[str, Any]:
         return {
@@ -89,9 +100,10 @@ class SandboxCapabilities:
             "filesystem_isolation": self.filesystem_isolation,
             "process_tree_cleanup": self.process_tree_cleanup,
             "runtime_identity": self.runtime_identity,
-            "image_identity": None,
+            "image_identity": self.image_identity,
             "boundary_claim": (
                 "hostile-code-isolation" if self.hostile_code_isolation
+                else "trusted-local-oci-container" if self.image_identity is not None
                 else "trusted-local-process-only"
             ),
         }
@@ -184,6 +196,7 @@ class SealedCommand:
     selected_tests: tuple[str, ...]
     fixed_environment: tuple[tuple[str, str], ...] = ()
     verification_kind: str = "test-execution"
+    image_identity: str | None = None
 
     def __post_init__(self) -> None:
         if self.verification_kind not in {"test-execution", "compile-check"}:
@@ -191,12 +204,16 @@ class SealedCommand:
 
     @property
     def digest(self) -> str:
-        return raw_sha256(canonical_json_bytes({
+        document: dict[str, Any] = {
             "adapter_id": self.adapter_id, "argv": list(self.argv),
             "version_argv": list(self.version_argv), "selected_tests": list(self.selected_tests),
             "fixed_environment": [list(item) for item in self.fixed_environment],
             "verification_kind": self.verification_kind,
-        }))
+        }
+        if self.image_identity is not None:
+            # Host-process commands keep their historical digest byte for byte.
+            document["image_identity"] = self.image_identity
+        return raw_sha256(canonical_json_bytes(document))
 
 
 class VerificationAdapter(Protocol):
@@ -345,7 +362,7 @@ def verify_repository(
     repository: str | Path, *, evidence_directory: str | Path,
     selected_paths: Sequence[str] = (), adapter_id: str | None = None,
     sandbox: SandboxAdapter | None = None, requirements: SandboxRequirements | None = None,
-    budget: VerificationBudget | None = None,
+    budget: VerificationBudget | None = None, registry: VerificationRegistry | None = None,
 ) -> dict[str, Any]:
     root = Path(repository).resolve()
     if not root.is_dir() or root.is_symlink():
@@ -354,10 +371,13 @@ def verify_repository(
     boundary = sandbox or UnavailableSandbox()
     required = requirements or SandboxRequirements()
     limits = budget or VerificationBudget()
+    # Only trusted caller code supplies a registry; the same one seals and reports versions.
+    trusted_registry = registry or VerificationRegistry()
     capabilities = boundary.capabilities
 
-    def retain_status(document: dict[str, Any]) -> dict[str, Any]:
-        evidence.mkdir(parents=True, exist_ok=False)
+    def retain_status(document: dict[str, Any], *, evidence_ready: bool = False) -> dict[str, Any]:
+        if not evidence_ready:
+            evidence.mkdir(parents=True, exist_ok=False)
         retained = dict(document)
         retained["receipt_digest"] = raw_sha256(canonical_json_bytes(retained))
         (evidence / "receipt.json").write_bytes(canonical_json_bytes(retained) + b"\n")
@@ -378,13 +398,21 @@ def verify_repository(
             "sandbox": capabilities.document(), "source_repository": str(root),
             "verification_obligation": "Configure an adapter that satisfies the sealed sandbox requirements.",
         })
-    command = VerificationRegistry().seal(root, selected_paths, adapter_id)
+    command = trusted_registry.seal(root, selected_paths, adapter_id)
     if command is None:
         return retain_status({
             "schema_version": 1, "status": "VERIFICATION_OBLIGATION",
             "reason": "no compatible allowlisted verification adapter",
             "sandbox": capabilities.document(), "adapter_id": adapter_id,
             "source_repository": str(root),
+        })
+    if command.image_identity != capabilities.image_identity:
+        return retain_status({
+            "schema_version": 1, "status": "BLOCKED",
+            "reason": "sandbox image identity does not match the sealed command",
+            "sandbox": capabilities.document(), "adapter_id": command.adapter_id,
+            "sealed_command_digest": command.digest, "source_repository": str(root),
+            "verification_obligation": "Pair the image adapter with the sandbox pinned to the same image.",
         })
     unsafe_links = [path for path in root.rglob("*") if path.is_symlink()]
     if unsafe_links:
@@ -428,17 +456,48 @@ def verify_repository(
         name: value.replace("{workspace}", str(workspace))
         for name, value in command.fixed_environment
     })
+    if command.image_identity is not None:
+        # A container receives only the sealed values; host ambient variables are
+        # neither forwarded nor allowed to describe what actually ran.
+        environment = dict(command.fixed_environment)
     for directory_name in ("GOCACHE", "GOMODCACHE", "GOPATH", "GOTMPDIR"):
         if directory_name in environment:
             Path(environment[directory_name]).mkdir(parents=True, exist_ok=True)
     before_size = _tree_size(workspace) + _tree_size(scratch)
     started = time.monotonic()
+    sandbox_executions: list[dict[str, Any]] = []
+
+    def run_boundary(
+        phase: str, argv: tuple[str, ...], timeout: float, stdout_path: Path, stderr_path: Path,
+    ) -> tuple[int | None, bool]:
+        try:
+            return boundary.run(argv, workspace=workspace, environment=environment, timeout=timeout,
+                                stdout_path=stdout_path, stderr_path=stderr_path, budget=limits)
+        finally:
+            # Sandboxes that retain their own execution receipts are bound into this one,
+            # including when the call fails, so a substituted command cannot be concealed.
+            reporter = getattr(boundary, "last_execution_receipt", None)
+            report = reporter() if callable(reporter) else None
+            if isinstance(report, dict):
+                sandbox_executions.append({"phase": phase, **report})
+
+    def sandbox_blocked(error: SandboxUnavailable) -> dict[str, Any]:
+        return retain_status({
+            "schema_version": 1, "status": "BLOCKED", "reason": f"sandbox execution unavailable: {error}",
+            "sandbox": capabilities.document(), "adapter_id": command.adapter_id,
+            "sealed_command_digest": command.digest, "source_repository": str(root),
+            "sandbox_executions": sandbox_executions,
+            "verification_obligation": "Restore the sandbox backend and rerun; retained evidence records any allocation.",
+        }, evidence_ready=True)
+
     version_stdout_path, version_stderr_path = evidence / "version.stdout.bin", evidence / "version.stderr.bin"
-    version_exit, version_timed_out = boundary.run(
-        command.version_argv, workspace=workspace, environment=environment,
-        timeout=min(30.0, limits.wall_seconds), stdout_path=version_stdout_path,
-        stderr_path=version_stderr_path, budget=limits,
-    )
+    try:
+        version_exit, version_timed_out = run_boundary(
+            "version-probe", command.version_argv, min(30.0, limits.wall_seconds),
+            version_stdout_path, version_stderr_path,
+        )
+    except SandboxUnavailable as error:
+        return sandbox_blocked(error)
     version_stdout, version_stderr = version_stdout_path.read_bytes(), version_stderr_path.read_bytes()
     if version_exit != 0 or version_timed_out:
         raise VerificationError("verification adapter version probe failed")
@@ -446,19 +505,32 @@ def verify_repository(
     remaining = limits.wall_seconds - (time.monotonic() - started)
     if remaining <= 0:
         raise VerificationError("verification budget expired during version probe")
-    exit_code, timed_out = boundary.run(command.argv, workspace=workspace, environment=environment,
-                                        timeout=remaining, stdout_path=stdout_path,
-                                        stderr_path=stderr_path, budget=limits)
-    duration_ms = int((time.monotonic() - started) * 1000)
+    try:
+        exit_code, timed_out = run_boundary("test-run", command.argv, remaining, stdout_path, stderr_path)
+    except SandboxUnavailable as error:
+        return sandbox_blocked(error)
+    elapsed = time.monotonic() - started
+    duration_ms = int(elapsed * 1000)
     after_size = _tree_size(workspace) + _tree_size(scratch)
     stdout, stderr = stdout_path.read_bytes(), stderr_path.read_bytes()
     if len(stdout) > limits.max_output_bytes or len(stderr) > limits.max_output_bytes:
         raise VerificationError("verification output exceeded its sealed budget")
     disk_delta = max(0, after_size - before_size)
-    status = "PASSED" if exit_code == 0 and not timed_out and disk_delta <= limits.disk_bytes else "FAILED"
+    # A sandbox reports the separately bounded cleanup time it spent after its execution
+    # deadline; only that grace may lie outside the wall budget. Host-process behaviour
+    # is preserved: the extra check applies to image-sealed commands only.
+    cleanup_grace = sum(
+        float(item["cleanup_seconds"]) for item in sandbox_executions
+        if isinstance(item.get("cleanup_seconds"), (int, float))
+    )
+    wall_exceeded = command.image_identity is not None and elapsed - cleanup_grace > limits.wall_seconds
+    status = (
+        "PASSED" if exit_code == 0 and not timed_out and disk_delta <= limits.disk_bytes and not wall_exceeded
+        else "FAILED"
+    )
     receipt: dict[str, Any] = {
         "schema_version": 1, "status": status, "adapter_id": command.adapter_id,
-        "adapter_version": next(a.adapter_version for a in VerificationRegistry().adapters if a.adapter_id == command.adapter_id),
+        "adapter_version": next(a.adapter_version for a in trusted_registry.adapters if a.adapter_id == command.adapter_id),
         "sealed_command_digest": command.digest, "argv": list(command.argv),
         "selected_tests": list(command.selected_tests), "environment": sorted(environment),
         "verification_kind": command.verification_kind,
@@ -481,6 +553,13 @@ def verify_repository(
         "stdout": {"path": str(stdout_path), "bytes": len(stdout), "digest": f"sha256:{hashlib.sha256(stdout).hexdigest()}"},
         "stderr": {"path": str(stderr_path), "bytes": len(stderr), "digest": f"sha256:{hashlib.sha256(stderr).hexdigest()}"},
     }
+    if command.image_identity is not None:
+        receipt["image_identity"] = command.image_identity
+    if sandbox_executions:
+        receipt["sandbox_executions"] = sandbox_executions
+        receipt["cleanup_grace_seconds"] = cleanup_grace
+    if wall_exceeded:
+        receipt["wall_budget_exceeded"] = True
     receipt["receipt_digest"] = raw_sha256(canonical_json_bytes(receipt))
     (evidence / "receipt.json").write_bytes(canonical_json_bytes(receipt) + b"\n")
     return receipt
@@ -488,6 +567,6 @@ def verify_repository(
 
 __all__ = [
     "GoTestAdapter", "LocalProcessSandbox", "NodeTypescriptAdapter", "PythonUnittestAdapter", "RustCompileAdapter",
-    "SandboxCapabilities", "SandboxRequirements", "SealedCommand", "UnavailableSandbox",
+    "SandboxCapabilities", "SandboxRequirements", "SandboxUnavailable", "SealedCommand", "UnavailableSandbox",
     "VerificationBudget", "VerificationError", "VerificationRegistry", "verify_repository",
 ]
