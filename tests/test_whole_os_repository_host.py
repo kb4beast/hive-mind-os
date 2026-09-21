@@ -16,6 +16,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from hive_mind_os.brain_kernel.canonical import canonical_digest
 from hive_mind_os.builder_session import BuilderDisposition
@@ -62,6 +63,7 @@ from hive_mind_os.whole_os_repository_host import (
     RepositoryHostUnavailable,
     RepositoryHostUncertain,
     RepositoryTaskBinding,
+    _git_bytes,
     attempt_key,
     compose_repository_factory,
     environment_identity_digest,
@@ -1111,6 +1113,165 @@ class RepositoryHostIntegrationTests(unittest.TestCase):
             "private paths live only in the private state root",
         )
         self.assertNotIn(MARKER, state_text)
+
+
+class RepositoryHostAmbientGitConfigTests(unittest.TestCase):
+    """Judge counterexample: a real Haiku proposal failed only because of ambient Git config.
+
+    The host materializes clones under ``core.autocrlf=false`` but used to apply the
+    accepted patch under the machine's configuration, so Windows ``core.autocrlf=true``
+    rewrote LF bytes as CRLF before any test ran.  The ambient value is injected for
+    child Git processes only; no Git configuration file is ever edited.
+    """
+
+    def _ambient(self, rig):
+        configuration = rig.root / "ambient-gitconfig"
+        configuration.write_text("[core]\n\tautocrlf = true\n", encoding="utf-8", newline="\n")
+        self.addCleanup(lambda: self.assertEqual(
+            configuration.read_text(encoding="utf-8"), "[core]\n\tautocrlf = true\n"))
+        return mock.patch.dict(
+            os.environ, {"GIT_CONFIG_GLOBAL": str(configuration), "GIT_CONFIG_NOSYSTEM": "1"})
+
+    def test_ambient_autocrlf_true_preserves_exact_accepted_bytes_through_qualification(self) -> None:
+        rig = _Rig(self, FIX)
+        with self._ambient(rig):
+            outcome = rig.build()
+            record = rig.record(outcome.candidate_tree)
+            committed = subprocess.run(
+                ["git", "-C", str(record.clone_root), "show", f"{record.commit}:src/calc.py"],
+                capture_output=True, check=True).stdout
+            worktree = (record.clone_root / "src" / "calc.py").read_bytes()
+            self.assertEqual(committed, FIXED.encode("utf-8"), "exact accepted bytes in the commit")
+            self.assertEqual(worktree, FIXED.encode("utf-8"), "exact accepted bytes in the clone")
+            self.assertNotIn(b"\r", committed + worktree)
+            self.assertEqual(rig.context.store.load_candidate(rig.key()).commit, record.commit)
+            receipt = ReceiptBoundCandidateQualifier(rig.context).qualify(rig.request(record))
+            self.assertIs(receipt.disposition, QualificationDisposition.PASSED)
+            self.assertEqual([check.actual_count for check in receipt.checks], [1, 1])
+        self.assertEqual(len(rig.worker.calls), 1, "one model call, no replay needed")
+        rig.source_untouched()
+
+    def test_a_dirty_line_ending_change_in_a_retained_clone_is_seen_despite_ambient_config(self) -> None:
+        rig = _Rig(self, FIX)
+        outcome = rig.build()
+        record = rig.record(outcome.candidate_tree)
+        target = record.clone_root / "src" / "calc.py"
+        target.write_bytes(target.read_bytes().replace(b"\n", b"\r\n"))
+        with self._ambient(rig):
+            # Ambient autocrlf=true normalizes CRLF back to LF when Git compares, so an
+            # unpinned status could hide this; the pinned policy must still report it.
+            with self.assertRaisesRegex(RepositoryHostBlocked, "dirty"):
+                rig.context.store.load_candidate(rig.key())
+
+
+class RepositoryHostReadOnlyGitIsolationTests(unittest.TestCase):
+    """Cross-Examiner counterexample: a read-only status query ran an ambient helper.
+
+    An ambient global ``core.fsmonitor`` command was executed by the host's retained-
+    state ``git status`` (and still returned clean).  The helpers here only append to a
+    marker file, so running them is observable and harmless.  Ambient values are injected
+    for child processes only; no Git configuration file is edited.
+    """
+
+    def setUp(self) -> None:
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory(ignore_cleanup_errors=True)))
+        self.repo = self.root / "retained-clone"
+        self.repo.mkdir()
+        _git(self.repo, "init", "-q", "-b", "main")
+        _git(self.repo, "config", "user.name", "Synthetic Fixture")
+        _git(self.repo, "config", "user.email", "fixture@example.invalid")
+        (self.repo / "tracked.txt").write_bytes(b"one\n")
+        _git(self.repo, "add", ".")
+        _git(self.repo, "commit", "-q", "-m", "synthetic base")
+        self.head = _git(self.repo, "rev-parse", "HEAD")
+
+    def _helper(self, name: str) -> tuple[str, Path]:
+        """An inert fsmonitor command that records that it was launched."""
+        marker = self.root / f"{name}.called"
+        script = self.root / f"{name}.py"
+        script.write_text(
+            f"import pathlib\npathlib.Path({str(marker)!r}).open('a').write('called\\n')\n",
+            encoding="utf-8",
+        )
+        command = f'"{Path(sys.executable).as_posix()}" "{script.as_posix()}"'
+        return command, marker
+
+    def _ambient(self, command: str):
+        configuration = self.root / "ambient-gitconfig"
+        escaped = command.replace("\\", "\\\\").replace('"', '\\"')
+        configuration.write_text(f'[core]\n\tfsmonitor = "{escaped}"\n', encoding="utf-8", newline="\n")
+        original = configuration.read_bytes()
+        self.addCleanup(lambda: self.assertEqual(configuration.read_bytes(), original))
+        return mock.patch.dict(
+            os.environ, {"GIT_CONFIG_GLOBAL": str(configuration), "GIT_CONFIG_NOSYSTEM": "1"})
+
+    def _plain_status(self) -> bytes:
+        return subprocess.run(
+            ["git", "--no-optional-locks", "-C", str(self.repo), "status", "--porcelain"],
+            capture_output=True, check=True,
+        ).stdout
+
+    def _assert_helper_is_live_for_plain_git(self, marker: Path) -> None:
+        marker.unlink(missing_ok=True)
+        self._plain_status()
+        if not marker.exists():
+            self.skipTest("this Git does not launch a core.fsmonitor command for status, "
+                          "so there is no helper vector to guard on this platform")
+        marker.unlink()
+
+    def test_ambient_global_fsmonitor_helper_is_not_executed_by_the_host_reader(self) -> None:
+        command, marker = self._helper("ambient-global")
+        with self._ambient(command):
+            self._assert_helper_is_live_for_plain_git(marker)
+            before = dict(os.environ)
+            self.assertEqual(_git_bytes(self.repo, "status", "--porcelain", "--untracked-files=all"), b"")
+            self.assertFalse(marker.exists(), "the ambient helper was launched by the host reader")
+            self.assertEqual(dict(os.environ), before, "the parent environment was not mutated")
+
+    def test_clone_local_fsmonitor_helper_is_overridden_too(self) -> None:
+        command, marker = self._helper("clone-local")
+        _git(self.repo, "config", "core.fsmonitor", command)
+        self._assert_helper_is_live_for_plain_git(marker)
+        self.assertEqual(_git_bytes(self.repo, "status", "--porcelain", "--untracked-files=all"), b"")
+        self.assertFalse(marker.exists(), "the clone-local helper was launched by the host reader")
+
+    def test_both_helpers_at_once_are_never_launched_and_controlled_reads_still_work(self) -> None:
+        ambient_command, ambient_marker = self._helper("both-ambient")
+        local_command, local_marker = self._helper("both-local")
+        _git(self.repo, "config", "core.fsmonitor", local_command)
+        with self._ambient(ambient_command):
+            for name in ("status", "diff", "rev-parse", "ls-tree", "remote"):
+                arguments = {
+                    "status": ("status", "--porcelain", "--untracked-files=all"),
+                    "diff": ("diff", "--name-only", "-z", self.head, "HEAD"),
+                    "rev-parse": ("rev-parse", "HEAD^{tree}"),
+                    "ls-tree": ("ls-tree", "-r", "--name-only", "-z", self.head),
+                    "remote": ("remote",),
+                }[name]
+                with self.subTest(name):
+                    _git_bytes(self.repo, *arguments)
+            # Reads reflect the real state: HEAD identity, cleanliness, then a real edit.
+            self.assertEqual(_git_bytes(self.repo, "rev-parse", "HEAD").decode().strip(), self.head)
+            self.assertEqual(_git_bytes(self.repo, "status", "--porcelain", "--untracked-files=all"), b"")
+            (self.repo / "tracked.txt").write_bytes(b"two\n")
+            (self.repo / "untracked.txt").write_bytes(b"x\n")
+            status = _git_bytes(self.repo, "status", "--porcelain", "--untracked-files=all").decode()
+            self.assertIn("tracked.txt", status)
+            self.assertIn("untracked.txt", status)
+            self.assertFalse(ambient_marker.exists() or local_marker.exists())
+
+    def test_retained_candidate_reads_are_isolated_end_to_end(self) -> None:
+        """The store's own dirty check is the production caller of the reader."""
+
+        rig = _Rig(self, FIX)
+        record = rig.record(rig.build().candidate_tree)
+        command, marker = self._helper("store-reader")
+        _git(record.clone_root, "config", "core.fsmonitor", command)
+        with self._ambient(self._helper("store-ambient")[0]):
+            loaded = rig.context.store.load_candidate(rig.key())
+        self.assertEqual(loaded.commit, record.commit)
+        self.assertFalse(marker.exists())
+        self.assertFalse((self.root / "store-ambient.called").exists())
 
 
 class RepositoryHostOuterReplayTests(unittest.TestCase):

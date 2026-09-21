@@ -511,6 +511,73 @@ class ClaudeWorkerRunTests(_ClaudeRig):
                 self.assertEqual(receipt["status"], "failed")
                 self.assertIsNone(receipt["report"])
 
+    def test_unchanged_executable_is_rechecked_and_recorded_at_dispatch(self) -> None:
+        calls = []
+        canned = self._runner(_text(_events()))
+
+        def runner(*args, **kwargs):
+            calls.append(args[0][0])
+            return canned(*args, **kwargs)
+
+        worker = self._worker(command_runner=runner)
+        receipt = self._run(worker)
+        self.assertEqual(receipt["status"], "completed", receipt["reason"])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(
+            receipt["dispatch"],
+            {
+                "dispatched": True,
+                "executable_sha256_sealed": worker.executable_sha256,
+                "executable_sha256_observed": worker.executable_sha256,
+                "matches_sealed": True,
+            },
+        )
+
+    def test_executable_drift_after_construction_is_refused_before_dispatch(self) -> None:
+        # Judge counterexample: preflight saw the drift, run() still dispatched.
+        calls = []
+        canned = self._runner(_text(_events()))
+
+        def runner(*args, **kwargs):
+            calls.append(args[0][0])
+            return canned(*args, **kwargs)
+
+        cases = {
+            "content replaced": lambda path: path.write_bytes(b"synthetic changed executable"),
+            "file removed": lambda path: path.unlink(),
+        }
+        for name, damage in cases.items():
+            with self.subTest(name):
+                calls.clear()
+                worker = self._worker(command_runner=runner)
+                sealed = worker.executable_sha256
+                self.assertEqual(worker.preflight(), ())
+                damage(worker.executable)
+                self.assertTrue(worker.preflight())
+                receipt = self._run(worker)
+                self.assertEqual(calls, [], "the runner was never reached")
+                self.assertEqual(receipt["status"], "failed")
+                self.assertIsNone(receipt["report"])
+                self.assertIn("dispatch refused", receipt["reason"])
+                self.assertIn("no process was started", receipt["reason"])
+                self.assertFalse(receipt["dispatch"]["dispatched"])
+                self.assertFalse(receipt["dispatch"]["matches_sealed"])
+                self.assertEqual(receipt["dispatch"]["executable_sha256_sealed"], sealed)
+                if name == "content replaced":
+                    self.assertNotEqual(receipt["dispatch"]["executable_sha256_observed"], sealed)
+                else:
+                    self.assertIsNone(receipt["dispatch"]["executable_sha256_observed"])
+                evidence = Path(receipt["evidence"]["source_packet"]["path"]).parent
+                self.assertFalse((evidence / "stdout.jsonl").exists(), "no transcript exists")
+                self.assertFalse((evidence / "process.json").exists(), "no process was recorded")
+                on_disk = json.loads((evidence / "receipt.json").read_text(encoding="utf-8"))
+                self.assertEqual(on_disk["dispatch"], receipt["dispatch"])
+                # Restoring the exact sealed bytes lets the same worker dispatch again.
+                self._executable()
+                self.assertEqual(worker.preflight(), ())
+                self.assertEqual(self._run(worker)["status"], "completed")
+                self.assertEqual(len(calls), 1)
+
     def test_a_rejected_transcript_preserves_the_actual_session_identity(self) -> None:
         events = _events()
         events.pop(-5)  # the internal tool_result, just before message_delta/stop/result

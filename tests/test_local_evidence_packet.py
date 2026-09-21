@@ -180,6 +180,107 @@ class LocalEvidencePacketTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "applied")
         self.assertIn("return 2", (self.workspace / "src/example.py").read_text())
 
+    def _lf_clone(self, name, *, local_config=()):
+        """A detached, remote-free clone materialized with LF bytes, like ``GitWorkspace``.
+
+        The clone carries no ``core.autocrlf`` of its own, so ambient Git configuration
+        decides what a later ``git apply`` writes: exactly the H1 counterexample.
+        """
+        target = self.root / name
+        subprocess.run(["git", "clone", "--quiet", "--no-hardlinks", "-c", "core.autocrlf=false",
+                        str(self.workspace), str(target)], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(target), "checkout", "--quiet", "--detach", "HEAD"],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(target), "remote", "remove", "origin"],
+                       check=True, capture_output=True)
+        for key, value in local_config:
+            subprocess.run(["git", "-C", str(target), "config", key, value],
+                           check=True, capture_output=True)
+        return target
+
+    def _ambient_autocrlf(self):
+        """Machine-level ``core.autocrlf=true`` for child Git processes only."""
+        configuration = self.root / "ambient-gitconfig"
+        configuration.write_text("[core]\n\tautocrlf = true\n", encoding="utf-8", newline="\n")
+        original = configuration.read_bytes()
+        self.addCleanup(lambda: self.assertEqual(configuration.read_bytes(), original))
+        return configuration, mock.patch.dict(
+            os.environ, {"GIT_CONFIG_GLOBAL": str(configuration), "GIT_CONFIG_NOSYSTEM": "1"})
+
+    def test_ambient_autocrlf_converted_lf_bytes_before_and_isolated_apply_preserves_them(self):
+        before = (self.workspace / "src/example.py").read_text()
+        after = before.replace("return 1", "return 2")
+        expected = after.encode("utf-8")
+        patch = self.patch("src/example.py", before, after)
+        configuration, ambient = self._ambient_autocrlf()
+        with ambient:
+            legacy = self._lf_clone("legacy-clone")
+            legacy_receipt = apply_proposed_patch(legacy, patch, ["src/example.py"])
+            converted = (legacy / "src/example.py").read_bytes()
+            self.assertEqual(legacy_receipt["git_configuration"], "ambient")
+            if b"\r\n" not in converted:
+                self.skipTest("this Git does not convert LF to CRLF on apply under "
+                              "core.autocrlf=true, so the old failure cannot occur here")
+            # The old failure: the accepted bytes became CRLF and grew by one byte per line.
+            self.assertNotEqual(converted, expected)
+            self.assertEqual(len(converted), len(expected) + expected.count(b"\n"))
+
+            isolated = self._lf_clone("isolated-clone")
+            receipt = apply_proposed_patch(isolated, patch, ["src/example.py"], isolate_git_config=True)
+            written = (isolated / "src/example.py").read_bytes()
+            self.assertEqual(written, expected, "exact accepted bytes, not normalized")
+            self.assertNotIn(b"\r", written)
+            self.assertEqual(receipt["after_sha256"]["src/example.py"], hashlib.sha256(expected).hexdigest())
+            self.assertTrue(receipt["git_configuration"].startswith("isolated"))
+            self.assertEqual(receipt["changed_paths"], ["src/example.py"])
+        # The machine configuration was never edited (also asserted again at cleanup).
+        self.assertEqual(configuration.read_text(encoding="utf-8"), "[core]\n\tautocrlf = true\n")
+
+    def test_isolated_apply_ignores_untrusted_clone_local_conversion_and_whitespace_settings(self):
+        before = (self.workspace / "src/example.py").read_text()
+        after = before.replace("return 1", "return 2  ")  # trailing spaces must survive
+        expected = after.encode("utf-8")
+        patch = self.patch("src/example.py", before, after)
+        _, ambient = self._ambient_autocrlf()
+        with ambient:
+            hostile = self._lf_clone("hostile-clone", local_config=(
+                ("core.autocrlf", "true"), ("apply.whitespace", "fix"), ("core.safecrlf", "false")))
+            apply_proposed_patch(hostile, patch, ["src/example.py"], isolate_git_config=True)
+            self.assertEqual((hostile / "src/example.py").read_bytes(), expected)
+            self.assertNotIn(b"\r", expected)
+            # The same clone under ambient rules shows why the pin matters.
+            control = self._lf_clone("control-clone", local_config=(("apply.whitespace", "fix"),))
+            apply_proposed_patch(control, patch, ["src/example.py"])
+            self.assertNotEqual((control / "src/example.py").read_bytes(), expected)
+
+    def test_isolated_apply_refuses_and_restores_bytes_altered_by_a_conversion_it_cannot_pin(self):
+        before_bytes = (self.workspace / "src/example.py").read_bytes()
+        patch = self.patch("src/example.py", before_bytes.decode(),
+                           before_bytes.decode().replace("return 1", "return 2"))
+        clone = self._lf_clone("guarded-clone")
+        real = local_evidence_packet._git
+
+        def converting(workspace, *arguments, **keywords):
+            output = real(workspace, *arguments, **keywords)
+            if arguments[0] == "apply" and not {"--check", "--numstat", "--reverse"} & set(arguments):
+                target = Path(workspace) / "src/example.py"
+                target.write_bytes(target.read_bytes().replace(b"\n", b"\r\n"))
+            return output
+
+        with mock.patch.object(local_evidence_packet, "_git", converting):
+            with self.assertRaisesRegex(LocalEvidenceError, "line-ending conversion"):
+                apply_proposed_patch(clone, patch, ["src/example.py"], isolate_git_config=True)
+        self.assertEqual((clone / "src/example.py").read_bytes(), before_bytes)
+        self.assertEqual(subprocess.run(["git", "-C", str(clone), "status", "--porcelain"],
+                                        capture_output=True, check=True).stdout, b"")
+
+    def test_ambient_mode_keeps_its_documented_default_for_existing_callers(self):
+        before = (self.workspace / "src/example.py").read_text()
+        receipt = apply_proposed_patch(
+            self.workspace, self.patch("src/example.py", before, before.replace("return 1", "return 2")),
+            ["src/example.py"])
+        self.assertEqual(receipt["git_configuration"], "ambient")
+
     def test_node_priorities_keep_cited_module_counterpart_and_recent_adr_first(self):
         self.write("src/hive_mind_os/local_codex_worker.py", "# Runtime worker\n")
         self.write("tests/test_local_codex_worker.py", "# Worker test\n")

@@ -21,6 +21,7 @@ import math
 import os
 import re
 import subprocess
+import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -61,7 +62,7 @@ from .local_codex_worker import _validate_report
 from .local_evidence_packet import (
     MAX_CONTENT_BYTES,
     LocalEvidenceError,
-    _changed_paths,
+    _isolated_git_invocation,
     _safe_path,
     apply_proposed_patch,
     build_source_packet,
@@ -116,15 +117,6 @@ _COMMIT_DATE = "2026-01-03T00:00:00Z"
 _MAX_REPAIR_WINDOW = 3
 _AMBIENT_ENVIRONMENT_NAMES = frozenset(
     {"TEMP", "TMP", "TMPDIR", "SystemRoot", "USERNAME", "PATH"}
-)
-_GIT_CREDENTIAL_ENVIRONMENT = (
-    "GIT_CONFIG_COUNT",
-    "GIT_CONFIG_KEY_0",
-    "GIT_CONFIG_VALUE_0",
-    "GIT_CONFIG_KEY_1",
-    "GIT_CONFIG_VALUE_1",
-    "GIT_CONFIG_KEY_2",
-    "GIT_CONFIG_VALUE_2",
 )
 _SUCCESS = frozenset({PackageStatus.COMPLETED, PackageStatus.NO_CHANGE})
 # Windows MAX_PATH is 260 including the terminating NUL.  The sandbox and Git receipt
@@ -297,19 +289,35 @@ def _check_file_ref(reference: str, root: Path) -> None:
 
 
 def _git_bytes(repository: Path, *arguments: str, timeout: float = 60) -> bytes:
-    environment = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1"}
-    for name in _GIT_CREDENTIAL_ENVIRONMENT:
-        environment.pop(name, None)
+    """Run one read-only Git query with per-child configuration isolation.
+
+    The isolation is the one the patch helper uses (``_isolated_git_invocation``):
+    ambient user, system and ``GIT_*`` configuration and routing are excluded for
+    this child only, through a per-call scratch directory that holds an empty
+    global config and attributes file; nothing is written to any real Git file and
+    the parent's environment is never mutated.  ``core.autocrlf=false`` and
+    ``core.fsmonitor=false`` are pinned on the command line, which outranks the
+    inspected repository's own ``.git/config``, so a fsmonitor helper (or a
+    line-ending rewrite) configured anywhere cannot run or hide a change.
+
+    Limits: the repository's remaining local configuration is still read, and a
+    repository that needs a global ``safe.directory`` entry fails closed here
+    rather than being trusted.  This is trusted-host hygiene, not hostile-code
+    isolation.
+    """
+
     try:
-        completed = subprocess.run(
-            ["git", "--no-optional-locks", "-C", str(repository), *arguments],
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
-            shell=False,
-            env=environment,
-        )
+        with tempfile.TemporaryDirectory(prefix="hive-git-read-") as scratch:
+            options, environment = _isolated_git_invocation(Path(scratch))
+            completed = subprocess.run(
+                ["git", "--no-optional-locks", *options, "-C", str(repository), *arguments],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                timeout=timeout,
+                check=False,
+                shell=False,
+                env=environment,
+            )
     except (OSError, subprocess.SubprocessError) as error:
         raise RepositoryHostBlocked(f"git {arguments[0]} could not run") from error
     if completed.returncode:
@@ -2164,10 +2172,15 @@ class RepositoryBuilderAdapter:
         try:
             if patch_text is not None:
                 try:
-                    apply_proposed_patch(root, patch_text, list(declared))
+                    # Deterministic against ambient Git conversion: the receipt's own
+                    # observed change set (taken under the same pinned policy) is used,
+                    # so this host never re-reads the tree under the machine's config.
+                    applied = apply_proposed_patch(
+                        root, patch_text, list(declared), isolate_git_config=True
+                    )
                 except LocalEvidenceError as error:
                     raise _Refusal(_bounded(error)) from error
-                actual = _changed_paths(root)
+                actual = list(applied["changed_paths"])
                 if actual != declared:
                     raise _Refusal("observed change set differs from the declared paths")
                 self._require_scope(actual)

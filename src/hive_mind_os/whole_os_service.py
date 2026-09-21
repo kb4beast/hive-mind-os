@@ -6,6 +6,7 @@ import json
 import os
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -38,6 +39,25 @@ from .scheduler import Job, Scheduler, StaleLeaseError
 
 class ServiceError(RuntimeError):
     pass
+
+
+class _RetainedScope:
+    """Verdict memo for exactly one public invocation; dead once it exits."""
+
+    __slots__ = ("open", "verdicts")
+
+    def __init__(self) -> None:
+        self.open = True
+        self.verdicts: dict[str, str | None] = {}
+
+
+# The scope of the public invocation running in this execution context, keyed by
+# service identity.  It is only an efficiency memo for *private* helpers: every public
+# entry replaces it unconditionally (``WholeOSService._invocation``), and a scope that
+# has exited is closed, so a copied or inherited context can never authorize a call.
+_RETAINED_SCOPES: ContextVar[dict[int, _RetainedScope] | None] = ContextVar(
+    "whole_os_retained_scopes", default=None
+)
 
 
 class _LeaseHeartbeats:
@@ -318,10 +338,7 @@ class WholeOSService:
         ).removeprefix("sha256:")
         self._receipt_dir = config.state_dir / "whole-os-receipts" / campaign_key
         self._package_receipt_dir = self._receipt_dir / "packages"
-        # Retained-success verdicts are memoized only inside one public operation.
-        self._retained_memo: dict[str, str | None] | None = None
-        self._retained_rejections: dict[str, str] = {}
-        with self._retained_scope():
+        with self._invocation():
             self._enqueue_ready()
 
     def _build_kickoff(self) -> dict[str, object]:
@@ -355,20 +372,28 @@ class WholeOSService:
         )
 
     @contextmanager
-    def _retained_scope(self) -> Iterator[None]:
-        """Share one host revalidation across a single public operation.
+    def _invocation(self) -> Iterator[None]:
+        """Open the fresh validation scope of ONE public call.
 
-        Verdicts are never carried between operations, so every resume, every new
-        service object and every observation asks the host again.
+        Every public entry (constructor, ``run_once``, ``run_cohort``,
+        ``run_to_completion``, ``observe``) enters this and always installs a new
+        scope, whatever the execution context already holds.  The presence of an
+        inherited entry therefore proves nothing: a copied ``contextvars`` context, a
+        propagated task context or a re-entrant public call from a host all
+        revalidate with the host.  Private helpers (``_observe``, ``_run_cohort``,
+        ``_classify_done`` ...) assume their public caller opened the scope and share
+        its memo, which is what keeps one call from asking the host repeatedly.  On
+        exit the scope is closed, so a context copied inside the call cannot reuse
+        its verdicts even when it is kept alive afterwards.
         """
-        outermost = self._retained_memo is None
-        if outermost:
-            self._retained_memo = {}
+        scope = _RetainedScope()
+        token = _RETAINED_SCOPES.set({**(_RETAINED_SCOPES.get() or {}), id(self): scope})
         try:
             yield
         finally:
-            if outermost:
-                self._retained_memo = None
+            scope.open = False
+            scope.verdicts.clear()
+            _RETAINED_SCOPES.reset(token)
 
     def _check_retained(self, package_id: str) -> str | None:
         """Ask the host whether a retained success is still valid (fail closed)."""
@@ -392,7 +417,8 @@ class WholeOSService:
         return reason
 
     def _retained_rejection(self, package_id: str) -> str | None:
-        memo = self._retained_memo
+        scope = (_RETAINED_SCOPES.get() or {}).get(id(self))
+        memo = scope.verdicts if scope is not None and scope.open else None
         if memo is not None and package_id in memo:
             return memo[package_id]
         reason = self._check_retained(package_id)
@@ -415,7 +441,6 @@ class WholeOSService:
                 valid.add(package_id)
             else:
                 rejected[package_id] = reason
-        self._retained_rejections = rejected
         return valid, rejected
 
     def _completed(self) -> set[str]:
@@ -782,7 +807,7 @@ class WholeOSService:
 
     def run_once(self) -> ServiceObservation:
         """Execute one package using the original strict compatibility behavior."""
-        with self._retained_scope():
+        with self._invocation():
             return self._run_once()
 
     def _run_once(self) -> ServiceObservation:
@@ -791,7 +816,7 @@ class WholeOSService:
         )
         if not jobs:
             self._run_terminal_assessment_if_ready()
-            return self.observe()
+            return self._observe(None, ())
         job = jobs[0]
         package_id = str(job.payload.get("package_id", ""))
         package = self.by_id.get(package_id)
@@ -809,7 +834,7 @@ class WholeOSService:
                 self._persist_result(job, retained)
                 self._enqueue_ready()
                 self._run_terminal_assessment_if_ready()
-                return self.observe(last_result=retained)
+                return self._observe(retained, ())
             resolved = self.bindings.resolve(job.payload, self.config.state_dir)
             result = self.host.execute_package(package, resolved, job.payload)
             if result.package_id != package_id:
@@ -825,7 +850,7 @@ class WholeOSService:
                     mission_id=self.config.campaign_id,
                 )
             self._run_terminal_assessment_if_ready()
-            return self.observe(last_result=result)
+            return self._observe(result, ())
         except Exception as exc:
             self.scheduler.fail(
                 job.id,
@@ -833,10 +858,11 @@ class WholeOSService:
                 f"{type(exc).__name__}: {exc}",
                 mission_id=self.config.campaign_id,
             )
-            return self.observe(
-                last_result=PackageExecutionResult(
+            return self._observe(
+                PackageExecutionResult(
                     package_id, PackageStatus.FAILED, None, (), str(exc)
-                )
+                ),
+                (),
             )
 
     @staticmethod
@@ -1012,7 +1038,7 @@ class WholeOSService:
         Scheduler leases are heartbeated while host work is active, and all queue
         transitions occur on the coordinating thread after execution completes.
         """
-        with self._retained_scope():
+        with self._invocation():
             return self._run_cohort()
 
     def _run_cohort(self) -> ServiceObservation:
@@ -1021,7 +1047,7 @@ class WholeOSService:
         jobs = self._claim_cohort(owner)
         if not jobs:
             self._run_terminal_assessment_if_ready()
-            return self.observe()
+            return self._observe(None, ())
 
         results: dict[str, PackageExecutionResult] = {}
         with _LeaseHeartbeats(self.scheduler, jobs) as heartbeats:
@@ -1063,10 +1089,7 @@ class WholeOSService:
             for package in self.config.graph.packages
             if package.package_id in results
         )
-        return self.observe(
-            last_result=ordered[-1] if ordered else None,
-            recent_results=ordered,
-        )
+        return self._observe(ordered[-1] if ordered else None, ordered)
 
     def run_to_completion(
         self, *, maximum_cohorts: int | None = None
@@ -1112,7 +1135,7 @@ class WholeOSService:
         last_result: PackageExecutionResult | None = None,
         recent_results: tuple[PackageExecutionResult, ...] = (),
     ) -> ServiceObservation:
-        with self._retained_scope():
+        with self._invocation():
             return self._observe(last_result, recent_results)
 
     def _observe(

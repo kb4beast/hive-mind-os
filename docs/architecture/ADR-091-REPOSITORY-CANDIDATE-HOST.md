@@ -218,6 +218,169 @@ regression), `tests/test_whole_os_integration.py::WholeOSRetainedReplayTests` (s
 with a synthetic validating host), `tests/test_whole_os_repository_host.py`
 (`RepositoryHostOuterReplayTests`, `RepositoryHostPathBoundTests`).
 
+## Correction 2026-09-21: three boundary defects found by the independent Judge and a real canary
+
+The sections above are kept as written; three of their claims were wrong or incomplete and
+are corrected here. **All repair tests below are UNRUN by the Builder.** Earlier evidence
+(the failed real-canary run, its retained-replay pass with a clone-local
+`core.autocrlf=false`, and the Judge's reproductions) is preserved and unaltered; the
+replay pass proves the proposal was valid, not that this host was deterministic.
+
+### C1. Retained-success memo was instance-wide (corrects R1)
+
+R1 said verdicts were "memoized only inside one public operation". They were held in an
+attribute of the service object, so two overlapping public calls shared one dictionary:
+with a barrier between them, admission revoked after the first call classified the package,
+the second `observe()` returned `complete` without asking the host (validator count
+unchanged) and only the next non-overlapping call blocked. Repair: the memo now lives in a
+module `ContextVar`, keyed by service identity. A public call opens a fresh scope unless its
+own execution context already holds one for that service, which is exactly a nested call
+made for the same invocation (so `observe()` still asks the host once, not once per
+internal `_completed()`). Independent threads, tasks and resumed calls start from their own
+context and never share a verdict. Cohort pool workers start with an empty context and ask
+the host directly. No lock is added and no verdict outlives its outermost call.
+Residual scope: a thread that deliberately copies its parent's context (or a runtime that
+inherits context into new threads) shares that parent's invocation, by design; a verdict
+is still never shared across invocations. Regression: forced overlap with revocation
+between the calls asserts fresh validation, a blocked second call, and one worker and one
+terminal assessment in total.
+
+### C2. Executable was not rechecked at dispatch (corrects "preflight recheck")
+
+`preflight()` saw a replaced executable but `run()` still invoked the runner and returned
+`completed` under the old hash. `run()` now re-hashes the sealed executable on every
+dispatch and, on drift or an unreadable file, records a failed receipt (`dispatch.dispatched`
+false, sealed and observed digests, `matches_sealed` false) before the runner is reached: no
+process, transcript or `process.json` exists. A successful run records the observed digest
+that matched. **Residual TOCTOU:** the check is hash-then-launch, not atomic. The file can
+still be replaced between the hash and the operating system starting the process. Closing
+that would need an exclusive or content-addressed launch this worker does not have, so no
+atomicity is claimed; the per-dispatch check narrows the window from "since construction"
+to one read and one spawn.
+
+### C3. Ambient Git configuration changed accepted bytes (real Haiku canary)
+
+Root cause, observed on Windows: the host materializes clones under `core.autocrlf=false`
+but called `apply_proposed_patch` directly, which ran Git with the machine's configuration.
+System `core.autocrlf=true` made `git apply` write the one-line, LF proposal as CRLF (26
+bytes became 28), and the exact-byte guard failed before any test ran. The retained replay
+that passed set clone-local `autocrlf=false`, which is precisely the untrusted, clone-local
+reliance to avoid.
+
+Repair, in `local_evidence_packet.apply_proposed_patch(..., isolate_git_config=True)`, which
+the host now always passes:
+- Ambient user, system and every `GIT_*` variable are excluded **for the child processes
+  only** (`GIT_CONFIG_NOSYSTEM=1`, an empty per-call `GIT_CONFIG_GLOBAL`, all other `GIT_*`
+  dropped). No global, user or system Git file is read for these calls or modified.
+- The keys that decide written bytes are pinned on the command line, which outranks the
+  clone's own `.git/config`: `core.autocrlf=false`, `apply.whitespace=nowarn`,
+  `apply.ignoreWhitespace=no`, and an empty `core.attributesFile`. This mirrors
+  `GitWorkspace`'s policy, so materialization and application agree.
+- Repository `.gitattributes` are part of the pinned tree and remain honored, exactly as at
+  checkout; a `text eol=crlf` repository therefore keeps CRLF consistently. Filter drivers
+  cannot come from the excluded global config. The clone's remaining local config is still
+  read, acceptable only because the host creates that clone.
+- Detection, not normalization: if neither the old file nor the patch contains a carriage
+  return and one appears after apply, the files are restored byte for byte and the patch is
+  refused. Acceptance bytes are never rewritten to hide a change.
+- The host now uses the receipt's own observed change set instead of re-reading the tree
+  under ambient config, and its read-only retained-clone checks pin `core.autocrlf=false`.
+Existing callers are deliberately unchanged: the default remains ambient behavior, which
+local DAG runs rely on for genuine Windows CRLF checkouts (the existing autocrlf test still
+covers it). The new mode is opt-in per call; forcing it globally would break those runs.
+
+Threats and limits: a repository that intentionally converts line endings is not refused
+(it is deterministic per pinned tree); an attacker able to write `.git/info/attributes` or
+filter drivers into the clone before application is out of scope because the clone is
+host-created; the carriage-return guard does not detect other filter effects.
+
+### Repair tests added (UNRUN by the Builder)
+
+`tests/test_whole_os_integration.py` (nested calls share one verdict, forced-overlap
+revocation, concurrent independent runs), `tests/test_local_claude_worker.py` (dispatch
+recheck recorded on success; drift and removal refused before dispatch; sealed bytes
+restored dispatch again), `tests/test_local_evidence_packet.py` (real Git with ambient
+`autocrlf=true` reproduces the CRLF growth in the ambient mode, isolated mode preserves the
+exact bytes, hostile clone-local settings ignored, conversion guard restores and refuses,
+default unchanged), `tests/test_whole_os_repository_host.py`
+(`RepositoryHostAmbientGitConfigTests`: exact committed and worktree bytes, qualification
+passes with two actually executed tests, one model call). The ambient reproduction skips
+with an explicit message on a Git that does not convert on apply.
+
+### Rollback for this correction
+
+Each part is independent and additive. C1: revert the `ContextVar` scope only if the
+validating-host seam is also reverted; alone it would reopen the overlap defect. C2:
+revert the dispatch recheck; `preflight()` is unchanged. C3: pass
+`isolate_git_config=False` (or revert the parameter) to restore ambient behavior, which
+reopens the Windows conversion failure; evidence and candidates are never deleted.
+
+## Correction 2026-09-21 (remand 3): copied context, fsmonitor helper, test cleanup
+
+Earlier text is kept as written. **Every repair test named here is UNRUN by the Builder.**
+
+### C4. WITHDRAWN: "inherited context is the same invocation" (corrects C1)
+
+C1 said a scope inherited through `contextvars` "is the same invocation, by design", and
+that verdicts are never shared across invocations. **That claim is withdrawn.** The
+independent Judge showed it false: a context copied inside a first public `observe()` and
+run after revocation returned `complete` with no host call, both while the first call was
+still open and after it had exited. Treating "an entry exists in the context" as proof of
+nesting let any caller-held scope authorize a public call.
+
+Repair (still no scheduler redesign): **every public entry establishes a fresh scope
+unconditionally** through one private context manager, `_invocation()`, whatever the
+inherited context holds. The public entries are the constructor, `run_once`,
+`run_cohort` and `observe`; `run_to_completion` opens a fresh scope on each of its public
+`run_cohort`/`observe` calls, so a long loop is also re-validated per wave. Private helpers
+(`_observe`, `_run_cohort`, `_run_once`, `_classify_done`) assume their public caller opened
+the scope and share its memo, so one call still asks the host once per package. The scope
+object is closed and emptied when its call exits, so a copied context kept alive afterwards
+holds only a dead scope that memoizes nothing. A re-entrant public call (for example from a
+host callback) validates fresh. No thread id or context identity is used to infer
+invocation. Regressions: the original two-thread overlap; a context copied inside a public
+call used for `observe`, `run_once`, `run_cohort` and `run_to_completion` while the first
+call is open and again after it exits; four concurrent calls in copies; and the
+nested-call efficiency count (one host validation per `observe()`), with worker and terminal
+assessment counts asserted at 1/1.
+
+### C5. Read-only Git helper executed an ambient `core.fsmonitor` command
+
+Root cause: the host's retained-state reader (`_git_bytes`) scrubbed only a few
+`GIT_CONFIG_*` names and left the user's global Git configuration, so a global
+`core.fsmonitor` command was launched by `git status` and the status still returned clean.
+Repair: the reader now reuses the patch helper's per-child isolation
+(`_isolated_git_invocation`, which gained `core.fsmonitor=false`): every `GIT_*` variable
+dropped, `GIT_CONFIG_NOSYSTEM=1`, an empty global config and attributes file in a per-call
+scratch directory, and `core.autocrlf=false` plus `core.fsmonitor=false` pinned on the
+command line, which outranks the inspected repository's own `.git/config`. The parent's
+environment is never mutated and no Git file is edited. The retained target, base and
+commit paths are unchanged. The added `core.fsmonitor=false` also applies to the opted-in
+patch mode; it only prevents a helper launch and changes no written bytes, and the previously
+accepted patch behavior is otherwise unchanged.
+Regression: an inert marker-writing fsmonitor command as an ambient global setting, as a
+clone-local setting, and both; a control run proves the plain Git launches it (skipped with a
+message on a Git that does not), the reader does not launch it, the parent environment is
+unchanged, and status/diff/rev-parse/ls-tree/remote reads still report real state, including
+a real edit. The store's own retained-candidate load is covered end to end.
+Limits, stated honestly: this is trusted-host hygiene, not hostile-code isolation. The
+repository's other local configuration is still read; other helper-launching keys not
+listed above are not enumerated; a repository that needs a global `safe.directory` entry now
+fails closed instead of being trusted; `GitWorkspace` remains the owner of clone creation and
+is unchanged. Legacy callers of the patch helper keep the ambient default.
+
+### C6. New service tests leaked SQLite handles on Windows
+
+The three tests added in remand 2 used a `with TemporaryDirectory()` block whose exit ran
+before the registered `service.close`. They and the new regressions now enter the temporary
+directory with `enterContext`, so cleanup runs in last-in-first-out order and the service
+closes first. No cleanup or `ResourceWarning` is suppressed.
+
+### Rollback for this correction
+
+C4: reverting `_invocation()` to a presence check reopens the copied-context defect. C5:
+restoring the old reader reopens ambient helper execution. Neither deletes evidence.
+
 ## Rollback
 
 Stop only the new registered host attempt and keep all receipts and candidates as local
@@ -231,3 +394,36 @@ host the seam can only make a success stricter, so rolling it back reopens the s
 defect; keep it unless the host is disabled.
 
 Root validation after the first repair: 18 worker tests, 41 repository-host tests and 17 service integration tests pass locally; Ruff and Pyright pass. The first integration-test run failed Windows TemporaryDirectory cleanup because service.close had been registered for the later unittest cleanup phase. Root placed the seven new directories on unittest's cleanup stack before registering service closers, preserving LIFO lifetime ordering and every behavioral assertion. The failed first log is retained. These focused passes do not substitute for independent counterexample replay, an actual provider canary or the full integrated CI gate; those remain separate obligations.
+
+## Independent disposition and validation, 2026-09-21
+
+The final remand-3 candidate passed 22 service integration tests, 47 repository-host
+tests, 23 evidence-packet tests (one platform skip), and 20 Claude-worker tests.
+Ruff and Pyright passed. These are root-executed results; the Builder's earlier
+UNRUN statements remain historical and are not retroactively rewritten.
+
+The separate Curator adopted the bounded trusted-host repair after replaying the
+original 39 assertions, three positive exact-byte Git policy assertions, the
+preserved legacy ambient-CRLF negative control, and 19 fsmonitor assertions with
+real global/local inert-helper controls. The source seal was unchanged throughout.
+Report SHA-256: `2a6bf52259af3b1fdd8b9c85b9c34e3d6e77cdd5506dd14a4181896511750ffb`;
+manifest: `268ec4ac0fc971f74735fd3bbf624ebb4709a22ff1d3f1c56c786a86f7052898`.
+
+The separate Judge issued scoped ADAPT for the retained-replay and executable
+binding repairs. Original ordinary-thread and executable-drift probes, copied-context
+overlap and post-exit probes, and 12 retained-replay tests passed without duplicate
+worker or terminal execution. Report SHA-256:
+`9f39de8f20e37a48d38b7854ce9d3ddc8b93dcb0e12717532b3f2a9f181fe5a7`;
+manifest: `62a4f7f4281dab8dbdff47b925c13b701592418560fc01ee44b3a37f914c1ba8`.
+The Judge's independent Git condition is supplied by the Curator evidence above.
+
+One actual Haiku call produced a valid structured proposal. The original host run
+rejected Git's ambient LF-to-CRLF conversion before tests; that failed receipt is
+preserved. Retained proposal replay and the final real-Git isolation controls passed
+without another model call. This does not claim a newly completed live mission.
+
+Mandatory full integrated CI on the stacked delivery checkout is still pending at
+this dated entry. Local H1 preparation does not grant remote-delivery authority,
+complete H2, admit a pilot, provide hostile isolation, or close production readiness.
+All losing probes and receipt corrections remain in the operator's append-only
+production-closeout evidence bundle.

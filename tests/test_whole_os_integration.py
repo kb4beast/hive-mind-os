@@ -1,7 +1,9 @@
 import unittest
+from contextvars import copy_context
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Barrier, Condition, Event, Lock, Thread
+from threading import Barrier, Condition, Event, Lock, Thread, current_thread
+from types import MethodType
 
 from hive_mind_os.cohort_assurance import (
     TerminalAssessment,
@@ -681,6 +683,157 @@ class WholeOSRetainedReplayTests(unittest.TestCase):
         self.assertEqual(service.observe().status, "blocked")
         host.verdict = None
         self.assertEqual(service.observe().status, "complete")
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_nested_calls_share_one_verdict_per_invocation(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        before = host.validations
+        self.assertEqual(service.observe().status, "complete")
+        # observe() classifies the package for its packages, its terminal
+        # candidate and its status, yet asks the host once for the invocation.
+        self.assertEqual(host.validations - before, 1)
+        before = host.validations
+        self.assertEqual(service.observe().status, "complete")
+        self.assertEqual(host.validations - before, 1, "a second call asks again")
+
+    def _hold_first_observation(self, service, host):
+        """Pause a first public ``observe()`` after it holds a valid verdict.
+
+        Returns ``(shared, finish)``: ``shared['context']`` is a context copied *inside*
+        that call (what a propagating framework would hand to another call) and
+        ``finish()`` releases and joins the first call, restoring the service.
+        """
+
+        classified, release = Event(), Event()
+        original = service._classify_done
+        shared = {}
+
+        def classify_then_wait(self_):
+            result = original()
+            if current_thread().name == "first-observer":
+                shared["context"] = copy_context()
+                classified.set()
+                if not release.wait(10):
+                    raise AssertionError("coordinator failed to release the first observer")
+            return result
+
+        def first_observation():
+            try:
+                shared["status"] = service.observe().status
+            except BaseException as error:  # reported through the assertion below
+                shared["error"] = repr(error)
+
+        service._classify_done = MethodType(classify_then_wait, service)
+        thread = Thread(target=first_observation, name="first-observer")
+        thread.start()
+        self.assertTrue(classified.wait(10), "first call reached classification")
+
+        def finish():
+            release.set()
+            thread.join(10)
+            service._classify_done = original
+            self.assertFalse(thread.is_alive())
+            self.assertNotIn("error", shared)
+
+        self.addCleanup(finish)
+        return shared, finish
+
+    def test_overlapping_public_calls_never_share_a_verdict(self):
+        """Judge counterexample: revocation between two overlapping observations."""
+
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        shared, finish = self._hold_first_observation(service, host)
+        # The first call now holds a valid verdict; revoke, then call again.
+        host.verdict = "synthetic admission revoked between overlapping calls"
+        before = host.validations
+        second = service.observe()
+        self.assertGreater(host.validations, before, "fresh host validation")
+        self.assertEqual(second.status, "blocked")
+        self.assertEqual(second.completed_packages, ())
+        self.assertIsNone(second.terminal_assessment)
+        self.assertIn("revoked between overlapping calls", second.terminal_message)
+        finish()
+        self.assertEqual(service.observe().status, "blocked")
+        self.assertEqual(service.run_to_completion().status, "blocked")
+        self.assertEqual((host.executions, host.assessments), (1, 1), "no duplicate effects")
+
+    def test_copied_context_never_authorizes_another_public_call(self):
+        """Judge remand-2 counterexample: a context copied inside a public call."""
+
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        shared, finish = self._hold_first_observation(service, host)
+        host.verdict = "synthetic admission revoked before a context-propagated call"
+        for name, entry in (
+            ("observe", service.observe),
+            ("run_once", service.run_once),
+            ("run_cohort", service.run_cohort),
+            ("run_to_completion", service.run_to_completion),
+        ):
+            with self.subTest(f"overlapping {name}"):
+                before = host.validations
+                result = shared["context"].copy().run(entry)
+                self.assertGreater(host.validations, before, "fresh host validation")
+                self.assertEqual(result.status, "blocked")
+                self.assertEqual(result.completed_packages, ())
+                self.assertIsNone(result.terminal_assessment)
+        finish()
+        # The original invocation has exited; its escaped context must stay inert.
+        for name, entry in (("observe", service.observe), ("run_to_completion", service.run_to_completion)):
+            with self.subTest(f"after exit {name}"):
+                before = host.validations
+                result = shared["context"].copy().run(entry)
+                self.assertGreater(host.validations, before, "fresh host validation")
+                self.assertEqual(result.status, "blocked")
+        before = host.validations
+        shared["context"].copy().run(service._classify_done)
+        shared["context"].copy().run(service._classify_done)
+        self.assertEqual(host.validations - before, 2, "a closed scope memoizes nothing")
+        self.assertEqual((host.executions, host.assessments), (1, 1), "no duplicate effects")
+
+    def test_concurrent_calls_in_copied_contexts_each_revalidate(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        shared, finish = self._hold_first_observation(service, host)
+        host.verdict = "revoked"
+        before = host.validations
+        seen = []
+
+        def observe_in_copy():
+            seen.append(shared["context"].copy().run(service.observe).status)
+
+        threads = [Thread(target=observe_in_copy) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(30)
+        self.assertEqual(seen, ["blocked"] * 4)
+        self.assertGreaterEqual(host.validations - before, 4)
+        finish()
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_concurrent_independent_run_calls_each_revalidate(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        host.verdict = "revoked"
+        seen = []
+
+        def run():
+            seen.append(service.run_to_completion().status)
+
+        threads = [Thread(target=run) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(30)
+        self.assertEqual(seen, ["blocked"] * 4)
         self.assertEqual((host.executions, host.assessments), (1, 1))
 
     def test_host_errors_and_untyped_verdicts_fail_closed(self):

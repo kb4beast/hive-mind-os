@@ -597,15 +597,28 @@ class ClaudeLocalWorker:
         self.max_output_bytes = max_output_bytes
         self.command_runner = command_runner or _run_claude_process
 
+    def _observe_executable(self) -> tuple[str | None, str | None]:
+        """Hash the installed executable now: ``(digest, problem)``.
+
+        This is a check-then-use guard, not an atomic guarantee: the file can still
+        be replaced between this hash and the operating system starting the process.
+        Closing that window needs an exclusive or content-addressed launch that this
+        worker does not have, so the residual scope is stated rather than hidden.
+        """
+
+        try:
+            observed = _sha256(self.executable.read_bytes())
+        except OSError:
+            return None, "Claude executable is unavailable"
+        if observed != self.executable_sha256:
+            return observed, "Claude executable changed since its interface evidence"
+        return observed, None
+
     def preflight(self) -> tuple[str, ...]:
         """Read-only recheck that the retained-interface binary is still installed."""
 
-        try:
-            if _sha256(self.executable.read_bytes()) != self.executable_sha256:
-                return ("Claude executable changed since its interface evidence",)
-        except OSError:
-            return ("Claude executable is unavailable",)
-        return ()
+        _, problem = self._observe_executable()
+        return () if problem is None else (problem,)
 
     def _command(self, schema_text: str) -> list[str]:
         return [
@@ -708,10 +721,25 @@ class ClaudeLocalWorker:
                 "help_sha256": self.help_sha256,
             },
             "workspace_entries_after": [],
+            "dispatch": {"dispatched": False},
         }
         try:
             command = self._command(schema_text)
+            # The command below is what would be issued; ``dispatch.dispatched`` says
+            # whether it was.  The sealed executable is re-hashed on every dispatch,
+            # not only at construction or preflight, and a mismatch or unreadable
+            # file fails closed before the runner is reached.
             receipt["command"] = command
+            observed, problem = self._observe_executable()
+            receipt["dispatch"] = {
+                "dispatched": False,
+                "executable_sha256_sealed": self.executable_sha256,
+                "executable_sha256_observed": observed,
+                "matches_sealed": problem is None,
+            }
+            if problem is not None:
+                raise ValueError(f"dispatch refused: {problem}; no process was started")
+            receipt["dispatch"]["dispatched"] = True
             exit_code, timed_out, limited = self.command_runner(
                 command, cwd=workspace, environment=self._environment(), prompt=prompt,
                 stdout_path=paths["stdout"], stderr_path=paths["stderr"],
