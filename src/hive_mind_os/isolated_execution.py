@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Protocol, Sequence
 
@@ -49,6 +50,7 @@ class IsolationAttestation:
         ):
             if type(v) is not str or not v.strip():
                 raise IsolationError(f"{n} is required")
+        self._validate_expires_at(self.expires_at)
         if any(
             isinstance(value, bool)
             or not isinstance(value, (int, float))
@@ -57,12 +59,32 @@ class IsolationAttestation:
         ):
             raise IsolationError("resource limits must be nonnegative numbers")
 
+    @staticmethod
+    def _validate_expires_at(expires_at: str) -> None:
+        try:
+            dt = datetime.fromisoformat(expires_at)
+        except ValueError as error:
+            raise IsolationError("expires_at must be valid ISO8601") from error
+        if dt.tzinfo is None:
+            raise IsolationError("expires_at must be timezone-aware")
+
     @property
     def digest(self):
         return canonical_digest(self)
 
-    def admits_untrusted(self):
-        return self.probe_result is ProbeResult.ENFORCED
+    def admits_untrusted(self, *, now: datetime | None = None) -> bool:
+        """Check structural status/freshness, not provenance or subject authority.
+
+        The caller must authenticate the attestation before relying on it. An
+        explicit clock is trusted host input and is never taken from the target.
+        """
+        observed = datetime.now(timezone.utc) if now is None else now
+        if not isinstance(observed, datetime) or observed.utcoffset() is None:
+            raise IsolationError("now must be a timezone-aware datetime")
+        return (
+            self.probe_result is ProbeResult.ENFORCED
+            and observed < datetime.fromisoformat(self.expires_at)
+        )
 
     def to_dict(self):
         from .brain_kernel.canonical import canonical_document
@@ -142,10 +164,10 @@ class UnavailableIsolationBackend:
         return "none"
 
 
-def require_attested(attestation: IsolationAttestation) -> None:
-    if not attestation.admits_untrusted():
+def require_attested(attestation: IsolationAttestation, *, now: datetime | None = None) -> None:
+    if not attestation.admits_untrusted(now=now):
         raise IsolationError(
-            "untrusted execution requires ENFORCED isolation attestation"
+            "untrusted execution requires a fresh ENFORCED isolation attestation"
         )
 
 
