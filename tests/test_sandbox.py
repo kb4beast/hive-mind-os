@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import base64
+import copy
+import errno
 import json
 import os
+import pickle
 import subprocess
 import sys
 import tempfile
@@ -28,15 +32,61 @@ from hive_mind_os.receipts import (
     sha256_digest,
 )
 from hive_mind_os.sandbox import (
+    _INCOMPLETE_CREDENTIALED_STREAM,
     ConfinementViolation,
     SandboxDenied,
+    SandboxError,
     SandboxRunner,
     SandboxSpec,
     SandboxTimeout,
+    _canonical_receipt,
     _interpreter_flags,
+    _TrustedChildContext,
 )
 
 _MOUNT_POINT_TAG = 0xA0000003
+_SECRET_ENV = "HIVE_MIND_TRUSTED_SECRET"
+_SYNTHETIC_TOKEN = "synthetic-sandbox-token-3b7e91c4"
+_SYNTHETIC_REMOTE = "https://github.com/example/synthetic-repo.git"
+_OTHER_REMOTE = "https://github.com/example/other-repo.git"
+# A controlled child that derives every supported secret form from its own
+# environment and echoes it in the mode named by ``sys.argv[1]``.  No backslashes:
+# the sandbox would treat the argument as a path.
+_ECHO_CHILD = """
+import base64, os, sys, time
+token = os.environ['HIVE_MIND_TRUSTED_SECRET']
+encoded = base64.b64encode(('x-access-token:' + token).encode()).decode()
+header = 'Authorization: Basic ' + encoded
+forms = [token, 'x-access-token:' + token, encoded, 'Basic ' + encoded, header]
+mode = sys.argv[1]
+NL = bytes([10])
+out = sys.stdout.buffer
+err = sys.stderr.buffer
+if mode in ('echo', 'fail'):
+    for form in forms:
+        out.write(form.encode() + NL)
+        err.write(form.encode() + NL)
+    out.flush()
+    err.flush()
+    sys.exit(3 if mode == 'fail' else 0)
+if mode == 'boundary':
+    out.write(b'a' * (65536 - 10) + header.encode() + b'b' * 100)
+    out.flush()
+if mode == 'cap-stdout':
+    out.write(b'y' * 100 + header.encode())
+    out.flush()
+if mode == 'cap-stderr':
+    out.write(b'ok')
+    out.flush()
+    err.write(b'z' * 100 + header.encode())
+    err.flush()
+if mode == 'sleep':
+    out.write(header.encode())
+    err.write(header.encode())
+    out.flush()
+    err.flush()
+    time.sleep(60)
+"""
 
 
 class SandboxTests(unittest.TestCase):
@@ -797,6 +847,795 @@ class SandboxTests(unittest.TestCase):
     def test_trusted_receipt_store_cannot_be_inside_workspace(self) -> None:
         with self.assertRaisesRegex(ValueError, "outside"):
             self.runner(trusted=self.root / "untrusted-receipts")
+
+    # -- private one-use trusted child context -------------------------------------
+
+    @staticmethod
+    def secret_forms(token: str = _SYNTHETIC_TOKEN) -> tuple[bytes, ...]:
+        encoded = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
+        return tuple(
+            form.encode()
+            for form in (
+                token,
+                f"x-access-token:{token}",
+                encoded,
+                f"Basic {encoded}",
+                f"Authorization: Basic {encoded}",
+            )
+        )
+
+    def echo_runner(self, name: str, **spec_overrides: Any) -> SandboxRunner:
+        return self.runner(
+            spec=self.spec(env_allowlist=(_SECRET_ENV,), **spec_overrides),
+            trusted=self.base / f"{name}-evidence",
+        )
+
+    def echo_argv(self, mode: str) -> list[str]:
+        return [sys.executable, "-c", _ECHO_CHILD, mode, _SYNTHETIC_REMOTE]
+
+    def echo_context(
+        self,
+        runner: SandboxRunner,
+        mode: str,
+        token: str = _SYNTHETIC_TOKEN,
+    ) -> _TrustedChildContext:
+        return _TrustedChildContext(
+            runner,
+            self.echo_argv(mode),
+            overrides=((_SECRET_ENV, token),),
+            secrets=self.secret_forms(token),
+            remote=_SYNTHETIC_REMOTE,
+        )
+
+    def run_echo(
+        self,
+        runner: SandboxRunner,
+        mode: str,
+        *,
+        action_id: str = "ACT-echo-1",
+    ) -> dict[str, Any]:
+        return runner.run(
+            self.intent(self.echo_argv(mode), action_id=action_id),
+            _trusted=self.echo_context(runner, mode),
+        )
+
+    def assert_no_forms(self, root: Path, forms: tuple[bytes, ...] | None = None) -> None:
+        """Scan every persisted byte (receipts and artifacts) for a supported form."""
+
+        forms = forms or self.secret_forms()
+        scanned = 0
+        for path in sorted(root.rglob("*")):
+            if path.is_file():
+                scanned += 1
+                content = path.read_bytes()
+                for form in forms:
+                    self.assertNotIn(form, content, path.name)
+        self.assertGreater(scanned, 0)
+
+    @staticmethod
+    def stream(receipt: dict[str, Any], root: Path, index: int) -> bytes:
+        return (root / receipt["artifacts"][index]["path"]).read_bytes()
+
+    def test_trusted_environment_is_child_only_and_ordered_drop_fixed_override(self) -> None:
+        dropped = "HIVE_MIND_TRUSTED_DROPPED"
+        kept = "HIVE_MIND_TRUSTED_KEPT"
+        fixed_dropped = "HIVE_MIND_TRUSTED_FIXED_DROPPED"
+        overridden = "HIVE_MIND_TRUSTED_OVERRIDDEN"
+        child_only = "HIVE_MIND_TRUSTED_CHILD_ONLY"
+        names = [dropped, kept, fixed_dropped, overridden, child_only]
+        code = (
+            "import json,os;"
+            f"print(json.dumps({{n: os.environ.get(n) for n in {names!r}}}, sort_keys=True))"
+        )
+        runner = self.runner(
+            spec=self.spec(
+                env_allowlist=tuple(names),
+                fixed_environment=((fixed_dropped, "fixed-nonsecret"), (overridden, "fixed-old")),
+            )
+        )
+        argv = [sys.executable, "-c", code]
+        context = _TrustedChildContext(
+            runner,
+            argv,
+            overrides=((overridden, "override-value"), (child_only, "child-only-value")),
+            drop=(dropped, fixed_dropped),
+        )
+        ambient = {
+            dropped: "ambient-dropped",
+            kept: "ambient-kept",
+            fixed_dropped: "ambient-secret-not-fixed",
+            overridden: "ambient-overridden",
+        }
+        with patch.dict(os.environ, ambient):
+            before = dict(os.environ)
+            receipt = runner.run(self.intent(argv), _trusted=context)
+            after = dict(os.environ)
+        self.assertEqual(before, after)
+        self.assertNotIn(child_only, os.environ)
+        self.assertEqual(
+            json.loads(self.stdout(receipt)),
+            {
+                dropped: None,
+                kept: "ambient-kept",
+                fixed_dropped: "fixed-nonsecret",
+                overridden: "override-value",
+                child_only: "child-only-value",
+            },
+        )
+
+    def test_trusted_secret_is_absent_from_parent_and_unrelated_children_during_popen(self) -> None:
+        code = f"import os;print(os.environ.get({_SECRET_ENV!r}, 'absent'))"
+        argv = [sys.executable, "-c", code]
+        trusted_runner = self.echo_runner("blocked-trusted")
+        unrelated_runner = self.echo_runner("blocked-unrelated")
+        # The remote must be part of the bound argv for a credentialed context.
+        argv_with_remote = [*argv, _SYNTHETIC_REMOTE]
+        context = _TrustedChildContext(
+            trusted_runner,
+            argv_with_remote,
+            overrides=((_SECRET_ENV, _SYNTHETIC_TOKEN),),
+            secrets=self.secret_forms(),
+            remote=_SYNTHETIC_REMOTE,
+        )
+        real_popen = subprocess.Popen
+        entered = threading.Event()
+        release = threading.Event()
+        environments: list[dict[str, str]] = []
+
+        def blocked_popen(command: list[str], **kwargs: Any) -> Any:
+            environment = dict(kwargs["env"])
+            environments.append(environment)
+            if _SECRET_ENV in environment:
+                entered.set()
+                if not release.wait(timeout=30):
+                    raise RuntimeError("probe was never released")
+            return real_popen(command, **kwargs)
+
+        before = dict(os.environ)
+        with patch.object(subprocess, "Popen", side_effect=blocked_popen):
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
+                    trusted_runner.run,
+                    self.intent(argv_with_remote, action_id="ACT-blocked-trusted"),
+                    _trusted=context,
+                )
+                try:
+                    self.assertTrue(entered.wait(timeout=30))
+                    # Observe the leak window while the credentialed Popen is blocked.
+                    during = dict(os.environ)
+                    unrelated = unrelated_runner.run(
+                        self.intent(argv, action_id="ACT-blocked-unrelated")
+                    )
+                finally:
+                    release.set()
+                trusted = future.result(timeout=60)
+        after = dict(os.environ)
+        self.assertEqual(before, during)
+        self.assertEqual(before, after)
+        self.assertNotIn(_SECRET_ENV, during)
+        for value in during.values():
+            self.assertNotIn(_SYNTHETIC_TOKEN, value)
+        self.assertEqual(
+            self.stdout(unrelated, self.base / "blocked-unrelated-evidence").splitlines(),
+            [b"absent"],
+        )
+        # The header-bearing mapping reached exactly one child: the credentialed one.
+        self.assertEqual(sum(_SECRET_ENV in env for env in environments), 1)
+        self.assertEqual(
+            self.stdout(trusted, self.base / "blocked-trusted-evidence").splitlines(),
+            [b"[REDACTED]"],
+        )
+
+    def test_concurrent_trusted_children_each_receive_only_their_own_environment(self) -> None:
+        names = ["HIVE_MIND_TRUSTED_ONE", "HIVE_MIND_TRUSTED_TWO"]
+        code = (
+            "import json,os,time;time.sleep(0.6);"
+            f"print(json.dumps({{n: os.environ.get(n) for n in {names!r}}}, sort_keys=True))"
+        )
+        argv = [sys.executable, "-c", code]
+        runners = [
+            self.runner(
+                spec=self.spec(env_allowlist=tuple(names)),
+                trusted=self.base / f"concurrent-{index}-evidence",
+            )
+            for index in range(3)
+        ]
+        contexts = [
+            _TrustedChildContext(runners[0], argv, overrides=((names[0], "value-one"),)),
+            _TrustedChildContext(runners[1], argv, overrides=((names[1], "value-two"),)),
+            None,
+        ]
+
+        def invoke(index: int) -> dict[str, Any]:
+            intent = self.intent(argv, action_id=f"ACT-concurrent-env-{index}")
+            context = contexts[index]
+            if context is None:
+                return runners[index].run(intent)
+            return runners[index].run(intent, _trusted=context)
+
+        before = dict(os.environ)
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            receipts = list(pool.map(invoke, range(3)))
+        self.assertEqual(before, dict(os.environ))
+        observed = [
+            json.loads(self.stdout(receipt, self.base / f"concurrent-{index}-evidence"))
+            for index, receipt in enumerate(receipts)
+        ]
+        self.assertEqual(observed[0], {names[0]: "value-one", names[1]: None})
+        self.assertEqual(observed[1], {names[0]: None, names[1]: "value-two"})
+        self.assertEqual(observed[2], {names[0]: None, names[1]: None})
+
+    def test_trusted_context_denials_are_pre_spawn_and_leak_nothing(self) -> None:
+        forms = self.secret_forms()
+        overrides = ((_SECRET_ENV, _SYNTHETIC_TOKEN),)
+        code = "print('bound')"
+        bound = [sys.executable, "-c", code, _SYNTHETIC_REMOTE]
+
+        def context_for(
+            runner: SandboxRunner,
+            argv: list[str],
+            *,
+            remote: str | None = _SYNTHETIC_REMOTE,
+            secrets: tuple[bytes, ...] = forms,
+        ) -> _TrustedChildContext:
+            return _TrustedChildContext(
+                runner, argv, overrides=overrides, secrets=secrets, remote=remote
+            )
+
+        # (label, denial reason, spec overrides); the branches below build the mismatch.
+        other_argv = [sys.executable, "-c", "print('other')", _SYNTHETIC_REMOTE]
+        wrong_remote_argv = [sys.executable, "-c", code, _OTHER_REMOTE]
+        two_urls_argv = [sys.executable, "-c", code, _SYNTHETIC_REMOTE, _OTHER_REMOTE]
+        cases: list[tuple[str, str, dict[str, Any]]] = [
+            ("runner", "another runner", {}),
+            ("identity", "another runner", {}),
+            ("executable", "another executable", {}),
+            ("arguments", "other arguments", {}),
+            ("remote", "another remote", {}),
+            ("second-url", "another remote", {}),
+            ("allowlist", "not allowlisted", {"env_allowlist": ()}),
+            ("invalid", "invalid", {}),
+            ("reuse", "already used", {}),
+        ]
+        for label, reason, spec_overrides in cases:
+            with self.subTest(case=label):
+                ledger = EvidenceLedger()
+                trusted_root = self.base / f"denial-{label}-evidence"
+                spec_values = {"env_allowlist": (_SECRET_ENV,), **spec_overrides}
+                runner = self.runner(
+                    spec=self.spec(**spec_values),
+                    trusted=trusted_root,
+                    ledger=ledger,
+                )
+                other = self.runner(
+                    spec=self.spec(**spec_values),
+                    trusted=self.base / f"denial-{label}-other-evidence",
+                )
+                intent_argv = bound
+                subject: Any = context_for(runner, bound)
+                target = runner
+                if label == "runner":
+                    subject = context_for(other, bound)
+                elif label == "identity":
+                    runner.runner_identity = "renamed-sandbox-runner"
+                elif label == "executable":
+                    subject = context_for(
+                        runner, ["definitely-not-a-hive-executable", *bound[1:]]
+                    )
+                elif label == "arguments":
+                    subject = context_for(runner, other_argv)
+                elif label == "remote":
+                    intent_argv = wrong_remote_argv
+                    subject = context_for(runner, wrong_remote_argv)
+                elif label == "second-url":
+                    intent_argv = two_urls_argv
+                    subject = context_for(runner, two_urls_argv)
+                elif label == "invalid":
+                    subject = object()
+                elif label == "reuse":
+                    first = runner.run(
+                        self.intent(bound, action_id="ACT-denial-first"),
+                        _trusted=subject,
+                    )
+                    self.assertEqual(first["result"], "succeeded")
+                spawned = target.spawn_count
+                with self.assertRaisesRegex(SandboxDenied, reason) as captured:
+                    target.run(
+                        self.intent(intent_argv, action_id="ACT-denial-second"),
+                        _trusted=subject,
+                    )
+                self.assertEqual(target.spawn_count, spawned)
+                for form in forms:
+                    self.assertNotIn(form.decode(), str(captured.exception))
+                    self.assertNotIn(form.decode(), json.dumps(ledger.events(), default=str))
+                denials = [
+                    event
+                    for event in ledger.events()
+                    if event["event_type"] == "sandbox.denied"
+                ]
+                self.assertEqual(len(denials), 1)
+                self.assertEqual(denials[0]["payload"]["reason"], str(captured.exception))
+                if label != "reuse":
+                    self.assertFalse((trusted_root / "r").exists())
+
+    def test_trusted_context_is_private_redacted_and_not_copyable_or_serializable(self) -> None:
+        runner = self.echo_runner("private-context")
+        context = self.echo_context(runner, "echo")
+        for rendered in (repr(context), str(context), f"{context}", format(context, "")):
+            self.assertEqual(rendered, "<_TrustedChildContext redacted>")
+            self.assertNotIn(_SYNTHETIC_TOKEN, rendered)
+        self.assertFalse(hasattr(context, "__dict__"))
+        with self.assertRaises(TypeError):
+            copy.copy(context)
+        with self.assertRaises(TypeError):
+            copy.deepcopy(context)
+        for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+            with self.subTest(protocol=protocol), self.assertRaises(TypeError):
+                pickle.dumps(context, protocol=protocol)
+        with self.assertRaises(TypeError):
+            json.dumps(context)
+
+    def test_trusted_context_constructor_errors_do_not_stringify_values(self) -> None:
+        runner = self.echo_runner("constructor-errors")
+        argv = self.echo_argv("echo")
+        bad_cases: list[dict[str, Any]] = [
+            {"overrides": (("BAD=NAME", _SYNTHETIC_TOKEN),)},
+            {"overrides": ((_SECRET_ENV, _SYNTHETIC_TOKEN + "\x00"),)},
+            {"overrides": ((_SECRET_ENV, _SYNTHETIC_TOKEN), (_SECRET_ENV, "again"))},
+            {"drop": (None,)},
+            {"secrets": self.secret_forms(), "remote": None},
+            {"remote": "https://user:" + _SYNTHETIC_TOKEN + "@github.com/o/r.git"},
+        ]
+        for keywords in bad_cases:
+            with self.subTest(keywords=sorted(keywords)):
+                with self.assertRaises(ValueError) as captured:
+                    _TrustedChildContext(runner, argv, **keywords)
+                self.assertNotIn(_SYNTHETIC_TOKEN, str(captured.exception))
+                self.assertNotIn(_SYNTHETIC_TOKEN, repr(captured.exception))
+
+    def test_credentialed_streams_are_redacted_before_persistence(self) -> None:
+        for mode in ("echo", "fail"):
+            with self.subTest(mode=mode):
+                runner = self.echo_runner(f"redact-{mode}")
+                receipt = self.run_echo(runner, mode)
+                root = self.base / f"redact-{mode}-evidence"
+                expected = b"[REDACTED]" + bytes([10])
+                self.assertEqual(self.stream(receipt, root, 0), expected * 5)
+                self.assertEqual(self.stream(receipt, root, 1), expected * 5)
+                self.assertEqual(receipt["result"], "failed" if mode == "fail" else "succeeded")
+                for label, index in (("stdout", 0), ("stderr", 1)):
+                    stored = self.stream(receipt, root, index)
+                    stream = receipt["execution"][label]
+                    self.assertEqual(stream["bytes"], len(stored))
+                    self.assertEqual(stream["digest"], sha256_digest(stored))
+                    self.assertFalse(stream["truncated"])
+                self.assert_no_forms(root)
+                self.assertEqual(
+                    (runner.tool_calls_used, runner.compute_units_used, runner.spawn_count),
+                    (1, 1.0, 1),
+                )
+
+    def test_secret_split_across_pipe_reads_is_redacted(self) -> None:
+        runner = self.echo_runner("boundary", max_output_bytes=200_000)
+        receipt = self.run_echo(runner, "boundary")
+        root = self.base / "boundary-evidence"
+        stored = self.stream(receipt, root, 0)
+        self.assertEqual(stored, b"a" * (65536 - 10) + b"[REDACTED]" + b"b" * 100)
+        self.assertFalse(receipt["execution"]["stdout"]["truncated"])
+        self.assertEqual(receipt["execution"]["stdout"]["bytes"], len(stored))
+        self.assert_no_forms(root)
+
+    def test_truncated_credentialed_streams_store_a_fixed_marker_with_raw_truth(self) -> None:
+        marker = _INCOMPLETE_CREDENTIALED_STREAM
+        for mode, index, other in (("cap-stdout", 0, 1), ("cap-stderr", 1, 0)):
+            with self.subTest(mode=mode):
+                runner = self.echo_runner(f"cap-{mode}", max_output_bytes=128)
+                receipt = self.run_echo(runner, mode)
+                root = self.base / f"cap-{mode}-evidence"
+                label = ("stdout", "stderr")[index]
+                self.assertEqual(self.stream(receipt, root, index), marker)
+                stream = receipt["execution"][label]
+                self.assertTrue(stream["truncated"])
+                self.assertEqual(stream["bytes"], len(marker))
+                self.assertEqual(stream["digest"], sha256_digest(marker))
+                self.assertFalse(receipt["execution"][("stdout", "stderr")[other]]["truncated"])
+                self.assert_no_forms(root)
+                self.assertEqual(
+                    (runner.tool_calls_used, runner.compute_units_used, runner.spawn_count),
+                    (1, 1.0, 1),
+                )
+
+    def test_timed_out_credentialed_streams_store_a_fixed_marker(self) -> None:
+        runner = self.echo_runner("timeout", timeout_s=4.0)
+        with self.assertRaises(SandboxTimeout) as captured:
+            self.run_echo(runner, "sleep")
+        root = self.base / "timeout-evidence"
+        receipt = captured.exception.receipt
+        self.assertEqual(receipt["execution"]["outcome"], "timeout")
+        self.assertEqual(self.stream(receipt, root, 0), _INCOMPLETE_CREDENTIALED_STREAM)
+        self.assertEqual(self.stream(receipt, root, 1), _INCOMPLETE_CREDENTIALED_STREAM)
+        self.assertEqual(
+            receipt["execution"]["stdout"]["digest"],
+            sha256_digest(_INCOMPLETE_CREDENTIALED_STREAM),
+        )
+        self.assert_no_forms(root)
+        for form in self.secret_forms():
+            self.assertNotIn(form.decode(), str(captured.exception))
+
+    def test_context_without_secrets_leaves_output_and_truncation_untouched(self) -> None:
+        runner = self.runner(spec=self.spec(max_output_bytes=100))
+        argv = [sys.executable, "-c", "import sys;sys.stdout.buffer.write(b'x'*4096)"]
+        receipt = runner.run(
+            self.intent(argv),
+            _trusted=_TrustedChildContext(runner, argv),
+        )
+        self.assertEqual(self.stdout(receipt), b"x" * 100)
+        self.assertTrue(receipt["execution"]["stdout"]["truncated"])
+        self.assertEqual(receipt["execution"]["stdout"]["bytes"], 100)
+
+    def test_trusted_context_does_not_change_intent_spec_or_receipt_digests(self) -> None:
+        runner = self.runner()
+        argv = [sys.executable, "-c", "print('stable')"]
+        intent = self.intent(argv)
+        spec_digest = runner.spec.spec_digest()
+        plain = runner.run(intent)
+        trusted = runner.run(intent, _trusted=_TrustedChildContext(runner, argv))
+        self.assertEqual(runner.spec.spec_digest(), spec_digest)
+        self.assertEqual(trusted["action_digest"], intent["action_digest"])
+        self.assertEqual(
+            trusted["execution"]["sandbox_spec_digest"],
+            plain["execution"]["sandbox_spec_digest"],
+        )
+
+        def normalize(receipt: dict[str, Any]) -> dict[str, Any]:
+            normalized = deepcopy(receipt)
+            normalized["receipt_id"] = "<receipt-id>"
+            normalized["execution_id"] = "<execution-id>"
+            normalized["observed_at"] = "<timestamp>"
+            normalized["execution"]["duration_ms"] = 0
+            for artifact in normalized["artifacts"]:
+                artifact["created_at"] = "<timestamp>"
+            return normalized
+
+        self.assertEqual(normalize(plain), normalize(trusted))
+
+    def test_credentialed_receipt_digests_bind_only_sanitized_stored_bytes(self) -> None:
+        runner = self.echo_runner("credentialed-receipt")
+        receipt = self.run_echo(runner, "echo")
+        assert runner.last_reference is not None
+        intent = self.intent(self.echo_argv("echo"), action_id="ACT-echo-1")
+        validation = FileReceiptValidator(self.base / "credentialed-receipt-evidence").validate(
+            runner.last_reference,
+            mission_id=intent["mission_id"],
+            state_ref=intent["state_ref"],
+            actor_id=intent["actor_id"],
+            action_id=intent["action_id"],
+            action_kind=intent["kind"],
+            action_digest=receipt["action_digest"],
+        )
+        self.assertTrue(validation.valid, validation.issues)
+        self.assertEqual(receipt["execution"]["argv"][-1], _SYNTHETIC_REMOTE)
+        self.assertEqual(receipt["execution"]["requested_argv"][-1], _SYNTHETIC_REMOTE)
+
+    def test_returned_receipt_derives_the_exact_published_reference(self) -> None:
+        runner = self.runner()
+        first = runner.run(self.intent([sys.executable, "-c", "print('one')"], action_id="ACT-ref-1"))
+        first_reference = runner.last_reference
+        second = runner.run(self.intent([sys.executable, "-c", "print('two')"], action_id="ACT-ref-2"))
+        # The shared legacy reference now names the second invocation, but each returned
+        # receipt still derives its own content address and retained bytes.
+        self.assertNotEqual(first_reference, runner.last_reference)
+        raw, reference = _canonical_receipt(first)
+        self.assertEqual(reference, first_reference)
+        self.assertEqual((self.trusted / reference.path).read_bytes(), raw)
+        self.assertEqual(reference.digest, sha256_digest(raw))
+        raw, reference = _canonical_receipt(second)
+        self.assertEqual(reference, runner.last_reference)
+        self.assertEqual((self.trusted / reference.path).read_bytes(), raw)
+
+    # -- concurrent immutable content-addressed publication ------------------------------
+    # These use the real filesystem and the real publication primitive (``os.link``).
+    # The barrier wraps the primitive and passes through, so a change of primitive makes
+    # ``ready`` never fire and the test fails instead of passing vacuously.
+
+    def publication_target(self, name: str, content: bytes) -> tuple[SandboxRunner, str, Path]:
+        trusted = self.base / f"{name}-evidence"
+        runner = self.runner(trusted=trusted)
+        relative = f"artifacts/{sha256_digest(content).removeprefix('sha256:')}.stderr"
+        return runner, relative, trusted / relative
+
+    @staticmethod
+    def park_first_link(name: str) -> tuple[Any, threading.Event, threading.Event]:
+        """Park the named thread inside the real ``os.link``, after its temp file is complete."""
+
+        real_link = os.link
+        ready = threading.Event()
+        release = threading.Event()
+
+        def link(source: Any, target: Any, *args: Any, **kwargs: Any) -> Any:
+            if threading.current_thread().name == name and not ready.is_set():
+                ready.set()
+                if not release.wait(timeout=30):
+                    raise RuntimeError("publication barrier was never released")
+            return real_link(source, target, *args, **kwargs)
+
+        return patch.object(os, "link", side_effect=link), ready, release
+
+    def race_publishers(
+        self,
+        runner: SandboxRunner,
+        relative: str,
+        destination: Path,
+        first_content: bytes,
+        second_content: bytes,
+        *,
+        held_reader: bool,
+    ) -> tuple[dict[str, str], os.stat_result]:
+        """A checks the destination absent and parks; B publishes; a reader holds the
+        winner open; then A resumes. Returns A's outcome and the winner's identity."""
+
+        patcher, ready, release = self.park_first_link("publisher-A")
+        outcome: dict[str, str] = {}
+
+        def first() -> None:
+            try:
+                runner._atomic_write(relative, first_content)
+                outcome["A"] = "success"
+            except BaseException as error:  # recorded and asserted by the caller
+                outcome["A"] = f"{type(error).__name__}: {error}"
+
+        with patcher:
+            thread = threading.Thread(target=first, name="publisher-A")
+            thread.start()
+            try:
+                self.assertTrue(ready.wait(timeout=30))
+                runner._atomic_write(relative, second_content)
+                winner = os.stat(destination)
+                if held_reader:
+                    with destination.open("rb") as reader:
+                        self.assertEqual(reader.read(), second_content)
+                        release.set()
+                        thread.join(timeout=30)
+                else:
+                    release.set()
+                    thread.join(timeout=30)
+            finally:
+                release.set()
+                thread.join(timeout=30)
+        self.assertFalse(thread.is_alive())
+        return outcome, winner
+
+    def test_concurrent_same_bytes_publication_adopts_the_winner_with_a_held_reader(self) -> None:
+        for content in (b"", b"exact matching complete artifact bytes\n"):
+            for held_reader in (False, True):
+                with self.subTest(content=len(content), held_reader=held_reader):
+                    runner, relative, destination = self.publication_target(
+                        f"same-{len(content)}-{held_reader}", content
+                    )
+                    outcome, winner = self.race_publishers(
+                        runner, relative, destination, content, content, held_reader=held_reader
+                    )
+                    self.assertEqual(outcome, {"A": "success"})
+                    after = os.stat(destination)
+                    # The winner's file was adopted, not replaced.
+                    self.assertEqual((after.st_dev, after.st_ino), (winner.st_dev, winner.st_ino))
+                    self.assertEqual(destination.read_bytes(), content)
+                    # Both owned temporary files are gone; nothing else was created.
+                    self.assertEqual(
+                        [entry.name for entry in destination.parent.iterdir()],
+                        [destination.name],
+                    )
+
+    def test_concurrent_conflicting_bytes_fail_closed_without_overwrite(self) -> None:
+        for held_reader in (False, True):
+            with self.subTest(held_reader=held_reader):
+                runner, relative, destination = self.publication_target(
+                    f"conflict-{held_reader}", b"winner"
+                )
+                outcome, winner = self.race_publishers(
+                    runner, relative, destination, b"loser", b"winner", held_reader=held_reader
+                )
+                self.assertEqual(
+                    outcome, {"A": "SandboxError: content-addressed artifact collision"}
+                )
+                after = os.stat(destination)
+                self.assertEqual((after.st_dev, after.st_ino), (winner.st_dev, winner.st_ino))
+                self.assertEqual(destination.read_bytes(), b"winner")
+                self.assertEqual(
+                    [entry.name for entry in destination.parent.iterdir()],
+                    [destination.name],
+                )
+
+    def test_existing_different_or_partial_bytes_are_never_accepted_or_overwritten(self) -> None:
+        full = b"complete artifact bytes"
+        for label, existing in (("different", b"other artifact bytes"), ("partial", full[:8])):
+            with self.subTest(existing=label):
+                runner, relative, destination = self.publication_target(f"existing-{label}", full)
+                destination.parent.mkdir(parents=True)
+                destination.write_bytes(existing)
+                before = os.stat(destination)
+                with self.assertRaisesRegex(SandboxError, "collision"):
+                    runner._atomic_write(relative, full)
+                after = os.stat(destination)
+                self.assertEqual((before.st_dev, before.st_ino), (after.st_dev, after.st_ino))
+                self.assertEqual(destination.read_bytes(), existing)
+                self.assertEqual(
+                    [entry.name for entry in destination.parent.iterdir()],
+                    [destination.name],
+                )
+
+    def test_publication_cleans_only_its_owned_temporary_file(self) -> None:
+        content = b"owned temporary cleanup"
+        runner, relative, destination = self.publication_target("cleanup", content)
+        sibling = destination.parent / "unrelated-evidence.txt"
+        destination.parent.mkdir(parents=True)
+        sibling.write_bytes(b"must survive every publication attempt")
+
+        def entries() -> list[str]:
+            return sorted(entry.name for entry in destination.parent.iterdir())
+
+        # Failure before publication (fsync) never exposes the destination.
+        with patch.object(os, "fsync", side_effect=OSError(errno.EIO, "simulated fsync failure")):
+            with self.assertRaises(OSError):
+                runner._atomic_write(relative, content)
+        self.assertEqual(entries(), [sibling.name])
+        # A data error from the link propagates as itself, and its temporary file is removed.
+        with patch.object(os, "link", side_effect=OSError(errno.ENOSPC, "simulated disk full")):
+            with self.assertRaises(OSError) as captured:
+                runner._atomic_write(relative, content)
+        self.assertNotIsInstance(captured.exception, SandboxError)
+        self.assertEqual(entries(), [sibling.name])
+        # A cleanup failure never masks the primary error.
+        with (
+            patch.object(os, "link", side_effect=OSError(errno.ENOSPC, "simulated disk full")),
+            patch.object(Path, "unlink", side_effect=PermissionError("temporary is locked")),
+        ):
+            with self.assertRaises(OSError) as masked:
+                runner._atomic_write(relative, content)
+        self.assertEqual(masked.exception.errno, errno.ENOSPC)
+        for leftover in [entry for entry in destination.parent.iterdir() if entry != sibling]:
+            leftover.unlink()  # the test's own leftover from the simulated locked file
+        # Success leaves exactly the destination and the untouched sibling.
+        runner._atomic_write(relative, content)
+        self.assertEqual(entries(), sorted([destination.name, sibling.name]))
+        self.assertEqual(destination.read_bytes(), content)
+        self.assertEqual(sibling.read_bytes(), b"must survive every publication attempt")
+        # A cleanup failure after a completed publication does not fail it, and the
+        # leftover name holds the same complete bytes.
+        other = b"published while its temporary file cannot be removed"
+        _, other_relative, other_destination = self.publication_target("cleanup", other)
+        with patch.object(Path, "unlink", side_effect=PermissionError("temporary is locked")):
+            runner._atomic_write(other_relative, other)
+        self.assertEqual(other_destination.read_bytes(), other)
+        for entry in destination.parent.iterdir():
+            if entry.name not in {destination.name, sibling.name}:
+                self.assertIn(entry.read_bytes(), {other, content})
+
+    def test_unsupported_hard_links_fail_with_a_typed_error_and_no_weaker_fallback(self) -> None:
+        content = b"needs an atomic create-if-absent primitive"
+        for label, error in (
+            ("not implemented", NotImplementedError()),
+            ("not permitted", OSError(errno.EPERM, "links are not permitted here")),
+            ("cross-device", OSError(errno.EXDEV, "invalid cross-device link")),
+        ):
+            with self.subTest(host=label):
+                runner, relative, destination = self.publication_target(
+                    f"unsupported-{label.replace(' ', '-')}", content
+                )
+                with patch.object(os, "link", side_effect=error):
+                    with self.assertRaisesRegex(SandboxError, "hard-link support"):
+                        runner._atomic_write(relative, content)
+                self.assertFalse(destination.exists())
+                self.assertEqual(list(destination.parent.iterdir()), [])
+
+    def test_many_concurrent_writers_and_readers_publish_identical_bytes(self) -> None:
+        content = b"identical artifact bytes published by many writers"
+        runner, relative, destination = self.publication_target("many-writers", content)
+        writers = 8
+        start = threading.Barrier(writers + 1)
+        finished = threading.Event()
+        errors: list[BaseException] = []
+
+        def write() -> None:
+            try:
+                start.wait(timeout=30)
+                runner._atomic_write(relative, content)
+            except BaseException as error:  # collected and asserted below
+                errors.append(error)
+
+        def read() -> None:
+            try:
+                start.wait(timeout=30)
+                while not finished.is_set():
+                    try:
+                        with destination.open("rb") as handle:
+                            # Visible means complete: never a partial destination.
+                            assert handle.read() == content
+                    except FileNotFoundError:
+                        pass
+            except BaseException as error:  # collected and asserted below
+                errors.append(error)
+
+        reader = threading.Thread(target=read)
+        pool = [threading.Thread(target=write) for _ in range(writers)]
+        reader.start()
+        for thread in pool:
+            thread.start()
+        for thread in pool:
+            thread.join(timeout=60)
+        finished.set()
+        reader.join(timeout=30)
+        self.assertEqual(errors, [])
+        self.assertEqual(destination.read_bytes(), content)
+        # A temporary name may survive only when a concurrent open reader blocked its
+        # removal; it must then hold the same complete bytes.
+        for entry in destination.parent.iterdir():
+            self.assertEqual(entry.read_bytes(), content)
+
+    def test_concurrent_runs_with_identical_artifacts_both_persist_their_receipts(self) -> None:
+        runner = self.runner()
+        argv = [sys.executable, "-c", "print('identical output')"]
+        patcher, ready, release = self.park_first_link("run-A")
+        results: dict[str, Any] = {}
+
+        def first() -> None:
+            try:
+                results["A"] = runner.run(self.intent(argv, action_id="ACT-publication-A"))
+            except BaseException as error:  # asserted below
+                results["A"] = error
+
+        with patcher:
+            thread = threading.Thread(target=first, name="run-A")
+            thread.start()
+            try:
+                self.assertTrue(ready.wait(timeout=30))
+                results["B"] = runner.run(self.intent(argv, action_id="ACT-publication-B"))
+                shared = self.trusted / results["B"]["artifacts"][0]["path"]
+                with shared.open("rb") as reader:
+                    reader.read()
+                    release.set()
+                    thread.join(timeout=60)
+            finally:
+                release.set()
+                thread.join(timeout=60)
+        self.assertFalse(thread.is_alive())
+        for label in ("A", "B"):
+            receipt = results[label]
+            self.assertIsInstance(receipt, dict, repr(receipt))
+            raw, reference = _canonical_receipt(receipt)
+            self.assertEqual((self.trusted / reference.path).read_bytes(), raw)
+            self.assertTrue(validate_contract("tool-receipt", receipt).valid)
+        self.assertEqual(
+            results["A"]["artifacts"][0]["digest"], results["B"]["artifacts"][0]["digest"]
+        )
+        self.assertEqual(runner.spawn_count, 2)
+
+    def test_old_signature_spawn_override_serves_only_context_free_calls(self) -> None:
+        class LegacyRunner(SandboxRunner):
+            def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
+                return super()._spawn(argv)
+
+        ledger = EvidenceLedger()
+        runner = LegacyRunner(
+            self.spec(env_allowlist=(_SECRET_ENV,)),
+            self.base / "legacy-evidence",
+            EpisodeAllowance(5, 5.0),
+            ledger=ledger,
+        )
+        plain = runner.run(self.intent([sys.executable, "-c", "print('legacy')"]))
+        self.assertEqual(plain["result"], "succeeded")
+        self.assertEqual(runner.spawn_count, 1)
+        with self.assertRaises(TypeError) as captured:
+            self.run_echo(runner, "echo")
+        self.assertEqual(runner.spawn_count, 1)
+        for form in self.secret_forms():
+            self.assertNotIn(form.decode(), str(captured.exception))
+        self.assertFalse(
+            any(
+                path.is_file() and b"REDACTED" in path.read_bytes()
+                for path in (self.base / "legacy-evidence").rglob("*")
+            )
+        )
 
 
 if __name__ == "__main__":
