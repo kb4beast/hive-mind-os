@@ -481,3 +481,35 @@ test and 34 skips. The initial local integrated run was deliberately stopped
 after that failure was known; its partial log remains incomplete evidence.
 Both are preserved. A corrected-head full local and GitHub gate remains required;
 neither this correction nor the scoped Curator verdict substitutes for it.
+
+## Correction 2026-09-21: clock-independent test fixture identities
+
+At `8a9dda3e2a7fce8482d2cdc9b54e1b51212d5553`, the complete local gate
+passed 2,244 tests with 14 skips. GitHub run `35558867283` passed nine jobs
+but Windows Python 3.12 failed with nine fixture-creation errors. Multiple
+`time.monotonic_ns()` calls returned the same tick, so scratch paths collided
+before worker assertions ran. The original CI log remains retained as
+`h1-github-windows312-failure-35558867283.log`.
+
+The repair assigns fixture names from a per-test counter inside the existing
+unique temporary root. Scratch creation, stream contents and intentionally
+uncreated evidence paths retain their original semantics. One new regression
+freezes the clock while creating 60 distinct scratch, stream and evidence paths.
+No existing acceptance assertion was removed or changed, and production worker
+SHA-256 remains `e0beaeca61cc86bd091d2d39ebb86450cb535ed054ef3e946e69a1ec6d8c4254`.
+
+Independent Curator `/root/readiness_judge` reproduced 13 collision errors in
+the original 20 methods under a frozen clock on Python 3.12.10; the repaired
+21 methods pass with zero skips. AST comparison preserves all original methods
+and assertions. Separate controls retain 20 different stream contents, 20 empty
+scratch directories, and distinct completed-worker evidence directories.
+The exact repaired test SHA-256 is
+`e82b8c47880dcab65ce2a14afe728a131eaccdec1cd020558e24592a0e4a5d18`.
+The scoped disposition is ADOPT, subject to the complete CI gate. Review digest:
+`2f2a5903aa046487cb485bda0f8010842daf3068e74f4c91464102d64de7e36c`;
+receipt: `dc302110c421767c5eb5393789a68dcfe5ddd4fd5290f8d6b64a25915eddd9b3`.
+
+Root's focused 21-test run also passes. This test-only correction supplies no
+additional runtime authority or pilot admission. Rollback reverts the test
+counter and new regression, retaining the failed CI and independent controls.
+The full corrected-head local and remote gates remain required.

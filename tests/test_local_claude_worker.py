@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+from itertools import count
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -341,9 +342,14 @@ class _Directory(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
+        self._fixture_paths = count()
+
+    def _fixture_path(self, prefix: str, suffix: str = "") -> Path:
+        # Clock resolution is not a uniqueness guarantee (Windows Python 3.12).
+        return self.root / f"{prefix}-{next(self._fixture_paths)}{suffix}"
 
     def stream_file(self, text: str) -> Path:
-        path = self.root / f"stream-{time.monotonic_ns()}.jsonl"
+        path = self._fixture_path("stream", ".jsonl")
         path.write_text(text, encoding="utf-8")
         return path
 
@@ -453,9 +459,20 @@ class ClaudeStreamParserTests(_Directory):
 
 class ClaudeWorkerRunTests(_ClaudeRig):
     def _scratch(self) -> Path:
-        path = self.root / f"scratch-{time.monotonic_ns()}"
+        path = self._fixture_path("scratch")
         path.mkdir()
         return path
+
+    def test_fixture_paths_do_not_reuse_a_clock_tick_or_overwrite_streams(self) -> None:
+        with mock.patch("time.monotonic_ns", return_value=2428890000000):
+            scratches = [self._scratch() for _ in range(20)]
+            streams = [self.stream_file(str(index)) for index in range(20)]
+            evidence = [self._fixture_path("evidence") for _ in range(20)]
+        self.assertEqual(60, len(set(scratches + streams + evidence)))
+        self.assertTrue(all(path.is_dir() and not tuple(path.iterdir()) for path in scratches))
+        self.assertEqual([str(index) for index in range(20)],
+                         [path.read_text(encoding="utf-8") for path in streams])
+        self.assertTrue(all(not path.exists() and path.parent == self.root for path in evidence))
 
     @staticmethod
     def _runner(text: str, *, code: int = 0, timed_out: bool = False, limited: bool = False, write=None):
@@ -474,7 +491,7 @@ class ClaudeWorkerRunTests(_ClaudeRig):
         return worker.run(
             node={"id": "package"}, actor_id="builder-actor", role="builder",
             workspace=scratch or self._scratch(),
-            evidence_directory=self.root / f"evidence-{time.monotonic_ns()}",
+            evidence_directory=self._fixture_path("evidence"),
             predecessor_reports=[], objective="propose a patch", timeout_seconds=30,
             writable=True, source_packet=packet,
         )
@@ -597,14 +614,14 @@ class ClaudeWorkerRunTests(_ClaudeRig):
             with self.subTest(bad), self.assertRaises(ValueError):
                 worker.run(
                     node={"id": "p"}, actor_id="a", role="builder", workspace=self._scratch(),
-                    evidence_directory=self.root / f"e-{time.monotonic_ns()}",
+                    evidence_directory=self._fixture_path("e"),
                     predecessor_reports=[], objective="o", timeout_seconds=bad,
                     writable=True, source_packet={},
                 )
         with self.assertRaises(ValueError):
             worker.run(
                 node={"id": "p"}, actor_id="a", role="builder", workspace=self._scratch(),
-                evidence_directory=self.root / f"e-{time.monotonic_ns()}",
+                evidence_directory=self._fixture_path("e"),
                 predecessor_reports=[], objective="o", timeout_seconds=5, writable=True,
                 source_packet=None,
             )
@@ -614,7 +631,7 @@ class ClaudeProcessRunnerTests(_Directory):
     """Real subprocesses: no model is involved, only the deadline and byte-cap machinery."""
 
     def _run(self, script: str, *arguments: str, timeout: float, cap: int = 1_000_000, prompt: bytes = b""):
-        base = self.root / f"run-{time.monotonic_ns()}"
+        base = self._fixture_path("run")
         base.mkdir()
         result = _run_claude_process(
             [sys.executable, "-c", script, *arguments], cwd=base, environment=dict(os.environ),
