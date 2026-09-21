@@ -10,7 +10,7 @@ import shutil
 import sys
 import tempfile
 import threading
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
@@ -33,7 +33,14 @@ from .receipts import (
     portable_path_parts,
     sha256_digest,
 )
-from .sandbox import ConfinementViolation, SandboxRunner, SandboxSpec
+from .sandbox import (
+    ConfinementViolation,
+    SandboxRunner,
+    SandboxSpec,
+    _canonical_receipt,
+    _environment_key,
+    _TrustedChildContext,
+)
 
 _FULL_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
 _BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
@@ -48,6 +55,7 @@ _GIT_CREDENTIAL_ENV = (
     "GIT_CONFIG_VALUE_2",
 )
 _GIT_PLATFORM_ENV = ("SYSTEMROOT",) if os.name == "nt" else ()
+_CREDENTIAL_REMOTE_HOSTS = ("github.com",)
 
 
 class GitOperationFailed(RuntimeError):
@@ -204,6 +212,16 @@ def _normalized_executable(value: str) -> str:
     return Path(value).name.casefold().removesuffix(".exe")
 
 
+def _is_git_command(executable: str) -> bool:
+    requested = shutil.which(executable)
+    git = shutil.which("git")
+    return (
+        requested is not None
+        and git is not None
+        and _normalized_executable(requested) == _normalized_executable(git)
+    )
+
+
 def _branch_name(value: str) -> str:
     if (
         not _BRANCH.fullmatch(value)
@@ -234,56 +252,112 @@ def _git_dates(author_date: str, committer_date: str) -> Iterator[None]:
                     os.environ[name] = value
 
 
-@contextmanager
-def _isolated_git_config(config_path: Path) -> Iterator[None]:
-    values = {
-        "GIT_CONFIG_GLOBAL": str(config_path),
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "GIT_TERMINAL_PROMPT": "0",
-    }
-    with _GIT_ENV_LOCK:
-        previous = {name: os.environ.get(name) for name in values}
-        os.environ.update(values)
-        try:
-            yield
-        finally:
-            for name, value in previous.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
+def _require_canonical_remote(remote: str, allowed_hosts: Sequence[str]) -> None:
+    """Refuse any remote that is not exactly what ``_github_remote`` would emit.
+
+    ``_github_remote`` is the one URL policy. Requiring its output to equal the input
+    keeps a caller from binding a host, port, query, path or spelling that only
+    validates after normalization.
+    """
+
+    if _github_remote(remote, allowed_hosts=allowed_hosts) != remote:
+        raise PinViolation("remote must be the canonical credential-free HTTPS GitHub URL")
 
 
-@contextmanager
-def _git_http_credentials(remote_url: str, token: str) -> Iterator[tuple[str, ...]]:
-    if not token:
+def _git_credential_environment(
+    remote: str,
+    token: str,
+) -> tuple[tuple[tuple[str, str], ...], tuple[bytes, ...]]:
+    """Return child-only credential overrides and every byte form to redact.
+
+    ``remote`` must already be the canonical credential-free URL. Nothing returned
+    here is ever written to ``os.environ``, an intent, a spec or a receipt.
+    """
+
+    if not isinstance(token, str) or not token:
         raise GitOperationFailed("GitHub credential is required")
-    remote = _github_remote(remote_url)
-    encoded = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
-    values = {
-        "GIT_CONFIG_COUNT": "3" if os.name == "nt" else "1",
-        "GIT_CONFIG_KEY_0": f"http.{remote}/.extraHeader",
-        "GIT_CONFIG_VALUE_0": f"Authorization: Basic {encoded}",
-    }
+    _require_canonical_remote(remote, _CREDENTIAL_REMOTE_HOSTS)
+    encoded =base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
+    header = f"Authorization: Basic {encoded}"
+    values = [
+        ("GIT_CONFIG_COUNT", "3" if os.name == "nt" else "1"),
+        ("GIT_CONFIG_KEY_0", f"http.{remote}/.extraHeader"),
+        ("GIT_CONFIG_VALUE_0", header),
+    ]
     if os.name == "nt":
         # Git for Windows uses Schannel. Some managed Windows hosts make CRL/OCSP
         # unavailable; retain chain and hostname verification while making that
         # environment-specific revocation limitation explicit and deterministic.
-        values["GIT_CONFIG_KEY_1"] = "http.sslBackend"
-        values["GIT_CONFIG_VALUE_1"] = "schannel"
-        values["GIT_CONFIG_KEY_2"] = "http.schannelCheckRevoke"
-        values["GIT_CONFIG_VALUE_2"] = "false"
-    with _GIT_ENV_LOCK:
-        previous = {name: os.environ.get(name) for name in values}
-        os.environ.update(values)
-        try:
-            yield (token, encoded)
-        finally:
-            for name, value in previous.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
+        values += [
+            ("GIT_CONFIG_KEY_1", "http.sslBackend"),
+            ("GIT_CONFIG_VALUE_1", "schannel"),
+            ("GIT_CONFIG_KEY_2", "http.schannelCheckRevoke"),
+            ("GIT_CONFIG_VALUE_2", "false"),
+        ]
+    forms = (
+        token,
+        f"x-access-token:{token}",
+        encoded,
+        f"Basic {encoded}",
+        header,
+    )
+    return tuple(values), tuple(form.encode("utf-8") for form in forms)
+
+
+def _git_child_context(
+    runner: SandboxRunner,
+    argv: Sequence[str],
+    config_path: Path,
+    *,
+    remote: str | None = None,
+    token: str | None = None,
+    allowed_hosts: Sequence[str] = _CREDENTIAL_REMOTE_HOSTS,
+) -> _TrustedChildContext:
+    """Bind one Git invocation's child environment to its runner, argv and remote.
+
+    A supplied remote must already be the canonical credential-free URL; it is checked
+    here, at the only place a context is created, against ``_github_remote``. A
+    credentialed context is always checked against the default GitHub host, whatever
+    ``allowed_hosts`` says, so no host grant is widened.
+
+    The isolated-config values keep the historical allowlist behavior: a runner that
+    does not allow a name never receives it. Credential overrides are never filtered;
+    ``SandboxRunner.run`` denies the command before spawn if the runner does not
+    allow every one of them.
+    """
+
+    if remote is not None:
+        _require_canonical_remote(
+            remote,
+            _CREDENTIAL_REMOTE_HOSTS if token is not None else allowed_hosts,
+        )
+    allowed ={_environment_key(name) for name in runner.spec.env_allowlist}
+    overrides = [
+        (name, value)
+        for name, value in (
+            ("GIT_CONFIG_GLOBAL", str(config_path)),
+            ("GIT_CONFIG_NOSYSTEM", "1"),
+            ("GIT_TERMINAL_PROMPT", "0"),
+        )
+        if _environment_key(name) in allowed
+    ]
+    secrets: tuple[bytes, ...] = ()
+    if token is not None:
+        if remote is None:
+            raise GitOperationFailed("GitHub credential requires a bound remote")
+        credential_environment, secrets = _git_credential_environment(remote, token)
+        overrides.extend(credential_environment)
+    try:
+        return _TrustedChildContext(
+            runner,
+            argv,
+            overrides=overrides,
+            drop=_GIT_CREDENTIAL_ENV,
+            secrets=secrets,
+            remote=remote,
+        )
+    except ValueError:
+        raise GitOperationFailed("Git child environment could not be bound") from None
 
 
 @contextmanager
@@ -419,15 +493,17 @@ class GitWorkspace:
             str(source) if remote else "source",
             "repo",
         ]
-        with _isolated_git_config(staging_config):
-            clone_receipt = cls._execute(
-                staging_runner,
-                cls._git_argv(staging_hooks, clone_args),
-                mission_id=mission_id,
-                role=role,
-                description="clone approved local repository snapshot",
-                path_args=[10] if remote else [9, 10],
-            )
+        clone_receipt = cls._execute(
+            staging_runner,
+            cls._git_argv(staging_hooks, clone_args),
+            mission_id=mission_id,
+            role=role,
+            description="clone approved local repository snapshot",
+            path_args=[10] if remote else [9, 10],
+            git_config=staging_config,
+            remote=str(source) if remote else None,
+            remote_hosts=allowed_hosts,
+        )
         cls._append_receipt(receipts, staging_runner, clone_receipt)
         if clone_receipt["result"] != "succeeded":
             raise GitOperationFailed("local repository clone failed")
@@ -518,7 +594,41 @@ class GitWorkspace:
         description: str,
         path_args: list[int] | None = None,
         acceptance_specification: Mapping[str, str] | None = None,
+        git_config: Path | None = None,
+        remote: str | None = None,
+        token: str | None = None,
+        remote_hosts: Sequence[str] = _CREDENTIAL_REMOTE_HOSTS,
     ) -> dict[str, Any]:
+        """Run one command; a Git invocation (``git_config`` given) gets a child context.
+
+        The context carries the isolated-config values and, for a credentialed call,
+        the header overrides and redaction forms. It is bound to this runner, the
+        resolved executable, ``argv[1:]`` and the canonical ``remote``, and
+        ``SandboxRunner.run`` consumes it once. Non-Git commands keep the legacy path.
+
+        Nothing is inferred from a flag: a supplied credential or remote, or an argv
+        whose executable is Git, without ``git_config`` is refused before any intent is
+        built, so it can never reach ``_spawn`` context-free.
+        """
+
+        context: _TrustedChildContext | None
+        if git_config is None:
+            if token is not None or remote is not None:
+                raise GitOperationFailed(
+                    "a Git credential or remote requires the isolated Git context"
+                )
+            if argv and _is_git_command(argv[0]):
+                raise GitPolicyDenied("Git execution requires the isolated Git context")
+            context = None
+        else:
+            context = _git_child_context(
+                runner,
+                argv,
+                git_config,
+                remote=remote,
+                token=token,
+                allowed_hosts=remote_hosts,
+            )
         intent: dict[str, Any] = {
             "schema_version": 1,
             "action_id": f"ACT-git-{uuid4()}",
@@ -541,7 +651,9 @@ class GitWorkspace:
         if acceptance_specification is not None:
             intent["acceptance_specification"] = dict(acceptance_specification)
         intent["action_digest"] = tool_intent_digest(intent)
-        return runner.run(intent)
+        if context is None:
+            return runner.run(intent)
+        return runner.run(intent, _trusted=context)
 
     @staticmethod
     def _append_receipt(
@@ -549,9 +661,21 @@ class GitWorkspace:
         runner: SandboxRunner,
         receipt: Mapping[str, Any],
     ) -> None:
-        reference = runner.last_reference
-        if reference is None:
-            raise GitOperationFailed("sandbox execution did not publish a receipt")
+        # Bind the index row to this invocation's own returned receipt. The runner's
+        # shared ``last_reference`` is whichever invocation finished last, so it is
+        # never consulted: the reference is re-derived from the receipt and accepted
+        # only if the content-addressed bytes the runner retained are exactly them.
+        raw, reference = _canonical_receipt(receipt)
+        try:
+            retained = (
+                runner.trusted_root / Path(*portable_path_parts(reference.path))
+            ).read_bytes()
+        except OSError:
+            raise GitOperationFailed(
+                "sandbox execution did not publish a receipt"
+            ) from None
+        if retained != raw:
+            raise GitOperationFailed("published sandbox receipt does not match its invocation")
         records.append(
             {
                 "path": reference.path,
@@ -599,28 +723,29 @@ class GitWorkspace:
             if path_args
             else []
         )
-        credential_context = (
-            _git_http_credentials(credential[0], credential[1])
-            if credential is not None
-            else nullcontext(())
+        remote: str | None = None
+        token: str | None = None
+        if credential is not None:
+            remote = _github_remote(credential[0])
+            token = credential[1]
+        receipt = self._execute(
+            self.runner,
+            argv,
+            mission_id=self.mission_id,
+            role=self.role,
+            description=description,
+            path_args=adjusted_paths,
+            git_config=self.git_config,
+            remote=remote,
+            token=token,
         )
-        with _isolated_git_config(self.git_config), credential_context as secrets:
-            receipt = self._execute(
-                self.runner,
-                argv,
-                mission_id=self.mission_id,
-                role=self.role,
-                description=description,
-                path_args=adjusted_paths,
-            )
         self._append_receipt(self.receipt_records, self.runner, receipt)
+        # Both streams were redacted before persistence; only artifact bytes are read.
         stdout = self._artifact(receipt, "stdout")
         if receipt["execution"]["stdout"]["truncated"]:
             raise GitOperationFailed(f"{description} exceeded the Git output limit")
         if receipt["result"] != "succeeded" and not allow_failure:
             stderr = self._artifact(receipt, "stderr").decode("utf-8", "replace").strip()
-            for secret in secrets:
-                stderr = stderr.replace(secret, "[REDACTED]")
             raise GitOperationFailed(f"{description} failed: {stderr}")
         return receipt, stdout
 

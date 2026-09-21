@@ -6,6 +6,7 @@ groups; Windows provides confinement checks and best-effort timeout termination.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -15,9 +16,10 @@ import subprocess
 import tempfile
 import threading
 import time
+import weakref
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, NoReturn, cast
+from typing import Any, Iterable, Mapping, NoReturn, Sequence, cast
 from uuid import uuid4
 
 from .autonomy import EpisodeAllowance
@@ -236,6 +238,187 @@ def _interpreter_flags(executable: str) -> frozenset[str]:
     return frozenset()
 
 
+def _environment_key(name: str) -> str:
+    return name.upper() if os.name == "nt" else name
+
+
+def _check_environment_entries(
+    entries: Iterable[tuple[str, str]],
+    message: str,
+) -> None:
+    """Apply the one environment name/value rule shared by specs and child contexts."""
+
+    names: set[str] = set()
+    for name, value in entries:
+        if (
+            not isinstance(name, str)
+            or not name
+            or "=" in name
+            or "\x00" in name
+            or not isinstance(value, str)
+            or "\x00" in value
+            or name in names
+        ):
+            raise ValueError(message)
+        names.add(name)
+
+
+_FIXED_ENVIRONMENT_MESSAGE = "fixed environment entries must have unique safe names and values"
+_URL_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
+_REDACTED = b"[REDACTED]"
+_INCOMPLETE_CREDENTIALED_STREAM = b"[REDACTED: incomplete credentialed output]"
+
+
+def _canonical_receipt(receipt: Mapping[str, Any]) -> tuple[bytes, ReceiptReference]:
+    """Return the canonical persisted bytes of one receipt and its content address.
+
+    ``SandboxRunner._persist`` publishes exactly these bytes at exactly this path, so
+    a caller holding the returned receipt can derive its reference without reading the
+    runner's shared ``last_reference``.
+    """
+
+    raw = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+    digest = sha256_digest(raw)
+    return raw, ReceiptReference(f"r/{digest.removeprefix('sha256:')}.json", digest)
+
+
+def _hard_links_unsupported(error: BaseException) -> bool:
+    """Whether a failed ``os.link`` means the host cannot hard-link, not a data error."""
+
+    if isinstance(error, NotImplementedError):
+        return True
+    return getattr(error, "errno", None) in {
+        errno.EPERM,
+        errno.ENOSYS,
+        errno.ENOTSUP,
+        errno.EOPNOTSUPP,
+        errno.EXDEV,
+        errno.EMLINK,
+    } or getattr(error, "winerror", None) in {1, 50}  # INVALID_FUNCTION, NOT_SUPPORTED
+
+
+def _canonical_executable(value: str) -> str | None:
+    resolved = shutil.which(value)
+    return None if resolved is None else str(Path(resolved).resolve())
+
+
+class _TrustedChildContext:
+    """Private, one-use child-process context for trusted in-process callers.
+
+    The context carries what must never appear in a public ``SandboxSpec``, tool
+    intent or receipt: per-child environment overrides, the environment names the
+    child must not inherit, the byte forms of any secret those overrides embed and,
+    where applicable, the canonical credential-free remote the command targets. It
+    is bound to one runner, one resolved executable and one exact ``argv[1:]`` and
+    is consumed by the first ``SandboxRunner.run`` that accepts it. Its state lives
+    here, never on the runner, so concurrent invocations cannot observe each other.
+
+    It has no dict, no serialized form and a redacted ``repr``; copying and pickling
+    are refused. This is a seam between trusted callers, not isolation from code
+    running inside the same process.
+    """
+
+    __slots__ = (
+        "_overrides",
+        "_drop",
+        "_pattern",
+        "_runner",
+        "_runner_identity",
+        "_executable",
+        "_argv_tail",
+        "_remote",
+        "_lock",
+        "_used",
+    )
+
+    def __init__(
+        self,
+        runner: SandboxRunner,
+        argv: Sequence[str],
+        *,
+        overrides: Iterable[tuple[str, str]] = (),
+        drop: Iterable[str] = (),
+        secrets: Iterable[bytes] = (),
+        remote: str | None = None,
+    ) -> None:
+        entries = tuple((name, value) for name, value in overrides)
+        _check_environment_entries(
+            entries,
+            "trusted child environment entries must have unique safe names and values",
+        )
+        dropped = tuple(drop)
+        if not all(isinstance(name, str) and name for name in dropped):
+            raise ValueError("trusted child environment drops must be names")
+        drop_names = frozenset(_environment_key(name) for name in dropped)
+        forms = sorted(
+            {form for form in secrets if isinstance(form, bytes) and form},
+            key=len,
+            reverse=True,
+        )
+        arguments = tuple(argv)
+        if not arguments or not all(isinstance(argument, str) for argument in arguments):
+            raise ValueError("trusted child command must be a non-empty argument list")
+        # An unresolvable executable binds to None: run() then denies it as
+        # non-allowlisted before this context is ever consulted.
+        executable = _canonical_executable(arguments[0])
+        if remote is not None and (
+            not remote.startswith("https://")
+            or "@" in remote
+            or any(character.isspace() or character == "\x00" for character in remote)
+        ):
+            raise ValueError("trusted child remote must be a credential-free https URL")
+        if forms and remote is None:
+            raise ValueError("credentialed child context requires a bound remote")
+        self._overrides = entries
+        self._drop = drop_names
+        self._pattern = (
+            re.compile(b"|".join(re.escape(form) for form in forms)) if forms else None
+        )
+        self._runner = weakref.ref(runner)
+        self._runner_identity = runner.runner_identity
+        self._executable = executable
+        self._argv_tail = arguments[1:]
+        self._remote = remote
+        self._lock = threading.Lock()
+        self._used = False
+
+    def __repr__(self) -> str:
+        return "<_TrustedChildContext redacted>"
+
+    def __copy__(self) -> NoReturn:
+        raise TypeError("trusted child context cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> NoReturn:
+        raise TypeError("trusted child context cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        raise TypeError("trusted child context cannot be serialized")
+
+    def __reduce_ex__(self, protocol: object) -> NoReturn:
+        raise TypeError("trusted child context cannot be serialized")
+
+    def _consume(self) -> bool:
+        with self._lock:
+            if self._used:
+                return False
+            self._used = True
+            return True
+
+    def _sanitize(self, stream: bytes, *, incomplete: bool) -> bytes:
+        """Return the bytes that may be persisted for one raw child stream.
+
+        A credentialed stream that ended early (output cap or timeout) may end inside
+        a secret, so a fixed marker replaces it. Otherwise every supported secret
+        form is replaced in one pass over the whole joined stream, which also covers
+        a secret split across pipe reads.
+        """
+
+        if self._pattern is None or not stream:
+            return stream
+        if incomplete:
+            return _INCOMPLETE_CREDENTIALED_STREAM
+        return self._pattern.sub(_REDACTED, stream)
+
 @dataclass(frozen=True, slots=True)
 class SandboxSpec:
     root: Path
@@ -258,19 +441,7 @@ class SandboxSpec:
             raise ValueError("sandbox allowlist and limits must be positive")
         if type(self.allow_interpreter_flags) is not bool:
             raise ValueError("allow_interpreter_flags must be boolean")
-        fixed_names: set[str] = set()
-        for name, value in self.fixed_environment:
-            if (
-                not isinstance(name, str)
-                or not name
-                or "=" in name
-                or "\x00" in name
-                or not isinstance(value, str)
-                or "\x00" in value
-                or name in fixed_names
-            ):
-                raise ValueError("fixed environment entries must have unique safe names and values")
-            fixed_names.add(name)
+        _check_environment_entries(self.fixed_environment, _FIXED_ENVIRONMENT_MESSAGE)
         if self.cpu_seconds is not None and self.cpu_seconds < 1:
             raise ValueError("CPU limit must be positive")
         if self.memory_bytes is not None and self.memory_bytes < 1:
@@ -337,7 +508,12 @@ class SandboxRunner:
         self.last_reference: ReceiptReference | None = None
         self._usage_lock = threading.Lock()
 
-    def run(self, intent: dict[str, Any]) -> dict[str, Any]:
+    def run(
+        self,
+        intent: dict[str, Any],
+        *,
+        _trusted: _TrustedChildContext | None = None,
+    ) -> dict[str, Any]:
         self._validate_intent(intent)
         decision = self.policy.decide(self.role, Action.RUN_COMMANDS, self.risk)
         if not decision.allowed:
@@ -367,11 +543,20 @@ class SandboxRunner:
         self._validate_paths(intent, argv, command["path_args"])
         if intent["actor_id"] == self.runner_identity:
             self._deny(intent, "runner identity must differ from acting identity")
+        if _trusted is not None:
+            self._authorize_trusted(intent, _trusted, argv, command["argv"][1:])
 
         started = time.monotonic()
         deadline = started + self.spec.timeout_s
         try:
-            process = self._spawn(argv)
+            # Only a trusted invocation passes the extra parameter, so an override
+            # with the historical ``_spawn(argv)`` signature keeps serving context-free
+            # calls and fails closed with ``TypeError`` before a context can be used.
+            process = (
+                self._spawn(argv)
+                if _trusted is None
+                else self._spawn(argv, _trusted=_trusted)
+            )
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             self._deny(intent, f"process creation failed: {type(error).__name__}")
         with self._usage_lock:
@@ -431,7 +616,12 @@ class SandboxRunner:
             job.close()
         out = b"".join(stdout)
         err = b"".join(stderr)
-        outcome = "timeout" if timed_out else ("succeeded" if process.returncode == 0 else "failed")
+        if _trusted is not None:
+            # Redact after the readers join and before anything is hashed or written.
+            # Raw caps and the truncated flags above were decided on unredacted bytes.
+            out = _trusted._sanitize(out, incomplete=truncated[0] or timed_out)
+            err = _trusted._sanitize(err, incomplete=truncated[1] or timed_out)
+        outcome ="timeout" if timed_out else ("succeeded" if process.returncode == 0 else "failed")
         receipt = self._persist(
             intent,
             argv,
@@ -526,13 +716,70 @@ class SandboxRunner:
             )
         return not argument.startswith("-") and bool(_SIMPLE_PATH_TOKEN.fullmatch(argument))
 
-    def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
+    def _authorize_trusted(
+        self,
+        intent: Mapping[str, Any],
+        trusted: _TrustedChildContext,
+        argv: list[str],
+        requested_tail: Sequence[str],
+    ) -> None:
+        """Deny, before any spawn, a context not bound to exactly this invocation."""
+
+        if type(trusted) is not _TrustedChildContext:
+            self._deny(intent, "trusted child context is invalid")
+        if trusted._runner() is not self or trusted._runner_identity != self.runner_identity:
+            self._deny(intent, "trusted child context belongs to another runner")
+        allowed = {_environment_key(name) for name in self.spec.env_allowlist}
+        if any(_environment_key(name) not in allowed for name, _ in trusted._overrides):
+            self._deny(intent, "trusted child environment is not allowlisted")
+        if argv[0] != trusted._executable:
+            self._deny(intent, "trusted child context is bound to another executable")
+        if tuple(requested_tail) != trusted._argv_tail:
+            self._deny(intent, "trusted child context is bound to other arguments")
+        remote = trusted._remote
+        if remote is not None and (
+            remote not in trusted._argv_tail
+            or any(
+                _URL_SCHEME.match(argument) and argument != remote
+                for argument in trusted._argv_tail
+            )
+        ):
+            self._deny(intent, "trusted child context is bound to another remote")
+        if not trusted._consume():
+            self._deny(intent, "trusted child context was already used")
+
+    def _child_environment(
+        self,
+        trusted: _TrustedChildContext | None,
+    ) -> dict[str, str]:
+        """Build the child mapping locally; nothing here writes ``os.environ``.
+
+        Inherited allowlisted values exclude the context's drop names, then the
+        spec's fixed values apply, then the context's explicit overrides.
+        """
+
+        dropped = trusted._drop if trusted is not None else frozenset()
         environment = {
             name: os.environ[name]
             for name in self.spec.env_allowlist
-            if name in os.environ
+            if name in os.environ and _environment_key(name) not in dropped
         }
         environment.update(dict(self.spec.fixed_environment))
+        if trusted is not None:
+            for name, value in trusted._overrides:
+                key = _environment_key(name)
+                for existing in [n for n in environment if _environment_key(n) == key]:
+                    del environment[existing]
+                environment[name] = value
+        return environment
+
+    def _spawn(
+        self,
+        argv: list[str],
+        *,
+        _trusted: _TrustedChildContext | None = None,
+    ) -> subprocess.Popen[bytes]:
+        environment = self._child_environment(_trusted)
         kwargs: dict[str, Any] = {
             "cwd": self.spec.root,
             "env": environment,
@@ -994,26 +1241,59 @@ class SandboxRunner:
         validation = validate_contract("tool-receipt", receipt)
         if not validation.valid:
             raise SandboxError("; ".join(validation.issues))
-        raw = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
-        digest = sha256_digest(raw)
-        path = f"r/{digest.removeprefix('sha256:')}.json"
-        self._atomic_write(path, raw)
-        self.last_reference = ReceiptReference(path, digest)
+        raw, reference = _canonical_receipt(receipt)
+        self._atomic_write(reference.path, raw)
+        self.last_reference = reference
         return receipt
 
     def _atomic_write(self, relative: str, content: bytes) -> None:
+        """Publish immutable content-addressed bytes without ever replacing a file.
+
+        The bytes are written, flushed and fsynced to an owned temporary file in the
+        destination directory, which is then hard-linked to the destination. The link is
+        an atomic create-if-absent, so the destination is never partial and never
+        overwritten. If a concurrent writer already published the destination, it is
+        adopted only when its complete bytes equal ``content``; different bytes fail
+        closed as a collision. Adoption never touches the existing file, so an open
+        reader of it (which blocks ``os.replace`` on Windows) cannot fail a writer.
+
+        Only the temporary file this call created is removed, best effort: after a
+        successful publication a leftover name is a harmless second link to the same
+        complete bytes, and a cleanup failure never masks the primary outcome. A host
+        or filesystem without hard links fails with a typed ``SandboxError`` instead of
+        falling back to a weaker publication.
+        """
+
         destination = self.trusted_root / Path(*portable_path_parts(relative))
         destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists():
             if destination.read_bytes() != content:
                 raise SandboxError("content-addressed artifact collision")
             return
-        with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-            temporary = Path(handle.name)
-        os.replace(temporary, destination)
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
+                temporary = Path(handle.name)
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.link(temporary, destination)
+            except FileExistsError:
+                if destination.read_bytes() != content:
+                    raise SandboxError("content-addressed artifact collision") from None
+            except (NotImplementedError, OSError) as error:
+                if _hard_links_unsupported(error):
+                    raise SandboxError(
+                        "content-addressed publication requires hard-link support"
+                    ) from error
+                raise
+        finally:
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def _deny(
         self,
