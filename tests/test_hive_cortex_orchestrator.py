@@ -174,6 +174,62 @@ def append_transition(
 
 
 class OrchestratorPlannerTests(unittest.TestCase):
+    def test_select_simplest_prefers_the_smallest_sufficient_same_charter_plan(self) -> None:
+        planner = OrchestratorPlanner()
+        small_item = work("WORK-small")
+        small = planner.plan(charter(), (small_item,), (schedule(small_item),))
+        first = work("WORK-first")
+        second = work("WORK-second", dependencies=(first.work_id,))
+        larger = planner.plan(
+            charter(),
+            (first, second),
+            (schedule(first), schedule(second)),
+        )
+
+        self.assertIs(small, planner.select_simplest((larger, small)))
+        self.assertLess(small.complexity, larger.complexity)
+        foreign_item = work("WORK-foreign", mission_id="MISSION-foreign")
+        foreign = planner.plan(
+            charter("MISSION-foreign"),
+            (foreign_item,),
+            (schedule(foreign_item),),
+        )
+        with self.assertRaisesRegex(ValueError, "same charter"):
+            planner.select_simplest((small, foreign))
+
+    def test_simplify_requires_a_strict_downward_plan(self) -> None:
+        planner = OrchestratorPlanner()
+        first = work("WORK-first")
+        second = work("WORK-second", dependencies=(first.work_id,))
+        previous = planner.plan(
+            charter(),
+            (first, second),
+            (schedule(first), schedule(second)),
+        )
+        replacement = work("WORK-focused")
+        simplified = planner.simplify(
+            previous,
+            (replacement,),
+            (schedule(replacement),),
+            reason="owner narrowed the requested outcome",
+            evidence_refs=("operator:scope-reduction",),
+        )
+        self.assertTrue(simplified.complexity.strictly_reduces(previous.complexity))
+        self.assertEqual(previous.digest, simplified.replaces_digest)
+
+        costly_schedule = schedule(
+            replacement,
+            schedule_budget=budget(90, 3, 300, 300, 300, 8, 2, 1),
+        )
+        with self.assertRaisesRegex(ValueError, "increase none"):
+            planner.simplify(
+                previous,
+                (replacement,),
+                (costly_schedule,),
+                reason="smaller graph with larger resource bounds",
+                evidence_refs=("operator:scope-reduction",),
+            )
+
     def test_orchestrator_dag_tests_schedule_dependencies_scopes_budgets_and_gates(self) -> None:
         prepare = work("WORK-prepare", role="builder", risk="R1")
         release = work(

@@ -71,6 +71,10 @@ from .objectives import ObjectiveGraph, PlanLimits, paths_overlap
 from .planner import (
     DeterministicFixturePlanner,
     FixturePlan,
+    OrchestrationPlan,
+    OrchestratorPlanner,
+    PlanComplexity,
+    WorkSchedule,
     graph_from_events,
     persist_plan,
 )
@@ -171,6 +175,10 @@ __all__ = (
     "derive_technical_closeout",
     "DeterministicFixturePlanner",
     "FixturePlan",
+    "OrchestrationPlan",
+    "OrchestratorPlanner",
+    "PlanComplexity",
+    "WorkSchedule",
     "HotContextItem",
     "graph_from_events",
     "integrate_verified_work",

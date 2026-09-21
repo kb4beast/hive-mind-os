@@ -170,6 +170,43 @@ class WorkSchedule:
             raise ValueError("scheduled work document is invalid") from error
 
 
+@dataclass(frozen=True, slots=True, order=True)
+class PlanComplexity:
+    """Deterministic upper bounds used to compare sufficient plans."""
+
+    work_items: int
+    dependency_edges: int
+    max_depth: int
+    max_attempts: int
+    wall_seconds: int
+    model_calls: int
+    input_tokens: int
+    output_tokens: int
+    cost_microunits: int
+    tool_calls: int
+
+    def strictly_reduces(self, previous: PlanComplexity) -> bool:
+        """Return true only when no bound grows and at least one bound shrinks."""
+
+        current = self.as_tuple()
+        prior = previous.as_tuple()
+        return current != prior and all(value <= old for value, old in zip(current, prior))
+
+    def as_tuple(self) -> tuple[int, ...]:
+        return (
+            self.work_items,
+            self.dependency_edges,
+            self.max_depth,
+            self.max_attempts,
+            self.wall_seconds,
+            self.model_calls,
+            self.input_tokens,
+            self.output_tokens,
+            self.cost_microunits,
+            self.tool_calls,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class OrchestrationPlan:
     """A deterministic DAG plus the non-improvised execution schedule for it."""
@@ -228,6 +265,22 @@ class OrchestrationPlan:
     def digest(self) -> str:
         return canonical_digest(self.to_document())
 
+    @property
+    def complexity(self) -> PlanComplexity:
+        totals = _schedule_budget_totals(self.schedules)
+        return PlanComplexity(
+            work_items=len(self.graph.work_items),
+            dependency_edges=sum(len(item.dependencies) for item in self.graph.work_items),
+            max_depth=max(item.depth for item in self.graph.work_items),
+            max_attempts=sum(item.max_attempts for item in self.graph.work_items),
+            wall_seconds=totals["max_wall_seconds"],
+            model_calls=totals["max_model_calls"],
+            input_tokens=totals["max_input_tokens"],
+            output_tokens=totals["max_output_tokens"],
+            cost_microunits=totals["max_cost_microunits"],
+            tool_calls=totals["max_tool_calls"],
+        )
+
     def to_document(self) -> dict[str, object]:
         return {
             "schema_version": _PLAN_SCHEMA_VERSION,
@@ -277,6 +330,39 @@ class OrchestratorPlanner:
             replan_reason=reason,
             replan_evidence_refs=evidence,
         )
+
+    def select_simplest(self, candidates: Iterable[OrchestrationPlan]) -> OrchestrationPlan:
+        """Choose the least complex sufficient plan for one exact charter."""
+
+        plans = tuple(candidates)
+        if not plans:
+            raise ValueError("simplicity selection needs at least one plan")
+        charter_digest = plans[0].graph.charter.digest()
+        if any(plan.graph.charter.digest() != charter_digest for plan in plans[1:]):
+            raise ValueError("simplicity candidates must use the same charter")
+        return min(plans, key=lambda plan: (plan.complexity, plan.digest))
+
+    def simplify(
+        self,
+        previous: OrchestrationPlan,
+        work_items: Iterable[WorkItem],
+        schedules: Iterable[WorkSchedule],
+        *,
+        reason: str,
+        evidence_refs: Iterable[str],
+    ) -> OrchestrationPlan:
+        """Replan downward without allowing any structural or resource bound to grow."""
+
+        candidate = self.replan(
+            previous,
+            work_items,
+            schedules,
+            reason=reason,
+            evidence_refs=evidence_refs,
+        )
+        if not candidate.complexity.strictly_reduces(previous.complexity):
+            raise ValueError("simplification must reduce at least one bound and increase none")
+        return candidate
 
 
 class DeterministicFixturePlanner:
