@@ -1,7 +1,9 @@
 import unittest
+from contextvars import copy_context
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Barrier, Condition, Event, Lock, Thread
+from threading import Barrier, Condition, Event, Lock, Thread, current_thread
+from types import MethodType
 
 from hive_mind_os.cohort_assurance import (
     TerminalAssessment,
@@ -586,6 +588,312 @@ class WholeOSIntegrationTests(unittest.TestCase):
                     self.assertEqual(host.calls, 2)
                     first.close()
                     second.close()
+
+
+class _SyntheticReplayHost(FakeHost):
+    """SYNTHETIC host that vouches for its retained successes on demand."""
+
+    def __init__(self, verdict=None):
+        self.verdict = verdict
+        self.executions = 0
+        self.assessments = 0
+        self.validations = 0
+
+    def execute_package(self, package, bindings, payload):
+        self.executions += 1
+        return super().execute_package(package, bindings, payload)
+
+    def assess_terminal_candidate(self, candidate, payload):
+        self.assessments += 1
+        return super().assess_terminal_candidate(candidate, payload)
+
+    def validate_retained_package_result(self, package, result, payload):
+        self.validations += 1
+        self.seen = (package.package_id, result, payload)
+        if isinstance(self.verdict, Exception):
+            raise self.verdict
+        return self.verdict
+
+
+class WholeOSRetainedReplayTests(unittest.TestCase):
+    """The service must not deliver a resumed success its host no longer vouches for."""
+
+    def _service(self, root, host):
+        return WholeOSIntegrationTests()._components(
+            root,
+            (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
+            host=host,
+        )
+
+    def _completed(self, root, host):
+        config, provider, _ = self._service(root, host)
+        service = WholeOSService(config, provider, host)
+        self.addCleanup(service.close)
+        self.assertEqual(service.run_to_completion().status, "complete")
+        return config, provider, service
+
+    def test_valid_retained_success_is_delivered_after_every_resume(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        config, provider, first = self._completed(Path(directory), host)
+        self.assertGreater(host.validations, 0)
+        self.assertEqual(host.seen[0], "A")
+        self.assertEqual(host.seen[1].status, PackageStatus.COMPLETED)
+        self.assertEqual(host.seen[2]["package_id"], "A")
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        self.assertEqual(resumed.run_to_completion().status, "complete")
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_rejected_retained_success_is_blocked_for_same_and_recreated_service(self):
+        directory = self.enterContext(TemporaryDirectory())
+        root = Path(directory)
+        host = _SyntheticReplayHost()
+        config, provider, first = self._completed(root, host)
+        historical = first.observe()
+        self.assertIsNotNone(historical.terminal_assessment)
+
+        host.verdict = "admission revoked"
+        before = host.validations
+        replay = first.run_to_completion()
+        self.assertGreater(host.validations, before, "the host was asked again")
+        self.assertEqual(replay.status, "blocked")
+        self.assertEqual(replay.completed_packages, ())
+        self.assertEqual(replay.blocked_packages, ("A",))
+        self.assertIsNone(replay.terminal_assessment)
+        self.assertIn("admission revoked", replay.terminal_message)
+        self.assertIn("failed revalidation", replay.terminal_message)
+        self.assertEqual(first.run_once().status, "blocked")
+
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        self.assertEqual(resumed.run_to_completion().status, "blocked")
+        self.assertEqual(resumed.observe().status, "blocked")
+        # No duplicate effect and no new terminal assessment on a rejected replay;
+        # the retained receipts stay on disk as history.
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+        self.assertTrue(list(Path(directory).rglob("terminal-*.json")))
+        self.assertTrue(list((Path(directory)).rglob("packages/*.json")))
+
+    def test_verdict_is_never_carried_between_operations(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        host.verdict = "temporarily unavailable"
+        self.assertEqual(service.observe().status, "blocked")
+        host.verdict = None
+        self.assertEqual(service.observe().status, "complete")
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_nested_calls_share_one_verdict_per_invocation(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        before = host.validations
+        self.assertEqual(service.observe().status, "complete")
+        # observe() classifies the package for its packages, its terminal
+        # candidate and its status, yet asks the host once for the invocation.
+        self.assertEqual(host.validations - before, 1)
+        before = host.validations
+        self.assertEqual(service.observe().status, "complete")
+        self.assertEqual(host.validations - before, 1, "a second call asks again")
+
+    def _hold_first_observation(self, service, host):
+        """Pause a first public ``observe()`` after it holds a valid verdict.
+
+        Returns ``(shared, finish)``: ``shared['context']`` is a context copied *inside*
+        that call (what a propagating framework would hand to another call) and
+        ``finish()`` releases and joins the first call, restoring the service.
+        """
+
+        classified, release = Event(), Event()
+        original = service._classify_done
+        shared = {}
+
+        def classify_then_wait(self_):
+            result = original()
+            if current_thread().name == "first-observer":
+                shared["context"] = copy_context()
+                classified.set()
+                if not release.wait(10):
+                    raise AssertionError("coordinator failed to release the first observer")
+            return result
+
+        def first_observation():
+            try:
+                shared["status"] = service.observe().status
+            except BaseException as error:  # reported through the assertion below
+                shared["error"] = repr(error)
+
+        service._classify_done = MethodType(classify_then_wait, service)
+        thread = Thread(target=first_observation, name="first-observer")
+        thread.start()
+        self.assertTrue(classified.wait(10), "first call reached classification")
+
+        def finish():
+            release.set()
+            thread.join(10)
+            service._classify_done = original
+            self.assertFalse(thread.is_alive())
+            self.assertNotIn("error", shared)
+
+        self.addCleanup(finish)
+        return shared, finish
+
+    def test_overlapping_public_calls_never_share_a_verdict(self):
+        """Judge counterexample: revocation between two overlapping observations."""
+
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        shared, finish = self._hold_first_observation(service, host)
+        # The first call now holds a valid verdict; revoke, then call again.
+        host.verdict = "synthetic admission revoked between overlapping calls"
+        before = host.validations
+        second = service.observe()
+        self.assertGreater(host.validations, before, "fresh host validation")
+        self.assertEqual(second.status, "blocked")
+        self.assertEqual(second.completed_packages, ())
+        self.assertIsNone(second.terminal_assessment)
+        self.assertIn("revoked between overlapping calls", second.terminal_message)
+        finish()
+        self.assertEqual(service.observe().status, "blocked")
+        self.assertEqual(service.run_to_completion().status, "blocked")
+        self.assertEqual((host.executions, host.assessments), (1, 1), "no duplicate effects")
+
+    def test_copied_context_never_authorizes_another_public_call(self):
+        """Judge remand-2 counterexample: a context copied inside a public call."""
+
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        shared, finish = self._hold_first_observation(service, host)
+        host.verdict = "synthetic admission revoked before a context-propagated call"
+        for name, entry in (
+            ("observe", service.observe),
+            ("run_once", service.run_once),
+            ("run_cohort", service.run_cohort),
+            ("run_to_completion", service.run_to_completion),
+        ):
+            with self.subTest(f"overlapping {name}"):
+                before = host.validations
+                result = shared["context"].copy().run(entry)
+                self.assertGreater(host.validations, before, "fresh host validation")
+                self.assertEqual(result.status, "blocked")
+                self.assertEqual(result.completed_packages, ())
+                self.assertIsNone(result.terminal_assessment)
+        finish()
+        # The original invocation has exited; its escaped context must stay inert.
+        for name, entry in (("observe", service.observe), ("run_to_completion", service.run_to_completion)):
+            with self.subTest(f"after exit {name}"):
+                before = host.validations
+                result = shared["context"].copy().run(entry)
+                self.assertGreater(host.validations, before, "fresh host validation")
+                self.assertEqual(result.status, "blocked")
+        before = host.validations
+        shared["context"].copy().run(service._classify_done)
+        shared["context"].copy().run(service._classify_done)
+        self.assertEqual(host.validations - before, 2, "a closed scope memoizes nothing")
+        self.assertEqual((host.executions, host.assessments), (1, 1), "no duplicate effects")
+
+    def test_concurrent_calls_in_copied_contexts_each_revalidate(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        shared, finish = self._hold_first_observation(service, host)
+        host.verdict = "revoked"
+        before = host.validations
+        seen = []
+
+        def observe_in_copy():
+            seen.append(shared["context"].copy().run(service.observe).status)
+
+        threads = [Thread(target=observe_in_copy) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(30)
+        self.assertEqual(seen, ["blocked"] * 4)
+        self.assertGreaterEqual(host.validations - before, 4)
+        finish()
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_concurrent_independent_run_calls_each_revalidate(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        host.verdict = "revoked"
+        seen = []
+
+        def run():
+            seen.append(service.run_to_completion().status)
+
+        threads = [Thread(target=run) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(30)
+        self.assertEqual(seen, ["blocked"] * 4)
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_host_errors_and_untyped_verdicts_fail_closed(self):
+        for verdict in (RuntimeError("evidence unreadable"), True, "", 0):
+            with self.subTest(verdict=repr(verdict)):
+                directory = self.enterContext(TemporaryDirectory())
+                host = _SyntheticReplayHost()
+                _, _, service = self._completed(Path(directory), host)
+                host.verdict = verdict
+                self.assertEqual(service.observe().status, "blocked")
+
+    def test_missing_service_receipt_of_a_done_package_is_rejected_when_validated(self):
+        directory = self.enterContext(TemporaryDirectory())
+        root = Path(directory)
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(root, host)
+        for receipt in root.rglob("packages/*.json"):
+            receipt.unlink()
+        observation = service.observe()
+        self.assertEqual(observation.status, "blocked")
+        self.assertIn("lacks a valid durable receipt", observation.terminal_message)
+
+    def test_host_without_the_capability_keeps_its_explicit_legacy_contract(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = FakeHost()
+        config, provider, _ = WholeOSRetainedReplayTests._service(
+            self, Path(directory), host
+        )
+        service = WholeOSService(config, provider, host)
+        self.addCleanup(service.close)
+        self.assertEqual(service.run_to_completion().status, "complete")
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        self.assertEqual(resumed.run_to_completion().status, "complete")
+
+    def test_dependents_are_not_released_by_a_rejected_dependency(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        config, provider, _ = WholeOSIntegrationTests()._components(
+            Path(directory),
+            (
+                OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),
+                OutcomeWorkPackage(
+                    "B", ("R2",), dependencies=("A",), allowed_paths=("b",)
+                ),
+            ),
+            capacity=1,
+            host=host,
+        )
+        first = WholeOSService(config, provider, host)
+        self.addCleanup(first.close)
+        self.assertEqual(first.run_cohort().completed_packages, ("A",))
+        host.verdict = "evidence corrupted"
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        observation = resumed.run_to_completion()
+        self.assertEqual(observation.status, "blocked")
+        self.assertEqual(observation.completed_packages, ())
+        self.assertEqual(observation.blocked_packages, ("A", "B"))
+        self.assertEqual(host.executions, 1, "B never ran on a rejected dependency")
 
 
 if __name__ == "__main__":

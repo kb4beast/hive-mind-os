@@ -12,6 +12,7 @@ import math
 import os
 import re
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
@@ -35,10 +36,49 @@ class LocalEvidenceError(ValueError):
     """The requested evidence operation cannot meet its local contract."""
 
 
-def _git(workspace: Path, *arguments: str, data: bytes | None = None) -> bytes:
+def _isolated_git_invocation(scratch: Path) -> tuple[list[str], dict[str, str]]:
+    """Command-scope Git options and a scrubbed environment for deterministic effects.
+
+    User, system and ``GIT_*`` ambient configuration is excluded without touching
+    any of those files: ``GIT_CONFIG_NOSYSTEM`` plus an empty ``GIT_CONFIG_GLOBAL``
+    replace the machine's Git for this process only, and every other ``GIT_*``
+    variable (``GIT_CONFIG_COUNT``, ``GIT_DIR`` ...) is dropped.  The keys that decide
+    what bytes ``git apply`` writes are then pinned on the command line, which also
+    outranks the clone's own ``.git/config``, so an untrusted clone-local
+    ``core.autocrlf`` or ``apply.whitespace`` cannot change them.  This mirrors the
+    ``core.autocrlf=false`` policy ``GitWorkspace`` uses when it materializes clones.
+    """
+
+    configuration = scratch / "gitconfig"
+    attributes = scratch / "gitattributes"
+    for path in (configuration, attributes):
+        if not path.exists():
+            path.write_bytes(b"")
+    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    environment.update(
+        GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=str(configuration), GIT_TERMINAL_PROMPT="0",
+    )
+    options = [
+        "-c", "core.autocrlf=false",
+        # Command scope outranks every file, so an ambient or clone-local
+        # ``core.fsmonitor`` helper is never launched by these child processes.
+        "-c", "core.fsmonitor=false",
+        "-c", "apply.whitespace=nowarn",
+        "-c", "apply.ignoreWhitespace=no",
+        "-c", f"core.attributesFile={attributes.as_posix()}",
+    ]
+    return options, environment
+
+
+def _git(workspace: Path, *arguments: str, data: bytes | None = None,
+         isolation: Path | None = None) -> bytes:
+    options: list[str] = []
+    environment: dict[str, str] | None = None
+    if isolation is not None:
+        options, environment = _isolated_git_invocation(isolation)
     result = subprocess.run(
-        ["git", "--no-optional-locks", "-C", str(workspace), *arguments],
-        input=data, capture_output=True, timeout=60, check=False,
+        ["git", "--no-optional-locks", *options, "-C", str(workspace), *arguments],
+        input=data, capture_output=True, timeout=60, check=False, env=environment,
     )
     if result.returncode:
         raise LocalEvidenceError(f"git {arguments[0]} failed: {result.stderr.decode('utf-8', 'replace').strip()}")
@@ -79,16 +119,21 @@ def _isolated_clone(workspace: Path) -> Path:
     return root
 
 
-def _reject_tracked_symlinks(workspace: Path, paths: list[str]) -> None:
+def _reject_tracked_symlinks(workspace: Path, paths: list[str], isolation: Path | None = None) -> None:
     if not paths:
         return
-    for row in _git(workspace, "ls-files", "--stage", "-z", "--", *paths).split(b"\0"):
+    for row in _git(workspace, "ls-files", "--stage", "-z", "--", *paths, isolation=isolation).split(b"\0"):
         if row.startswith(b"120000 "):
             raise LocalEvidenceError("tracked symlink targets are forbidden, including Windows link placeholders")
 
 
-def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list[dict], *, max_content_bytes: int = MAX_CONTENT_BYTES) -> dict:
-    """Read whole UTF-8 blobs from HEAD, recording everything omitted explicitly."""
+def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list[dict], *, max_content_bytes: int = MAX_CONTENT_BYTES, withheld_paths: frozenset[str] = frozenset()) -> dict:
+    """Read whole UTF-8 blobs from HEAD, recording everything omitted explicitly.
+
+    ``withheld_paths`` names tracked files whose bytes, size and blob hash must not
+    reach the model, such as sealed held-out acceptance tests. They stay listed as
+    omitted so the packet does not pretend the tree is empty there.
+    """
     if not 1 <= max_content_bytes <= MAX_CONTENT_BYTES:
         raise LocalEvidenceError("source packet budget is outside its supported bound")
     root = workspace.resolve()
@@ -100,8 +145,10 @@ def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list
         metadata, raw_name = entry.split(b"\t", 1)
         mode, kind, blob, size = metadata.decode("ascii").split()
         name = raw_name.decode("utf-8", "surrogateescape")
+        withheld = name in withheld_paths
         inventory.append({"path": name, "mode": mode, "kind": kind,
-                          "blob_hash": blob, "size_bytes": int(size) if size != "-" else None})
+                          "blob_hash": None if withheld else blob,
+                          "size_bytes": None if withheld or size == "-" else int(size)})
 
     tracked_names = {item["path"] for item in inventory}
     def citations(value: Any) -> set[str]:
@@ -189,7 +236,9 @@ def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list
     selected, omitted, content_bytes = [], [], 0
     for item in sorted(inventory, key=priority):
         name, reason = item["path"], None
-        if item["kind"] != "blob" or item["mode"] == "120000":
+        if name in withheld_paths:
+            reason = "sealed held-out content withheld from the model"
+        elif item["kind"] != "blob" or item["mode"] == "120000":
             reason = "symlink or non-file entry"
         elif _SECRET_PATH.search(name):
             reason = "secret-sensitive path"
@@ -395,7 +444,7 @@ def _recount_options(patch: str, paths: list[str]) -> tuple[str, ...]:
     return ("--recount",) if len(paths) == 1 or re.search(r"(?m)^diff --git ", patch) else ()
 
 
-def _patch_paths(workspace: Path, patch: str) -> list[str]:
+def _patch_paths(workspace: Path, patch: str, isolation: Path | None = None) -> list[str]:
     if not isinstance(patch, str) or not patch.strip() or "\x00" in patch:
         raise LocalEvidenceError("patch must be a non-empty plain unified diff")
     if re.search(r"(?m)^(?:GIT binary patch|Binary files |rename (?:from|to) |copy (?:from|to) |similarity index )", patch):
@@ -447,7 +496,8 @@ def _patch_paths(workspace: Path, patch: str) -> list[str]:
     if not paths or len(paths) != len(set(paths)):
         raise LocalEvidenceError("patch requires distinct plain unified file sections")
     # Git parses hunk grammar independently; its interpreted paths must agree.
-    parsed = _git(workspace, "apply", *_recount_options(patch, paths), "--numstat", "-z", "-", data=patch.encode("utf-8"))
+    parsed = _git(workspace, "apply", *_recount_options(patch, paths), "--numstat", "-z", "-",
+                  data=patch.encode("utf-8"), isolation=isolation)
     actual = []
     for record in parsed.split(b"\0"):
         if record:
@@ -461,25 +511,52 @@ def _patch_paths(workspace: Path, patch: str) -> list[str]:
     return sorted(paths)
 
 
-def _changed_paths(workspace: Path) -> list[str]:
+def _changed_paths(workspace: Path, isolation: Path | None = None) -> list[str]:
     # Compare bytes through Git's normal EOL rules: status can report a stale
     # stat-only modification after a Windows CRLF checkout with optional locks off.
     tracked = _git(workspace, "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
-                   "--name-only", "-z", "HEAD", "--")
-    untracked = _git(workspace, "ls-files", "--others", "--exclude-standard", "-z")
+                   "--name-only", "-z", "HEAD", "--", isolation=isolation)
+    untracked = _git(workspace, "ls-files", "--others", "--exclude-standard", "-z", isolation=isolation)
     return sorted({row.decode("utf-8") for row in (tracked + untracked).split(b"\0") if row})
 
 
-def apply_proposed_patch(workspace: Path, patch: str, changed_paths: list[str]) -> dict:
-    """Check and apply only declared paths in a clean, detached, remote-free clone."""
+def _read_or_none(path: Path) -> bytes | None:
+    return path.read_bytes() if path.is_file() else None
+
+
+def apply_proposed_patch(workspace: Path, patch: str, changed_paths: list[str], *,
+                         isolate_git_config: bool = False) -> dict:
+    """Check and apply only declared paths in a clean, detached, remote-free clone.
+
+    By default Git runs with the machine's own configuration, so a Windows
+    ``core.autocrlf=true`` (system, user or clone-local) is honored: the historical
+    behavior local DAG runs rely on for CRLF checkouts.  With ``isolate_git_config``
+    the outcome no longer depends on that configuration.  Ambient Git configuration is
+    excluded for the child processes only (nothing on disk is modified), the byte-
+    deciding keys are pinned on the command line above the clone's own config, and the
+    result is checked: if neither the old file nor the patch contains a carriage
+    return, no carriage return may appear, otherwise a conversion filter changed
+    bytes the patch did not ask to change; the files are then restored byte for byte
+    and the application is refused.  Repository ``.gitattributes`` remain part of the
+    pinned tree and are honored, as they are when the clone is materialized.  The
+    clone's remaining local config is still read, which is acceptable only because the
+    host creates that clone.
+    """
     root = _isolated_clone(workspace)
+    if not isolate_git_config:
+        return _apply_checked(root, patch, changed_paths, None)
+    with tempfile.TemporaryDirectory(prefix="hive-git-isolation-") as scratch:
+        return _apply_checked(root, patch, changed_paths, Path(scratch))
+
+
+def _apply_checked(root: Path, patch: str, changed_paths: list[str], isolation: Path | None) -> dict:
     if not isinstance(changed_paths, list) or any(not isinstance(p, str) for p in changed_paths):
         raise LocalEvidenceError("changed_paths must be a list of relative file paths")
-    paths = _patch_paths(root, patch)
+    paths = _patch_paths(root, patch, isolation)
     if len(changed_paths) != len(set(changed_paths)) or paths != sorted(changed_paths):
         raise LocalEvidenceError("patch paths must exactly match declared changed_paths")
-    _reject_tracked_symlinks(root, paths)
-    if _changed_paths(root):
+    _reject_tracked_symlinks(root, paths, isolation)
+    if _changed_paths(root, isolation):
         raise LocalEvidenceError("patch application requires a clean isolated workspace")
 
     def digests() -> dict:
@@ -487,18 +564,36 @@ def apply_proposed_patch(workspace: Path, patch: str, changed_paths: list[str]) 
                 for name in paths for target in [_safe_path(root, name)]}
 
     before = digests()
+    before_bytes = {name: _read_or_none(_safe_path(root, name)) for name in paths}
     encoded = patch.encode("utf-8")
     recount_options = _recount_options(patch, paths)
-    _git(root, "apply", *recount_options, "--check", "-", data=encoded)
-    _git(root, "apply", *recount_options, "-", data=encoded)
-    actual = _changed_paths(root)
+    _git(root, "apply", *recount_options, "--check", "-", data=encoded, isolation=isolation)
+    _git(root, "apply", *recount_options, "-", data=encoded, isolation=isolation)
+    actual = _changed_paths(root, isolation)
     if actual != paths:
-        _git(root, "apply", *recount_options, "--reverse", "-", data=encoded)
+        _git(root, "apply", *recount_options, "--reverse", "-", data=encoded, isolation=isolation)
         raise LocalEvidenceError("applied change set differs from declared paths; patch reversed")
+    if isolation is not None and b"\r" not in encoded:
+        converted = [name for name in paths
+                     if b"\r" not in (before_bytes[name] or b"")
+                     and b"\r" in (_read_or_none(_safe_path(root, name)) or b"")]
+        if converted:
+            for name in paths:
+                target = _safe_path(root, name)
+                original = before_bytes[name]
+                if original is None:
+                    target.unlink(missing_ok=True)
+                else:
+                    target.write_bytes(original)
+            raise LocalEvidenceError(
+                "applied bytes were altered by a line-ending conversion the patch did not "
+                "request; files restored")
     return {"status": "applied", "head": _git(root, "rev-parse", "HEAD").decode().strip(),
             "patch_sha256": hashlib.sha256(encoded).hexdigest(), "changed_paths": actual,
             "hunk_count_handling": "git apply --recount; original patch bytes preserved" if recount_options else
                                    "git apply; original traditional multi-file boundaries preserved",
+            "git_configuration": "isolated: ambient config excluded, byte-deciding keys pinned"
+                                 if isolation is not None else "ambient",
             "before_sha256": before, "after_sha256": digests()}
 
 

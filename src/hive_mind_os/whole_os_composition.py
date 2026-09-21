@@ -724,6 +724,26 @@ class WholeOSCompositionHost:
                 ),
             )
 
+        if disposition is BuilderDisposition.NO_CHANGE:
+            # A verified no-change candidate has nothing to publish, so it never
+            # reaches a transport. It closes only a package whose contract does
+            # not require a changed delivery; otherwise the unmet outcome stays.
+            if not self._no_change_permitted(package, payload):
+                return self._finish(
+                    path,
+                    payload_digest,
+                    PackageExecutionResult(
+                        package.package_id,
+                        PackageStatus.FAILED,
+                        None,
+                        (qualification.digest,),
+                        "no-change cannot satisfy a package that requires a change",
+                    ),
+                )
+            return self._record_learning_and_finish(
+                package, path, payload_digest, discovery, build, qualification, None, []
+            )
+
         if self.delivery_policy.publish_required and not self.repository_profile.allows(
             ProfileCapability.CODE_PR, destination=self.delivery_policy.target
         ):
@@ -851,6 +871,37 @@ class WholeOSCompositionHost:
                     ),
                 )
 
+        return self._record_learning_and_finish(
+            package,
+            path,
+            payload_digest,
+            discovery,
+            build,
+            qualification,
+            delivery.request_digest,
+            feedback_refs,
+        )
+
+    def _no_change_permitted(
+        self, package: OutcomeWorkPackage, payload: Mapping[str, Any]
+    ) -> bool:
+        """Whether a verified NO_CHANGE candidate may close this package."""
+
+        del package, payload
+        return not self.delivery_policy.publish_required
+
+    def _record_learning_and_finish(
+        self,
+        package: OutcomeWorkPackage,
+        path: Path,
+        payload_digest: str,
+        discovery: DiscoveryOutcome,
+        build: BuildOutcome,
+        qualification: QualificationReceipt,
+        delivery_digest: str | None,
+        feedback_refs: list[str],
+    ) -> PackageExecutionResult:
+        disposition = build.result.disposition
         destination_subject = (
             self.delivery_policy.learning_destination_subject_id
             or self.repository_profile.identity.repository_id
@@ -879,7 +930,7 @@ class WholeOSCompositionHost:
                     discovery.court_receipt,
                     *build.result.evidence_refs,
                     qualification.digest,
-                    delivery.request_digest,
+                    *(() if delivery_digest is None else (delivery_digest,)),
                     *feedback_refs,
                 )
             )
