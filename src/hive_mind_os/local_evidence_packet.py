@@ -87,8 +87,13 @@ def _reject_tracked_symlinks(workspace: Path, paths: list[str]) -> None:
             raise LocalEvidenceError("tracked symlink targets are forbidden, including Windows link placeholders")
 
 
-def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list[dict], *, max_content_bytes: int = MAX_CONTENT_BYTES) -> dict:
-    """Read whole UTF-8 blobs from HEAD, recording everything omitted explicitly."""
+def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list[dict], *, max_content_bytes: int = MAX_CONTENT_BYTES, withheld_paths: frozenset[str] = frozenset()) -> dict:
+    """Read whole UTF-8 blobs from HEAD, recording everything omitted explicitly.
+
+    ``withheld_paths`` names tracked files whose bytes, size and blob hash must not
+    reach the model, such as sealed held-out acceptance tests. They stay listed as
+    omitted so the packet does not pretend the tree is empty there.
+    """
     if not 1 <= max_content_bytes <= MAX_CONTENT_BYTES:
         raise LocalEvidenceError("source packet budget is outside its supported bound")
     root = workspace.resolve()
@@ -100,8 +105,10 @@ def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list
         metadata, raw_name = entry.split(b"\t", 1)
         mode, kind, blob, size = metadata.decode("ascii").split()
         name = raw_name.decode("utf-8", "surrogateescape")
+        withheld = name in withheld_paths
         inventory.append({"path": name, "mode": mode, "kind": kind,
-                          "blob_hash": blob, "size_bytes": int(size) if size != "-" else None})
+                          "blob_hash": None if withheld else blob,
+                          "size_bytes": None if withheld or size == "-" else int(size)})
 
     tracked_names = {item["path"] for item in inventory}
     def citations(value: Any) -> set[str]:
@@ -189,7 +196,9 @@ def build_source_packet(workspace: Path, node_id: str, predecessor_reports: list
     selected, omitted, content_bytes = [], [], 0
     for item in sorted(inventory, key=priority):
         name, reason = item["path"], None
-        if item["kind"] != "blob" or item["mode"] == "120000":
+        if name in withheld_paths:
+            reason = "sealed held-out content withheld from the model"
+        elif item["kind"] != "blob" or item["mode"] == "120000":
             reason = "symlink or non-file entry"
         elif _SECRET_PATH.search(name):
             reason = "secret-sensitive path"
