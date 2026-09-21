@@ -12,6 +12,11 @@ license = { text = "MIT" }
 authors = [{ name = "Hive Mind OS contributors" }]
 dependencies = []
 
+[project.optional-dependencies]
+coupon-hive-windows = [
+    "tzdata==2026.4; sys_platform == 'win32'",
+]
+
 [project.scripts]
 hive-mind = "hive_mind_os.cli:main"
 

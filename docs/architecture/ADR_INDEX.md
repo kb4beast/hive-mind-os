@@ -62,9 +62,11 @@ evidence. Numeric-only references to ADR-008, ADR-012, ADR-057, or ADR-058 are a
 | `ADR-085`     | [Mission cohort topology](ADR-085-MISSION-COHORT-TOPOLOGY.md) | Repository mission runtime | adapted implementation candidate; integrated qualification pending |
 | `ADR-086`     | [Bounded cohort repair and efficiency receipts](ADR-086-BOUNDED-COHORT-REPAIR-AND-EFFICIENCY.md) | Cohort assurance | adapted implementation candidate; production superiority unclaimed |
 | `ADR-087`     | [Durable cohort journal](ADR-087-DURABLE-COHORT-JOURNAL.md) | Cohort continuity | adapted implementation candidate; integrated qualification pending |
+| `ADR-088`     | [Trusted local Codex host for WholeOSService](ADR-088-TRUSTED-CODEX-WHOLE-OS-HOST.md) | Whole-OS host | adopted for the first trusted local host; publication and production isolation excluded |
+| `ADR-089`     | [Optional IANA timezone data for Windows plugin validation](ADR-089-WINDOWS-IANA-TIMEZONE-DATA.md) | Windows qualification | adapted; independent Curator validation passed; protected promotion pending |
 | `ADR-041`     | [Typed executable acceptance specifications](ADR-041-TYPED-EXECUTABLE-ACCEPTANCE-SPECS.md)                                  | P3.4                       | adapted                                                                              |
 | `ADR-042`     | [Contribution governance tiers](ADR-042-CONTRIBUTION-GOVERNANCE-TIERS.md)                                                   | P4.05                      | adopted                                                                              |
 | `ADR-043`     | [Verification-first open-source posture and comparator intake](ADR-043-VERIFICATION-FIRST-OPEN-SOURCE-POSTURE.md)           | P5.3 follow-up             | adopted; G6 read-only comparator intake authorized                                   |
 
 The collisions are preserved as historical provenance. The next new numeric ADR identifier
-is ADR-088; it must be unique at creation time.
+is ADR-090; it must be unique at creation time.
