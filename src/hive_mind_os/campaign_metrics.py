@@ -62,23 +62,31 @@ class LeaseExhausted(CampaignMetricsError):
     """Typed stop used when a revalidated lease is expired or revoked."""
 
 
-def canonical_digest(value: object) -> str:
-    def plain(item: object) -> object:
-        if hasattr(item, "to_document"):
-            return plain(item.to_document())  # type: ignore[union-attr]
-        if isinstance(item, Mapping):
-            return {str(key): plain(val) for key, val in item.items()}
-        if isinstance(item, (tuple, list, set, frozenset)):
-            values = [plain(val) for val in item]
-            return (
-                sorted(values, key=lambda val: json.dumps(val, sort_keys=True))
-                if isinstance(item, (set, frozenset))
-                else values
-            )
-        return item
+def canonical_document(item: object) -> object:
+    """Plain JSON-compatible form shared by digests and durable host storage.
 
+    Mapping keys keep the historical ``str(key)`` behaviour for every unrelated campaign
+    document. That is **not** a claim that generic frozenset-key hashing is deterministic:
+    ``str(frozenset)`` follows the per-process hash seed. Bracket identities therefore
+    never reach this function with such keys; see :data:`BRACKET_CODEC_ID`.
+    """
+    if hasattr(item, "to_document"):
+        return canonical_document(item.to_document())  # type: ignore[union-attr]
+    if isinstance(item, Mapping):
+        return {str(key): canonical_document(val) for key, val in item.items()}
+    if isinstance(item, (tuple, list, set, frozenset)):
+        values = [canonical_document(val) for val in item]
+        return (
+            sorted(values, key=lambda val: json.dumps(val, sort_keys=True))
+            if isinstance(item, (set, frozenset))
+            else values
+        )
+    return item
+
+
+def canonical_digest(value: object) -> str:
     encoded = json.dumps(
-        plain(value), sort_keys=True, separators=(",", ":"), allow_nan=False
+        canonical_document(value), sort_keys=True, separators=(",", ":"), allow_nan=False
     )
     return "sha256:" + sha256(encoded.encode("utf-8")).hexdigest()
 
@@ -1130,6 +1138,19 @@ def _resolve(
             protocol.protocol_digest, stage, operation, state_admission_digest
         ),
     )
+    return validate_admission_snapshot(
+        snapshot, protocol, stage, operation, state_admission_digest
+    )
+
+
+def validate_admission_snapshot(
+    snapshot: AdmissionSnapshot,
+    protocol: MatchProtocol,
+    stage: str,
+    operation: str,
+    state_admission_digest: str | None = None,
+) -> AdmissionSnapshot:
+    """Pure admission checks; durable registries reuse them on every direct call."""
     if not isinstance(snapshot, AdmissionSnapshot):
         raise CampaignMetricsError("registry returned invalid admission")
     evidence = snapshot.stage_evidence
@@ -1174,11 +1195,11 @@ def _resolve(
         raise CampaignMetricsError("untrusted lease issuer")
     if lease.revoked_at is not None and lease.revoked_at <= snapshot.observed_at:
         raise LeaseExhausted("lease revoked")
-    if (
-        snapshot.observed_at < lease.issued_at
-        or snapshot.observed_at >= lease.expires_at
-    ):
-        raise LeaseExhausted("lease expired or not active")
+    if snapshot.observed_at < lease.issued_at:
+        # A future activation is a blocker, never confirmed exhaustion.
+        raise CampaignMetricsError("lease is not yet active at trusted time")
+    if snapshot.observed_at >= lease.expires_at:
+        raise LeaseExhausted("lease expired")
     if operation not in lease.operations:
         raise CampaignMetricsError("lease does not allow operation")
     if not {task.task_id for task in evidence.tasks} <= set(protocol.scenario_task_ids):
@@ -1396,9 +1417,162 @@ def _maximum_pairs(
     return best
 
 
+BRACKET_CODEC_DOMAIN = "hive-mind-os.bracket-state"
+BRACKET_CODEC_VERSION = 1
+BRACKET_CODEC_ID = f"{BRACKET_CODEC_DOMAIN}/v{BRACKET_CODEC_VERSION}"
+_BRACKET_DOCUMENT_KEYS = frozenset(
+    {
+        "domain",
+        "type",
+        "version",
+        "protocol_digest",
+        "admission_digest",
+        "stage",
+        "track",
+        "round_number",
+        "losses",
+        "byes",
+        "inconclusive",
+        "quarantined",
+        "terminal",
+        "applied_receipt_digests",
+    }
+)
+
+
+def _bracket_body(
+    round_number: int,
+    losses: Mapping[str, int],
+    byes: Mapping[str, int],
+    inconclusive: Mapping[frozenset[str], int],
+    quarantined: Iterable[str],
+    terminal: str | None,
+    applied: Iterable[str],
+) -> dict[str, object]:
+    """The versioned bracket preimage body.
+
+    Inconclusive matchups are explicit, typed, sorted ``{"pair": [a, b], "count": n}``
+    entries with ``a < b``. No frozenset ever reaches :func:`canonical_document` as a
+    mapping key, so the preimage cannot depend on the per-process hash seed, and a
+    JSON-looking string key can never be reinterpreted as a pair.
+    """
+    entries = sorted(
+        (tuple(sorted(pair)), count) for pair, count in inconclusive.items()
+    )
+    return {
+        "round_number": round_number,
+        "losses": dict(losses),
+        "byes": dict(byes),
+        "inconclusive": [
+            {"pair": [pair[0], pair[1]], "count": count} for pair, count in entries
+        ],
+        "quarantined": sorted(quarantined),
+        "terminal": terminal,
+        "applied_receipt_digests": sorted(applied),
+    }
+
+
+def _decode_string_counts(value: object, name: str) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        raise CampaignMetricsError(f"bracket {name} must be an object")
+    counts: dict[str, int] = {}
+    for key, count in value.items():
+        if type(key) is not str or type(count) is not int or count < 0:
+            raise CampaignMetricsError(f"bracket {name} entry is malformed")
+        counts[key] = count
+    return counts
+
+
+def _decode_sorted_strings(value: object, name: str) -> list[str]:
+    if not isinstance(value, list) or any(type(item) is not str for item in value):
+        raise CampaignMetricsError(f"bracket {name} must be a list of strings")
+    if value != sorted(set(value)):
+        raise CampaignMetricsError(f"bracket {name} must be sorted and duplicate-free")
+    return list(value)
+
+
+def _decode_pair_entries(value: object) -> dict[frozenset[str], int]:
+    if not isinstance(value, list):
+        raise CampaignMetricsError("bracket inconclusive must be a list of typed pairs")
+    meetings: dict[frozenset[str], int] = {}
+    previous: tuple[str, str] | None = None
+    for entry in value:
+        if not isinstance(entry, Mapping) or set(entry) != {"pair", "count"}:
+            raise CampaignMetricsError("bracket inconclusive entry is malformed")
+        pair, count = entry["pair"], entry["count"]
+        if (
+            not isinstance(pair, list)
+            or len(pair) != 2
+            or any(type(item) is not str for item in pair)
+            or not pair[0] < pair[1]
+            or type(count) is not int
+            or count < 0
+        ):
+            raise CampaignMetricsError("bracket inconclusive pair is malformed")
+        ordered = (pair[0], pair[1])
+        if previous is not None and not previous < ordered:
+            raise CampaignMetricsError(
+                "bracket inconclusive pairs must be sorted and duplicate-free"
+            )
+        previous = ordered
+        meetings[frozenset(ordered)] = count
+    return meetings
+
+
+def bracket_from_document(document: object) -> "BracketSnapshot":
+    """Strict decoder for the versioned bracket document.
+
+    A document without an explicit domain/version (the legacy representation), an
+    unknown domain, type or version, extra or missing fields, duplicates, unsorted
+    entries or malformed pairs are rejected. The version is never inferred from an
+    empty history or from a successful parse; there is no legacy decoding path.
+    """
+    if not isinstance(document, Mapping):
+        raise CampaignMetricsError("bracket document must be an object")
+    if "domain" not in document or "version" not in document:
+        raise CampaignMetricsError(
+            "versionless legacy bracket document is unsupported for positive use"
+        )
+    version = document["version"]
+    if (
+        document["domain"] != BRACKET_CODEC_DOMAIN
+        or document.get("type") != "bracket-snapshot"
+        or type(version) is not int
+        or version != BRACKET_CODEC_VERSION
+    ):
+        raise CampaignMetricsError("unknown bracket codec domain/type/version")
+    if set(document) != _BRACKET_DOCUMENT_KEYS:
+        raise CampaignMetricsError("bracket document has missing or unknown fields")
+    terminal = document["terminal"]
+    if terminal is not None and type(terminal) is not str:
+        raise CampaignMetricsError("bracket terminal must be a string or null")
+    return BracketSnapshot(
+        cast(str, document["protocol_digest"]),
+        cast(str, document["admission_digest"]),
+        cast(str, document["stage"]),
+        cast(str, document["track"]),
+        cast(int, document["round_number"]),
+        _decode_string_counts(document["losses"], "losses"),
+        _decode_string_counts(document["byes"], "byes"),
+        _decode_pair_entries(document["inconclusive"]),
+        frozenset(_decode_sorted_strings(document["quarantined"], "quarantined")),
+        terminal,
+        frozenset(
+            _decode_sorted_strings(
+                document["applied_receipt_digests"], "applied_receipt_digests"
+            )
+        ),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class BracketSnapshot:
-    """Registry-authenticated bracket history; callers never submit this to execute."""
+    """Registry-authenticated bracket history; callers never submit this to execute.
+
+    Its identity uses the versioned bracket codec (:data:`BRACKET_CODEC_ID`); a
+    deliberate, documented break from the versionless legacy identity (see
+    :meth:`legacy_document`, retained only as evidence).
+    """
 
     protocol_digest: str
     admission_digest: str
@@ -1454,6 +1628,32 @@ class BracketSnapshot:
         return canonical_digest(self.to_document())
 
     def to_document(self) -> Mapping[str, object]:
+        """The versioned preimage used for every CAS, plan, issuance and audit digest."""
+        return {
+            "domain": BRACKET_CODEC_DOMAIN,
+            "type": "bracket-snapshot",
+            "version": BRACKET_CODEC_VERSION,
+            "protocol_digest": self.protocol_digest,
+            "admission_digest": self.admission_digest,
+            "stage": self.stage,
+            "track": self.track,
+            **_bracket_body(
+                self.round_number,
+                self.losses,
+                self.byes,
+                self.inconclusive,
+                self.quarantined,
+                self.terminal,
+                self.applied_receipt_digests,
+            ),
+        }
+
+    def legacy_document(self) -> Mapping[str, object]:
+        """The removed versionless representation, kept as retained evidence only.
+
+        Its digest depends on ``str(frozenset)`` for inconclusive matchups and therefore
+        on the hash seed. It is never used for identity, storage or positive use.
+        """
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
 
@@ -1484,10 +1684,137 @@ class BracketTransition:
         )
 
     def to_document(self) -> Mapping[str, object]:
+        """Versioned transition preimage; same pair encoding as the snapshot."""
+        return {
+            "domain": BRACKET_CODEC_DOMAIN,
+            "type": "bracket-transition",
+            "version": BRACKET_CODEC_VERSION,
+            **_bracket_body(
+                self.round_number,
+                self.losses,
+                self.byes,
+                self.inconclusive,
+                self.quarantined,
+                self.terminal,
+                self.applied_receipt_digests,
+            ),
+        }
+
+    def legacy_document(self) -> Mapping[str, object]:
+        """Removed versionless representation; retained as evidence, never identity."""
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
 
 DUMMY_DIGEST = "sha256:" + "0" * 64
+
+
+def _plan_round(
+    protocol: MatchProtocol, bracket: BracketSnapshot, snapshot: AdmissionSnapshot
+) -> tuple[str | None, tuple[RoundPlanEntry, ...]]:
+    """Pure canonical next-round plan, or the terminal reason that replaces it."""
+    if bracket.terminal:
+        return bracket.terminal, ()
+    if bracket.round_number >= protocol.max_rounds:
+        return "max_rounds", ()
+    evidence = snapshot.stage_evidence
+    eligible = [
+        variant
+        for variant in _active_variants(protocol, evidence, bracket.track)
+        if variant not in bracket.quarantined
+        and bracket.losses.get(variant, 0) < protocol.elimination_losses
+    ]
+    if len(eligible) == 1:
+        return "one_survivor", ()
+    if not eligible:
+        return "no_schedulable_pairs", ()
+    ordered = sorted(
+        eligible, key=lambda variant: (bracket.losses.get(variant, 0), variant)
+    )
+    rotation = bracket.round_number % len(ordered)
+    ordered = ordered[rotation:] + ordered[:rotation]
+    bye = None
+    if len(ordered) % 2:
+        bye = min(ordered, key=lambda variant: (bracket.byes.get(variant, 0), variant))
+        ordered.remove(bye)
+    pairs = _maximum_pairs(protocol, tuple(ordered), bracket.inconclusive)
+    if not pairs:
+        return "no_schedulable_pairs", ()
+    items: tuple[tuple[str, str | None], ...] = (
+        (((bye, None),) + pairs) if bye is not None else pairs
+    )
+    entries = []
+    for pair_index, (left, right) in enumerate(items):
+        task = evidence.tasks[(bracket.round_number + pair_index) % len(evidence.tasks)]
+        repetition = bracket.round_number % evidence.repetitions
+        recipe = protocol.recipe(left)
+        assert recipe is not None
+        entries.append(
+            RoundPlanEntry(
+                snapshot.admission_digest,
+                protocol.protocol_digest,
+                bracket.bracket_digest,
+                bracket.stage,
+                bracket.round_number + 1,
+                pair_index,
+                left,
+                right,
+                right is None,
+                bracket.track,
+                str(recipe["regime_id"]),
+                evidence.block_id,
+                evidence.block_digest,
+                task.task_id,
+                task.family_id,
+                repetition,
+                task.repetition_seeds[repetition],
+                evidence.principals.evaluator_id,
+                evidence.principals.custodian_id,
+            )
+        )
+    return None, tuple(entries)
+
+
+def _round_transition(
+    protocol: MatchProtocol,
+    bracket: BracketSnapshot,
+    results: Sequence[ReceiptOutcome],
+) -> BracketTransition:
+    """Pure successor of one bracket after an exact set of round outcomes."""
+    losses = dict(bracket.losses)
+    byes = dict(bracket.byes)
+    inconclusive = dict(bracket.inconclusive)
+    quarantined = set(bracket.quarantined)
+    for result in results:
+        plan = result.receipt.plan
+        if result.outcome == "BYE":
+            byes[plan.left] = byes.get(plan.left, 0) + 1
+            continue
+        assert plan.right is not None
+        key = frozenset((plan.left, plan.right))
+        if result.outcome == "LEFT":
+            losses[plan.right] = losses.get(plan.right, 0) + 1
+        elif result.outcome == "RIGHT":
+            losses[plan.left] = losses.get(plan.left, 0) + 1
+        elif result.outcome == "QUARANTINE_LEFT":
+            quarantined.add(plan.left)
+        elif result.outcome == "QUARANTINE_RIGHT":
+            quarantined.add(plan.right)
+        elif result.outcome == "QUARANTINE_BOTH":
+            quarantined.update((plan.left, plan.right))
+        else:
+            inconclusive[key] = inconclusive.get(key, 0) + 1
+    next_round = bracket.round_number + 1
+    terminal = "max_rounds" if next_round >= protocol.max_rounds else None
+    return BracketTransition(
+        next_round,
+        losses,
+        byes,
+        inconclusive,
+        frozenset(quarantined),
+        terminal,
+        bracket.applied_receipt_digests
+        | frozenset(result.receipt.receipt_digest for result in results),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1559,6 +1886,25 @@ class BracketState:
             raise CampaignMetricsError("registry failed bracket terminal commit")
         return state
 
+    def _close_exhausted(
+        self,
+        registry: AdmissionRegistry,
+        admission_handle: object,
+        protocol: MatchProtocol,
+        operation: str,
+    ) -> tuple[str, "BracketState"]:
+        """Close after confirmed exhaustion without rewriting an earlier terminal."""
+        bracket = registry.resolve_bracket(
+            admission_handle, self.opaque_handle, protocol.protocol_digest, operation
+        )
+        if not isinstance(bracket, BracketSnapshot):
+            raise CampaignMetricsError("registry returned foreign bracket state")
+        if bracket.terminal:
+            return bracket.terminal, self
+        return "lease_exhausted", self._terminal(
+            registry, admission_handle, bracket, "lease_exhausted"
+        )
+
     def schedule(
         self,
         protocol: MatchProtocol,
@@ -1571,109 +1917,53 @@ class BracketState:
                 registry, admission_handle, protocol, "schedule"
             )
         except LeaseExhausted:
-            bracket = registry.resolve_bracket(
-                admission_handle,
-                self.opaque_handle,
-                protocol.protocol_digest,
-                "schedule",
+            reason, state = self._close_exhausted(
+                registry, admission_handle, protocol, "schedule"
             )
-            return BracketSchedule(
-                (),
-                "lease_exhausted",
-                self._terminal(registry, admission_handle, bracket, "lease_exhausted"),
-            )
+            return BracketSchedule((), reason, state)
         if bracket.terminal:
             return BracketSchedule((), bracket.terminal, self)
-        if bracket.round_number >= protocol.max_rounds:
-            return BracketSchedule(
-                (),
-                "max_rounds",
-                self._terminal(registry, admission_handle, bracket, "max_rounds"),
-            )
-        evidence = snapshot.stage_evidence
-        eligible = [
-            variant
-            for variant in _active_variants(protocol, evidence, bracket.track)
-            if variant not in bracket.quarantined
-            and bracket.losses.get(variant, 0) < protocol.elimination_losses
-        ]
-        if len(eligible) == 1:
-            return BracketSchedule(
-                (),
-                "one_survivor",
-                self._terminal(registry, admission_handle, bracket, "one_survivor"),
-            )
-        if not eligible:
-            return BracketSchedule(
-                (),
-                "no_schedulable_pairs",
-                self._terminal(
-                    registry, admission_handle, bracket, "no_schedulable_pairs"
-                ),
-            )
-        ordered = sorted(
-            eligible, key=lambda variant: (bracket.losses.get(variant, 0), variant)
-        )
-        rotation = bracket.round_number % len(ordered)
-        ordered = ordered[rotation:] + ordered[:rotation]
-        bye = None
-        if len(ordered) % 2:
-            bye = min(
-                ordered, key=lambda variant: (bracket.byes.get(variant, 0), variant)
-            )
-            ordered.remove(bye)
-        pairs = _maximum_pairs(protocol, tuple(ordered), bracket.inconclusive)
-        if not pairs:
-            return BracketSchedule(
-                (),
-                "no_schedulable_pairs",
-                self._terminal(
-                    registry, admission_handle, bracket, "no_schedulable_pairs"
-                ),
-            )
-        items: tuple[tuple[str, str | None], ...] = (
-            (((bye, None),) + pairs) if bye is not None else pairs
-        )
-        entries = []
-        for pair_index, (left, right) in enumerate(items):
-            task = evidence.tasks[
-                (bracket.round_number + pair_index) % len(evidence.tasks)
-            ]
-            repetition = bracket.round_number % evidence.repetitions
-            recipe = protocol.recipe(left)
-            assert recipe is not None
-            entries.append(
-                RoundPlanEntry(
-                    snapshot.admission_digest,
-                    protocol.protocol_digest,
-                    bracket.bracket_digest,
-                    bracket.stage,
-                    bracket.round_number + 1,
-                    pair_index,
-                    left,
-                    right,
-                    right is None,
-                    bracket.track,
-                    str(recipe["regime_id"]),
-                    evidence.block_id,
-                    evidence.block_digest,
-                    task.task_id,
-                    task.family_id,
-                    repetition,
-                    task.repetition_seeds[repetition],
-                    evidence.principals.evaluator_id,
-                    evidence.principals.custodian_id,
+        terminal, entries = _plan_round(protocol, bracket, snapshot)
+        if terminal is not None:
+            # An ordinary terminal commit re-authorizes; confirmed exhaustion found
+            # there must close the bracket through this same public call as well.
+            try:
+                committed = self._terminal(registry, admission_handle, bracket, terminal)
+            except LeaseExhausted:
+                reason, state = self._close_exhausted(
+                    registry, admission_handle, protocol, "schedule"
                 )
+                return BracketSchedule((), reason, state)
+            return BracketSchedule((), terminal, committed)
+        try:
+            receipts = tuple(registry.issue_round(admission_handle, entries))
+            # Issuance time is immutable; current use is a separate, fresh check.
+            # It must cover the whole public call so an expiry/revocation between
+            # issuance and this recheck closes the bracket instead of leaking
+            # usable receipts.
+            fresh = _resolve(
+                registry,
+                admission_handle,
+                protocol,
+                bracket.stage,
+                "schedule",
+                snapshot.admission_digest,
             )
-        receipts = tuple(registry.issue_round(admission_handle, tuple(entries)))
+        except LeaseExhausted:
+            reason, state = self._close_exhausted(
+                registry, admission_handle, protocol, "schedule"
+            )
+            return BracketSchedule((), reason, state)
         if (
             len(receipts) != len(entries)
+            or fresh.admission_digest != snapshot.admission_digest
             or any(
                 not isinstance(receipt, IssuedReceipt)
                 or receipt.plan != entry
-                or not snapshot.observed_at
+                or not fresh.lease.issued_at
                 <= receipt.issued_at
-                < snapshot.lease.expires_at
+                <= fresh.observed_at
+                < fresh.lease.expires_at
                 for receipt, entry in zip(receipts, entries)
             )
             or len({id(receipt.opaque_handle) for receipt in receipts}) != len(receipts)
@@ -1696,12 +1986,9 @@ class BracketState:
         except LeaseExhausted:
             if results:
                 raise CampaignMetricsError("expired lease cannot consume results")
-            bracket = registry.resolve_bracket(
-                admission_handle, self.opaque_handle, protocol.protocol_digest, "apply"
-            )
-            return self._terminal(
-                registry, admission_handle, bracket, "lease_exhausted"
-            )
+            return self._close_exhausted(
+                registry, admission_handle, protocol, "apply"
+            )[1]
         scheduled = self.schedule(
             protocol, registry=registry, admission_handle=admission_handle
         )
@@ -1730,41 +2017,7 @@ class BracketState:
                 or result.receipt.receipt_digest != issued.receipt_digest
             ):
                 raise CampaignMetricsError("receipt mutated or substituted")
-        losses = dict(bracket.losses)
-        byes = dict(bracket.byes)
-        inconclusive = dict(bracket.inconclusive)
-        quarantined = set(bracket.quarantined)
-        for result in submitted:
-            plan = result.receipt.plan
-            if result.outcome == "BYE":
-                byes[plan.left] = byes.get(plan.left, 0) + 1
-                continue
-            assert plan.right is not None
-            key = frozenset((plan.left, plan.right))
-            if result.outcome == "LEFT":
-                losses[plan.right] = losses.get(plan.right, 0) + 1
-            elif result.outcome == "RIGHT":
-                losses[plan.left] = losses.get(plan.left, 0) + 1
-            elif result.outcome == "QUARANTINE_LEFT":
-                quarantined.add(plan.left)
-            elif result.outcome == "QUARANTINE_RIGHT":
-                quarantined.add(plan.right)
-            elif result.outcome == "QUARANTINE_BOTH":
-                quarantined.update((plan.left, plan.right))
-            else:
-                inconclusive[key] = inconclusive.get(key, 0) + 1
-        next_round = bracket.round_number + 1
-        terminal = "max_rounds" if next_round >= protocol.max_rounds else None
-        transition = BracketTransition(
-            next_round,
-            losses,
-            byes,
-            inconclusive,
-            frozenset(quarantined),
-            terminal,
-            bracket.applied_receipt_digests
-            | frozenset(result.receipt.receipt_digest for result in submitted),
-        )
+        transition = _round_transition(protocol, bracket, submitted)
         request = ConsumeRoundRequest(
             bracket.admission_digest,
             bracket.protocol_digest,
@@ -1804,6 +2057,20 @@ def validate_and_append_seals(
     if not rows:
         raise CampaignMetricsError("no seals supplied")
     snapshot = _resolve(registry, admission_handle, protocol, rows[0].stage, "seal")
+    history = check_seal_append(protocol, snapshot, rows)
+    registry.append_seals(
+        admission_handle, canonical_digest(history), snapshot.observed_at, rows
+    )
+
+
+def check_seal_append(
+    protocol: MatchProtocol,
+    snapshot: AdmissionSnapshot,
+    rows: tuple[VariantSeal, ...],
+) -> tuple[VariantSeal, ...]:
+    """Pure seal-append validation shared with durable registries; returns history."""
+    if not rows or any(not isinstance(seal, VariantSeal) for seal in rows):
+        raise CampaignMetricsError("no seals supplied")
     evidence = snapshot.stage_evidence
     history = tuple(snapshot.seal_history)
     if history and (
@@ -1863,9 +2130,7 @@ def validate_and_append_seals(
         entry.variant_id for entry in evidence.final_pair
     }:
         raise CampaignMetricsError("final seals must append exact pair together")
-    registry.append_seals(
-        admission_handle, canonical_digest(history), snapshot.observed_at, rows
-    )
+    return history
 
 
 def _stage_from_handle(
@@ -1876,6 +2141,8 @@ def _stage_from_handle(
             snapshot = registry.resolve(
                 handle, AdmissionUse(protocol.protocol_digest, stage, operation)
             )
+        except LeaseExhausted:
+            raise
         except CampaignMetricsError:
             continue
         if (
@@ -1900,7 +2167,41 @@ def stage_paired_bootstrap(
 ) -> AggregateReceipt:
     stage = _stage_from_handle(registry, admission_handle, protocol, "aggregate")
     snapshot = _resolve(registry, admission_handle, protocol, stage, "aggregate")
+    rows = tuple(observations)
+    record = build_aggregate_evidence(
+        protocol,
+        snapshot,
+        metric,
+        left,
+        right,
+        rows,
+        left_hard_gates=left_hard_gates,
+        right_hard_gates=right_hard_gates,
+    )
+    receipt = registry.record_aggregate(admission_handle, record, rows)
+    if not isinstance(
+        receipt, AggregateReceipt
+    ) or receipt.aggregate_digest != canonical_digest(record):
+        raise CampaignMetricsError("registry returned invalid aggregate receipt")
+    return receipt
+
+
+def build_aggregate_evidence(
+    protocol: MatchProtocol,
+    snapshot: AdmissionSnapshot,
+    metric: str,
+    left: str,
+    right: str,
+    observations: Sequence[FamilyObservation],
+    *,
+    left_hard_gates: bool,
+    right_hard_gates: bool,
+) -> AggregateEvidence:
+    """Pure aggregate recomputation shared with durable registries."""
     evidence = snapshot.stage_evidence
+    stage = evidence.stage
+    if any(not isinstance(row, FamilyObservation) for row in observations):
+        raise CampaignMetricsError("observations must be FamilyObservation rows")
     if type(left_hard_gates) is not bool or type(right_hard_gates) is not bool:
         raise CampaignMetricsError("hard gates must be booleans")
     _id(metric, "metric")
@@ -1949,7 +2250,7 @@ def stage_paired_bootstrap(
             raise CampaignMetricsError("unknown qualification metric")
         grouped.setdefault(row.family_id, []).append(row.value)
     interval = paired_family_bootstrap(grouped, seed=evidence.seed)
-    record = AggregateEvidence(
+    return AggregateEvidence(
         snapshot.admission_digest,
         protocol.protocol_digest,
         stage,
@@ -1967,12 +2268,6 @@ def stage_paired_bootstrap(
         left_hard_gates,
         right_hard_gates,
     )
-    receipt = registry.record_aggregate(admission_handle, record, rows)
-    if not isinstance(
-        receipt, AggregateReceipt
-    ) or receipt.aggregate_digest != canonical_digest(record):
-        raise CampaignMetricsError("registry returned invalid aggregate receipt")
-    return receipt
 
 
 def decide_match(
@@ -2090,7 +2385,17 @@ def decide_match(
     return "DRAW"
 
 
+plan_next_round = _plan_round
+transition_after_round = _round_transition
+observation_shape_for = _observation_shape
+active_variants_for = _active_variants
+expected_admission_digest = _expected_admission_digest
+
 __all__ = [
+    "BRACKET_CODEC_DOMAIN",
+    "BRACKET_CODEC_ID",
+    "BRACKET_CODEC_VERSION",
+    "bracket_from_document",
     "AdmissionRegistry",
     "AdmissionSnapshot",
     "AdmissionUse",
@@ -2120,8 +2425,17 @@ __all__ = [
     "StageEvidence",
     "TaskBinding",
     "VariantSeal",
+    "active_variants_for",
+    "build_aggregate_evidence",
+    "expected_admission_digest",
+    "observation_shape_for",
     "canonical_digest",
+    "canonical_document",
+    "check_seal_append",
     "decide_match",
+    "plan_next_round",
+    "transition_after_round",
+    "validate_admission_snapshot",
     "load_match_protocol",
     "load_match_protocol_for_inspection",
     "paired_family_bootstrap",

@@ -15,6 +15,7 @@ from typing import Mapping, Protocol, cast
 
 from .campaign_metrics import (
     AdmissionRegistry,
+    AdmissionSnapshot,
     MatchProtocol,
     StageEvidence,
     VariantSeal,
@@ -494,6 +495,74 @@ class AdmittedBenchmarkInvocation:
         )
 
 
+def build_admitted_invocation(
+    protocol: MatchProtocol,
+    manifest: BenchmarkAdapterManifest,
+    snapshot: AdmissionSnapshot,
+    *,
+    stage: str,
+    variant_id: str,
+    task_id: str,
+    repetition: int = 0,
+) -> AdmittedBenchmarkInvocation:
+    """Pure lane construction from an already-resolved admission snapshot.
+
+    Shared by the runner and by durable registries that recompute the expected
+    execution ancestry of a measurement; it performs no registry or broker call.
+    """
+    evidence = snapshot.stage_evidence
+    manifest.validate_for(protocol, evidence)
+    tasks = tuple(task for task in evidence.tasks if task.task_id == task_id)
+    if len(tasks) != 1:
+        raise BenchmarkAdapterError("task is not uniquely admitted for this stage")
+    task = tasks[0]
+    if type(repetition) is not int or repetition < 0 or repetition >= evidence.repetitions:
+        raise BenchmarkAdapterError("repetition is outside the admitted task shape")
+    if len(task.repetition_seeds) != evidence.repetitions:
+        raise BenchmarkAdapterError("task seeds differ from the admitted shape")
+    if variant_id not in manifest.recipes:
+        raise BenchmarkAdapterError("variant is absent from the adapter manifest")
+    protocol_recipe = protocol.recipe(variant_id)
+    if protocol_recipe is None:
+        raise BenchmarkAdapterError("variant is absent from the frozen protocol")
+    seal = AdmittedBenchmarkRunner._variant_seal(
+        evidence, snapshot.seal_history, variant_id
+    )
+    if seal.recipe_digest != protocol.recipe_digest(variant_id, protocol_recipe):
+        raise BenchmarkAdapterError("candidate seal targets another recipe")
+    binding = {
+        "admission_digest": snapshot.admission_digest,
+        "stage_evidence_digest": evidence.evidence_digest,
+        "lease_digest": snapshot.lease.lease_digest,
+        "variant_seal_digest": seal.seal_digest,
+        "repetition": repetition,
+        "seed": task.repetition_seeds[repetition],
+    }
+    binding_digest = canonical_digest(binding)
+    adapter = PinnedRecipeAdapter(manifest.recipes[variant_id])
+    request = adapter.request(
+        experiment_id=protocol.protocol_id,
+        stage=stage,
+        task_id=task.task_id,
+        family_id=task.family_id,
+        candidate_digest=seal.candidate_digest,
+        budget_digest=snapshot.lease.budget_digest,
+        environment_digest=evidence.evidence_digest,
+        lease_handle=snapshot.lease.lease_digest,
+        execution_binding_digest=binding_digest,
+    )
+    return AdmittedBenchmarkInvocation(
+        request,
+        variant_id,
+        snapshot.admission_digest,
+        evidence.evidence_digest,
+        snapshot.lease.lease_digest,
+        seal.seal_digest,
+        repetition,
+        task.repetition_seeds[repetition],
+    )
+
+
 class AdmittedBenchmarkRunner:
     """Generate and execute commands only from a live N02 registry admission."""
 
@@ -544,54 +613,14 @@ class AdmittedBenchmarkRunner:
             admission_handle=self.admission_handle,
             stage=stage,
         )
-        evidence = snapshot.stage_evidence
-        self.manifest.validate_for(self.protocol, evidence)
-        tasks = tuple(task for task in evidence.tasks if task.task_id == task_id)
-        if len(tasks) != 1:
-            raise BenchmarkAdapterError("task is not uniquely admitted for this stage")
-        task = tasks[0]
-        if type(repetition) is not int or repetition < 0 or repetition >= evidence.repetitions:
-            raise BenchmarkAdapterError("repetition is outside the admitted task shape")
-        if len(task.repetition_seeds) != evidence.repetitions:
-            raise BenchmarkAdapterError("task seeds differ from the admitted shape")
-        if variant_id not in self.manifest.recipes:
-            raise BenchmarkAdapterError("variant is absent from the adapter manifest")
-        protocol_recipe = self.protocol.recipe(variant_id)
-        if protocol_recipe is None:
-            raise BenchmarkAdapterError("variant is absent from the frozen protocol")
-        seal = self._variant_seal(evidence, snapshot.seal_history, variant_id)
-        if seal.recipe_digest != self.protocol.recipe_digest(variant_id, protocol_recipe):
-            raise BenchmarkAdapterError("candidate seal targets another recipe")
-        binding = {
-            "admission_digest": snapshot.admission_digest,
-            "stage_evidence_digest": evidence.evidence_digest,
-            "lease_digest": snapshot.lease.lease_digest,
-            "variant_seal_digest": seal.seal_digest,
-            "repetition": repetition,
-            "seed": task.repetition_seeds[repetition],
-        }
-        binding_digest = canonical_digest(binding)
-        adapter = PinnedRecipeAdapter(self.manifest.recipes[variant_id])
-        request = adapter.request(
-            experiment_id=self.protocol.protocol_id,
+        return build_admitted_invocation(
+            self.protocol,
+            self.manifest,
+            snapshot,
             stage=stage,
-            task_id=task.task_id,
-            family_id=task.family_id,
-            candidate_digest=seal.candidate_digest,
-            budget_digest=snapshot.lease.budget_digest,
-            environment_digest=evidence.evidence_digest,
-            lease_handle=snapshot.lease.lease_digest,
-            execution_binding_digest=binding_digest,
-        )
-        return AdmittedBenchmarkInvocation(
-            request,
-            variant_id,
-            snapshot.admission_digest,
-            evidence.evidence_digest,
-            snapshot.lease.lease_digest,
-            seal.seal_digest,
-            repetition,
-            task.repetition_seeds[repetition],
+            variant_id=variant_id,
+            task_id=task_id,
+            repetition=repetition,
         )
 
     def execute(self, invocation: AdmittedBenchmarkInvocation) -> BenchmarkResponse:
