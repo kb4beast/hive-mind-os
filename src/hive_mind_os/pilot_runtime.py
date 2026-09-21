@@ -7,8 +7,19 @@ from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from threading import RLock
-from typing import Iterable
+from typing import Iterable, Mapping
 
+from .production_evidence import (
+    MODE_LEGACY,
+    MODE_PRODUCTION,
+    MODE_TRUSTED_LOCAL,
+    EvidenceBlocker,
+    EvidencePurpose,
+    EvidenceUse,
+    ProductionEvidenceContext,
+    ProductionEvidenceError,
+    obligation_for,
+)
 from .whole_os_qualification import (
     Disposition,
     EvidenceKind,
@@ -228,8 +239,13 @@ class PilotState:
     active_attempts: tuple[ActivePilotAttempt, ...] = ()
     restart_evidence: EvidenceRef | None = None
     observation_evidence: EvidenceRef | None = None
+    # Persisted only as a consistency check. A missing value loads as MODE_LEGACY and can
+    # never be reopened as production; the mode is chosen by host construction.
+    evidence_mode: str = MODE_LEGACY
 
     def __post_init__(self) -> None:
+        if self.evidence_mode not in {MODE_LEGACY, MODE_TRUSTED_LOCAL, MODE_PRODUCTION}:
+            raise ValueError("pilot evidence mode is not recognized")
         observed = (
             self.plan.starts_at
             if self.observed_through is None
@@ -357,6 +373,9 @@ class PilotStore:
         active_attempts = tuple(
             ActivePilotAttempt(**item) for item in raw.get("active_attempts", ())
         )
+        mode = raw.get("evidence_mode", MODE_LEGACY)
+        if type(mode) is not str:
+            raise ValueError("pilot evidence mode is not recognized")
         return PilotState(
             plan=plan,
             attempts=attempts,
@@ -370,25 +389,290 @@ class PilotStore:
             active_attempts=active_attempts,
             restart_evidence=evidence(raw.get("restart_evidence")),
             observation_evidence=evidence(raw.get("observation_evidence")),
+            evidence_mode=mode,
         )
 
 
 class PilotController:
-    def __init__(self, store: PilotStore, plan: PilotPlan) -> None:
-        self.store, self.plan = store, plan
+    """Durable pilot state. ``production`` is fixed at construction by the host; it is
+    never read from a request or a persisted document. Without it the controller keeps
+    its original trusted-local behavior, where evidence labels are structural only."""
+
+    def __init__(
+        self,
+        store: PilotStore,
+        plan: PilotPlan,
+        *,
+        production: ProductionEvidenceContext | None = None,
+    ) -> None:
+        if production is not None and type(production) is not ProductionEvidenceContext:
+            raise ValueError("production evidence context must be a ProductionEvidenceContext")
+        self.store, self.plan, self.production = store, plan, production
+        self._mode = MODE_TRUSTED_LOCAL if production is None else MODE_PRODUCTION
         if store.current.exists():
-            state = store.load()
-            if state.plan != plan:
-                raise ValueError("existing pilot state belongs to another plan")
+            self._checked(store.load())
         else:
             store.save(
-                PilotState(plan, obligations=plan.prerequisites.blockers(plan.mode)),
+                PilotState(
+                    plan,
+                    obligations=plan.prerequisites.blockers(plan.mode),
+                    evidence_mode=self._mode,
+                ),
                 expected_revision=None,
             )
 
+    def _checked(self, state: PilotState) -> PilotState:
+        """Every ordinary public entry re-checks plan and mode against durable state."""
+        if state.plan != self.plan:
+            raise ValueError("existing pilot state belongs to another plan")
+        if self._mode == MODE_PRODUCTION:
+            if state.evidence_mode != MODE_PRODUCTION:
+                raise ProductionEvidenceError(
+                    EvidenceBlocker.MODE_MISMATCH,
+                    "persisted pilot state is not a production-evidence pilot",
+                )
+        elif state.evidence_mode == MODE_PRODUCTION:
+            raise ProductionEvidenceError(
+                EvidenceBlocker.MODE_MISMATCH,
+                "a production-evidence pilot cannot be reopened without its evidence context",
+            )
+        return state
+
+    def _state(self) -> PilotState:
+        return self._checked(self.store.load())
+
+    def snapshot(self) -> PilotState:
+        """The current durable state after the plan/mode check."""
+        return self._state()
+
+    def _claim(self) -> tuple[str, ...]:
+        return ("N31" if self.plan.mode == "self" else "N32",)
+
+    # --- production guards: evidence is resolved afresh on every call -------------------
+
+    def _prerequisite_entries(
+        self, lease_digest: str | None
+    ) -> list[tuple[EvidenceRef, EvidenceUse]]:
+        plan, pre = self.plan, self.plan.prerequisites
+        mode: Mapping[str, object] = {"pilot_mode": plan.mode}
+        entries: list[tuple[EvidenceRef, EvidenceUse]] = []
+
+        def add(
+            ref: EvidenceRef | None,
+            purpose: EvidencePurpose,
+            subject_id: str,
+            claims: Mapping[str, object],
+        ) -> None:
+            # Unusable or missing references are already typed structural blockers.
+            if ref is None or not PilotPrerequisites._usable(ref):
+                return
+            entries.append(
+                (
+                    ref,
+                    EvidenceUse(
+                        purpose,
+                        subject_id,
+                        plan.pilot_id,
+                        plan.candidate_digest,
+                        plan.authority_digest,
+                        claims,
+                        window_end=plan.starts_at,
+                        lease_digest=lease_digest,
+                    ),
+                )
+            )
+
+        add(pre.whole_os_host, EvidencePurpose.PILOT_HOST, plan.pilot_id, mode)
+        add(pre.supervisor, EvidencePurpose.PILOT_SUPERVISOR, plan.pilot_id, mode)
+        add(pre.delivery_authority, EvidencePurpose.PILOT_DELIVERY_AUTHORITY, plan.pilot_id, mode)
+        add(pre.benchmark_candidate, EvidencePurpose.PILOT_BENCHMARK, plan.candidate_digest, {})
+        for target in pre.targets:
+            add(target, EvidencePurpose.PILOT_TARGET, target.subject_id, mode)
+        for runtime in pre.runtime:
+            add(runtime, EvidencePurpose.PILOT_RUNTIME_CAPABILITY, runtime.subject_id, mode)
+        return entries
+
+    def _attempt_entries(self, attempt: PilotAttempt) -> list[tuple[EvidenceRef, EvidenceUse]]:
+        assert attempt.started_at is not None and attempt.ended_at is not None
+        plan = self.plan
+        scope = {
+            "family_id": attempt.family_id,
+            "started_at": attempt.started_at,
+            "ended_at": attempt.ended_at,
+        }
+        entries: list[tuple[EvidenceRef, EvidenceUse]] = []
+        if attempt.delivery_receipt is not None:
+            entries.append(
+                (
+                    attempt.delivery_receipt,
+                    EvidenceUse(
+                        EvidencePurpose.ATTEMPT_DELIVERY,
+                        attempt.subject_id,
+                        attempt.attempt_id,
+                        attempt.candidate_digest,
+                        plan.authority_digest,
+                        {
+                            **scope,
+                            "resource_units": attempt.resource_units,
+                            "domain": attempt.domain or "",
+                        },
+                        window_start=attempt.started_at,
+                        window_end=plan.ends_at,
+                    ),
+                )
+            )
+        for item in attempt.runtime_evidence:
+            entries.append(
+                (
+                    item.receipt,
+                    EvidenceUse(
+                        EvidencePurpose.ATTEMPT_RUNTIME,
+                        attempt.subject_id,
+                        attempt.attempt_id,
+                        attempt.candidate_digest,
+                        plan.authority_digest,
+                        {**scope, "check_class": item.check_class},
+                        window_start=attempt.started_at,
+                        window_end=plan.ends_at,
+                    ),
+                )
+            )
+        return entries
+
+    def _control_entries(
+        self,
+        *,
+        restart: EvidenceRef | None = None,
+        rollback: EvidenceRef | None = None,
+        observation: EvidenceRef | None = None,
+    ) -> list[tuple[EvidenceRef, EvidenceUse]]:
+        plan = self.plan
+        mode: Mapping[str, object] = {"pilot_mode": plan.mode}
+        entries: list[tuple[EvidenceRef, EvidenceUse]] = []
+
+        def add(
+            ref: EvidenceRef | None,
+            purpose: EvidencePurpose,
+            claims: Mapping[str, object],
+            *,
+            start: int | None,
+        ) -> None:
+            if ref is not None:
+                entries.append(
+                    (
+                        ref,
+                        EvidenceUse(
+                            purpose,
+                            plan.pilot_id,
+                            plan.pilot_id,
+                            plan.candidate_digest,
+                            plan.authority_digest,
+                            claims,
+                            window_start=start,
+                            window_end=plan.ends_at,
+                        ),
+                    )
+                )
+
+        add(restart, EvidencePurpose.PILOT_RESTART, mode, start=plan.starts_at)
+        add(rollback, EvidencePurpose.PILOT_ROLLBACK_CONTROL, mode, start=None)
+        add(
+            observation,
+            EvidencePurpose.PILOT_OBSERVATION,
+            {"observed_through": 0 if observation is None else observation.observed_at},
+            start=plan.starts_at,
+        )
+        return entries
+
+    def _dispatch_entries(
+        self, scope: str, attempt_id: str, subject_id: str
+    ) -> list[tuple[EvidenceRef, EvidenceUse]]:
+        assert self.production is not None
+        try:
+            lease = self.production.lease_digest(
+                candidate_digest=self.plan.candidate_digest,
+                subject_id=subject_id,
+                attempt_id=attempt_id,
+            )
+            return self._prerequisite_entries(lease)
+        except ProductionEvidenceError as error:
+            # A missing lease mapping happens before any resolution; audit it anyway.
+            self.production.record_failure(scope, error)
+            raise
+
+    def require_dispatch_gate(self, *, attempt_id: str, subject_id: str) -> None:
+        """Resolve every prerequisite afresh against the actual host lease for this
+        attempt. Raises a typed blocker; a passing call authorizes nothing by itself."""
+        if self.production is None:
+            return
+        self._state()
+        self._require_structural_admission("pilot-dispatch-gate")
+        self.production.verify(
+            "pilot-dispatch-gate",
+            self._dispatch_entries("pilot-dispatch-gate", attempt_id, subject_id),
+        )
+
+    def _require_structural_admission(self, scope: str) -> None:
+        """Re-derive the required prerequisites from the frozen plan. A missing or
+        unusable required reference is a typed, audited blocker; stored obligations are
+        never consulted and absent references are never silently skipped."""
+        assert self.production is not None
+        structural = self.plan.prerequisites.blockers(self.plan.mode)
+        if structural:
+            error = ProductionEvidenceError(
+                EvidenceBlocker.INCOMPLETE,
+                "unresolved prerequisites: "
+                + ", ".join(item.obligation_id for item in structural),
+            )
+            self.production.record_failure(scope, error)
+            raise error
+
+    def _require_completion(self, attempt: PilotAttempt) -> None:
+        """A positive (accepted) attempt needs the frozen plan's complete structural
+        admission, current prerequisites, the actual lease and its own delivery/runtime
+        receipts, all before any durable credit. Non-accepted closes need no admission."""
+        if self.production is None or attempt.status != "accepted":
+            return
+        self._require_structural_admission("pilot-attempt-completion")
+        entries = [
+            *self._dispatch_entries(
+                "pilot-attempt-completion", attempt.attempt_id, attempt.subject_id
+            ),
+            *self._attempt_entries(attempt),
+        ]
+        self.production.verify("pilot-attempt-completion", entries)
+
+    def _report_obligations(self, state: PilotState) -> tuple[ExternalObligation, ...]:
+        if self.production is None:
+            return state.obligations
+        merged = {item.obligation_id: item for item in state.obligations}
+        # Re-derived from the frozen plan: a hand-edited empty list clears nothing.
+        for item in self.plan.prerequisites.blockers(self.plan.mode):
+            merged[item.obligation_id] = item
+        entries = self._prerequisite_entries(None)
+        for attempt in state.attempts:
+            if attempt.status == "accepted":
+                entries.extend(self._attempt_entries(attempt))
+        entries.extend(
+            self._control_entries(
+                restart=state.restart_evidence,
+                rollback=state.rollback_evidence,
+                observation=state.observation_evidence,
+            )
+        )
+        try:
+            self.production.verify("pilot-report", entries)
+        except ProductionEvidenceError as error:
+            item = obligation_for(error, self._claim())
+            merged[item.obligation_id] = item
+        return tuple(merged.values())
+
     def _update(self, transform) -> PilotState:
-        state = self.store.load()
+        state = self._state()
         successor = transform(state)
+        if successor is state:
+            # An idempotent transition found its effect already committed: write nothing.
+            return state
         if successor.revision != state.revision + 1:
             raise ValueError("pilot transition must increment revision exactly once")
         self.store.save(successor, expected_revision=state.revision)
@@ -424,6 +708,62 @@ class PilotController:
         resource_units: int = 1,
         domain: str | None = None,
     ) -> PilotState:
+        self._state()
+        if self.production is not None:
+            # Validate identifiers first, then resolve the dispatch gate (including the
+            # actual host lease) before any durable effect and before the idempotent
+            # early return below.
+            ActivePilotAttempt(
+                attempt_id,
+                subject_id,
+                family_id,
+                self.plan.candidate_digest,
+                started_at,
+                resource_units,
+                domain,
+            )
+            if subject_id not in self.plan.subject_ids:
+                raise ValueError("attempt is outside the pilot subject")
+            self.require_dispatch_gate(attempt_id=attempt_id, subject_id=subject_id)
+        return self._begin(
+            attempt_id=attempt_id,
+            subject_id=subject_id,
+            family_id=family_id,
+            started_at=started_at,
+            resource_units=resource_units,
+            domain=domain,
+        )
+
+    @staticmethod
+    def _already_active(state: PilotState, active: ActivePilotAttempt) -> bool:
+        """True for an identical durable active lease. Raises for a conflicting lease or
+        an identity that already completed."""
+        existing = next(
+            (
+                item
+                for item in state.active_attempts
+                if item.attempt_id == active.attempt_id
+            ),
+            None,
+        )
+        if existing is not None:
+            if existing != active:
+                raise ValueError("attempt identity already has different content")
+            return True
+        if any(item.attempt_id == active.attempt_id for item in state.attempts):
+            raise ValueError("attempt identity is already complete")
+        return False
+
+    def _begin(
+        self,
+        *,
+        attempt_id: str,
+        subject_id: str,
+        family_id: str,
+        started_at: int,
+        resource_units: int = 1,
+        domain: str | None = None,
+    ) -> PilotState:
         active = ActivePilotAttempt(
             attempt_id,
             subject_id,
@@ -438,19 +778,15 @@ class PilotController:
         if not self.plan.starts_at <= started_at <= self.plan.ends_at:
             raise ValueError("attempt is outside the planned pilot window")
 
-        state = self.store.load()
-        existing = next(
-            (item for item in state.active_attempts if item.attempt_id == attempt_id),
-            None,
-        )
-        if existing is not None:
-            if existing != active:
-                raise ValueError("attempt identity already has different content")
+        state = self._state()
+        if self._already_active(state, active):
             return state
-        if any(item.attempt_id == attempt_id for item in state.attempts):
-            raise ValueError("attempt identity is already complete")
 
         def apply(current: PilotState) -> PilotState:
+            # Re-decided against the state actually committed over, so concurrent
+            # identical begins charge once and a completed identity is never reopened.
+            if self._already_active(current, active):
+                return current
             if len(current.active_attempts) >= current.plan.maximum_concurrent:
                 raise ValueError("pilot maximum concurrency exhausted")
             day = self._day(started_at)
@@ -474,10 +810,17 @@ class PilotController:
         return self._update(apply)
 
     def complete_attempt(self, attempt: PilotAttempt) -> PilotState:
+        self._state()
         self._validate_attempt_scope(attempt)
-        assert attempt.started_at is not None and attempt.ended_at is not None
-        ended_at = attempt.ended_at
-        state = self.store.load()
+        # Guarded before the idempotent early return: replay of a completed accepted
+        # attempt is revalidated, never trusted from durable state.
+        self._require_completion(attempt)
+        return self._complete(attempt)
+
+    @staticmethod
+    def _already_completed(state: PilotState, attempt: PilotAttempt) -> bool:
+        """True for an identical durable completion. Raises for a conflicting completion
+        or when no matching active lease exists in ``state``."""
         completed = next(
             (item for item in state.attempts if item.attempt_id == attempt.attempt_id),
             None,
@@ -485,7 +828,7 @@ class PilotController:
         if completed is not None:
             if completed != attempt:
                 raise ValueError("attempt identity already has different content")
-            return state
+            return True
         active = next(
             (
                 item
@@ -505,8 +848,23 @@ class PilotController:
             or active.domain != attempt.domain
         ):
             raise ValueError("completed attempt does not match its active lease")
+        return False
+
+    def _complete(self, attempt: PilotAttempt) -> PilotState:
+        self._validate_attempt_scope(attempt)
+        assert attempt.started_at is not None and attempt.ended_at is not None
+        ended_at = attempt.ended_at
+        state = self._state()
+        if self._already_completed(state, attempt):
+            return state
 
         def apply(current: PilotState) -> PilotState:
+            # Re-decided against the state this transition will actually be compared
+            # to and committed over: an identical completion that landed meanwhile is
+            # returned unchanged (one attempt, one charge); a different payload or a
+            # vanished active binding never appends or replaces anything.
+            if self._already_completed(current, attempt):
+                return current
             if (
                 attempt.status == "accepted"
                 and sum(
@@ -539,9 +897,11 @@ class PilotController:
 
     def record_attempt(self, attempt: PilotAttempt) -> PilotState:
         """Durably begin and complete an observed attempt, safely resumable between steps."""
+        state = self._state()
         self._validate_attempt_scope(attempt)
         assert attempt.started_at is not None
-        state = self.store.load()
+        # Guarded before any early return so an identical replay is revalidated too.
+        self._require_completion(attempt)
         existing = next(
             (item for item in state.attempts if item.attempt_id == attempt.attempt_id),
             None,
@@ -550,7 +910,7 @@ class PilotController:
             if existing != attempt:
                 raise ValueError("attempt identity already has different content")
             return state
-        self.begin_attempt(
+        self._begin(
             attempt_id=attempt.attempt_id,
             subject_id=attempt.subject_id,
             family_id=attempt.family_id,
@@ -558,7 +918,7 @@ class PilotController:
             resource_units=attempt.resource_units,
             domain=attempt.domain,
         )
-        return self.complete_attempt(attempt)
+        return self._complete(attempt)
 
     def record_controls(
         self,
@@ -583,6 +943,17 @@ class PilotController:
         ):
             raise ValueError("pilot rollback evidence is not externally bound")
         supplied_obligations = tuple(obligations)
+        persisted = self._state()
+        if self.production is not None:
+            # Only evidence being accepted is resolved; recording an obligation or a
+            # counter needs no admission, so recovery stays possible after revocation.
+            entries = self._control_entries(
+                restart=restart_evidence, rollback=rollback_evidence
+            )
+            if restart_exercised is True and restart_evidence is None:
+                entries.extend(self._control_entries(restart=persisted.restart_evidence))
+            if entries:
+                self.production.verify("pilot-controls", entries)
 
         def apply(state: PilotState) -> PilotState:
             reconciled = {item.obligation_id: item for item in state.obligations}
@@ -632,6 +1003,11 @@ class PilotController:
             or evidence.observed_at != observed_at
         ):
             raise ValueError("pilot observation evidence is not externally bound")
+        self._state()
+        if self.production is not None and evidence is not None:
+            self.production.verify(
+                "pilot-observation", self._control_entries(observation=evidence)
+            )
 
         def apply(state: PilotState) -> PilotState:
             prior = (
@@ -651,7 +1027,10 @@ class PilotController:
         return self._update(apply)
 
     def report(self) -> PilotReport:
-        state = self.store.load()
+        """Trusted-local: a structural view. Production: obligations are re-derived from
+        the frozen plan and every relied-upon receipt is resolved afresh; any failure is
+        a typed obligation, so a blocked report can never read as positive."""
+        state = self._state()
         observed_through = (
             state.plan.starts_at
             if state.observed_through is None
@@ -668,7 +1047,7 @@ class PilotController:
             state.duplicate_effects,
             state.avoidable_owner_questions,
             state.rollback_evidence,
-            state.obligations,
+            self._report_obligations(state),
             tuple(item.attempt_id for item in state.active_attempts),
             state.restart_evidence,
             state.observation_evidence,
