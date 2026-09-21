@@ -23,6 +23,7 @@ EVIDENCE_CRYPTO_INSTALL = (
     "python -m pip install --disable-pip-version-check --only-binary=:all: "
     "--require-hashes -r requirements/production-evidence-crypto.txt"
 )
+EVIDENCE_CRYPTO_RUN_LINE = "run: " + json.dumps(EVIDENCE_CRYPTO_INSTALL)
 
 
 def _unapproved_test_imports(module: str, imports: set[str], allowed: set[str]) -> set[str]:
@@ -140,7 +141,10 @@ class CIContractTests(unittest.TestCase):
         self.assertLess(job.index(EVIDENCE_CRYPTO_INSTALL), job.index(self._workflow_test_command()))
         self.assertIsNone(re.search(r"(?m)^\s*(?:if|continue-on-error):", job))
         install_line = next(line.strip() for line in job.splitlines() if EVIDENCE_CRYPTO_INSTALL in line)
-        self.assertEqual("run: " + EVIDENCE_CRYPTO_INSTALL, install_line)
+        # A plain YAML scalar cannot contain the colon-space in ':all: '.
+        # JSON double-quoted strings are YAML strings and decode exactly here.
+        self.assertEqual(EVIDENCE_CRYPTO_RUN_LINE, install_line)
+        self.assertEqual(EVIDENCE_CRYPTO_INSTALL, json.loads(install_line.removeprefix("run: ")))
 
     def test_both_unit_matrices_require_hash_locked_crypto_before_full_discovery(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -152,10 +156,11 @@ class CIContractTests(unittest.TestCase):
                     job.replace(EVIDENCE_CRYPTO_INSTALL, "echo omitted"),
                     job.replace("--require-hashes", ""),
                     job.replace("--only-binary=:all:", ""),
-                    job.replace("        run: " + EVIDENCE_CRYPTO_INSTALL,
-                                "        if: false\n        run: " + EVIDENCE_CRYPTO_INSTALL),
-                    job.replace("        run: " + EVIDENCE_CRYPTO_INSTALL,
-                                "        continue-on-error: true\n        run: " + EVIDENCE_CRYPTO_INSTALL),
+                    job.replace(EVIDENCE_CRYPTO_RUN_LINE,
+                                "if: false\n        " + EVIDENCE_CRYPTO_RUN_LINE),
+                    job.replace(EVIDENCE_CRYPTO_RUN_LINE,
+                                "continue-on-error: true\n        " + EVIDENCE_CRYPTO_RUN_LINE),
+                    job.replace(EVIDENCE_CRYPTO_RUN_LINE, "run: " + EVIDENCE_CRYPTO_INSTALL),
                     job.replace(EVIDENCE_CRYPTO_INSTALL, EVIDENCE_CRYPTO_INSTALL + " || true"),
                 ):
                     with self.assertRaises(AssertionError):

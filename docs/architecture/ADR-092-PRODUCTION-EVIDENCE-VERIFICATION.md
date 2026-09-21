@@ -482,3 +482,28 @@ admitted pilot outcomes remain required. Signature validity authenticates the
 configured attestor's claim; it does not independently prove the claim is true.
 Disable production-mode composition on rollback and retain evidence; never
 substitute trusted-local mode as a production qualification fallback.
+
+### CI syntax correction, 2026-09-21
+
+GitHub run `35564496631` rejected the workflow before creating any jobs. The
+unquoted pip command contained a colon followed by a space in `:all: `, which
+is invalid in that plain YAML scalar. The original lexical CI checks missed
+this syntax failure. Both install commands are now JSON/YAML double-quoted
+strings; their decoded command bytes, flags, dependency pins, ordering and
+five runtime matrix cells are unchanged. The contract additionally rejects
+the original unquoted spelling and decodes the required string exactly.
+
+An independent Curator reproduced the old whole-document ScannerError at
+line 36, column 82 using the already installed PyYAML 6.0.3, then parsed the
+fixed whole workflow and verified both exact commands and all seven job
+definitions. All 15 CI contract tests pass independently (4.793 seconds) and
+under root (4.304 seconds). PyYAML is a local validation tool here; it is not
+a new repository dependency or test-import exception. Scoped disposition:
+ADOPT for this CI syntax correction. Review digest:
+`014633b8f098fcc45394b5455122484d250c4f935a748e17e36a1ab35ad98e71`;
+receipt: `7386f38837b282e824e46b45a5b1c9c3d4b5068da0999635b978c2d34bfb0c00`.
+
+The prior lexical-only CI disposition did not establish YAML validity and is
+corrected by this observation. The second local full run was deliberately
+stopped as incomplete when these workflow/test bytes changed. A new full run
+and remote gate are required; no runtime verifier or authority rule changed.
