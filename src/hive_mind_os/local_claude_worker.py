@@ -74,11 +74,22 @@ _ENVIRONMENT_OVERRIDES = {
     "CLAUDE_CODE_AUTO_CONNECT_IDE": "false",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
 }
+# The tool_result body the retained canary shows for the internal schema envelope.
+STRUCTURED_OUTPUT_ACK = "Structured output provided successfully"
 _EVENT_TYPES = frozenset(
     {"system", "stream_event", "assistant", "user", "rate_limit_event", "result"}
 )
-_SYSTEM_SUBTYPES = frozenset({"init", "status"})
-_INERT_BLOCK_TYPES = frozenset({"text", "thinking", "redacted_thinking"})
+_MESSAGE_EVENTS = frozenset(
+    {
+        "message_start",
+        "content_block_start",
+        "content_block_delta",
+        "content_block_stop",
+        "message_delta",
+        "message_stop",
+    }
+)
+_EMPTY_SESSION_LISTS = ("plugins", "skills", "slash_commands")
 _SYSTEM_PROMPT = (
     "You are a fresh, independently identified Hive Mind OS Builder in model-only "
     "evidence-packet mode. Use only the literal user message. Do not access files, "
@@ -113,93 +124,230 @@ def supported_options(help_text: str) -> frozenset[str]:
     return frozenset(options)
 
 
-def _check_block(block: Any) -> None:
-    if not isinstance(block, dict):
-        raise ValueError("Claude stream content block is not an object")
-    kind = block.get("type")
-    if kind in _INERT_BLOCK_TYPES:
+def _canonical(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def _require_init(init: dict[str, Any]) -> str:
+    """Validate the session init and return the one model identity it declares."""
+
+    model = init.get("model")
+    if not isinstance(model, str) or not model.strip():
+        raise ValueError("Claude session did not identify its model")
+    if init.get("tools") != [STRUCTURED_OUTPUT_TOOL] or init.get("mcp_servers") != []:
+        raise ValueError("Claude session exposed more than the schema envelope")
+    if init.get("permissionMode") != "dontAsk":
+        raise ValueError("Claude session did not run in dontAsk mode")
+    for name in _EMPTY_SESSION_LISTS:
+        if name in init and init[name] != []:
+            raise ValueError(f"Claude session loaded {name}")
+    return model
+
+
+def _stream_message_event(
+    inner: dict[str, Any],
+    *,
+    model: str,
+    state: dict[str, Any],
+    blocks: dict[int, dict[str, Any]],
+    tool_ids: set[str],
+) -> None:
+    """Advance the streamed message lifecycle; anything unlisted is rejected."""
+
+    kind = inner.get("type")
+    if kind not in _MESSAGE_EVENTS:
+        raise ValueError("Claude stream contains an unlisted stream event")
+    if kind == "message_start":
+        message = inner.get("message")
+        if (
+            state["message"] != "none"
+            or not isinstance(message, dict)
+            or message.get("role") != "assistant"
+            or message.get("model") != model
+            or message.get("content") != []
+        ):
+            raise ValueError("Claude message start is invalid or conflicts with the session")
+        state["message"] = "open"
         return
-    if kind == "tool_use":
-        if block.get("name") != STRUCTURED_OUTPUT_TOOL:
-            raise ValueError("Claude attempted a tool other than the schema envelope")
+    if state["message"] != "open":
+        raise ValueError("Claude stream event lies outside its one open message")
+    if kind == "message_delta":
+        if not isinstance(inner.get("delta"), dict):
+            raise ValueError("Claude message delta is malformed")
         return
-    raise ValueError("Claude stream contains an unexpected content block type")
+    if kind == "message_stop":
+        if any(block["open"] for block in blocks.values()):
+            raise ValueError("Claude message ended with an open content block")
+        state["message"] = "done"
+        return
+    index = inner.get("index")
+    if type(index) is not int:
+        raise ValueError("Claude content block lacks an integer index")
+    if kind == "content_block_start":
+        block = inner.get("content_block")
+        if index in blocks or not isinstance(block, dict):
+            raise ValueError("Claude content block start is invalid")
+        block_type = block.get("type")
+        identity = block.get("id")
+        if block_type == "tool_use":
+            if (
+                block.get("name") != STRUCTURED_OUTPUT_TOOL
+                or not isinstance(identity, str)
+                or not identity.strip()
+                or identity in tool_ids
+            ):
+                raise ValueError("Claude attempted a tool other than the schema envelope")
+            tool_ids.add(identity)
+        elif block_type != "text":
+            raise ValueError("Claude stream contains an unexpected content block type")
+        blocks[index] = {"type": block_type, "id": identity, "parts": [], "open": True}
+        return
+    entry = blocks.get(index)
+    if entry is None or not entry["open"]:
+        raise ValueError("Claude stream refers to a content block that is not open")
+    if kind == "content_block_stop":
+        entry["open"] = False
+        return
+    delta = inner.get("delta")
+    if not isinstance(delta, dict):
+        raise ValueError("Claude content delta is malformed")
+    if entry["type"] == "tool_use":
+        fragment = delta.get("partial_json")
+        if delta.get("type") != "input_json_delta" or not isinstance(fragment, str):
+            raise ValueError("Claude tool delta is not schema envelope JSON")
+        entry["parts"].append(fragment)
+    elif delta.get("type") != "text_delta" or not isinstance(delta.get("text"), str):
+        raise ValueError("Claude text delta is malformed")
 
 
 def parse_claude_stream(path: Path, *, max_bytes: int = MAX_STREAM_BYTES) -> dict[str, Any]:
     """Validate one stream-json transcript and return its single schema object.
 
-    Only the internal StructuredOutput envelope may appear as a tool event, the
-    session must expose exactly that tool and no MCP servers, and the terminal
-    ``result`` must be a successful, completed, denial-free turn whose
-    ``structured_output`` equals the envelope's input.
+    The transcript is checked as an explicit state machine, not as a bag of
+    events.  It must begin with one session init that exposes only the internal
+    ``StructuredOutput`` return envelope, then carry one streamed message whose
+    only tool block is that envelope, one assistant envelope with the same
+    identity and input, exactly one tool_result for it, and a terminal ``result``
+    that is the last event.  Every event names the init session, every model
+    field agrees with the init, and anything unlisted, duplicated, out of order
+    or after the terminal result is rejected.  The report is taken only from the
+    result's ``structured_output`` and must equal the streamed envelope.
     """
 
     if path.stat().st_size > max_bytes:
         raise ValueError("Claude transcript exceeds byte limit")
     init: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
+    model = ""
+    session = ""
+    state: dict[str, Any] = {"message": "none"}
+    blocks: dict[int, dict[str, Any]] = {}
+    tool_ids: set[str] = set()
     envelopes: dict[str, Any] = {}
-    session_ids: set[str] = set()
+    answered: set[str] = set()
     with path.open(encoding="utf-8") as stream:
         for line in stream:
             if not line.strip():
                 continue
+            if result is not None:
+                raise ValueError("Claude stream continues after its terminal result")
             event = _load_json(line)
             if not isinstance(event, dict) or event.get("type") not in _EVENT_TYPES:
                 raise ValueError("Claude stream contains an unexpected event")
-            if isinstance(event.get("session_id"), str):
-                session_ids.add(event["session_id"])
             kind = event["type"]
+            identity = event.get("session_id")
+            if not isinstance(identity, str) or not identity.strip():
+                raise ValueError("Claude event lacks its session identity")
+            if init is None:
+                if kind != "system" or event.get("subtype") != "init":
+                    raise ValueError("Claude stream must begin with its session init")
+                model = _require_init(event)
+                init, session = event, identity
+                continue
+            if identity != session:
+                raise ValueError("Claude stream mixes session identities")
+            if event.get("parent_tool_use_id") is not None:
+                raise ValueError("Claude stream contains a nested agent event")
             if kind == "system":
-                if event.get("subtype") not in _SYSTEM_SUBTYPES:
+                if event.get("subtype") != "status":
                     raise ValueError("Claude stream contains an unexpected system event")
-                if event["subtype"] == "init":
-                    if init is not None:
-                        raise ValueError("Claude stream has more than one session init")
-                    init = event
+            elif kind == "rate_limit_event":
+                continue
             elif kind == "stream_event":
                 inner = event.get("event")
-                if isinstance(inner, dict) and inner.get("type") == "content_block_start":
-                    _check_block(inner.get("content_block"))
+                if not isinstance(inner, dict):
+                    raise ValueError("Claude stream event is malformed")
+                _stream_message_event(
+                    inner, model=model, state=state, blocks=blocks, tool_ids=tool_ids
+                )
             elif kind == "assistant":
                 message = event.get("message")
                 content = message.get("content") if isinstance(message, dict) else None
-                if not isinstance(content, list):
-                    raise ValueError("Claude assistant event lacks content")
+                if (
+                    state["message"] == "none"
+                    or not isinstance(message, dict)
+                    or message.get("model") != model
+                    or not isinstance(content, list)
+                ):
+                    raise ValueError("Claude assistant event is invalid or conflicts with the session")
                 for block in content:
-                    _check_block(block)
-                    if block["type"] == "tool_use":
-                        if not isinstance(block.get("id"), str) or block["id"] in envelopes:
-                            raise ValueError("Claude schema envelope identity is invalid")
-                        envelopes[block["id"]] = block.get("input")
+                    if not isinstance(block, dict):
+                        raise ValueError("Claude assistant content block is malformed")
+                    block_type = block.get("type")
+                    if block_type == "text":
+                        continue
+                    envelope_id = block.get("id")
+                    if (
+                        block_type != "tool_use"
+                        or block.get("name") != STRUCTURED_OUTPUT_TOOL
+                        or not isinstance(envelope_id, str)
+                        or envelope_id not in tool_ids
+                        or envelope_id in envelopes
+                        or not isinstance(block.get("input"), dict)
+                    ):
+                        raise ValueError("Claude attempted a tool other than the schema envelope")
+                    envelopes[envelope_id] = block["input"]
             elif kind == "user":
                 message = event.get("message")
                 content = message.get("content") if isinstance(message, dict) else None
-                if not isinstance(content, list) or not content:
-                    raise ValueError("Claude user event lacks content")
+                if (
+                    state["message"] == "none"
+                    or not isinstance(content, list)
+                    or not content
+                    or event.get("tool_use_result", STRUCTURED_OUTPUT_ACK) != STRUCTURED_OUTPUT_ACK
+                ):
+                    raise ValueError("Claude user event is invalid")
                 for block in content:
                     if (
                         not isinstance(block, dict)
                         or block.get("type") != "tool_result"
                         or block.get("tool_use_id") not in envelopes
+                        or block.get("tool_use_id") in answered
                         or block.get("is_error") is True
+                        or block.get("content") != STRUCTURED_OUTPUT_ACK
                     ):
                         raise ValueError("Claude stream contains an unexpected tool result")
-            elif kind == "result":
-                if result is not None:
-                    raise ValueError("Claude stream has more than one result")
+                    answered.add(block["tool_use_id"])
+            else:  # result
+                if state["message"] != "done":
+                    raise ValueError("Claude result arrived before its message finished")
                 result = event
     if init is None or result is None:
         raise ValueError("Claude transcript lacks its init or result event")
-    if len(session_ids) != 1 or init.get("session_id") != result.get("session_id"):
-        raise ValueError("Claude transcript must identify exactly one session")
-    if init.get("tools") != [STRUCTURED_OUTPUT_TOOL] or init.get("mcp_servers") != []:
-        raise ValueError("Claude session exposed more than the schema envelope")
-    if init.get("permissionMode") != "dontAsk":
-        raise ValueError("Claude session did not run in dontAsk mode")
-    if len(envelopes) != 1:
-        raise ValueError("Claude transcript must contain exactly one schema envelope")
+    if len(envelopes) != 1 or answered != set(envelopes):
+        raise ValueError(
+            "Claude transcript must contain exactly one schema envelope with one tool result"
+        )
+    (envelope_id, envelope), = envelopes.items()
+    streamed = [block for block in blocks.values() if block["type"] == "tool_use"]
+    if len(streamed) != 1 or streamed[0]["id"] != envelope_id:
+        raise ValueError("Claude streamed envelope differs from its assistant envelope")
+    try:
+        streamed_input = _load_json("".join(streamed[0]["parts"]))
+    except ValueError as error:
+        raise ValueError("Claude streamed envelope JSON is invalid") from error
+    if _canonical(streamed_input) != _canonical(envelope):
+        raise ValueError("Claude streamed envelope differs from its assistant envelope")
     if (
         result.get("subtype") != "success"
         or result.get("is_error") is not False
@@ -210,17 +358,22 @@ def parse_claude_stream(path: Path, *, max_bytes: int = MAX_STREAM_BYTES) -> dic
     stats = result.get("subagent_stats")
     if isinstance(stats, dict) and stats.get("spawned") != 0:
         raise ValueError("Claude spawned a subagent")
+    usage_by_model = result.get("modelUsage")
+    if isinstance(usage_by_model, dict) and not set(usage_by_model) <= {model}:
+        raise ValueError("Claude result reports another model than the session init")
     report = result.get("structured_output")
-    (envelope,) = envelopes.values()
-    if not isinstance(report, dict) or json.dumps(report, sort_keys=True) != json.dumps(
-        envelope, sort_keys=True
-    ):
+    if not isinstance(report, dict) or _canonical(report) != _canonical(envelope):
         raise ValueError("Claude structured output differs from its schema envelope")
-    model = init.get("model")
-    if not isinstance(model, str) or not model.strip():
-        raise ValueError("Claude session did not identify its model")
+    text_result = result.get("result")
+    if isinstance(text_result, str):
+        try:
+            rendered = _load_json(text_result)
+        except ValueError as error:
+            raise ValueError("Claude result text is not the schema object") from error
+        if _canonical(rendered) != _canonical(report):
+            raise ValueError("Claude result text differs from its structured output")
     return {
-        "session_id": init["session_id"],
+        "session_id": session,
         "model": model,
         "cli_version": init.get("claude_code_version"),
         "report": report,
@@ -251,6 +404,25 @@ def _session_from_stream(path: Path) -> str | None:
     except (OSError, ValueError, UnicodeError):
         pass
     return None
+
+
+def _close_pipes(process: subprocess.Popen[bytes], threads: list[threading.Thread]) -> None:
+    """Close the parent's pipe ends once the process is reaped.
+
+    Only a pipe whose reader thread has finished is closed: closing a buffered
+    reader that another thread is still blocked in could itself block, and every
+    wait here must stay bounded.  A pipe left open is reported by the caller.
+    """
+
+    streams = (process.stdin, process.stdout, process.stderr)
+    readers: list[threading.Thread | None] = [*threads, None, None, None][:3]
+    for stream, thread in zip(streams, readers):
+        if stream is None or (thread is not None and thread.is_alive()):
+            continue
+        try:
+            stream.close()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
 
 
 def _run_claude_process(
@@ -289,6 +461,7 @@ def _run_claude_process(
             start_new_session=os.name != "nt",
             creationflags=creationflags,
         )
+        threads: list[threading.Thread] = []
         try:
             with process_path.open("x", encoding="utf-8") as record:
                 json.dump(
@@ -304,12 +477,18 @@ def _run_claude_process(
                 )
 
             def feed() -> None:
+                stdin = process.stdin
+                if stdin is None:
+                    return
                 try:
-                    assert process.stdin is not None
-                    process.stdin.write(prompt)
-                    process.stdin.close()
-                except (BrokenPipeError, OSError):
+                    stdin.write(prompt)
+                except (BrokenPipeError, OSError, ValueError):
                     pass
+                finally:
+                    try:
+                        stdin.close()
+                    except (BrokenPipeError, OSError, ValueError):
+                        pass
 
             def pump(source: Any, sink: Any) -> None:
                 written = 0
@@ -324,11 +503,13 @@ def _run_claude_process(
                 except (OSError, ValueError):
                     pass
 
-            threads = [
-                threading.Thread(target=feed, daemon=True),
-                threading.Thread(target=pump, args=(process.stdout, stdout), daemon=True),
-                threading.Thread(target=pump, args=(process.stderr, stderr), daemon=True),
-            ]
+            threads.extend(
+                (
+                    threading.Thread(target=feed, daemon=True),
+                    threading.Thread(target=pump, args=(process.stdout, stdout), daemon=True),
+                    threading.Thread(target=pump, args=(process.stderr, stderr), daemon=True),
+                )
+            )
             for thread in threads:
                 thread.start()
             deadline = time.monotonic() + timeout_seconds
@@ -353,6 +534,13 @@ def _run_claude_process(
             if process.poll() is None:
                 _kill_process_tree(process)
             raise
+        finally:
+            _close_pipes(process, threads)
+        if any(thread.is_alive() for thread in threads):
+            raise RuntimeError(
+                "Claude output readers did not finish after the process ended; "
+                "their pipes were left open and the transcript cannot be trusted"
+            )
         return process.returncode, timed_out, overflow.is_set()
 
 
@@ -581,6 +769,7 @@ __all__ = [
     "ClaudeInterfaceUnavailable",
     "ClaudeLocalWorker",
     "PROTOCOL",
+    "STRUCTURED_OUTPUT_ACK",
     "parse_claude_stream",
     "supported_options",
 ]

@@ -27,7 +27,11 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Mapping, Protocol, Sequence
 from uuid import uuid4
 
-from .brain_kernel.canonical import canonical_bytes, canonical_digest, canonical_document
+from .brain_kernel.canonical import (
+    canonical_bytes,
+    canonical_digest,
+    canonical_document,
+)
 from .builder_session import (
     BuilderDisposition,
     BuilderSession,
@@ -123,6 +127,32 @@ _GIT_CREDENTIAL_ENVIRONMENT = (
     "GIT_CONFIG_VALUE_2",
 )
 _SUCCESS = frozenset({PackageStatus.COMPLETED, PackageStatus.NO_CHANGE})
+# Windows MAX_PATH is 260 including the terminating NUL.  The sandbox and Git receipt
+# writers below do not use extended-length paths, so this host bounds its state root
+# instead: fixed artifact names and the deepest materialized checkout must fit.
+WINDOWS_PATH_LIMIT = 259
+DEFAULT_PATH_LIMIT: int | None = WINDOWS_PATH_LIMIT if os.name == "nt" else None
+_WORST_TASK_PREFIX = os.sep.join(
+    (
+        "repository-host",
+        "0" * 16,
+        "tasks",
+        "0" * 16,
+        "qualification",
+        "0" * 16 + "-run-r99",
+    )
+)
+# state root + separator + the longest fixed sandbox artifact of a verifier clone
+_ARTIFACT_SPAN = (
+    1
+    + len(_WORST_TASK_PREFIX)
+    + 1
+    + len(os.sep.join(("clone-git", "artifacts", "0" * 64 + ".stdout")))
+)
+# state root + separator + the prefix before a repository-relative path is appended
+_WORKSPACE_SPAN = (
+    1 + len(_WORST_TASK_PREFIX) + 1 + len(os.sep.join(("verify-00", "workspace"))) + 1
+)
 CANDIDATE_KIND_CHANGED = "changed"
 CANDIDATE_KIND_NO_CHANGE = "no-change"
 PROFILE_TRUSTED_LOCAL = "trusted-local-unqualified"
@@ -931,6 +961,9 @@ def _evaluate_verification(
     streams: dict[str, bytes] = {}
     for name in ("stdout", "stderr"):
         info = receipt.get(name)
+        if not isinstance(info, dict):
+            reasons.append(f"{name}-artifact-invalid")
+            continue
         try:
             location = Path(info["path"])
             data = filesystem_path(location).read_bytes()
@@ -1339,7 +1372,14 @@ class RepositoryHostContext:
         sandbox: SandboxAdapter,
         reviewer: CandidateReviewer,
         holdouts: HoldoutSource | None = None,
+        path_limit: int | None = DEFAULT_PATH_LIMIT,
     ) -> None:
+        if path_limit is not None and (
+            isinstance(path_limit, bool)
+            or not isinstance(path_limit, int)
+            or path_limit < 1
+        ):
+            raise RepositoryBindingError("path limit must be a positive integer or None")
         self.binding = binding
         self.repository_profile = repository_profile
         self.admission = admission
@@ -1347,8 +1387,75 @@ class RepositoryHostContext:
         self.sandbox = sandbox
         self.reviewer = reviewer
         self.holdouts = holdouts
+        self.path_limit = path_limit
         self.store = RepositoryStateStore(binding)
         self._keys: dict[str, str] = {}
+        self._longest_tracked: int | None = None
+
+    def _longest_tracked_path(self) -> int:
+        """Length of the longest tracked path at the admitted base (read-only)."""
+
+        if self._longest_tracked is None:
+            listing = _git_bytes(
+                self.binding.source_repository,
+                "ls-tree",
+                "-r",
+                "--name-only",
+                "-z",
+                self.binding.base_commit,
+            )
+            self._longest_tracked = max(
+                (len(item.decode("utf-8", "replace")) for item in listing.split(b"\0") if item),
+                default=0,
+            )
+        return self._longest_tracked
+
+    def max_relative_path(self) -> int | None:
+        """Longest repository-relative path the host can materialize, if bounded."""
+
+        if self.path_limit is None:
+            return None
+        return self.path_limit - len(str(self.binding.state_root)) - _WORKSPACE_SPAN
+
+    def path_problems(self) -> tuple[str, ...]:
+        """Early typed unsupported-path check; it runs before any effect.
+
+        The underlying sandbox and Git receipt writers do not use Windows
+        extended-length paths, so a state root that pushes their fixed artifact
+        names past the limit failed deep inside a run.  H1 bounds the root
+        instead of rewriting those writers.
+        """
+
+        limit = self.path_limit
+        if limit is None:
+            return ()
+        root_length = len(str(self.binding.state_root))
+        problems: list[str] = []
+        worst = root_length + _ARTIFACT_SPAN
+        if worst > limit:
+            problems.append(
+                f"private state root is too deep: the longest fixed host artifact path "
+                f"would be {worst} characters, above the supported {limit}; use a state "
+                f"root of at most {limit - _ARTIFACT_SPAN} characters"
+            )
+            return tuple(problems)
+        room = limit - root_length - _WORKSPACE_SPAN
+        try:
+            longest = self._longest_tracked_path()
+        except RepositoryHostBlocked:
+            problems.append("tracked path lengths at the admitted base could not be measured")
+        else:
+            if longest > room:
+                problems.append(
+                    f"a tracked repository path of {longest} characters exceeds the {room} "
+                    f"the host can materialize under this state root (limit {limit})"
+                )
+        return tuple(problems)
+
+    def require_supported_paths(self) -> None:
+        problems = self.path_problems()
+        if problems:
+            raise RepositoryHostBlocked("unsupported path length: " + "; ".join(problems))
 
     def require_admission(self) -> None:
         try:
@@ -1442,8 +1549,14 @@ class RepositoryHostContext:
             add("worker", capability, "no actual patch-proposing worker is supplied")
         else:
             checker = getattr(self.worker, "preflight", None)
-            for problem in tuple(checker()) if callable(checker) else ():
-                add("worker", capability, str(problem))
+            found: object = checker() if callable(checker) else ()
+            if not isinstance(found, (list, tuple)):
+                add("worker", capability, "worker preflight returned an untyped result")
+            else:
+                for problem in found:
+                    add("worker", capability, str(problem))
+        for problem in self.path_problems():
+            add("paths", capability, problem)
         try:
             capabilities = self.sandbox.capabilities
         except Exception as error:
@@ -1504,6 +1617,9 @@ class RepositoryBuilderAdapter:
     ) -> BuildOutcome:
         context, binding, store = self.context, self.context.binding, self.context.store
         key = attempt_key(binding, package, payload)
+        # Before any write: an unsupported path length is a typed blocker, never a
+        # failure discovered midway through a run.
+        context.require_supported_paths()
         store.seal_binding()
         task = store.task_dir(key)
         task.mkdir(parents=True, exist_ok=True)
@@ -1927,10 +2043,12 @@ class RepositoryBuilderAdapter:
             if request["source_packet_sha256"] != hashlib.sha256(packet_bytes).hexdigest():
                 return "terminal", "worker receipt binds a different source packet"
         report = receipt.get("report")
+        if not isinstance(report, dict):
+            return "terminal", "worker report is not an object"
         try:
             _validate_report(report, writable=True, packet_mode=True)
         except ValueError as error:
-            declared = report.get("changed_paths") if isinstance(report, dict) else None
+            declared = report.get("changed_paths")
             if isinstance(declared, list) and any(not _safe_declared(item) for item in declared):
                 return "refused", "declared paths must be repository-relative and stay in scope"
             return "terminal", f"worker report failed validation: {_bounded(error)}"
@@ -2008,9 +2126,12 @@ class RepositoryBuilderAdapter:
 
     def _require_scope(self, paths: Sequence[str]) -> None:
         binding = self.context.binding
+        room = self.context.max_relative_path()
         for item in paths:
             if not _safe_declared(item):
                 raise _Refusal("declared paths must be repository-relative and stay in scope")
+            if room is not None and len(item) > room:
+                raise _Refusal("patch path exceeds the supported path length bound")
             if _within(item, binding.protected_scope):
                 raise _Refusal("patch touches sealed protected acceptance or test content")
             if not _within(item, binding.allowed_paths):
@@ -2027,18 +2148,23 @@ class RepositoryBuilderAdapter:
         report: Mapping[str, Any],
     ) -> CandidateRecord:
         binding, store = self.context.binding, self.context.store
-        declared = sorted(report["changed_paths"]) if kind == "patch" else []
-        patch = report["proposed_patch"] if kind == "patch" else None
+        declared: list[str] = []
+        patch_text: str | None = None
         if kind == "patch":
+            proposed = report["proposed_patch"]
+            if not isinstance(proposed, str):
+                raise _Refusal("proposed patch is not text")
+            patch_text = proposed
+            declared = sorted(report["changed_paths"])
             self._require_scope(declared)
         container = self._fresh(task, f"c{slot.index:03d}")
         workspace = self._materialize(container)
         root = workspace.root
         branch: str | None = None
         try:
-            if kind == "patch":
+            if patch_text is not None:
                 try:
-                    apply_proposed_patch(root, patch, list(declared))
+                    apply_proposed_patch(root, patch_text, list(declared))
                 except LocalEvidenceError as error:
                     raise _Refusal(_bounded(error)) from error
                 actual = _changed_paths(root)
@@ -2085,8 +2211,8 @@ class RepositoryBuilderAdapter:
         ) as error:
             raise RepositoryHostBlocked(f"candidate could not be committed: {_bounded(error)}") from error
         patch_sha: str | None = None
-        if kind == "patch":
-            patch_bytes = patch.encode("utf-8")
+        if patch_text is not None:
+            patch_bytes = patch_text.encode("utf-8")
             patch_sha = raw_sha256(patch_bytes)
             _publish_once(task / "candidate.patch", patch_bytes)
         identity = candidate_identity(binding.base_commit, commit, tree)
@@ -2205,6 +2331,14 @@ class ReceiptBoundCandidateQualifier(CandidateQualifier):
         if retained is not None:
             context.require_admission()
             return retained.receipt
+        unsupported = context.path_problems()
+        if unsupported:
+            return QualificationReceipt(
+                digest,
+                QualificationDisposition.INCOMPLETE,
+                (),
+                tuple(f"unsupported-path:{item}" for item in unsupported),
+            )
         try:
             capabilities = context.sandbox.capabilities
         except Exception:
@@ -2668,13 +2802,16 @@ class RepositoryCompositionHost(WholeOSCompositionHost):
     def _unsealed(
         self, package: OutcomeWorkPackage, blocker: CompositionBlocker
     ) -> PackageExecutionResult:
-        _store(
-            self.context.store.root / "blockers" / f"{_short(blocker.reference)}.json",
-            _sealed(
-                "repository-host-blocker",
-                {"stage": blocker.stage, "kind": blocker.kind.value, "detail": blocker.detail},
-            ),
-        )
+        if blocker.stage != "paths":
+            # An unsupported private root must not be written to at all, not even
+            # with the blocker record; the typed result still carries the reason.
+            _store(
+                self.context.store.root / "blockers" / f"{_short(blocker.reference)}.json",
+                _sealed(
+                    "repository-host-blocker",
+                    {"stage": blocker.stage, "kind": blocker.kind.value, "detail": blocker.detail},
+                ),
+            )
         return PackageExecutionResult(
             package.package_id,
             PackageStatus.BLOCKED_AUTHORITY
@@ -2733,9 +2870,47 @@ class RepositoryCompositionHost(WholeOSCompositionHost):
             self.context.revalidate(
                 str(retained.candidate_digest), retained.evidence_refs, expect_kind=expect
             )
-        except RepositoryHostBlocked as error:
-            return str(error)
+        except (RepositoryHostBlocked, KeyError, TypeError, ValueError, OSError) as error:
+            return f"{type(error).__name__}: {error}"
         return None
+
+    def validate_retained_package_result(
+        self,
+        package: OutcomeWorkPackage,
+        result: PackageExecutionResult,
+        payload: Mapping[str, Any],
+    ) -> str | None:
+        """Outer-replay guard used by ``WholeOSService`` (see ``WholeOSReplayValidator``).
+
+        The service keeps its own package receipt, so it would report a finished
+        package as complete forever.  This read-only check is what makes a resumed
+        success current: the full host binding and payload, the host's own terminal
+        receipt, current admission, and the retained candidate and qualification
+        artifacts must all still hold.  It never runs a worker or mutates Git.
+        """
+
+        if result.status not in _SUCCESS:
+            return "retained result is not a success"
+        if result.package_id != package.package_id:
+            return "retained result belongs to another package"
+        namespaced = dict(_plain(payload))
+        namespaced["repository_host_binding_digest"] = self.context.binding.digest
+        payload_digest = canonical_digest(_plain(namespaced))
+        try:
+            own = self._load_result(
+                self._receipt_path(namespaced, package.package_id), payload_digest
+            )
+        except CompositionError as error:
+            return f"host terminal receipt is invalid: {error}"
+        if own is None:
+            return "host terminal receipt is absent for this binding"
+        if (own.status, own.candidate_digest, own.evidence_refs) != (
+            result.status,
+            result.candidate_digest,
+            result.evidence_refs,
+        ):
+            return "service receipt differs from the host terminal receipt"
+        return self._replay_rejection(package, namespaced, own)
 
     def assess_terminal_candidate(
         self, candidate: ConvergenceResult, payload: Mapping[str, Any]
@@ -2816,6 +2991,7 @@ __all__ = [
     "CandidateRecord",
     "CandidateReview",
     "CandidateReviewer",
+    "DEFAULT_PATH_LIMIT",
     "HoldoutSource",
     "HoldoutSpec",
     "HostAdmission",
@@ -2843,4 +3019,5 @@ __all__ = [
     "sandbox_identity_digest",
     "service_context_digest",
     "toolchain_identity_digest",
+    "WINDOWS_PATH_LIMIT",
 ]

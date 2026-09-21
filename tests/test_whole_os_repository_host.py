@@ -22,7 +22,11 @@ from hive_mind_os.builder_session import BuilderDisposition
 from hive_mind_os.candidate_qualification import QualificationDisposition
 from hive_mind_os.cortex.repository.mission_bindings import MissionBindingDescriptor
 from hive_mind_os.delivery_broker import ArtifactKind, DeliveryBroker, DeliveryGrant
-from hive_mind_os.discovery_backlog import BacklogCandidate, DiscoveryBacklog, DiscoverySignal
+from hive_mind_os.discovery_backlog import (
+    BacklogCandidate,
+    DiscoveryBacklog,
+    DiscoverySignal,
+)
 from hive_mind_os.outcome_graph import OutcomeWorkPackage, compile_outcome_graph
 from hive_mind_os.repository_profile import (
     CapabilityGrant,
@@ -38,8 +42,12 @@ from hive_mind_os.verification_adapters import (
     UnavailableSandbox,
 )
 from hive_mind_os.whole_os_composition import BacklogDiscoveryAdapter
-from hive_mind_os.whole_os_qualification import CapabilityDeclaration, CompositionManifest
+from hive_mind_os.whole_os_qualification import (
+    CapabilityDeclaration,
+    CompositionManifest,
+)
 from hive_mind_os.whole_os_repository_host import (
+    WINDOWS_PATH_LIMIT,
     AcceptanceSpec,
     CandidateReview,
     HoldoutSpec,
@@ -51,8 +59,8 @@ from hive_mind_os.whole_os_repository_host import (
     RepositoryCompositionHost,
     RepositoryHostBlocked,
     RepositoryHostContext,
-    RepositoryHostUncertain,
     RepositoryHostUnavailable,
+    RepositoryHostUncertain,
     RepositoryTaskBinding,
     attempt_key,
     compose_repository_factory,
@@ -222,8 +230,10 @@ class _SyntheticRegistry:
     def __init__(self) -> None:
         self.current = True
         self.authorized = True
+        self.calls = 0
 
     def verify_profile(self, **_values) -> bool:
+        self.calls += 1
         return self.current
 
     def authorize_capability(self, **_values) -> bool:
@@ -306,6 +316,7 @@ class _Rig:
         budget: RepositoryBuildBudget | None = None,
         profile_tenant: str | None = None,
         binding_overrides: dict | None = None,
+        extra_files: dict[str, str] | None = None,
     ) -> None:
         self.case = case
         temporary = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -320,9 +331,12 @@ class _Rig:
             "src/calc.py": FIXED if already_fixed else BUGGY,
             "tests/test_visible.py": VISIBLE_SKIPPED if skipped_visible else VISIBLE,
             "tests/test_holdout.py": HOLDOUT,
+            **(extra_files or {}),
         }
         for name, text in files.items():
-            (self.source / name).write_bytes(text.encode("utf-8"))
+            target = self.source / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(text.encode("utf-8"))
         _git(self.source, "init", "-b", "main")
         _git(self.source, "config", "user.name", "Synthetic Fixture")
         _git(self.source, "config", "user.email", "fixture@example.invalid")
@@ -436,12 +450,15 @@ class _Rig:
     def binding(self, **overrides) -> RepositoryTaskBinding:
         return RepositoryTaskBinding(**{**self.binding_values, **overrides})
 
-    def context_for(self, worker, *, attempt_id: str | None = None, **overrides) -> RepositoryHostContext:
+    def context_for(
+        self, worker, *, attempt_id: str | None = None, path_limit=..., **overrides
+    ) -> RepositoryHostContext:
         binding = self.binding(**({"attempt_id": attempt_id} if attempt_id else {}), **overrides)
+        limits = {} if path_limit is ... else {"path_limit": path_limit}
         return RepositoryHostContext(
             binding, repository_profile=self.profile,
             admission=ProfileRegistryAdmission(self.profile, self.registry), worker=worker,
-            sandbox=self.sandbox, reviewer=self.curator, holdouts=self.vault,
+            sandbox=self.sandbox, reviewer=self.curator, holdouts=self.vault, **limits,
         )
 
     def factory(self, context: RepositoryHostContext | None = None):
@@ -488,11 +505,23 @@ class _Rig:
         store = (context or self.context).store
         return store.load_candidate(store.key_for_identity(identity))
 
-    def service(self) -> WholeOSService:
-        bootstrap = self.factory()(self.config)
+    def service(self, factory=None) -> WholeOSService:
+        """A service over ``factory`` (default: a freshly composed, preflighted one)."""
+
+        bootstrap = (factory or self.factory())(self.config)
         service = WholeOSService(self.config, bootstrap.bindings, bootstrap.host)
         self.case.addCleanup(service.close)
         return service
+
+    def snapshot(self) -> list[str]:
+        """Every non-Git-internal path under the private state root."""
+
+        store = self.context.store
+        return sorted(
+            item.relative_to(store.root).as_posix()
+            for item in store.root.rglob("*")
+            if ".git" not in item.relative_to(store.root).parts
+        )
 
     def request(self, record, context: RepositoryHostContext | None = None):
         return (context or self.context).qualification_request(record)
@@ -1082,6 +1111,250 @@ class RepositoryHostIntegrationTests(unittest.TestCase):
             "private paths live only in the private state root",
         )
         self.assertNotIn(MARKER, state_text)
+
+
+class RepositoryHostOuterReplayTests(unittest.TestCase):
+    """A resumed ``WholeOSService`` must not deliver a success the host cannot re-verify.
+
+    These replay the independent Curator's counterexamples through the real
+    service entry point (``run_to_completion``), not through the host alone.
+    """
+
+    def _complete(self):
+        rig = _Rig(self, FIX)
+        factory = rig.factory()
+        service = rig.service(factory)
+        first = service.run_to_completion()
+        self.assertEqual(first.status, "complete", first.terminal_message)
+        self.assertEqual(len(rig.worker.calls), 1)
+        return rig, factory, service
+
+    def _assert_blocked_without_effects(self, rig, replay, names) -> None:
+        self.assertEqual(replay.status, "blocked", replay.terminal_message)
+        self.assertIn("failed revalidation", replay.terminal_message)
+        self.assertEqual(replay.completed_packages, ())
+        self.assertIsNone(replay.terminal_assessment)
+        self.assertEqual(len(rig.worker.calls), 1, "no duplicate model work")
+        self.assertEqual(rig.snapshot(), names, "no new host, Git or receipt effects")
+        rig.source_untouched()
+
+    def test_same_service_resume_after_revoked_admission_is_blocked(self) -> None:
+        rig, _, service = self._complete()
+        names = rig.snapshot()
+        for flag in ("current", "authorized"):
+            with self.subTest(flag):
+                setattr(rig.registry, flag, False)
+                calls = rig.registry.calls
+                replay = service.run_to_completion()
+                self.assertGreater(rig.registry.calls, calls, "the host was asked again")
+                self._assert_blocked_without_effects(rig, replay, names)
+                self.assertEqual(service.observe().status, "blocked")
+                setattr(rig.registry, flag, True)
+                resumed = service.run_to_completion()
+                self.assertEqual(resumed.status, "complete", "restored evidence is delivered again")
+        self.assertEqual(len(rig.worker.calls), 1)
+        self.assertEqual(len(rig.curator.packets), 1, "no second Curator review")
+
+    def test_recreated_service_and_factory_resume_after_revoked_admission_is_blocked(self) -> None:
+        rig, factory, service = self._complete()
+        names = rig.snapshot()
+        rig.registry.current = False
+        calls = rig.registry.calls
+        reused = rig.service(factory)
+        replay = reused.run_to_completion()
+        self.assertGreater(rig.registry.calls, calls)
+        self._assert_blocked_without_effects(rig, replay, names)
+        # A freshly composed factory refuses to exist while admission is revoked.
+        with self.assertRaisesRegex(RepositoryHostUnavailable, "BLOCKED_AUTHORITY"):
+            rig.factory()
+        self.assertEqual(len(rig.worker.calls), 1)
+
+    def test_fresh_factory_resume_after_candidate_receipt_corruption_is_blocked(self) -> None:
+        rig, _, service = self._complete()
+        store, key = rig.context.store, rig.key()
+        path = store.candidate_path(key)
+        original = path.read_bytes()
+        names = rig.snapshot()
+        for name, damaged in (("empty object", b"{}\n"), ("truncated", original[:40]), ("appended", original + b" ")):
+            with self.subTest(name):
+                path.write_bytes(damaged)
+                resumed = rig.service()
+                self._assert_blocked_without_effects(rig, resumed.run_to_completion(), names)
+                self.assertEqual(service.observe().status, "blocked")
+        path.write_bytes(original)
+        self.assertEqual(rig.service().run_to_completion().status, "complete")
+        self.assertEqual(len(rig.worker.calls), 1)
+
+    def test_resume_after_candidate_clone_or_patch_corruption_is_blocked(self) -> None:
+        rig, _, service = self._complete()
+        store, key = rig.context.store, rig.key()
+        record = store.load_candidate(key)
+        names = rig.snapshot()
+        patch = store.task_dir(key) / "candidate.patch"
+        original = patch.read_bytes()
+        patch.write_bytes(original + b"\n")
+        self._assert_blocked_without_effects(rig, service.run_to_completion(), names)
+        patch.write_bytes(original)
+        (record.clone_root / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+        blocked = service.run_to_completion()
+        (record.clone_root / "untracked.txt").unlink()
+        self._assert_blocked_without_effects(rig, blocked, names)
+        self.assertEqual(service.run_to_completion().status, "complete")
+
+    def test_resume_after_qualification_evidence_corruption_is_blocked(self) -> None:
+        rig, _, service = self._complete()
+        store, key = rig.context.store, rig.key()
+        record = store.load_candidate(key)
+        digest = canonical_digest(rig.request(record))
+        receipt_path, envelope_path = store.qualification_paths(key, digest)
+        retained = store.load_qualification(key, digest, record)
+        stdout_path = _artifact(retained.receipt.checks[0].artifacts[1])
+        names = rig.snapshot()
+        for name, path in (
+            ("verification stdout", stdout_path),
+            ("qualification receipt", receipt_path),
+            ("qualification envelope", envelope_path),
+        ):
+            original = path.read_bytes()
+            path.write_bytes(original + b" ")
+            try:
+                with self.subTest(name):
+                    self._assert_blocked_without_effects(rig, service.run_to_completion(), names)
+            finally:
+                path.write_bytes(original)
+            self.assertEqual(service.run_to_completion().status, "complete")
+        original = envelope_path.read_bytes()
+        envelope_path.unlink()
+        try:
+            with self.subTest("missing qualification envelope"):
+                replay = service.run_to_completion()
+                self.assertEqual(replay.status, "blocked")
+                self.assertIn("partial", replay.terminal_message)
+        finally:
+            envelope_path.write_bytes(original)
+        self.assertEqual(len(rig.worker.calls), 1)
+
+    def test_resume_under_another_host_binding_never_reuses_the_old_success(self) -> None:
+        rig, _, _ = self._complete()
+        names = rig.snapshot()
+        worker = _ScriptedPatchWorker(FIX)
+        other = rig.context_for(worker, attempt_id="attempt-rebound")
+        resumed = rig.service(rig.factory(other))
+        replay = resumed.run_to_completion()
+        self.assertEqual(replay.status, "blocked")
+        self.assertIn("host terminal receipt is absent for this binding", replay.terminal_message)
+        self.assertEqual(worker.calls, [], "another binding never starts model work here")
+        self.assertEqual(len(rig.worker.calls), 1)
+        self.assertEqual(rig.snapshot(), names)
+        self.assertFalse(other.store.root.exists(), "the other binding wrote nothing")
+
+    def test_a_service_receipt_that_disagrees_with_the_host_receipt_is_rejected(self) -> None:
+        rig, _, service = self._complete()
+        receipts = list(rig.config.state_dir.rglob("packages/*.json"))
+        self.assertEqual(len(receipts), 1)
+        document = json.loads(receipts[0].read_text(encoding="utf-8"))
+        original = receipts[0].read_bytes()
+        document["candidate_digest"] = "sha256:" + "9" * 64
+        receipts[0].write_bytes(json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+        try:
+            replay = service.run_to_completion()
+            self.assertEqual(replay.status, "blocked")
+            self.assertIn("differs from the host terminal receipt", replay.terminal_message)
+        finally:
+            receipts[0].write_bytes(original)
+        self.assertEqual(service.run_to_completion().status, "complete")
+
+    def test_direct_host_validator_is_read_only_and_names_the_reason(self) -> None:
+        rig = _Rig(self, FIX)
+        host = rig.host()
+        result = rig.execute(host)
+        payload = rig.payload()
+        names = rig.snapshot()
+        self.assertIsNone(host.validate_retained_package_result(rig.package, result, payload))
+        rig.registry.current = False
+        reason = host.validate_retained_package_result(rig.package, result, payload)
+        self.assertIn("admission", reason)
+        forged = dataclasses.replace(result, status=PackageStatus.NO_CHANGE)
+        rig.registry.current = True
+        self.assertIn("differs", host.validate_retained_package_result(rig.package, forged, payload))
+        failed = dataclasses.replace(result, status=PackageStatus.FAILED, candidate_digest=None)
+        self.assertIn("not a success", host.validate_retained_package_result(rig.package, failed, payload))
+        self.assertEqual(rig.snapshot(), names, "validation wrote nothing")
+        self.assertEqual(len(rig.worker.calls), 1)
+
+
+class RepositoryHostPathBoundTests(unittest.TestCase):
+    """The documented Windows path bound is an early typed preflight, not a mid-run crash.
+
+    The sandbox and Git receipt writers do not use extended-length paths, so a deep
+    private state root once failed inside a run.  The bound is checked with an
+    explicit limit so it is exercised on every platform.
+    """
+
+    SPAN = 187  # documented: state root + fixed artifact path of a verifier clone
+
+    def test_documented_bound_is_exact(self) -> None:
+        rig = _Rig(self, FIX)
+        length = len(str(rig.context.binding.state_root))
+        self.assertEqual(WINDOWS_PATH_LIMIT - self.SPAN, 72, "documented state-root bound")
+        self.assertEqual(rig.context_for(rig.worker, path_limit=length + self.SPAN).path_problems(), ())
+        tight = rig.context_for(rig.worker, path_limit=length + self.SPAN - 1).path_problems()
+        self.assertEqual(len(tight), 1)
+        self.assertIn("state root is too deep", tight[0])
+        self.assertIsNone(rig.context_for(rig.worker, path_limit=None).max_relative_path())
+        with self.assertRaises(RepositoryBindingError):
+            rig.context_for(rig.worker, path_limit=0)
+
+    def test_deep_state_root_blocks_before_any_effect(self) -> None:
+        rig = _Rig(self, FIX)
+        deep = rig.root / ("d" * 70) / "state"
+        context = rig.context_for(rig.worker, path_limit=WINDOWS_PATH_LIMIT, state_root=deep)
+        self.assertEqual(len(context.path_problems()), 1)
+        with self.assertRaisesRegex(RepositoryHostUnavailable, "state root is too deep"):
+            rig.factory(context)
+        with self.assertRaisesRegex(RepositoryHostBlocked, "unsupported path length"):
+            rig.build(context)
+        host = RepositoryCompositionHost(
+            context, manifest=rig.manifest, profile_id="external-python", discovery=rig.discovery
+        )
+        result = host.execute_package(rig.package, ("runtime", "delivery"), rig.payload())
+        self.assertIs(result.status, PackageStatus.BLOCKED_CAPABILITY)
+        self.assertIn("state root is too deep", result.message)
+        self.assertEqual(rig.worker.calls, [])
+        self.assertEqual(rig.sandbox.runs, 0)
+        self.assertFalse(deep.parent.exists(), "no directory was created for the rejected root")
+
+    def test_long_tracked_path_is_a_typed_blocker(self) -> None:
+        tracked = "src/" + "a" * 40 + "/" + "b" * 40 + ".py"  # 88 characters
+        rig = _Rig(self, FIX, extra_files={tracked: "x = 1\n"})
+        length = len(str(rig.context.binding.state_root))
+        context = rig.context_for(rig.worker, path_limit=length + self.SPAN)  # room for 71
+        problems = context.path_problems()
+        self.assertEqual(len(problems), 1)
+        self.assertIn("88 characters", problems[0])
+        with self.assertRaisesRegex(RepositoryHostUnavailable, "tracked repository path"):
+            rig.factory(context)
+        self.assertEqual((rig.worker.calls, rig.sandbox.runs), ([], 0))
+
+    def test_a_patch_path_beyond_the_bound_is_refused_before_it_is_applied(self) -> None:
+        rig = _Rig(self, FIX)
+        length = len(str(rig.context.binding.state_root))
+        name = "src/" + "n" * 70 + ".py"  # 77 characters, above the 71 of this limit
+        patch = (
+            f"diff --git a/{name} b/{name}\nnew file mode 100644\n--- /dev/null\n"
+            f"+++ b/{name}\n@@ -0,0 +1 @@\n+x = 1\n"
+        )
+        worker = _ScriptedPatchWorker({"patch": patch, "paths": [name]})
+        single = RepositoryBuildBudget(1, 600.0, 300.0, 20, 1800.0, 100_000)
+        context = rig.context_for(
+            worker, attempt_id="attempt-long-patch", path_limit=length + self.SPAN, budget=single
+        )
+        outcome = rig.build(context)
+        self.assertIs(outcome.result.disposition, BuilderDisposition.BUDGET_EXHAUSTED)
+        slot = context.store.load_slot(rig.key(context), 0)
+        self.assertEqual(slot.decision["decision"], "refused")
+        self.assertIn("path length bound", slot.decision["reason"])
+        self.assertFalse(context.store.candidate_path(rig.key(context)).exists())
 
 
 if __name__ == "__main__":

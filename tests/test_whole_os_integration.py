@@ -588,5 +588,160 @@ class WholeOSIntegrationTests(unittest.TestCase):
                     second.close()
 
 
+class _SyntheticReplayHost(FakeHost):
+    """SYNTHETIC host that vouches for its retained successes on demand."""
+
+    def __init__(self, verdict=None):
+        self.verdict = verdict
+        self.executions = 0
+        self.assessments = 0
+        self.validations = 0
+
+    def execute_package(self, package, bindings, payload):
+        self.executions += 1
+        return super().execute_package(package, bindings, payload)
+
+    def assess_terminal_candidate(self, candidate, payload):
+        self.assessments += 1
+        return super().assess_terminal_candidate(candidate, payload)
+
+    def validate_retained_package_result(self, package, result, payload):
+        self.validations += 1
+        self.seen = (package.package_id, result, payload)
+        if isinstance(self.verdict, Exception):
+            raise self.verdict
+        return self.verdict
+
+
+class WholeOSRetainedReplayTests(unittest.TestCase):
+    """The service must not deliver a resumed success its host no longer vouches for."""
+
+    def _service(self, root, host):
+        return WholeOSIntegrationTests()._components(
+            root,
+            (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
+            host=host,
+        )
+
+    def _completed(self, root, host):
+        config, provider, _ = self._service(root, host)
+        service = WholeOSService(config, provider, host)
+        self.addCleanup(service.close)
+        self.assertEqual(service.run_to_completion().status, "complete")
+        return config, provider, service
+
+    def test_valid_retained_success_is_delivered_after_every_resume(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        config, provider, first = self._completed(Path(directory), host)
+        self.assertGreater(host.validations, 0)
+        self.assertEqual(host.seen[0], "A")
+        self.assertEqual(host.seen[1].status, PackageStatus.COMPLETED)
+        self.assertEqual(host.seen[2]["package_id"], "A")
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        self.assertEqual(resumed.run_to_completion().status, "complete")
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_rejected_retained_success_is_blocked_for_same_and_recreated_service(self):
+        directory = self.enterContext(TemporaryDirectory())
+        root = Path(directory)
+        host = _SyntheticReplayHost()
+        config, provider, first = self._completed(root, host)
+        historical = first.observe()
+        self.assertIsNotNone(historical.terminal_assessment)
+
+        host.verdict = "admission revoked"
+        before = host.validations
+        replay = first.run_to_completion()
+        self.assertGreater(host.validations, before, "the host was asked again")
+        self.assertEqual(replay.status, "blocked")
+        self.assertEqual(replay.completed_packages, ())
+        self.assertEqual(replay.blocked_packages, ("A",))
+        self.assertIsNone(replay.terminal_assessment)
+        self.assertIn("admission revoked", replay.terminal_message)
+        self.assertIn("failed revalidation", replay.terminal_message)
+        self.assertEqual(first.run_once().status, "blocked")
+
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        self.assertEqual(resumed.run_to_completion().status, "blocked")
+        self.assertEqual(resumed.observe().status, "blocked")
+        # No duplicate effect and no new terminal assessment on a rejected replay;
+        # the retained receipts stay on disk as history.
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+        self.assertTrue(list(Path(directory).rglob("terminal-*.json")))
+        self.assertTrue(list((Path(directory)).rglob("packages/*.json")))
+
+    def test_verdict_is_never_carried_between_operations(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(Path(directory), host)
+        host.verdict = "temporarily unavailable"
+        self.assertEqual(service.observe().status, "blocked")
+        host.verdict = None
+        self.assertEqual(service.observe().status, "complete")
+        self.assertEqual((host.executions, host.assessments), (1, 1))
+
+    def test_host_errors_and_untyped_verdicts_fail_closed(self):
+        for verdict in (RuntimeError("evidence unreadable"), True, "", 0):
+            with self.subTest(verdict=repr(verdict)):
+                directory = self.enterContext(TemporaryDirectory())
+                host = _SyntheticReplayHost()
+                _, _, service = self._completed(Path(directory), host)
+                host.verdict = verdict
+                self.assertEqual(service.observe().status, "blocked")
+
+    def test_missing_service_receipt_of_a_done_package_is_rejected_when_validated(self):
+        directory = self.enterContext(TemporaryDirectory())
+        root = Path(directory)
+        host = _SyntheticReplayHost()
+        _, _, service = self._completed(root, host)
+        for receipt in root.rglob("packages/*.json"):
+            receipt.unlink()
+        observation = service.observe()
+        self.assertEqual(observation.status, "blocked")
+        self.assertIn("lacks a valid durable receipt", observation.terminal_message)
+
+    def test_host_without_the_capability_keeps_its_explicit_legacy_contract(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = FakeHost()
+        config, provider, _ = WholeOSRetainedReplayTests._service(
+            self, Path(directory), host
+        )
+        service = WholeOSService(config, provider, host)
+        self.addCleanup(service.close)
+        self.assertEqual(service.run_to_completion().status, "complete")
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        self.assertEqual(resumed.run_to_completion().status, "complete")
+
+    def test_dependents_are_not_released_by_a_rejected_dependency(self):
+        directory = self.enterContext(TemporaryDirectory())
+        host = _SyntheticReplayHost()
+        config, provider, _ = WholeOSIntegrationTests()._components(
+            Path(directory),
+            (
+                OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),
+                OutcomeWorkPackage(
+                    "B", ("R2",), dependencies=("A",), allowed_paths=("b",)
+                ),
+            ),
+            capacity=1,
+            host=host,
+        )
+        first = WholeOSService(config, provider, host)
+        self.addCleanup(first.close)
+        self.assertEqual(first.run_cohort().completed_packages, ("A",))
+        host.verdict = "evidence corrupted"
+        resumed = WholeOSService(config, provider, host)
+        self.addCleanup(resumed.close)
+        observation = resumed.run_to_completion()
+        self.assertEqual(observation.status, "blocked")
+        self.assertEqual(observation.completed_packages, ())
+        self.assertEqual(observation.blocked_packages, ("A", "B"))
+        self.assertEqual(host.executions, 1, "B never ran on a rejected dependency")
+
+
 if __name__ == "__main__":
     unittest.main()

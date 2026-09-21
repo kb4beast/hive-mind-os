@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import gc
 import hashlib
 import json
 import os
@@ -8,10 +10,12 @@ import sys
 import tempfile
 import time
 import unittest
+import warnings
 from pathlib import Path
 
 from hive_mind_os.local_claude_worker import (
     PROTOCOL,
+    STRUCTURED_OUTPUT_ACK,
     ClaudeInterfaceUnavailable,
     ClaudeLocalWorker,
     _run_claude_process,
@@ -68,48 +72,267 @@ REPORT = {
     "proposed_patch": "diff --git a/src/calc.py b/src/calc.py\n",
 }
 SESSION = "11111111-2222-3333-4444-555555555555"
+MODEL = "claude-haiku-4-5-20251001"
+TOOL_ID = "toolu_synthetic_0001"
+TOOL = "StructuredOutput"
 
 
-def _stream(
-    report: dict | None = None,
-    *,
-    tools: list | None = None,
-    extra_tool: str | None = None,
-    envelopes: int = 1,
-    result_overrides: dict | None = None,
-    extra_events: list | None = None,
-) -> str:
-    """A SYNTHETIC transcript shaped like the retained canary, not a model run."""
+def _events(report: dict | None = None, *, tool_name: str = TOOL, with_text: bool = False):
+    """A SYNTHETIC transcript with the exact event sequence of the retained canary.
+
+    Sequence: init, status, message_start, tool block start/deltas, assistant
+    envelope, block stop, tool_result, message_delta, message_stop, rate limit,
+    result. It is not a model run and carries no real identifiers.
+    """
 
     report = REPORT if report is None else report
+    rendered = json.dumps(report)
+    cut = len(rendered) // 2
+    index = 1 if with_text else 0
+
+    def streamed(inner: dict) -> dict:
+        return {
+            "type": "stream_event",
+            "event": inner,
+            "session_id": SESSION,
+            "parent_tool_use_id": None,
+        }
+
     events = [
-        {"type": "system", "subtype": "init", "session_id": SESSION,
-         "tools": ["StructuredOutput"] if tools is None else tools, "mcp_servers": [],
-         "model": "claude-haiku-4-5-20251001", "permissionMode": "dontAsk",
-         "claude_code_version": "2.1.278"},
+        {
+            "type": "system", "subtype": "init", "session_id": SESSION, "tools": [TOOL],
+            "mcp_servers": [], "model": MODEL, "permissionMode": "dontAsk",
+            "slash_commands": [], "skills": [], "plugins": [],
+            "claude_code_version": "2.1.278",
+        },
         {"type": "system", "subtype": "status", "status": "requesting", "session_id": SESSION},
-        {"type": "stream_event", "session_id": SESSION, "event": {
-            "type": "content_block_start", "index": 0,
-            "content_block": {"type": "tool_use", "id": "toolu_1", "name": "StructuredOutput", "input": {}}}},
+        streamed({
+            "type": "message_start",
+            "message": {"model": MODEL, "role": "assistant", "content": []},
+        }),
     ]
-    for number in range(envelopes):
-        events.append({"type": "assistant", "session_id": SESSION, "message": {"content": [
-            {"type": "tool_use", "id": f"toolu_{number + 1}", "name": "StructuredOutput", "input": report}]}})
-    if extra_tool:
-        events.append({"type": "assistant", "session_id": SESSION, "message": {"content": [
-            {"type": "tool_use", "id": "toolu_x", "name": extra_tool, "input": {}}]}})
-    events.append({"type": "user", "session_id": SESSION, "message": {"content": [
-        {"type": "tool_result", "tool_use_id": "toolu_1", "content": "Structured output provided successfully"}]}})
-    events.extend(extra_events or [])
-    events.append({"type": "rate_limit_event", "session_id": SESSION, "rate_limit_info": {}})
-    result = {"type": "result", "subtype": "success", "is_error": False, "session_id": SESSION,
-              "terminal_reason": "completed", "permission_denials": [], "structured_output": report,
-              "result": json.dumps(report), "usage": {"input_tokens": 1, "output_tokens": 2},
-              "modelUsage": {}, "total_cost_usd": 0.001, "duration_ms": 5, "num_turns": 2,
-              "subagent_stats": {"spawned": 0}}
-    result.update(result_overrides or {})
-    events.append(result)
+    content = []
+    if with_text:
+        events += [
+            streamed({"type": "content_block_start", "index": 0,
+                      "content_block": {"type": "text", "text": ""}}),
+            streamed({"type": "content_block_delta", "index": 0,
+                      "delta": {"type": "text_delta", "text": "inert preface"}}),
+            streamed({"type": "content_block_stop", "index": 0}),
+        ]
+        content.append({"type": "text", "text": "inert preface"})
+    events.append(streamed({
+        "type": "content_block_start", "index": index,
+        "content_block": {"type": "tool_use", "id": TOOL_ID, "name": tool_name, "input": {}},
+    }))
+    for piece in ("", rendered[:cut], rendered[cut:]):
+        events.append(streamed({
+            "type": "content_block_delta", "index": index,
+            "delta": {"type": "input_json_delta", "partial_json": piece},
+        }))
+    content.append({"type": "tool_use", "id": TOOL_ID, "name": tool_name, "input": report})
+    events += [
+        {
+            "type": "assistant", "session_id": SESSION, "parent_tool_use_id": None,
+            "message": {"model": MODEL, "role": "assistant", "content": content},
+        },
+        streamed({"type": "content_block_stop", "index": index}),
+        {
+            "type": "user", "session_id": SESSION, "parent_tool_use_id": None,
+            "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": TOOL_ID, "content": STRUCTURED_OUTPUT_ACK},
+            ]},
+            "tool_use_result": STRUCTURED_OUTPUT_ACK,
+        },
+        streamed({"type": "message_delta", "delta": {"stop_reason": "tool_use"}}),
+        streamed({"type": "message_stop"}),
+        {"type": "rate_limit_event", "session_id": SESSION, "rate_limit_info": {}},
+        {
+            "type": "result", "subtype": "success", "is_error": False, "session_id": SESSION,
+            "terminal_reason": "completed", "permission_denials": [],
+            "structured_output": report, "result": rendered,
+            "usage": {"input_tokens": 1, "output_tokens": 2},
+            "modelUsage": {MODEL: {}}, "total_cost_usd": 0.001, "duration_ms": 5,
+            "duration_api_ms": 4, "num_turns": 2, "subagent_stats": {"spawned": 0},
+        },
+    ]
+    return events
+
+
+def _text(events: list[dict]) -> str:
     return "\n".join(json.dumps(event) for event in events) + "\n"
+
+
+def _find(events: list[dict], kind: str, inner: str | None = None) -> dict:
+    return next(
+        event for event in events
+        if event["type"] == kind and (inner is None or event["event"]["type"] == inner)
+    )
+
+
+def _mutations() -> dict:
+    """Each entry damages a valid canary-shaped transcript in one specific way."""
+
+    def rename_assistant_tool(events):
+        _find(events, "assistant")["message"]["content"][0]["name"] = "Bash"
+
+    def rename_streamed_tool(events):
+        _find(events, "stream_event", "content_block_start")["event"]["content_block"]["name"] = "PowerShell"
+
+    def drop_tool_result(events):
+        events[:] = [event for event in events if event["type"] != "user"]
+
+    def duplicate_tool_result(events):
+        events.insert(-1, copy.deepcopy(_find(events, "user")))
+
+    def unknown_nested_execution(events):
+        events.insert(-1, {
+            "type": "stream_event", "session_id": SESSION, "parent_tool_use_id": None,
+            "event": {"type": "command_execution", "command": "INERT NEGATIVE CONTROL"},
+        })
+
+    def assistant_without_session(events):
+        _find(events, "assistant").pop("session_id")
+
+    def assistant_other_session(events):
+        _find(events, "assistant")["session_id"] = "different-synthetic-session"
+
+    def assistant_other_model(events):
+        _find(events, "assistant")["message"]["model"] = "different-synthetic-model"
+
+    def message_start_other_model(events):
+        _find(events, "stream_event", "message_start")["event"]["message"]["model"] = "other"
+
+    def event_after_result(events):
+        events.append({"type": "system", "subtype": "status", "status": "requesting", "session_id": SESSION})
+
+    def result_disagrees(events):
+        events[-1]["structured_output"] = {**REPORT, "summary": "other"}
+
+    def streamed_json_disagrees(events):
+        _find(events, "stream_event", "content_block_delta")["event"]["delta"]["partial_json"] = "{"
+
+    def extra_capability(events):
+        events[0]["tools"].append("Read")
+
+    def mcp_server(events):
+        events[0]["mcp_servers"] = [{"name": "external"}]
+
+    def plugin_loaded(events):
+        events[0]["plugins"] = ["external"]
+
+    def error_result(events):
+        events[-1]["is_error"] = True
+
+    def denial(events):
+        events[-1]["permission_denials"] = [{"tool": "Bash"}]
+
+    def unfinished(events):
+        events[-1]["terminal_reason"] = "max_turns"
+
+    def subagent(events):
+        events[-1]["subagent_stats"] = {"spawned": 1}
+
+    def nested_agent(events):
+        _find(events, "assistant")["parent_tool_use_id"] = "toolu_parent"
+
+    def second_envelope(events):
+        block = {"type": "tool_use", "id": "toolu_second", "name": TOOL, "input": REPORT}
+        _find(events, "assistant")["message"]["content"].append(block)
+
+    def second_message(events):
+        events.insert(3, copy.deepcopy(events[2]))
+
+    def result_before_message_stop(events):
+        events[:] = [event for event in events if not (
+            event["type"] == "stream_event" and event["event"]["type"] == "message_stop")]
+
+    def stream_without_message(events):
+        events[:] = [event for event in events if not (
+            event["type"] == "stream_event" and event["event"]["type"] == "message_start")]
+
+    def result_text_disagrees(events):
+        events[-1]["result"] = json.dumps({**REPORT, "summary": "other"})
+
+    def other_model_usage(events):
+        events[-1]["modelUsage"] = {"another-model": {}}
+
+    def tool_result_other_content(events):
+        _find(events, "user")["message"]["content"][0]["content"] = "something else"
+
+    def tool_result_other_summary(events):
+        _find(events, "user")["tool_use_result"] = "something else"
+
+    def tool_result_unknown_id(events):
+        _find(events, "user")["message"]["content"][0]["tool_use_id"] = "toolu_unknown"
+
+    def tool_result_error(events):
+        _find(events, "user")["message"]["content"][0]["is_error"] = True
+
+    def user_text_block(events):
+        _find(events, "user")["message"]["content"].append({"type": "text", "text": "hi"})
+
+    def status_before_init(events):
+        events[0], events[1] = events[1], events[0]
+
+    def delta_on_closed_block(events):
+        events.insert(-4, {
+            "type": "stream_event", "session_id": SESSION, "parent_tool_use_id": None,
+            "event": {"type": "content_block_delta", "index": 0,
+                      "delta": {"type": "input_json_delta", "partial_json": "{}"}},
+        })
+
+    def unknown_assistant_block(events):
+        _find(events, "assistant")["message"]["content"].append({"type": "command_execution"})
+
+    def unknown_event_type(events):
+        events.insert(-1, {"type": "tool_progress", "session_id": SESSION})
+
+    def other_system_subtype(events):
+        events[1]["subtype"] = "hook_started"
+
+    def truncated(events):
+        events.pop()
+
+    return {
+        "assistant tool renamed": rename_assistant_tool,
+        "streamed tool renamed": rename_streamed_tool,
+        "missing internal tool_result": drop_tool_result,
+        "duplicate internal tool_result": duplicate_tool_result,
+        "unknown nested execution event": unknown_nested_execution,
+        "assistant lacks session": assistant_without_session,
+        "assistant other session": assistant_other_session,
+        "assistant/init model conflict": assistant_other_model,
+        "message_start/init model conflict": message_start_other_model,
+        "event after terminal result": event_after_result,
+        "result disagrees with envelope": result_disagrees,
+        "streamed JSON disagrees with envelope": streamed_json_disagrees,
+        "extra executable capability": extra_capability,
+        "mcp server exposed": mcp_server,
+        "plugin loaded": plugin_loaded,
+        "error result": error_result,
+        "permission denial": denial,
+        "unfinished turn": unfinished,
+        "subagent spawned": subagent,
+        "nested agent event": nested_agent,
+        "second schema envelope": second_envelope,
+        "second message": second_message,
+        "result before message_stop": result_before_message_stop,
+        "stream event without message": stream_without_message,
+        "result text disagrees": result_text_disagrees,
+        "model usage names another model": other_model_usage,
+        "tool_result with other content": tool_result_other_content,
+        "tool_use_result with other content": tool_result_other_summary,
+        "tool_result for unknown id": tool_result_unknown_id,
+        "tool_result marked error": tool_result_error,
+        "extra user block": user_text_block,
+        "status before init": status_before_init,
+        "delta on a closed block": delta_on_closed_block,
+        "unknown assistant block": unknown_assistant_block,
+        "unknown event type": unknown_event_type,
+        "unknown system subtype": other_system_subtype,
+        "missing result": truncated,
+    }
 
 
 class _Directory(unittest.TestCase):
@@ -184,37 +407,47 @@ class ClaudeInterfaceBindingTests(_ClaudeRig):
 
 
 class ClaudeStreamParserTests(_Directory):
-    def test_exact_schema_envelope_is_the_only_permitted_tool_event(self) -> None:
-        parsed = parse_claude_stream(self.stream_file(_stream()))
+    def test_canary_shaped_envelope_is_accepted_with_exact_identities(self) -> None:
+        parsed = parse_claude_stream(self.stream_file(_text(_events())))
         self.assertEqual(parsed["session_id"], SESSION)
-        self.assertEqual(parsed["model"], "claude-haiku-4-5-20251001")
+        self.assertEqual(parsed["model"], MODEL)
+        self.assertEqual(parsed["cli_version"], "2.1.278")
         self.assertEqual(parsed["report"], REPORT)
         self.assertEqual(parsed["usage"]["total_cost_usd"], 0.001)
 
-    def test_every_other_tool_surface_is_rejected(self) -> None:
-        cases = {
-            "another tool use": _stream(extra_tool="Bash"),
-            "more tools exposed": _stream(tools=["StructuredOutput", "Bash"]),
-            "no tools listed": _stream(tools=[]),
-            "two envelopes": _stream(envelopes=2),
-            "denied permission": _stream(result_overrides={"permission_denials": [{"tool": "Bash"}]}),
-            "failed result": _stream(result_overrides={"is_error": True}),
-            "unfinished turn": _stream(result_overrides={"terminal_reason": "max_turns"}),
-            "output differs": _stream(result_overrides={"structured_output": {**REPORT, "summary": "other"}}),
-            "unknown event": _stream(extra_events=[{"type": "tool_progress", "session_id": SESSION}]),
-            "subagent": _stream(result_overrides={"subagent_stats": {"spawned": 1}}),
-        }
-        for name, text in cases.items():
-            with self.subTest(name), self.assertRaises(ValueError):
-                parse_claude_stream(self.stream_file(text))
+    def test_inert_text_block_is_allowed_beside_the_envelope(self) -> None:
+        parsed = parse_claude_stream(self.stream_file(_text(_events(with_text=True))))
+        self.assertEqual(parsed["report"], REPORT)
 
-    def test_second_session_or_missing_result_is_rejected(self) -> None:
-        foreign = {"type": "rate_limit_event", "session_id": "another-session"}
+    def test_every_counterexample_is_rejected(self) -> None:
+        for name, mutate in _mutations().items():
+            events = _events()
+            mutate(events)
+            with self.subTest(name), self.assertRaises(ValueError):
+                parse_claude_stream(self.stream_file(_text(events)))
+
+    def test_each_mutation_changes_a_transcript_that_is_otherwise_accepted(self) -> None:
+        # Guards the mutation table itself: the untouched transcript must pass.
+        parse_claude_stream(self.stream_file(_text(_events())))
+        for name, mutate in _mutations().items():
+            events = _events()
+            mutate(events)
+            self.assertNotEqual(events, _events(), name)
+
+    def test_duplicate_json_key_and_blank_padding_are_handled_strictly(self) -> None:
+        lines = [json.dumps(event) for event in _events()]
+        duplicated = [*lines[:-1], lines[-1][:-1] + ', "is_error": true}']
         with self.assertRaises(ValueError):
-            parse_claude_stream(self.stream_file(_stream(extra_events=[foreign])))
-        truncated = "\n".join(_stream().splitlines()[:-1]) + "\n"
+            parse_claude_stream(self.stream_file("\n".join(duplicated) + "\n"))
+        padded = "\n\n".join(lines) + "\n\n\n"
+        self.assertEqual(parse_claude_stream(self.stream_file(padded))["report"], REPORT)
         with self.assertRaises(ValueError):
-            parse_claude_stream(self.stream_file(truncated))
+            parse_claude_stream(self.stream_file("\n".join(lines) + "\n{}\n"))
+
+    def test_oversized_transcript_is_rejected_before_parsing(self) -> None:
+        path = self.stream_file(_text(_events()))
+        with self.assertRaises(ValueError):
+            parse_claude_stream(path, max_bytes=100)
 
 
 class ClaudeWorkerRunTests(_ClaudeRig):
@@ -246,12 +479,12 @@ class ClaudeWorkerRunTests(_ClaudeRig):
         )
 
     def test_receipt_binds_packet_session_model_and_usage(self) -> None:
-        worker = self._worker(command_runner=self._runner(_stream()))
+        worker = self._worker(command_runner=self._runner(_text(_events())))
         receipt = self._run(worker)
         self.assertEqual(receipt["protocol"], PROTOCOL)
         self.assertEqual(receipt["status"], "completed", receipt["reason"])
         self.assertEqual(receipt["session_id"], SESSION)
-        self.assertEqual(receipt["model"], "claude-haiku-4-5-20251001")
+        self.assertEqual(receipt["model"], MODEL)
         self.assertEqual(receipt["requested_model"], "haiku")
         self.assertEqual(receipt["usage"]["num_turns"], 2)
         packet_file = Path(receipt["evidence"]["source_packet"]["path"])
@@ -262,13 +495,14 @@ class ClaudeWorkerRunTests(_ClaudeRig):
         self.assertEqual(on_disk["report"], receipt["report"])
 
     def test_deadline_output_limit_exit_tool_and_scratch_changes_fail_closed(self) -> None:
+        tool_events = _events(tool_name="Bash")
         cases = {
             "deadline": self._runner("", timed_out=True),
             "output limit": self._runner("", limited=True),
-            "exit code": self._runner(_stream(), code=3),
-            "tool use": self._runner(_stream(extra_tool="Bash")),
+            "exit code": self._runner(_text(_events()), code=3),
+            "tool use": self._runner(_text(tool_events)),
             "scratch written": self._runner(
-                _stream(), write=lambda cwd: (cwd / "leak.txt").write_text("x", encoding="utf-8")
+                _text(_events()), write=lambda cwd: (cwd / "leak.txt").write_text("x", encoding="utf-8")
             ),
         }
         for name, runner in cases.items():
@@ -277,13 +511,16 @@ class ClaudeWorkerRunTests(_ClaudeRig):
                 self.assertEqual(receipt["status"], "failed")
                 self.assertIsNone(receipt["report"])
 
-    def test_tool_use_failure_preserves_the_actual_session_identity(self) -> None:
-        receipt = self._run(self._worker(command_runner=self._runner(_stream(extra_tool="Bash"))))
+    def test_a_rejected_transcript_preserves_the_actual_session_identity(self) -> None:
+        events = _events()
+        events.pop(-5)  # the internal tool_result, just before message_delta/stop/result
+        receipt = self._run(self._worker(command_runner=self._runner(_text(events))))
         self.assertEqual(receipt["status"], "failed")
+        self.assertIn("tool result", receipt["reason"])
         self.assertEqual(receipt["session_id"], SESSION)
 
     def test_worker_refuses_repository_access_and_unbounded_deadlines(self) -> None:
-        worker = self._worker(command_runner=self._runner(_stream()))
+        worker = self._worker(command_runner=self._runner(_text(_events())))
         scratch = self._scratch()
         (scratch / "source.py").write_text("x", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "empty scratch"):
@@ -351,6 +588,22 @@ class ClaudeProcessRunnerTests(_Directory):
         self.assertTrue(limited)
         self.assertFalse(timed_out)
         self.assertLessEqual((base / "stdout").stat().st_size, 5_000)
+
+    def test_no_pipe_is_left_open_after_a_deadline_an_output_cap_or_a_normal_exit(self) -> None:
+        # Regression: a timeout used to leave the stdout/stderr pipe readers open,
+        # which surfaced as ResourceWarning when they were garbage collected.
+        flood = "import sys\nwhile True:\n    sys.stdout.write('x' * 65536); sys.stdout.flush()\n"
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            (_, timed_out, _), _ = self._run("import time; time.sleep(120)", timeout=1)
+            self.assertTrue(timed_out)
+            (_, _, limited), _ = self._run(flood, timeout=60, cap=2_000)
+            self.assertTrue(limited)
+            (code, _, _), _ = self._run("print('done')", timeout=30)
+            self.assertEqual(code, 0)
+            gc.collect()
+        leaks = [str(item.message) for item in caught if issubclass(item.category, ResourceWarning)]
+        self.assertEqual(leaks, [])
 
 
 if __name__ == "__main__":

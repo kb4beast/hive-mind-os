@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import os
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from threading import Event, Lock, Thread
 from types import MappingProxyType
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Iterator, Mapping, Protocol
 from uuid import uuid4
 
 from .cohort_assurance import (
@@ -179,6 +180,33 @@ class WholeOSTerminalAssessor(Protocol):
         ...
 
 
+class WholeOSReplayValidator(Protocol):
+    """Optional host capability guarding replay of a retained package success.
+
+    The service keeps its own durable package receipt, so a package that finished
+    once would otherwise be reported successful forever, even after the host's
+    admission was revoked or the evidence behind it was corrupted.  A host that
+    holds such external evidence implements this method; the service then treats
+    a retained success as current only while it returns ``None``.
+
+    A host without the method keeps the original behaviour: the service trusts
+    its own receipt.  No default verifier is supplied on purpose, because a
+    default could only pretend to verify evidence it cannot see.
+    """
+
+    def validate_retained_package_result(
+        self,
+        package: OutcomeWorkPackage,
+        result: PackageExecutionResult,
+        payload: Mapping[str, Any],
+    ) -> str | None:
+        """Return ``None`` if still valid, otherwise a nonempty reason.
+
+        Must be read-only: it runs on every observation and on every resume.
+        """
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class WholeOSServiceConfig:
     campaign_id: str
@@ -290,7 +318,11 @@ class WholeOSService:
         ).removeprefix("sha256:")
         self._receipt_dir = config.state_dir / "whole-os-receipts" / campaign_key
         self._package_receipt_dir = self._receipt_dir / "packages"
-        self._enqueue_ready()
+        # Retained-success verdicts are memoized only inside one public operation.
+        self._retained_memo: dict[str, str | None] | None = None
+        self._retained_rejections: dict[str, str] = {}
+        with self._retained_scope():
+            self._enqueue_ready()
 
     def _build_kickoff(self) -> dict[str, object]:
         context: dict[str, object] = {
@@ -322,12 +354,72 @@ class WholeOSService:
             and job.mission_id == self.config.campaign_id
         )
 
-    def _completed(self) -> set[str]:
-        return {
+    @contextmanager
+    def _retained_scope(self) -> Iterator[None]:
+        """Share one host revalidation across a single public operation.
+
+        Verdicts are never carried between operations, so every resume, every new
+        service object and every observation asks the host again.
+        """
+        outermost = self._retained_memo is None
+        if outermost:
+            self._retained_memo = {}
+        try:
+            yield
+        finally:
+            if outermost:
+                self._retained_memo = None
+
+    def _check_retained(self, package_id: str) -> str | None:
+        """Ask the host whether a retained success is still valid (fail closed)."""
+        validator = getattr(self.host, "validate_retained_package_result", None)
+        if not callable(validator):
+            return None
+        package = self.by_id.get(package_id)
+        if package is None:
+            return "package is absent from the sealed graph"
+        try:
+            result = self._load_package_result(package_id)
+            reason = validator(
+                package, result, self._freeze(self._payload(package))
+            )
+        except Exception as exc:
+            return f"{type(exc).__name__}: {exc}"
+        if reason is None:
+            return None
+        if type(reason) is not str or not reason.strip():
+            return "host returned an untyped replay verdict"
+        return reason
+
+    def _retained_rejection(self, package_id: str) -> str | None:
+        memo = self._retained_memo
+        if memo is not None and package_id in memo:
+            return memo[package_id]
+        reason = self._check_retained(package_id)
+        if memo is not None:
+            memo[package_id] = reason
+        return reason
+
+    def _classify_done(self) -> tuple[set[str], dict[str, str]]:
+        """Split scheduler-``done`` packages into currently valid and rejected."""
+        valid: set[str] = set()
+        rejected: dict[str, str] = {}
+        done = {
             str(job.payload["package_id"])
             for job in self._jobs()
             if job.state == "done"
         }
+        for package_id in sorted(done):
+            reason = self._retained_rejection(package_id)
+            if reason is None:
+                valid.add(package_id)
+            else:
+                rejected[package_id] = reason
+        self._retained_rejections = rejected
+        return valid, rejected
+
+    def _completed(self) -> set[str]:
+        return self._classify_done()[0]
 
     def _enqueued(self) -> set[str]:
         return {str(job.payload["package_id"]) for job in self._jobs()}
@@ -458,8 +550,15 @@ class WholeOSService:
     def _retained_package_result(
         self, package_id: str
     ) -> PackageExecutionResult | None:
-        """Inspect the durable effect receipt before any retryable host call."""
+        """Inspect the durable effect receipt before any retryable host call.
+
+        A retained success the host no longer vouches for is not returned: the
+        package then goes back to the host, which owns the typed blocker.  This
+        path never starts a worker itself.
+        """
         if not filesystem_path(self._package_receipt_path(package_id)).exists():
+            return None
+        if self._check_retained(package_id) is not None:
             return None
         return self._load_package_result(package_id)
 
@@ -601,6 +700,10 @@ class WholeOSService:
     def _run_terminal_assessment_if_ready(self) -> None:
         """Claim, assess, and durably seal the completed package candidate once."""
         self._enqueue_terminal_ready()
+        if len(self._completed()) != len(self.by_id):
+            # A package whose retained success was rejected is not complete, so
+            # no terminal candidate exists to load or assess.
+            return
         jobs = self._terminal_jobs()
         if not jobs:
             return
@@ -679,6 +782,10 @@ class WholeOSService:
 
     def run_once(self) -> ServiceObservation:
         """Execute one package using the original strict compatibility behavior."""
+        with self._retained_scope():
+            return self._run_once()
+
+    def _run_once(self) -> ServiceObservation:
         jobs = self._claim_cohort(
             f"whole-os:{self.config.campaign_id}:strict", maximum=1
         )
@@ -767,12 +874,16 @@ class WholeOSService:
         paths: set[str] = set()
         locks: set[str] = set()
         capacity = maximum or self.config.graph.maximum_concurrent
+        completed = self._completed()
         for candidate in self._jobs():
             if len(claimed) >= capacity:
                 break
             if candidate.state not in {"ready", "leased"}:
                 continue
             package = self.by_id.get(str(candidate.payload.get("package_id", "")))
+            if package is not None and not set(package.dependencies) <= completed:
+                # Already queued, but a dependency is no longer currently valid.
+                continue
             if package is not None and (
                 paths.intersection(package.allowed_paths)
                 or locks.intersection(package.semantic_locks)
@@ -901,6 +1012,10 @@ class WholeOSService:
         Scheduler leases are heartbeated while host work is active, and all queue
         transitions occur on the coordinating thread after execution completes.
         """
+        with self._retained_scope():
+            return self._run_cohort()
+
+    def _run_cohort(self) -> ServiceObservation:
         self._enqueue_ready()
         owner = f"whole-os:{self.config.campaign_id}:cohort:{uuid4()}"
         jobs = self._claim_cohort(owner)
@@ -997,15 +1112,23 @@ class WholeOSService:
         last_result: PackageExecutionResult | None = None,
         recent_results: tuple[PackageExecutionResult, ...] = (),
     ) -> ServiceObservation:
+        with self._retained_scope():
+            return self._observe(last_result, recent_results)
+
+    def _observe(
+        self,
+        last_result: PackageExecutionResult | None,
+        recent_results: tuple[PackageExecutionResult, ...],
+    ) -> ServiceObservation:
         jobs = self._jobs()
-        completed = tuple(
-            sorted(
-                str(job.payload["package_id"]) for job in jobs if job.state == "done"
-            )
-        )
+        # A retained success the host no longer vouches for is history, not
+        # completion: it is reported as blocked, never as complete.  The retained
+        # receipts themselves stay untouched for audit.
+        valid, rejected = self._classify_done()
+        completed = tuple(sorted(valid))
         blocked_set = {
             str(job.payload["package_id"]) for job in jobs if job.state == "dead-letter"
-        }
+        } | set(rejected)
         changed = True
         while changed:
             changed = False
@@ -1047,7 +1170,11 @@ class WholeOSService:
             except ServiceError as exc:
                 status = "blocked"
                 terminal_message = str(exc)
-        elif any(job.state in {"ready", "leased"} for job in jobs):
+        elif any(
+            job.state in {"ready", "leased"}
+            and str(job.payload["package_id"]) not in blocked_set
+            for job in jobs
+        ):
             status = "ready"
         elif blocked:
             status = "blocked"
@@ -1055,6 +1182,10 @@ class WholeOSService:
             status = "dependency_wait"
         else:
             status = "idle"
+        if rejected:
+            terminal_message = "retained success failed revalidation: " + "; ".join(
+                f"{package_id}: {reason}" for package_id, reason in sorted(rejected.items())
+            )
         return ServiceObservation(
             self.config.campaign_id,
             status,
