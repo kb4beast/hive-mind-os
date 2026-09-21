@@ -16,6 +16,11 @@ class PlannerPromptTests(unittest.TestCase):
         )
         self.assertFalse(artifact["execution_authorized"])
         self.assertIn("discover, design, build, validate", prompt)
+        self.assertEqual(2, artifact["version"])
+        self.assertEqual("hive-mind-portable-planner-prompt-v2", artifact["kind"])
+        self.assertIn("smallest plan", prompt)
+        self.assertIn("Exclude optional enhancements by default", prompt)
+        self.assertIn("replan downward immediately", prompt)
         for forbidden in ("kb4beast", "GitHub", "release/hive-mind-autopilot", "BASELINE-000"):
             self.assertNotIn(forbidden, prompt)
 
