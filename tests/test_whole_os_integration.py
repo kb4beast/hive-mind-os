@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Barrier, Event, Lock, Thread
+from threading import Barrier, Condition, Event, Lock, Thread
 from time import sleep
 
 from hive_mind_os.cohort_assurance import (
@@ -15,7 +15,7 @@ from hive_mind_os.cortex.repository.mission_bindings import (
     MissionBindingDescriptor,
 )
 from hive_mind_os.outcome_graph import OutcomeWorkPackage, compile_outcome_graph
-from hive_mind_os.scheduler import Scheduler
+from hive_mind_os.scheduler import ManualClock, Scheduler
 from hive_mind_os.whole_os_service import (
     PackageExecutionResult,
     PackageStatus,
@@ -343,39 +343,72 @@ class WholeOSIntegrationTests(unittest.TestCase):
             service.close()
 
     def test_cohort_heartbeats_short_leases_and_retries_failures(self):
+        clock = ManualClock()
+        heartbeat_condition = Condition()
+        heartbeat_calls = 0
+
+        def advance_across_lease():
+            nonlocal heartbeat_calls
+            for _ in range(2):
+                with heartbeat_condition:
+                    prior_heartbeat = heartbeat_calls
+                    clock.advance(0.02)
+                    if not heartbeat_condition.wait_for(
+                        lambda: heartbeat_calls > prior_heartbeat, timeout=1.0
+                    ):
+                        raise AssertionError("heartbeat did not renew the logical lease")
+
+        class ObservingScheduler(Scheduler):
+            def heartbeat(self, job_id, lease_token):
+                nonlocal heartbeat_calls
+                with heartbeat_condition:
+                    result = super().heartbeat(job_id, lease_token)
+                    heartbeat_calls += 1
+                    heartbeat_condition.notify_all()
+                return result
+
         class SlowReceiptService(WholeOSService):
             def _persist_package_result(self, result):
                 sleep(0.05)
+                advance_across_lease()
                 return super()._persist_package_result(result)
 
         class RetryHost(FakeHost):
-            def __init__(self):
+            def __init__(self, scheduler):
+                self.scheduler = scheduler
                 self.calls = 0
                 self.assessment_calls = 0
 
             def execute_package(self, package, bindings, payload):
                 self.calls += 1
                 sleep(0.05)
+                advance_across_lease()
                 if self.calls == 1:
                     return PackageExecutionResult(
                         package.package_id, PackageStatus.FAILED, None, (), "transient"
                     )
+                prior = self.scheduler.jobs()[0]
+                if prior.last_error != "failed: transient":
+                    raise AssertionError("transient failure was not durably recorded")
                 return super().execute_package(package, bindings, payload)
 
             def assess_terminal_candidate(self, candidate, payload):
                 self.assessment_calls += 1
                 sleep(0.05)
+                advance_across_lease()
                 return super().assess_terminal_candidate(candidate, payload)
 
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            host = RetryHost()
+            scheduler = ObservingScheduler(
+                root / "queue", clock=clock, lease_seconds=0.03, backoff_seconds=0
+            )
+            host = RetryHost(scheduler)
             config, provider, _ = self._components(
                 root,
                 (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
                 host=host,
             )
-            scheduler = Scheduler(root / "queue", lease_seconds=0.03, backoff_seconds=0)
             service = SlowReceiptService(config, provider, host, scheduler=scheduler)
             try:
                 result = service.run_to_completion()

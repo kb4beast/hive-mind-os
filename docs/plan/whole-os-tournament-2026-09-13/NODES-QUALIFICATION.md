@@ -11,7 +11,7 @@ These nodes qualify future implementations. No result below has been achieved by
 **Steps:**
 
 1. Build a composition matrix with self-Python, external Python, Node/TypeScript, Go, supported Rust verification, and Roblox. Declare each adapter's actual check class; Rust metadata compilation remains compile-only until a real execution adapter is separately qualified.
-   Generic service integration may finish while Studio evidence is unavailable: report Roblox runtime qualification pending N27/N32. This does not close R14 or the full-program acceptance. Do not block unrelated generic service work on a missing optional domain worker.
+   Generic service integration may finish while Studio evidence is unavailable: report Roblox runtime qualification pending N27. This does not close R14; ADR-090 keeps the optional domain outside the current N32 scope. Do not block unrelated generic service work on a missing optional domain worker.
 2. Add a configured service entry that resolves the existing queue, bindings, graph, role runtime, execution backend, verification and delivery broker through one composition root. Keep old public commands' documented compatibility/retirement behavior.
 3. Use trusted local fixture repositories for deterministic integration and attested strong backends for untrusted-code/tenant claims. Fixture source must not silently fetch the public final target.
 4. Drive one full mission through discovery evidence, chosen goal, graph, worktree, builder, verifier, code PR intent, outcome observation and appropriate learning route. A fake forge test validates protocol; it does not prove live PR publication.
@@ -94,28 +94,26 @@ These nodes qualify future implementations. No result below has been achieved by
 
 **Output/stop:** self-pilot report with actual elapsed observation and interventions. **Rollback:** external supervisor restores previous release and pauses new self-jobs; existing evidence remains. **Escalate:** only a new external grant/resource need or critical revocation event.
 
-## N32 — Qualify external repositories and a Roblox production candidate
+## N32 — Qualify two external repositories
 
-**Dependencies:** N21, N27, N30. **Owner:** Integrator/Steward; independent Curator, domain witness and Judge. **Tier/risk/effort:** T3, external data/runtime, 3–5 sessions plus 72-hour observation. **Locks:** per-tenant pilot; no shared writable target checkout.
+**Dependencies:** N21, N30. **Owner:** Integrator/Steward; independent Curator, target witness and Judge. **Tier/risk/effort:** T3, external data/runtime, 3–5 sessions plus 72-hour observation. **Locks:** per-tenant pilot; no shared writable target checkout.
 
-**Read:** qualified domain profiles, target owners' actual goals and standing grants, code/lesson delivery routes, dataset/asset evidence. **Write:** NEW `docs/execution/EXTERNAL_PILOT_RECEIPT.md` sanitized report; target code PRs stay in their own repositories, upstream drafts use C07. Raw game code, reference assets and tenant receipts are private to their admitted subjects.
+**Read:** qualified target profiles, target owners' actual goals and standing grants, code/lesson delivery routes, and runtime evidence. **Write:** NEW `docs/execution/EXTERNAL_PILOT_RECEIPT.md` sanitized report; target code PRs stay in their own repositories, upstream drafts use C07. Raw target code, private data and tenant receipts remain private to their admitted subjects.
 
 **Steps:**
 
-1. Admit at least two distinct external repository profiles, including one ordinary non-Hive application and one Roblox project supplied with rights, runtime and measurable gameplay brief. A missing real project is an explicit unmet pilot prerequisite.
+1. Admit at least two distinct external repository profiles. Each must be an owner-authorized non-Hive project with a pinned snapshot, reuse rights, measurable acceptance goal, and declared runtime. A missing real project is an explicit unmet pilot prerequisite.
 2. Onboard each once: target identity, host capability, permitted provider data, secrets broker, build/acceptance, PR destination, lessons destination and resource lease. Retain configuration so routine runs need no repeated questions.
-3. For the ordinary app, autonomously discover and deliver at least two nontrivial accepted changes under the N31-style observation protocol. Prove no Hive runtime dependency in the result.
-4. For Roblox, let the Architect turn the supplied gameplay outcome into inspectable user journeys and server/client/data/asset contracts. The builder can choose internal modules and creative implementation details within that accepted brief.
-5. Build the complete agreed gameplay slice through Rojo plus required engine/runtime checks. Do not replace the requested game with a code stub or merely README changes. Larger games become linked meaningful work packages until the stated production profile is met.
-6. Execute core-loop, multiplayer, exploit/abuse, persistence/rejoin, network-degradation, asset provenance and target-device performance requirements from N27. Document actual devices, Studio/runtime versions and evidence artifacts.
-7. Keep test universes/data separate from production. Staging/public publication occurs only if already authorized and eligible; absence of publishing authority can leave a qualified repository candidate without pretending it is deployed.
-8. Complete a private app-learning update and a separate sanitized lessons-only draft obligation for each stable completed external mission. Verify the exported draft does not activate Hive memory or change Hive source.
-9. Run a concurrent two-tenant canary case and a service interruption. Ensure raw lessons, code, caches, provider payloads and PR credentials do not cross tenants.
-10. Independently judge external autonomy and Roblox production-candidate status. Do not generalize one game's success to arbitrary production games or claim weight training occurred.
+3. Autonomously discover and deliver at least two nontrivial accepted changes under the N31-style observation protocol, covering both targets. Prove no Hive runtime dependency in either result.
+4. Execute each target's declared build, test, security and user-acceptance profile on its real runtime. Record exact tool and runtime versions with the evidence artifacts.
+5. Keep test data separate from production. Staging or public publication occurs only if already authorized and eligible; absence of publishing authority can leave a qualified repository candidate without pretending it is deployed.
+6. Complete a private app-learning update and a separate sanitized lessons-only draft obligation for each stable completed external mission. Verify the exported draft does not activate Hive memory or change Hive source.
+7. Run a concurrent two-tenant canary case and a service interruption. Ensure raw lessons, code, caches, provider payloads and PR credentials do not cross tenants.
+8. Independently judge external autonomy for the exact target profiles. Do not generalize two repositories to arbitrary production systems or claim weight training occurred.
 
-**Acceptance:** Real target code PRs and required lesson drafts have exact safe receipts; engine/device evidence meets the declared profile; all obligations are visible; target games/apps run with Hive offline. N28/N29 checks pass on the final pilot release; actual domain observation is additionally required. Missing runtime/rights/target is BLOCKED_CAPABILITY/SOURCE for this node, not an automatically passing static substitute.
+**Acceptance:** Real target code PRs and required lesson drafts have exact safe receipts; runtime evidence meets each declared profile; all obligations are visible; both targets run with Hive offline. N28/N29 checks pass on the final pilot release; actual target observation is additionally required. Missing runtime, rights, or target evidence is BLOCKED_CAPABILITY/SOURCE for this node, not an automatically passing static substitute.
 
-**Output/stop:** per-subject maturity verdict, sanitized artifact links, real game acceptance matrix and residual limitations. **Rollback:** abandon/revert scoped candidate PRs and restore qualified test artifacts through normal target procedures; preserve learning drafts and failed evidence. **Escalate:** genuine external input/authority only.
+**Output/stop:** per-subject maturity verdict, sanitized artifact links, target acceptance matrix and residual limitations. **Rollback:** abandon/revert scoped candidate PRs and restore qualified test artifacts through normal target procedures; preserve learning drafts and failed evidence. **Escalate:** genuine external input/authority only.
 
 ## N33 — Close outcomes and publish the final operating handoff
 
