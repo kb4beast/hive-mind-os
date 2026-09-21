@@ -29,3 +29,23 @@ the current release scope.
 
 `ADOPT / CLEAR` for the contract change. Production readiness remains blocked on the
 operational receipts listed in `docs/execution/EXTERNAL_PILOT_RECEIPT.md`.
+
+## Post-merge provenance reconciliation
+
+Observed on `2026-09-21` against merged Hive Mind OS
+`55612298d764bf55551a0864da6c67b6f50bd89c`. GitHub's commit records were
+re-read for Coupon Hive `main` and Reese's Rainbow Web `main`; the latter resolves
+to merge commit `44b22e5f88a3f3a9e6656a48cea7787c5d20ab4e` with the same tree
+`af67971e1b7f9f920a01cc59176435fba142edf9` as the reviewed PR #1 head.
+
+- Builder/Orchestrator: `/root`.
+- Independent Curator/Cross-Examiner: `/root/post_merge_smallest_step`, using
+  `gpt-5.6-luna` at low reasoning effort.
+- Independent Judge: `/root/post_merge_evidence_judge`, using `gpt-5.6-luna` at
+  low reasoning effort.
+
+The cross-examiner verified both remote commit/tree pairs, preservation of the
+pre-merge provenance, and the absence of a production, runtime, superiority, or
+Roblox claim. The judge issued `ADOPT`; updating both the receipt and ADR avoids an
+inconsistent target identity. This disposition refreshes provenance only. It does
+not satisfy any host, authority, runtime, N30, or 72-hour observation obligation.
