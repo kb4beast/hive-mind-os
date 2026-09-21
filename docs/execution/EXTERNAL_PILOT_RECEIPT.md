@@ -6,17 +6,22 @@ pilot has not started.
 
 ## Reconciled observation
 
-- Observed on `2026-09-21` against Hive Mind OS base candidate
-  `213392dbf74d879a02fb2c613f809a3eb83cf31b` (tree
-  `6a0be6658160b4421eba378c941628b940b68a53`). The N32 scope is adapted by
-  ADR-090 to the runtime's existing two-repository `external` mode. Roblox remains a
-  separately qualified optional domain and is not claimed by this receipt.
+- Reconciled on `2026-09-21` against merged Hive Mind OS
+  `main@55612298d764bf55551a0864da6c67b6f50bd89c` (tree
+  `8ca1d0e7f923d7d7baad07f5d2d2cd138c390954`). The pilot scope was prepared
+  against pre-merge base `213392dbf74d879a02fb2c613f809a3eb83cf31b`;
+  this refresh records the merged baseline without relabelling earlier evidence.
+  ADR-090 adapts N32 to the runtime's existing two-repository `external` mode.
+  Roblox remains a separately qualified optional domain and is not claimed by this
+  receipt.
 - Coupon Hive is selected at `main@f9b695d90ec74764709a1547d60821910ece5705`
   (tree `9582c2410f20c916b580d7d4704b6263360c0631`). PR #2 is merged and the
   repository records an MIT license.
-- Reese's Rainbow Web is selected at PR #1 head
-  `fb5d9a84780dd9f6e4c3f46352bdd3beec141d4e` (tree
-  `af67971e1b7f9f920a01cc59176435fba142edf9`). Its dependency-free Node tests
+- Reese's Rainbow Web is selected at
+  `main@44b22e5f88a3f3a9e6656a48cea7787c5d20ab4e` (tree
+  `af67971e1b7f9f920a01cc59176435fba142edf9`), the merge commit for PR #1.
+  Its tree is identical to the reviewed PR head
+  `fb5d9a84780dd9f6e4c3f46352bdd3beec141d4e`; its dependency-free Node tests
   and Chrome playthrough passed during candidate preparation.
 - The selected commits and test results are preparation evidence only. They were not
   produced inside a sealed Whole-OS host lease and cannot be relabelled as N32 pilot

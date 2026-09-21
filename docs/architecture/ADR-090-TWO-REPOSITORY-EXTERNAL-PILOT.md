@@ -20,9 +20,11 @@ host-issued target profile or an external authority receipt.
 
 - Coupon Hive at `f9b695d90ec74764709a1547d60821910ece5705`, tree
   `9582c2410f20c916b580d7d4704b6263360c0631`.
-- Reese's Rainbow Web PR #1 at
-  `fb5d9a84780dd9f6e4c3f46352bdd3beec141d4e`, tree
-  `af67971e1b7f9f920a01cc59176435fba142edf9`.
+- Reese's Rainbow Web at
+  `main@44b22e5f88a3f3a9e6656a48cea7787c5d20ab4e`, tree
+  `af67971e1b7f9f920a01cc59176435fba142edf9`, after PR #1 merged. The merged
+  tree is identical to the independently reviewed PR head
+  `fb5d9a84780dd9f6e4c3f46352bdd3beec141d4e`.
 
 Roblox adapters and N26/N27 evidence remain available as a separately qualified
 optional domain. This decision does not claim Roblox runtime or production support.
