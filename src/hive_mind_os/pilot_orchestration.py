@@ -12,7 +12,8 @@ from enum import StrEnum
 from typing import Callable, Protocol
 
 from .pilot_runtime import PilotController, PilotState
-from .whole_os_qualification import ExternalObligation, PilotAttempt
+from .production_evidence import ProductionEvidenceError, obligation_for
+from .whole_os_qualification import Disposition, ExternalObligation, PilotAttempt
 from .whole_os_service import ServiceObservation
 
 
@@ -20,6 +21,8 @@ class PilotExecutionBlocker(StrEnum):
     PREREQUISITES_UNRESOLVED = "pilot-prerequisites-unresolved"
     RECONCILIATION_REQUIRED = "pilot-reconciliation-required"
     INVALID_HOST_RESULT = "pilot-invalid-host-result"
+    PRODUCTION_EVIDENCE_BLOCKED = "pilot-production-evidence-blocked"
+    ATTEMPT_UNRESOLVED_AFTER_WINDOW = "pilot-attempt-unresolved-after-window"
 
 
 class PilotExecutionError(RuntimeError):
@@ -59,7 +62,8 @@ class PilotAttemptEvaluator(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class PilotRunResult:
-    observation: ServiceObservation
+    # None only for a production crash-recovery close, which does not consult the service.
+    observation: ServiceObservation | None
     attempt: PilotAttempt
     state: PilotState
 
@@ -109,21 +113,52 @@ class WholeOSPilotRunner:
         domain: str | None = None,
     ) -> PilotRunResult:
         self._ready()
-        current = self.controller.store.load()
+        current = self.controller.snapshot()
         if any(item.attempt_id == attempt_id for item in current.active_attempts):
             raise PilotExecutionError(
                 PilotExecutionBlocker.RECONCILIATION_REQUIRED,
                 "the durable attempt is already active; observe before retrying",
             )
         started_at = self._time(self.clock)
-        self.controller.begin_attempt(
-            attempt_id=attempt_id,
-            subject_id=subject_id,
-            family_id=family_id,
-            started_at=started_at,
-            resource_units=resource_units,
-            domain=domain,
-        )
+        try:
+            # In production mode this resolves the full dispatch gate, including the
+            # actual host lease, before any durable state exists.
+            self.controller.begin_attempt(
+                attempt_id=attempt_id,
+                subject_id=subject_id,
+                family_id=family_id,
+                started_at=started_at,
+                resource_units=resource_units,
+                domain=domain,
+            )
+        except ProductionEvidenceError as error:
+            raise self._blocked(error) from error
+        if self.controller.production is not None:
+            # Immediately before the host call. Still not atomic with the effect; host
+            # effect leases remain the authority at the boundary.
+            try:
+                self.controller.require_dispatch_gate(
+                    attempt_id=attempt_id, subject_id=subject_id
+                )
+            except Exception as error:
+                blocked = (
+                    self._blocked(error)
+                    if isinstance(error, ProductionEvidenceError)
+                    else PilotExecutionError(
+                        PilotExecutionBlocker.PRODUCTION_EVIDENCE_BLOCKED,
+                        "the pre-dispatch evidence recheck failed",
+                    )
+                )
+                # Only this call frame knows service.run_once was never called.
+                self._close_without_effect(
+                    attempt_id=attempt_id,
+                    subject_id=subject_id,
+                    family_id=family_id,
+                    started_at=started_at,
+                    resource_units=resource_units,
+                    domain=domain,
+                )
+                raise blocked from error
         try:
             observation = self.service.run_once()
             ended_at = self._time(self.clock)
@@ -141,6 +176,9 @@ class WholeOSPilotRunner:
             state = self.controller.complete_attempt(attempt)
         except PilotExecutionError:
             raise
+        except ProductionEvidenceError as error:
+            # The host was called: the attempt stays active for inconclusive recovery.
+            raise self._blocked(error) from error
         except Exception as exc:
             raise PilotExecutionError(
                 PilotExecutionBlocker.RECONCILIATION_REQUIRED,
@@ -148,8 +186,119 @@ class WholeOSPilotRunner:
             ) from exc
         return PilotRunResult(observation, attempt, state)
 
+    def _claims(self) -> tuple[str, ...]:
+        return ("N31" if self.controller.plan.mode == "self" else "N32",)
+
+    def _blocked(self, error: ProductionEvidenceError) -> PilotExecutionError:
+        obligation = obligation_for(error, self._claims())
+        return PilotExecutionError(
+            PilotExecutionBlocker.PRODUCTION_EVIDENCE_BLOCKED,
+            str(error),
+            obligations=(obligation,),
+        )
+
+    def _preserve_unresolved(self, attempt_id: str) -> None:
+        """Keep the attempt active and record a typed obligation. The closing timestamp is
+        never clamped or invented to fit the pilot window."""
+        try:
+            self.controller.record_controls(
+                obligations=(
+                    ExternalObligation(
+                        f"pilot-attempt-{attempt_id}-unresolved",
+                        Disposition.BLOCKED_CAPABILITY,
+                        "The attempt cannot be closed inside the planned pilot window; it "
+                        "stays active and inconclusive with no accepted credit, refund or "
+                        "retry until a reviewed successor exists.",
+                        self._claims(),
+                    ),
+                )
+            )
+        except Exception as exc:
+            raise PilotExecutionError(
+                PilotExecutionBlocker.RECONCILIATION_REQUIRED,
+                "the unresolved attempt could not be annotated durably",
+            ) from exc
+
+    def _close_inconclusive(
+        self,
+        *,
+        status: str,
+        attempt_id: str,
+        subject_id: str,
+        family_id: str,
+        started_at: int,
+        resource_units: int,
+        domain: str | None,
+    ) -> PilotAttempt | None:
+        """Close a non-accepted attempt (no live admission is needed). Returns None and
+        preserves an obligation when the real end time falls outside the plan."""
+        plan = self.controller.plan
+        ended_at = self._time(self.clock)
+        if not started_at <= ended_at <= plan.ends_at:
+            self._preserve_unresolved(attempt_id)
+            return None
+        return PilotAttempt(
+            attempt_id,
+            subject_id,
+            family_id,
+            plan.candidate_digest,
+            status,
+            None,
+            started_at,
+            ended_at,
+            resource_units,
+            domain,
+        )
+
+    def _close_without_effect(self, **values) -> None:
+        attempt = self._close_inconclusive(status="blocked", **values)
+        if attempt is not None:
+            try:
+                self.controller.complete_attempt(attempt)
+            except Exception as exc:
+                self._preserve_unresolved(values["attempt_id"])
+                raise PilotExecutionError(
+                    PilotExecutionBlocker.RECONCILIATION_REQUIRED,
+                    "the no-effect attempt could not be closed",
+                ) from exc
+
+    def _recover_inconclusive(self, attempt_id: str) -> PilotRunResult:
+        """Production recovery of an active attempt from an unknown frame.
+
+        It cannot tell "never dispatched" from "dispatched, outcome unknown", and a
+        read-only observation does not prove no effect. The attempt therefore closes as
+        inconclusive: no accepted credit, refund or retry, and no live admission needed."""
+        state = self.controller.snapshot()
+        active = next(
+            (item for item in state.active_attempts if item.attempt_id == attempt_id),
+            None,
+        )
+        if active is None:
+            raise PilotExecutionError(
+                PilotExecutionBlocker.INVALID_HOST_RESULT,
+                "no active durable attempt exists for reconciliation",
+            )
+        attempt = self._close_inconclusive(
+            status="inconclusive",
+            attempt_id=active.attempt_id,
+            subject_id=active.subject_id,
+            family_id=active.family_id,
+            started_at=active.started_at,
+            resource_units=active.resource_units,
+            domain=active.domain,
+        )
+        if attempt is None:
+            raise PilotExecutionError(
+                PilotExecutionBlocker.ATTEMPT_UNRESOLVED_AFTER_WINDOW,
+                "the attempt cannot close inside the pilot window and stays inconclusive",
+            )
+        successor = self.controller.complete_attempt(attempt)
+        return PilotRunResult(None, attempt, successor)
+
     def reconcile_from_observation(self, attempt_id: str) -> PilotRunResult:
         """Reconcile an active attempt through the service's read-only observation."""
+        if self.controller.production is not None:
+            return self._recover_inconclusive(attempt_id)
         self._ready()
         state = self.controller.store.load()
         active = next(

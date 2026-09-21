@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
 
+from .production_evidence import (
+    EvidenceBlocker,
+    EvidencePurpose,
+    EvidenceResolution,
+    EvidenceUse,
+    ProductionEvidenceContext,
+    ProductionEvidenceError,
+)
 from .whole_os_qualification import (
     LIFECYCLE_STAGE_IDS,
     NODE_IDS,
@@ -19,6 +27,7 @@ from .whole_os_qualification import (
     EvidenceRef,
     ExternalObligation,
     OperationalReceipt,
+    QualificationError,
     canonical_digest,
 )
 
@@ -300,6 +309,304 @@ def load_release_manifest(path: str | Path) -> tuple[CloseoutManifest, str]:
         ):
             raise
         raise ValueError("release manifest is corrupt") from exc
+
+
+def manifest_digest(manifest: CloseoutManifest) -> str:
+    """Recompute the embedded manifest digest exactly as ``write_release_manifest`` does:
+    ``whole_os_qualification.canonical_digest`` over the document including
+    ``schema_version`` and excluding ``manifest_digest``. Never a kernel or file-byte
+    digest."""
+    return canonical_digest({"schema_version": 1, **asdict(manifest)})
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedCloseout:
+    """An audit observation of one verification, not a capability or admission token."""
+
+    manifest_digest: str
+    release_id: str
+    candidate_digest: str
+    final_disposition: Disposition
+    independent_judge_id: str
+    resolution_digests: tuple[str, ...]
+    verified_at: int
+
+    @property
+    def positive(self) -> bool:
+        return self.final_disposition in {Disposition.ADOPT, Disposition.ADAPT}
+
+
+def _closeout_entries(
+    manifest: CloseoutManifest, digest: str, judgment: EvidenceRef
+) -> list[tuple[EvidenceRef, EvidenceUse]]:
+    """Every nested reference is walked, including negative dispositions. The detached
+    final judgment is last; it cannot live inside the manifest it signs."""
+    release, candidate = manifest.release_id, manifest.candidate_digest
+    entries: list[tuple[EvidenceRef, EvidenceUse]] = []
+
+    def add(
+        ref: EvidenceRef,
+        purpose: EvidencePurpose,
+        subject_id: str,
+        claims: dict[str, object],
+        *,
+        window_start: int | None = None,
+    ) -> None:
+        entries.append(
+            (
+                ref,
+                EvidenceUse(
+                    purpose, subject_id, release, candidate, None, claims,
+                    window_start=window_start,
+                ),
+            )
+        )
+
+    for purpose, assessments in (
+        (EvidencePurpose.CLOSEOUT_REQUIREMENT, manifest.requirement_assessments),
+        (EvidencePurpose.CLOSEOUT_NODE, manifest.node_assessments),
+    ):
+        for key in sorted(assessments):
+            assessment = assessments[key]
+            for ref in assessment.evidence:
+                add(
+                    ref,
+                    purpose,
+                    assessment.subject_id,
+                    {
+                        "disposition": assessment.disposition.value,
+                        "obligation_ids": sorted(assessment.obligation_ids),
+                    },
+                )
+    for role_id in sorted(manifest.role_evidence):
+        for ref in manifest.role_evidence[role_id]:
+            add(ref, EvidencePurpose.CLOSEOUT_ROLE, role_id, {"role_id": role_id})
+    for stage_id in sorted(manifest.lifecycle_evidence):
+        for ref in manifest.lifecycle_evidence[stage_id]:
+            add(ref, EvidencePurpose.CLOSEOUT_STAGE, stage_id, {"stage_id": stage_id})
+    for purpose, receipt in (
+        (EvidencePurpose.CLOSEOUT_STARTUP, manifest.startup_receipt),
+        (EvidencePurpose.CLOSEOUT_ROLLBACK, manifest.rollback_receipt),
+    ):
+        add(
+            receipt.evidence,
+            purpose,
+            receipt.candidate_digest,
+            {"argv": list(receipt.argv), "exit_code": receipt.exit_code},
+        )
+    add(
+        judgment,
+        EvidencePurpose.CLOSEOUT_JUDGMENT,
+        release,
+        {
+            "manifest_digest": digest,
+            "release_id": release,
+            "previous_release_digest": manifest.previous_release_digest,
+            "sealed_at": manifest.sealed_at,
+            "final_disposition": manifest.final_disposition.value,
+            "independent_judge_id": manifest.independent_judge_id,
+        },
+        window_start=manifest.sealed_at,
+    )
+    return entries
+
+
+def verify_production_closeout(
+    manifest: CloseoutManifest,
+    supplied_digest: str,
+    judgment: EvidenceRef,
+    context: ProductionEvidenceContext,
+) -> VerifiedCloseout:
+    """Guarded verification that always walks the loaded content, so an existing file or
+    a raw structural load can never stand in for it. Raises a typed blocker and appends a
+    local audit record either way."""
+    snapshot = _validated_snapshot(manifest, context)
+    return _verify_snapshot(snapshot, supplied_digest, judgment, context)
+
+
+def _copy_evidence(item: object) -> EvidenceRef:
+    if type(item) is not EvidenceRef:
+        raise TypeError("closeout evidence must be typed evidence references")
+    return EvidenceRef(item.uri, item.digest, item.kind, item.subject_id, item.observed_at)
+
+
+def _copy_assessment(item: object) -> CloseoutAssessment:
+    if type(item) is not CloseoutAssessment:
+        raise TypeError("closeout assessments must be typed assessments")
+    return CloseoutAssessment(
+        item.subject_id,
+        item.disposition,
+        tuple(_copy_evidence(ref) for ref in tuple(item.evidence)),
+        tuple(item.obligation_ids),
+        item.rationale,
+    )
+
+
+def _copy_operation(item: object) -> OperationalReceipt:
+    if type(item) is not OperationalReceipt:
+        raise TypeError("operational receipts must be typed")
+    return OperationalReceipt(
+        tuple(item.argv), item.candidate_digest, item.exit_code, _copy_evidence(item.evidence)
+    )
+
+
+def _copy_map(value: object, copy) -> dict:
+    if not isinstance(value, dict):
+        raise TypeError("closeout collections must be mappings")
+    return {key: copy(item) for key, item in dict(value).items()}
+
+
+def snapshot_manifest(manifest: CloseoutManifest) -> CloseoutManifest:
+    """Return a validated, stable deep copy built through the unchanged
+    ``CloseoutManifest`` constructor, so every existing schema and acceptance rule is
+    re-applied to the content that will actually be verified, digested and written. Later
+    mutation of the caller's public mappings cannot reach the copy."""
+    try:
+        if type(manifest) is not CloseoutManifest:
+            raise TypeError("a CloseoutManifest is required")
+        obligations = manifest.obligations
+        if not isinstance(obligations, tuple) or any(
+            type(item) is not ExternalObligation for item in obligations
+        ):
+            raise TypeError("closeout obligations must be a tuple of typed obligations")
+        return CloseoutManifest(
+            manifest.release_id,
+            manifest.candidate_digest,
+            manifest.previous_release_digest,
+            _copy_map(manifest.requirement_assessments, _copy_assessment),
+            _copy_map(manifest.node_assessments, _copy_assessment),
+            tuple(
+                ExternalObligation(
+                    item.obligation_id, item.kind, item.description, tuple(item.blocks_claims)
+                )
+                for item in obligations
+            ),
+            _copy_map(
+                manifest.role_evidence,
+                lambda values: tuple(_copy_evidence(ref) for ref in tuple(values)),
+            ),
+            _copy_map(
+                manifest.lifecycle_evidence,
+                lambda values: tuple(_copy_evidence(ref) for ref in tuple(values)),
+            ),
+            _copy_operation(manifest.startup_receipt),
+            _copy_operation(manifest.rollback_receipt),
+            manifest.builder_id,
+            manifest.independent_judge_id,
+            manifest.final_disposition,
+            manifest.final_rationale,
+            manifest.sealed_at,
+        )
+    except (QualificationError, ValueError, TypeError, AttributeError, KeyError) as error:
+        raise ProductionEvidenceError(
+            EvidenceBlocker.MANIFEST_MALFORMED, f"manifest structure is invalid: {error}"
+        ) from error
+
+
+def _validated_snapshot(
+    manifest: CloseoutManifest, context: ProductionEvidenceContext
+) -> CloseoutManifest:
+    """The single structural gate every production boundary passes before any evidence
+    is resolved, any audit success is recorded or any file is written."""
+    if type(context) is not ProductionEvidenceContext:
+        raise ProductionEvidenceError(
+            EvidenceBlocker.POLICY_INVALID, "a production evidence context is required"
+        )
+    try:
+        return snapshot_manifest(manifest)
+    except ProductionEvidenceError as error:
+        context.record_failure("closeout", error)
+        raise
+
+
+def _verify_snapshot(
+    manifest: CloseoutManifest,
+    supplied_digest: str,
+    judgment: EvidenceRef,
+    context: ProductionEvidenceContext,
+) -> VerifiedCloseout:
+    scope = "closeout"
+    try:
+        now = context.now()
+        recomputed = manifest_digest(manifest)
+        if supplied_digest != recomputed:
+            raise ProductionEvidenceError(
+                EvidenceBlocker.DIGEST_MISMATCH,
+                "manifest digest does not match the recomputed canonical digest",
+            )
+        if manifest.sealed_at > now:
+            raise ProductionEvidenceError(EvidenceBlocker.TIME_WINDOW, "manifest is sealed in the future")
+        policy = context.resolver.policy
+        if policy is None:
+            raise ProductionEvidenceError(
+                EvidenceBlocker.TRUST_STORE_MISSING, "no evidence trust policy is configured"
+            )
+        builder, judge = policy.require_separation(
+            manifest.builder_id, manifest.independent_judge_id
+        )
+        entries = _closeout_entries(manifest, recomputed, judgment)
+    except ProductionEvidenceError as error:
+        context.record_failure(scope, error)
+        raise
+
+    def check(resolutions: tuple[EvidenceResolution, ...]) -> None:
+        *nested, final = resolutions
+        if (
+            final.purpose is not EvidencePurpose.CLOSEOUT_JUDGMENT
+            or final.issuer_id != manifest.independent_judge_id
+        ):
+            raise ProductionEvidenceError(
+                EvidenceBlocker.SEPARATION, "the final judgment was not issued by the sealed judge"
+            )
+        for item in nested:
+            if (
+                item.issuer_id in {judge.principal_id, builder.principal_id}
+                or item.administration_id == judge.administration_id
+                or item.public_key_digest == judge.public_key_digest
+            ):
+                raise ProductionEvidenceError(
+                    EvidenceBlocker.SEPARATION,
+                    "the judge or builder principal also attested nested closeout evidence",
+                )
+
+    resolutions = context.verify(scope, entries, now=now, after=check)
+    return VerifiedCloseout(
+        recomputed,
+        manifest.release_id,
+        manifest.candidate_digest,
+        manifest.final_disposition,
+        manifest.independent_judge_id,
+        tuple(item.digest() for item in resolutions),
+        now,
+    )
+
+
+def write_verified_release_manifest(
+    path: str | Path,
+    manifest: CloseoutManifest,
+    judgment: EvidenceRef,
+    context: ProductionEvidenceContext,
+) -> VerifiedCloseout:
+    """Production write: snapshot and validate once, verify that same content, then write
+    that same content. The existing-file early return in ``write_release_manifest`` cannot
+    bypass evidence resolution, and the caller's mutable manifest is never re-read."""
+    snapshot = _validated_snapshot(manifest, context)
+    verified = _verify_snapshot(snapshot, manifest_digest(snapshot), judgment, context)
+    if write_release_manifest(path, snapshot) != verified.manifest_digest:
+        raise ProductionEvidenceError(
+            EvidenceBlocker.DIGEST_MISMATCH, "written manifest digest differs from the verified one"
+        )
+    return verified
+
+
+def load_verified_release_manifest(
+    path: str | Path, judgment: EvidenceRef, context: ProductionEvidenceContext
+) -> tuple[CloseoutManifest, VerifiedCloseout]:
+    """Production load: the structural load is only the first step. The returned manifest
+    is the validated snapshot that was verified."""
+    manifest, digest = load_release_manifest(path)
+    snapshot = _validated_snapshot(manifest, context)
+    return snapshot, _verify_snapshot(snapshot, digest, judgment, context)
 
 
 def _load_evidence(document: dict[str, object]) -> EvidenceRef:
