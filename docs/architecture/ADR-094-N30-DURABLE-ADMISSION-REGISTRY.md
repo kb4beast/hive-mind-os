@@ -227,15 +227,31 @@ here; Curator reproduction (validate), E1 composition and broker (integrate), st
 - **L7** Wrapper interning retains strong references for the life of the instance; status and
   audit rows grow with use (no retention policy); `resolve_aggregate` re-authenticates every
   measurement (up to 90 provider calls; `decide_match` costs three passes).
-- **L8** New bracket goldens are not pinned (see R3). The lifecycle subprocess tests use
-  wall-clock windows and may be timing-sensitive on a loaded host.
+- **L8** The three independently captured codec goldens are now pinned (see R3). The lifecycle
+  subprocess tests use wall-clock windows and may be timing-sensitive on a loaded host.
+- **L9** A poison publisher or `close()` may wait on an in-flight local transaction without a
+  bound supplied by this design: SQLite's busy timeout limits only lock-acquisition waits; trusted
+  clock callbacks, local transaction execution, filesystem I/O and commit have no certified total
+  duration.
 
-## Honest status
+## Honest status (Author, historical)
 
 The author had no execution tools in this revision (read/glob/grep/edit/write only). **No test,
 Ruff or Pyright run has been performed on this revision**; nothing here is claimed to pass. The
 two earlier reported runs (54 tests: 53 pass, 1 error; Ruff 1; Pyright 10) are for the *first*
 revision and are not evidence for this one. Expect first-run defects, most likely in tests.
+
+**Independent Curator reproduction:** 89 focused tests PASS, no skips, 59.753s, with root
+89 tests PASS 47.332s. All 54 original test method names retained; six tests added. Unchanged
+original v2 race probe and independent close/adopt interleaving evidence retained. R1/R2 original
+inputs and R3/R4 regression controls passed with original/adapted scripts and earlier failures
+retained.
+
+The separate delivery Judge issued `adapt` with the timing-bound correction recorded in L9
+and Repair A below. The first full CI run was deliberately stopped incomplete before this
+documentation correction; full CI on the corrected delivery remains pending. These focused
+results grant no production admission, E1 composition, real provider qualification, external
+custody or benchmark superiority.
 
 ## Required verification
 
@@ -287,7 +303,9 @@ section records the repair. It is **not** a full-CI, delivery, admission or prod
   Consequences: a *deliberately serialized* concurrent operation on the same instance can
   now get a bounded typed refusal instead of committing (the no-queue contract is unchanged;
   nothing waits on a provider); a poison publisher may wait for one in-flight local
-  transaction (bounded by the SQLite write and busy timeout). Independent SQLite connections
+  transaction (duration not bounded by this design: SQLite's busy timeout only limits lock-wait,
+  and trusted clock callbacks, filesystem I/O and commit time are outside any certified bound).
+  Independent SQLite connections
   are unaffected: cross-connection CAS/once-only consumption stay in SQLite, and the existing
   two-connection race tests remain meaningful.
 - **Repair B (same-store reopen gap).** `_call` released the instance lock after setting
