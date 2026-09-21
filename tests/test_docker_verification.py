@@ -9,18 +9,17 @@ Python children in ``BoundedRunnerTests``.
 
 from __future__ import annotations
 
-import gc
 import hashlib
 import io
 import itertools
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
 import time
 import unittest
-import warnings
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, Mapping, Sequence, cast
@@ -1370,16 +1369,43 @@ class BoundedRunnerTests(unittest.TestCase):
             result.returncode, result.stdout, result.stderr, result.timed_out, result.truncated))
 
     def test_real_children_leave_no_unclosed_pipe_handle_behind(self) -> None:
-        # An unclosed BufferedReader emits a ResourceWarning when it is finalised, so a
-        # warning-free run proves the host pipe handles were closed by run_bounded itself.
+        # Retain our real children: finalizers cannot hide an open pipe, and unrelated
+        # resources collected elsewhere in the full suite cannot affect this assertion.
+        real_popen = subprocess.Popen
         quick = "import sys; sys.stdout.buffer.write(b'hi'); sys.stderr.buffer.write(b'e')"
         deadline = "import os, time; os.close(1); os.close(2); time.sleep(3)"
         for name, code, timeout in (("normal exit", quick, 30), ("deadline kill", deadline, 0.5)):
-            with self.subTest(name), warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter("always", ResourceWarning)
-                run_bounded((sys.executable, "-c", code), environment=dict(os.environ), timeout=timeout, limit=100)
-                gc.collect()
-            self.assertEqual([], [str(w.message) for w in caught if issubclass(w.category, ResourceWarning)])
+            processes: list[subprocess.Popen[Any]] = []
+
+            def track_process(*args: Any, **kwargs: Any) -> subprocess.Popen[Any]:
+                process = real_popen(*args, **kwargs)
+                processes.append(process)
+                return process
+
+            with self.subTest(name):
+                try:
+                    with mock.patch(
+                        "hive_mind_os.docker_verification.subprocess.Popen",
+                        side_effect=track_process,
+                    ):
+                        run_bounded((sys.executable, "-c", code), environment=dict(os.environ), timeout=timeout, limit=100)
+                    self.assertEqual(1, len(processes))
+                    process = processes[0]
+                    self.assertIsNotNone(process.returncode, "run_bounded must reap its child")
+                    self.assertIsNotNone(process.stdout)
+                    self.assertIsNotNone(process.stderr)
+                    assert process.stdout is not None and process.stderr is not None
+                    self.assertTrue(process.stdout.closed, "run_bounded left its stdout pipe open")
+                    self.assertTrue(process.stderr.closed, "run_bounded left its stderr pipe open")
+                finally:
+                    # Cleanup follows assertions, including when a regression leaks handles.
+                    for process in processes:
+                        if process.poll() is None:
+                            process.kill()
+                            process.wait(timeout=5)
+                        for stream in (process.stdout, process.stderr):
+                            if stream is not None:
+                                stream.close()
 
 
 class VerifyRepositoryIntegrationTests(DockerCase):
