@@ -1,8 +1,9 @@
 # Whole-OS N00-N33 status DAG
 
-Observed on 2026-09-14. PR #186 is merged at
+Reconciled on 2026-09-21. PR #186 remains the integrated implementation baseline at
 `main@4a0120a3a564723358f29adb60e34ab34bec5964`. The current successor candidate
-repairs the remaining local CLI, tournament, pilot, and closeout enforcement gaps.
+repairs the remaining local CLI, tournament, pilot, and closeout enforcement gaps;
+ADR-090 updates N32 to the owner-selected two-repository external scope.
 
 Legend: green = repository implementation and exact-candidate checks complete; blue =
 successor validation/integration in progress; amber = implementation exists but a
@@ -46,8 +47,7 @@ flowchart LR
   N29 --> N30
   N17 --> N31["N31 72h self pilot"]
   N30 --> N31
-  N21 --> N32["N32 72h external/Roblox pilot"]
-  N27 --> N32
+  N21 --> N32["N32 72h two-repository external pilot"]
   N30 --> N32
   N31 --> N33["N33 outcome closeout"]
   N32 --> N33
@@ -78,9 +78,9 @@ flowchart LR
 - N31: sealed Whole-OS host/config, scoped self-delivery grant, external supervisor
   champion pointer and rollback artifact, an admitted N30 candidate, and its 72-hour
   window with three accepted nontrivial changes.
-- N32: owner-admitted ordinary and Roblox targets; rights-cleared brief/assets/data;
-  Studio/Player multi-client, persistence, security, network and device harnesses;
-  target grants and resource/cleanup leases; admitted N30 candidate; 72-hour window.
+- N32: two owner-admitted external targets with pinned snapshots, rights, acceptance
+  and runtime profiles; target grants and resource/cleanup leases; an admitted N30
+  candidate; real target runtime receipts; and the 72-hour window.
 - N33: the completed N31/N32 outcome windows and final independent closeout mapping.
 
 The deterministic resume action is to inject those sealed capabilities into the

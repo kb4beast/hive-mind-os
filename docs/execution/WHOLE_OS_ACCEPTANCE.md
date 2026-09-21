@@ -5,6 +5,9 @@ Campaign disposition: `DEFER` -- the repository implementation is integrated on
 candidate. External qualification and elapsed observation remain open. This is not a
 production, superiority, or full-autonomy verdict.
 
+This status was reconciled on `2026-09-21` for ADR-090. The N32 target scope changed;
+the missing operational evidence and the `DEFER` disposition did not.
+
 ## Integrated candidate
 
 - PR #186 was merged to `main` at
@@ -33,9 +36,9 @@ production, superiority, or full-autonomy verdict.
 - N18/N23/N29: `BLOCKED_CAPABILITY` and `BLOCKED_EVIDENCE` for strong real-backend
   claims. Deterministic negative controls exist; attested hard-isolation, egress,
   secret-probe, evaluator-custody, and exact-candidate real-service execution do not.
-- N27: `BLOCKED_SOURCE`, `BLOCKED_CAPABILITY`, and `BLOCKED_AUTHORITY` for real Roblox
-  qualification. The adapter is implemented, but there is no admitted game, brokered
-  runtime/test universe, multi-client/device harness, or external verifier set.
+- N27: `DEFER` for optional Roblox qualification under ADR-090. The adapter is
+  implemented, but there is no admitted game, brokered runtime/test universe,
+  multi-client/device harness, or external verifier set. No Roblox support is claimed.
 - N30: `BLOCKED_SOURCE` and `BLOCKED_AUTHORITY` for execution. The runner is now
   closed over `AdmittedBenchmarkRunner`, revalidates the live admission immediately
   before each effect, persists intent first, and reconciles uncertain writes without
@@ -45,9 +48,10 @@ production, superiority, or full-autonomy verdict.
   leases, concurrency, daily budgets, distinct accepted families, restart and rollback
   evidence. No sealed real host, self-delivery grant, supervisor rollback pointer, or
   measured candidate receipt exists.
-- N32: `BLOCKED_SOURCE`, `BLOCKED_CAPABILITY`, `BLOCKED_AUTHORITY`, and
-  `BLOCKED_EVIDENCE`. No admitted ordinary target or rights-cleared Roblox subject,
-  runtime/test universe, device matrix, target grants, or N30 candidate exists.
+- N32: `BLOCKED_CAPABILITY`, `BLOCKED_AUTHORITY`, and `BLOCKED_EVIDENCE`. Coupon Hive
+  and Reese's Rainbow Web are selected as two real external candidates, but their
+  host-issued target profiles, scoped grants, attested runtime receipts, configured
+  Whole-OS host, and N30 candidate are not yet sealed.
 - N33: `DEFER`. The closeout schema now requires evidence-bearing R01-R18 and N00-N33
   assessments, all roles/stages, attested successful startup/rollback receipts, and a
   judge distinct from the builder. A positive verdict is structurally impossible
@@ -55,11 +59,12 @@ production, superiority, or full-autonomy verdict.
 
 Complete source ingestion and comparator reuse rights, production host/adapters,
 signed evaluator custody, scoped pilot delivery authority, real comparator receipts,
-and Roblox Studio/game/device evidence remain open. This is therefore a
-candidate-bound status receipt, not a production, superiority, or full-autonomy
-release verdict. A host-owned launcher must register the exact admitted executable
-factory before `hive-mind whole-os start`; configuration cannot name imports, commands,
-credentials, callbacks, or secret values.
+and the two-target observation window remain open. Optional Roblox
+Studio/game/device evidence remains deferred and outside this release scope. This is
+therefore a candidate-bound status receipt, not a production, superiority, or
+full-autonomy release verdict. A host-owned launcher must register the exact admitted
+executable factory before `hive-mind whole-os start`; configuration cannot name
+imports, commands, credentials, callbacks, or secret values.
 
 The color-coded dependency view and deterministic resume boundary are recorded in
 `docs/execution/WHOLE_OS_STATUS_DAG.md`.

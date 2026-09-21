@@ -871,10 +871,9 @@
     },
     {
       "id": "N32",
-      "objective": "Qualify external repositories and a Roblox candidate",
+      "objective": "Qualify two external repositories",
       "dependencies": [
         "N21",
-        "N27",
         "N30"
       ],
       "optional_evidence": [],
@@ -889,8 +888,7 @@
         "R04",
         "R07",
         "R09",
-        "R11",
-        "R14"
+        "R11"
       ],
       "branch_pattern": "codex/whole-os-n32-<short-purpose>",
       "implementation_status": "not_started_by_this_handoff",

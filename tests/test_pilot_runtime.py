@@ -133,6 +133,25 @@ class PilotRuntimeTests(unittest.TestCase):
                 },
             )
 
+    def test_external_pilot_accepts_two_non_roblox_target_receipts(self):
+        with TemporaryDirectory() as root:
+            prerequisites = self.prerequisites("coupon-hive", "reeses-rainbow-web")
+            plan = PilotPlan(
+                "pilot",
+                "external",
+                D,
+                ("coupon-hive", "reeses-rainbow-web"),
+                0,
+                259200,
+                2,
+                10,
+                2,
+                D,
+                prerequisites,
+            )
+            report = PilotController(PilotStore(Path(root)), plan).report()
+            self.assertFalse(report.obligations)
+
     def test_active_attempt_survives_restart_and_enforces_concurrency(self):
         with TemporaryDirectory() as root:
             plan = PilotPlan(

@@ -1635,7 +1635,7 @@
       "minimum_route": "T3",
       "contract_path": "docs/plan/whole-os-tournament-2026-09-13/NODES-QUALIFICATION.md",
       "contract_section": "N28",
-      "contract_digest": "sha256:c010fa13634b7ebdf48cf4a8fab6f8d043fbae8c68e4f5a905e7d5f87ecc339e",
+      "contract_digest": "sha256:ce309d5cb815885f79a91ecf7cef9de0c43330a1c8e7daf247cda45230eef0af",
       "requirement_ids": [
         "R03",
         "R07"
@@ -1840,10 +1840,9 @@
     },
     {
       "id": "N32",
-      "objective": "Qualify external repositories and a Roblox candidate",
+      "objective": "Qualify two external repositories",
       "dependencies": [
         "N21",
-        "N27",
         "N30"
       ],
       "owner_role": "Integrator",
@@ -1856,15 +1855,14 @@
       "minimum_route": "T3",
       "contract_path": "docs/plan/whole-os-tournament-2026-09-13/NODES-QUALIFICATION.md",
       "contract_section": "N32",
-      "contract_digest": "sha256:630cc37659f0416dd05b36751564cb17a298060c95f3aa5f0737508d480397ee",
+      "contract_digest": "sha256:6a5e6c3125dc20681ae22317d82691c34677d3c9e1c59407c2d9ec7a52855f22",
       "requirement_ids": [
         "R02",
         "R03",
         "R04",
         "R07",
         "R09",
-        "R11",
-        "R14"
+        "R11"
       ],
       "source_ids": [
         "OWNER-IMPLEMENTATION-01",
@@ -1879,9 +1877,9 @@
         "docs/execution/EXTERNAL_PILOT_RECEIPT.md"
       ],
       "acceptance_criteria": [
-        "Real target code PRs and required lesson drafts have exact safe receipts; engine/device evidence meets the declared profile; all obligations are visible; target games/apps run with Hive offline. N28/N29 checks pass on the final pilot release; actual domain observation is additionally required. Missing runtime/rights/target is BLOCKED_CAPABILITY/SOURCE for this node, not an automatically passing static substitute."
+        "Real target code PRs and required lesson drafts have exact safe receipts; runtime evidence meets each declared profile; all obligations are visible; both targets run with Hive offline. N28/N29 checks pass on the final pilot release; actual target observation is additionally required. Missing runtime, rights, or target evidence is BLOCKED_CAPABILITY/SOURCE for this node, not an automatically passing static substitute."
       ],
-      "rollback": "**Output/stop:** per-subject maturity verdict, sanitized artifact links, real game acceptance matrix and residual limitations. **Rollback:** abandon/revert scoped candidate PRs and restore qualified test artifacts through normal target procedures; preserve learning drafts and failed evidence. **Escalate:** genuine external input/authority only.",
+      "rollback": "**Output/stop:** per-subject maturity verdict, sanitized artifact links, target acceptance matrix and residual limitations. **Rollback:** abandon/revert scoped candidate PRs and restore qualified test artifacts through normal target procedures; preserve learning drafts and failed evidence. **Escalate:** genuine external input/authority only.",
       "output_contracts": [
         "node-receipt",
         "docs/execution/EXTERNAL_PILOT_RECEIPT.md"
