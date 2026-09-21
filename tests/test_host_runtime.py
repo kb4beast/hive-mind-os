@@ -6,7 +6,7 @@ import threading
 import time
 import unittest
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -773,6 +773,9 @@ class HostRuntimeTests(unittest.TestCase):
         self.assertEqual(1, self.host.execute_calls)
 
     def test_cross_handle_create_alias_waits_for_durable_owner(self) -> None:
+        # Disk-backed preflight can be slow on CI; these are bounds, not delays.
+        CALL_BUDGET_SECONDS = 20
+        EVENT_BUDGET_SECONDS = 30
         owner_in_prepare = threading.Event()
         alias_waiting = threading.Event()
         release_owner = threading.Event()
@@ -802,7 +805,7 @@ class HostRuntimeTests(unittest.TestCase):
 
                     def paused_prepare(**values: object) -> HostLease:
                         owner_in_prepare.set()
-                        if not release_owner.wait(timeout=3):
+                        if not release_owner.wait(timeout=EVENT_BUDGET_SECONDS):
                             raise RuntimeError("create owner was not released")
                         return original_prepare(**values)
 
@@ -832,17 +835,35 @@ class HostRuntimeTests(unittest.TestCase):
                             lease_deadline=LEASE_END,
                             authorization=authorization,
                             idempotency_key=key,
-                            timeout_seconds=1,
+                            timeout_seconds=CALL_BUDGET_SECONDS,
                         )
 
+                    def wait_for_event(
+                        event: threading.Event, future: Future[HostLease], name: str
+                    ) -> None:
+                        deadline = time.monotonic() + EVENT_BUDGET_SECONDS
+                        while not event.wait(timeout=0.05):
+                            if future.done():
+                                # Surface the worker's real error, not a timeout.
+                                future.result()
+                                self.fail(f"worker finished before {name}")
+                            if time.monotonic() >= deadline:
+                                self.fail(f"timed out waiting for {name}")
+
                     with ThreadPoolExecutor(max_workers=2) as pool:
-                        owner = pool.submit(create, owner_runtime, "handle-create-owner")
-                        self.assertTrue(owner_in_prepare.wait(timeout=3))
-                        alias = pool.submit(create, alias_runtime, "handle-create-alias")
-                        self.assertTrue(alias_waiting.wait(timeout=3))
-                        release_owner.set()
-                        owner_lease = owner.result(timeout=3)
-                        alias_lease = alias.result(timeout=3)
+                        try:
+                            owner = pool.submit(
+                                create, owner_runtime, "handle-create-owner"
+                            )
+                            wait_for_event(owner_in_prepare, owner, "owner prepare")
+                            alias = pool.submit(
+                                create, alias_runtime, "handle-create-alias"
+                            )
+                            wait_for_event(alias_waiting, alias, "alias wait")
+                        finally:
+                            release_owner.set()
+                        owner_lease = owner.result(timeout=EVENT_BUDGET_SECONDS)
+                        alias_lease = alias.result(timeout=EVENT_BUDGET_SECONDS)
 
                     self.assertEqual(owner_lease, alias_lease)
                     self.assertEqual(1, host.prepare_calls)

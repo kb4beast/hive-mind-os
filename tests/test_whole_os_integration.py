@@ -1,8 +1,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Barrier, Event, Lock, Thread
-from time import sleep
+from threading import Barrier, Condition, Event, Lock, Thread
 
 from hive_mind_os.cohort_assurance import (
     TerminalAssessment,
@@ -15,7 +14,7 @@ from hive_mind_os.cortex.repository.mission_bindings import (
     MissionBindingDescriptor,
 )
 from hive_mind_os.outcome_graph import OutcomeWorkPackage, compile_outcome_graph
-from hive_mind_os.scheduler import Scheduler
+from hive_mind_os.scheduler import ManualClock, Scheduler
 from hive_mind_os.whole_os_service import (
     PackageExecutionResult,
     PackageStatus,
@@ -343,9 +342,36 @@ class WholeOSIntegrationTests(unittest.TestCase):
             service.close()
 
     def test_cohort_heartbeats_short_leases_and_retries_failures(self):
+        class RecordingScheduler(Scheduler):
+            """Records each durably committed heartbeat expiry."""
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.heartbeat_seen = Condition()
+                self.heartbeat_expiries = []
+
+            def heartbeat(self, job_id, lease_token):
+                job = super().heartbeat(job_id, lease_token)
+                with self.heartbeat_seen:
+                    self.heartbeat_expiries.append(job.lease_expiry)
+                    self.heartbeat_seen.notify_all()
+                return job
+
+            def wait_for_expiry(self, target, timeout):
+                with self.heartbeat_seen:
+                    return self.heartbeat_seen.wait_for(
+                        lambda: any(
+                            expiry is not None and expiry >= target
+                            for expiry in self.heartbeat_expiries
+                        ),
+                        timeout=timeout,
+                    )
+
+        hold_errors = []
+
         class SlowReceiptService(WholeOSService):
             def _persist_package_result(self, result):
-                sleep(0.05)
+                hold_lease("receipt")
                 return super()._persist_package_result(result)
 
         class RetryHost(FakeHost):
@@ -355,7 +381,7 @@ class WholeOSIntegrationTests(unittest.TestCase):
 
             def execute_package(self, package, bindings, payload):
                 self.calls += 1
-                sleep(0.05)
+                hold_lease("host")
                 if self.calls == 1:
                     return PackageExecutionResult(
                         package.package_id, PackageStatus.FAILED, None, (), "transient"
@@ -364,7 +390,7 @@ class WholeOSIntegrationTests(unittest.TestCase):
 
             def assess_terminal_candidate(self, candidate, payload):
                 self.assessment_calls += 1
-                sleep(0.05)
+                hold_lease("assessment")
                 return super().assess_terminal_candidate(candidate, payload)
 
         with TemporaryDirectory() as directory:
@@ -375,10 +401,29 @@ class WholeOSIntegrationTests(unittest.TestCase):
                 (OutcomeWorkPackage("A", ("R1",), allowed_paths=("a",)),),
                 host=host,
             )
-            scheduler = Scheduler(root / "queue", lease_seconds=0.03, backoff_seconds=0)
+            clock = ManualClock(1000.0)
+            scheduler = RecordingScheduler(
+                root / "queue", clock=clock, lease_seconds=0.03, backoff_seconds=0
+            )
+
+            def hold_lease(stage):
+                # Slow stages advance controlled scheduler time past the original
+                # lease length. The clock stays frozen until the real heartbeat
+                # thread has durably renewed the lease for the new time, so CI
+                # latency cannot expire it and a missing heartbeat times out.
+                if hold_errors:
+                    return
+                for _ in range(3):
+                    clock.advance(0.02)
+                    target = clock.now() + scheduler.lease_seconds
+                    if not scheduler.wait_for_expiry(target, timeout=5.0):
+                        hold_errors.append(f"no durable heartbeat during {stage}")
+                        return
+
             service = SlowReceiptService(config, provider, host, scheduler=scheduler)
             try:
                 result = service.run_to_completion()
+                self.assertEqual([], hold_errors)
                 self.assertEqual(result.status, "complete")
                 self.assertEqual(host.calls, 2)
                 self.assertEqual(host.assessment_calls, 1)
