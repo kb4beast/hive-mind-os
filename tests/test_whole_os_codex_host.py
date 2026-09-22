@@ -9,6 +9,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from hive_mind_os.receipts import filesystem_path
 from hive_mind_os.runtime_contracts import canonical_json_bytes, raw_sha256
@@ -92,7 +93,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
         with TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
             root = Path(temporary)
             repository = self._repository(root)
-            state = root / "external-state"
+            state = root.joinpath(*(("external-state-segment",) * 8))
             executable = root / ("codex-test.exe" if sys.platform == "win32" else "codex-test")
             shutil.copy2(sys.executable, executable)
             # Match the production boundary, which canonicalizes the executable
@@ -125,7 +126,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
                 self.assertNotIn(forbidden, serialized)
             self.assertEqual(config["graph"]["packages"][0]["acceptance_ids"], [ACCEPTANCE_ID])
 
-            focused_directory = state / "focused"
+            focused_directory = filesystem_path(state / "focused")
             focused_directory.mkdir(parents=True)
             focused = {
                 "status": "PASSED",
@@ -133,7 +134,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
             }
             focused_path = focused_directory / "receipt.json"
             focused_path.write_bytes(canonical_json_bytes(focused) + b"\n")
-            curator_directory = state / "curator"
+            curator_directory = filesystem_path(state / "curator")
             curator = _FakeWorker().run(
                 evidence_directory=curator_directory,
                 workspace=repository,
@@ -175,7 +176,30 @@ class WholeOSCodexHostTests(unittest.TestCase):
             self.assertEqual(len(worker.calls), 1)
             self.assertFalse(worker.calls[0]["writable"])
             self.assertEqual(len(builder_paths), 1)
-            self.assertTrue((state / "learning").is_dir())
+            self.assertTrue(filesystem_path(state / "learning").is_dir())
+            shutil.rmtree(filesystem_path(root), ignore_errors=True)
+
+    def test_launcher_creates_a_state_root_beyond_windows_max_path(self) -> None:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            root = Path(temporary)
+            repository = self._repository(root)
+            state = root.joinpath(*(("external-state-segment",) * 12))
+            self.assertGreater(len(str(state)), 260)
+
+            with patch(
+                "hive_mind_os.whole_os_codex_host.build_deployment_bundle",
+                side_effect=CodexHostBootstrapError("stop after state-root creation"),
+            ):
+                code, receipt = execute_trusted_launcher(
+                    repository=repository,
+                    state_root=state,
+                    executable=Path(sys.executable),
+                )
+
+            self.assertEqual(code, 20)
+            self.assertIn("stop after state-root creation", receipt["blocker"])
+            self.assertTrue(filesystem_path(state).is_dir())
+            self.assertTrue(filesystem_path(Path(receipt["receipt_path"])).is_file())
             shutil.rmtree(filesystem_path(root), ignore_errors=True)
 
     def test_dirty_or_non_codex_branch_is_not_admitted(self) -> None:
