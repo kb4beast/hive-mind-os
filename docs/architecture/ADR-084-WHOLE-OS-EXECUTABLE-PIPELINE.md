@@ -9,6 +9,11 @@ the repository, and cannot release the next stage until the current stage report
 typed terminal completion. A hidden master process may persist across operator
 sessions and retries `in_progress` or `blocked` work at a bounded interval.
 
+ADR-091 adapts this sequence by explicit claim scope. The strict default retains all
+five stages. `bounded-operational-production-pilot` runs host bootstrap, N32, and
+N33; it still depends on retained N28/N29 evidence and cannot imply N30/N31,
+superiority, or full autonomy.
+
 The launcher uses `codex exec --ask-for-approval never --sandbox danger-full-access`
 inside the explicitly selected repository. It does not use Codex's dangerous bypass
 flag, ignore repository instructions, place secrets in arguments, auto-merge, spend,
@@ -42,6 +47,8 @@ Stage envelopes are written under `%LOCALAPPDATA%\HiveMindOS\whole-os-pipeline` 
 default. Restarting the master skips completed stages and resumes the first incomplete
 stage. A retained PID prevents duplicate background masters. Stop the recorded
 process to pause; retain the stage directory and restart the same command to resume.
+Stage and process envelopes now retain the claim scope; legacy state is interpreted
+as strict full scope, and cross-scope state reuse stops.
 Rollback removes no evidence: select the prior repository release and leave pipeline
 logs, result envelopes, failed attempts, and external obligations intact.
 

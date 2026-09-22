@@ -7,6 +7,10 @@ directive: "forget roblox for now, its to complex. lets pick a new project." The
 owner selected Coupon Hive as the first application and requested a smaller
 replacement project, which is now Reese's Rainbow Web.
 
+ADR-091 supersedes only this record's N30 dependency: N30 remains mandatory for
+`full-autonomy-or-superiority` and is not a bounded external-pilot prerequisite.
+The target selection, 72-hour window, and evidence requirements remain unchanged.
+
 ## Decision
 
 N32 qualifies two distinct externally admitted repositories through the generic

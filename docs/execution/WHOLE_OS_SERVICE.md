@@ -1,5 +1,9 @@
 # Whole-OS service composition
 
+The pipeline defaults to `full-autonomy-or-superiority`. A bounded operational run
+must opt into `-ClaimScope bounded-operational-production-pilot` and retain exact
+candidate, authority, target/runtime, 72-hour, restart, and rollback evidence.
+
 The implementation composes repository bindings, a versioned outcome graph, the
 durable scheduler, independent qualification, lesson routing, delivery, and
 benchmark adapters. `hive_mind_os.whole_os_service.WholeOSService` is the public
@@ -46,6 +50,17 @@ pipeline. It launches one stage at a time and durably resumes incomplete stages:
 ```powershell
 powershell -NoProfile -File scripts/whole-os/Invoke-WholeOSPipeline.ps1 -Background
 ```
+
+For the smaller two-target pilot, select the bounded scope explicitly:
+
+```powershell
+powershell -NoProfile -File scripts/whole-os/Invoke-WholeOSPipeline.ps1 `
+  -ClaimScope bounded-operational-production-pilot -Background
+```
+
+That route runs host bootstrap, N32, and N33. The default full scope also runs N30
+and N31. Existing state without a scope is treated as full scope, and a state-root
+scope mismatch stops before reuse.
 
 Individual stages can also be invoked directly from `scripts/whole-os/`. Their
 structured receipts default to `%LOCALAPPDATA%\HiveMindOS\whole-os-pipeline`, outside
@@ -117,10 +132,11 @@ Hive, its scheduler, state path, or evidence store at runtime.
 
 ## Current evidence state
 
-The generic scheduling and configured-host composition are implemented. Synthetic
-tests prove the typed protocol and target-runtime independence; they do not prove
-live PR publication, hostile-code isolation, Roblox Studio/device execution, or a
-measured tournament. Real host configuration, production adapter attestations,
-external delivery grants, and fresh-process receipts remain typed qualification
-inputs. See `docs/execution/WHOLE_OS_COMPOSITION_HOST.md` for the configured host
-boundary and its explicit incomplete-capability behavior.
+The generic scheduling and configured-host composition are implemented. A fresh
+trusted local host process completed for exact clean baseline `ed96ffde`, but that
+receipt does not prove hostile-code isolation, external delivery, a later candidate,
+Roblox Studio/device execution, or a measured tournament. Production candidate and
+adapter attestations, external delivery grants, target/runtime receipts, and the
+72-hour window remain typed bounded-pilot inputs. See
+`docs/execution/WHOLE_OS_COMPOSITION_HOST.md` for the configured host boundary and
+its explicit incomplete-capability behavior.

@@ -9,7 +9,9 @@ param(
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA "HiveMindOS\whole-os-pipeline"),
     [string]$Model = "gpt-5.6-sol",
     [ValidateSet("low", "medium", "high", "xhigh", "max", "ultra")]
-    [string]$ReasoningEffort = "high"
+    [string]$ReasoningEffort = "high",
+    [ValidateSet("bounded-operational-production-pilot", "full-autonomy-or-superiority")]
+    [string]$ClaimScope = "full-autonomy-or-superiority"
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,7 +44,17 @@ $currentResult = Join-Path $stageRoot "stage-current.json"
 $headBefore = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $branch = (& git -C $repositoryRoot branch --show-current).Trim()
 $prior = if (Test-Path -LiteralPath $currentResult -PathType Leaf) {
-    Get-Content -LiteralPath $currentResult -Raw
+    $retainedText = Get-Content -LiteralPath $currentResult -Raw
+    $retainedEnvelope = $retainedText | ConvertFrom-Json
+    $retainedScope = if ($retainedEnvelope.PSObject.Properties.Name -contains "claim_scope") {
+        [string]$retainedEnvelope.claim_scope
+    } else {
+        "full-autonomy-or-superiority"
+    }
+    if ($retainedScope -ne $ClaimScope) {
+        throw "Retained $Stage state belongs to claim scope $retainedScope, not $ClaimScope."
+    }
+    $retainedText
 } else {
     "null"
 }
@@ -52,6 +64,7 @@ $runtimeContext = @"
 
 Runtime context supplied by the sealed PowerShell launcher:
 - stage: $Stage
+- claim_scope: $ClaimScope
 - repository: $repositoryRoot
 - branch: $branch
 - head_before: $headBefore
@@ -126,8 +139,9 @@ if ([string]$agentResult.stage -ne $Stage) {
 }
 
 $envelope = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     stage = $Stage
+    claim_scope = $ClaimScope
     attempt_id = $attemptId
     observed_at = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     repository = $repositoryRoot

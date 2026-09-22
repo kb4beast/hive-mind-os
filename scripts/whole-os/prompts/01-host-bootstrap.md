@@ -13,6 +13,9 @@ them, and create or update one scoped PR when credentials allow.
 
 The stage is complete only when a fresh process can execute the trusted launcher
 against a real admitted repository and persist a non-synthetic startup receipt.
+Bind that receipt to the envelope's exact claim scope and candidate. Host startup
+evidence cannot satisfy production-candidate, external-pilot, N30, or release
+evidence and cannot be replayed for another candidate or scope.
 Permission in the operator request authorizes this bounded work but does not prove
 an unavailable credential, external signature, or runtime result. Record any such
 missing input as a typed blocker and recommend a low-frequency retry.

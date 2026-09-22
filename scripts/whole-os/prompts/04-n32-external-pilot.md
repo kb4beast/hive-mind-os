@@ -13,7 +13,11 @@ publish a target, or mutate production without a distinct recorded grant. Do not
 Roblox or another specialized platform a prerequisite unless the owner separately
 admits that scope.
 
-Implement/test bounded local repairs, commit, push, and update the scoped PR. Return
+Honor the envelope's claim scope. Bounded operation requires an exact production
+candidate, qualified host and authority, target/runtime receipts, a real 72-hour
+observation, restart, and rollback. Full autonomy or superiority additionally
+requires N30/N31. Implement/test bounded local repairs, commit, push, and update the
+scoped PR. Return
 `in_progress` while the genuine 72-hour window is open. Complete requires two real
 targets, target/runtime evidence, and the elapsed window. Missing targets, reuse
 rights, runtime automation, credentials, delivery authority, or independent verifier

@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,6 +12,7 @@ from hive_mind_os.whole_os_qualification import (
     PilotAttempt,
     PilotReport,
     PilotRuntimeEvidence,
+    QualificationClaimScope,
     QualificationLedger,
     canonical_digest,
 )
@@ -112,26 +114,35 @@ class WholeOSQualificationTests(unittest.TestCase):
             self.receipt("pilot", "rollback"),
             restart_evidence=self.receipt("pilot", "restart"),
             observation_evidence=self.receipt("pilot", "observation", 259200),
+            subject_ids=("self",),
+            production_candidate=self.receipt(
+                "sha256:" + "a" * 64, "production-self"
+            ),
+            benchmark_candidate=self.receipt(
+                "sha256:" + "a" * 64, "benchmark-self"
+            ),
         )
         self.assertEqual(report.disposition(), Disposition.DEFER)
 
-    def test_external_pilot_requires_distinct_subjects_and_complete_domain_evidence(self):
-        ordinary_one = self.attempt(
-            "ordinary-one", "ordinary", "feature", domain="ordinary", hive_free=True
+    def test_external_pilot_accepts_two_declared_non_roblox_targets(self):
+        coupon = self.attempt(
+            "coupon-one", "coupon-hive", "feature", domain="web", hive_free=True
         )
-        ordinary_two = self.attempt(
-            "ordinary-two", "ordinary", "failure", domain="ordinary", hive_free=True
+        rainbow = self.attempt(
+            "rainbow-one",
+            "reeses-rainbow-web",
+            "failure",
+            domain="web",
+            hive_free=True,
         )
-        roblox = self.attempt(
-            "roblox-one", "game", "gameplay", domain="roblox", runtime=True
-        )
+        candidate = "sha256:" + "a" * 64
         report = PilotReport(
             "pilot",
             "external",
-            "sha256:" + "a" * 64,
+            candidate,
             0,
             259200,
-            (ordinary_one, ordinary_two, roblox),
+            (coupon, rainbow),
             True,
             0,
             0,
@@ -140,25 +151,44 @@ class WholeOSQualificationTests(unittest.TestCase):
             observation_evidence=self.receipt(
                 "pilot", "observation-external", 259200
             ),
+            subject_ids=("coupon-hive", "reeses-rainbow-web"),
+            claim_scope=QualificationClaimScope.BOUNDED_OPERATIONAL_PRODUCTION,
+            production_candidate=self.receipt(candidate, "production-external"),
         )
         self.assertEqual(report.disposition(), Disposition.ADOPT)
-        incomplete = PilotReport(
-            "pilot",
-            "external",
-            "sha256:" + "a" * 64,
-            0,
-            259200,
-            (ordinary_one, ordinary_two),
-            True,
-            0,
-            0,
-            self.receipt("pilot", "rollback-incomplete"),
-            restart_evidence=self.receipt("pilot", "restart-incomplete"),
-            observation_evidence=self.receipt(
-                "pilot", "observation-incomplete", 259200
-            ),
+        self.assertEqual(
+            replace(
+                report,
+                claim_scope=QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY,
+            ).disposition(),
+            Disposition.DEFER,
         )
-        self.assertEqual(incomplete.disposition(), Disposition.DEFER)
+        self.assertEqual(
+            replace(
+                report,
+                claim_scope=QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY,
+                benchmark_candidate=self.receipt(candidate, "benchmark-external"),
+            ).disposition(),
+            Disposition.ADOPT,
+        )
+        self.assertEqual(
+            replace(report, attempts=(coupon,)).disposition(), Disposition.DEFER
+        )
+        self.assertEqual(
+            replace(report, rollback_evidence=None).disposition(), Disposition.DEFER
+        )
+        self.assertEqual(
+            replace(
+                report,
+                observation_evidence=self.receipt(
+                    "pilot", "stale-observation", 259199
+                ),
+            ).disposition(),
+            Disposition.DEFER,
+        )
+        self.assertEqual(
+            replace(report, ended_at=259199).disposition(), Disposition.DEFER
+        )
 
 
 if __name__ == "__main__":

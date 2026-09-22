@@ -17,6 +17,7 @@ from .whole_os_qualification import (
     PilotAttempt,
     PilotReport,
     PilotRuntimeEvidence,
+    QualificationClaimScope,
 )
 
 
@@ -27,6 +28,7 @@ class PilotBlockerCode(StrEnum):
     MISSING_RUNTIME = "missing-runtime-evidence"
     MISSING_AUTHORITY = "missing-delivery-authority"
     MISSING_BENCHMARK = "missing-benchmark-candidate"
+    MISSING_PRODUCTION_CANDIDATE = "missing-production-candidate"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +39,7 @@ class PilotPrerequisites:
     benchmark_candidate: EvidenceRef | None = None
     targets: tuple[EvidenceRef, ...] = ()
     runtime: tuple[EvidenceRef, ...] = ()
+    production_candidate: EvidenceRef | None = None
 
     def __post_init__(self) -> None:
         values = tuple(
@@ -46,6 +49,7 @@ class PilotPrerequisites:
                 self.supervisor,
                 self.delivery_authority,
                 self.benchmark_candidate,
+                self.production_candidate,
                 *self.targets,
                 *self.runtime,
             )
@@ -65,7 +69,12 @@ class PilotPrerequisites:
             EvidenceKind.EXTERNAL_RECEIPT,
         }
 
-    def blockers(self, mode: str) -> tuple[ExternalObligation, ...]:
+    def blockers(
+        self,
+        mode: str,
+        claim_scope: QualificationClaimScope,
+        subject_ids: tuple[str, ...],
+    ) -> tuple[ExternalObligation, ...]:
         rows: list[ExternalObligation] = []
 
         def block(
@@ -94,24 +103,42 @@ class PilotPrerequisites:
                 "A target-scoped pilot delivery grant is required.",
                 ("N31" if mode == "self" else "N32",),
             )
-        if not self._usable(self.benchmark_candidate):
+        if not self._usable(self.production_candidate):
+            block(
+                PilotBlockerCode.MISSING_PRODUCTION_CANDIDATE,
+                Disposition.BLOCKED_SOURCE,
+                "An independently qualified exact production candidate is required.",
+                ("N31" if mode == "self" else "N32",),
+            )
+        if (
+            claim_scope is QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY
+            and not self._usable(self.benchmark_candidate)
+        ):
             block(
                 PilotBlockerCode.MISSING_BENCHMARK,
                 Disposition.BLOCKED_SOURCE,
-                "An independently admitted N30 candidate receipt is required.",
+                "Full-autonomy or superiority scope requires an admitted N30 candidate.",
                 ("N31" if mode == "self" else "N32",),
             )
         target_minimum = 0 if mode == "self" else (2 if mode == "external" else 1)
         usable_targets = tuple(item for item in self.targets if self._usable(item))
-        if len({item.subject_id for item in usable_targets}) < target_minimum:
+        required_targets = set(subject_ids) if mode != "self" else set()
+        usable_target_ids = {item.subject_id for item in usable_targets}
+        if (
+            len(usable_target_ids) < target_minimum
+            or not required_targets.issubset(usable_target_ids)
+        ):
             block(
                 PilotBlockerCode.MISSING_TARGETS,
                 Disposition.BLOCKED_SOURCE,
                 f"The pilot requires {target_minimum} distinct admitted real target(s).",
                 ("N32",),
             )
-        if mode in {"external", "roblox"} and not any(
-            self._usable(item) for item in self.runtime
+        usable_runtime_ids = {
+            item.subject_id for item in self.runtime if self._usable(item)
+        }
+        if mode in {"external", "roblox"} and not required_targets.issubset(
+            usable_runtime_ids
         ):
             block(
                 PilotBlockerCode.MISSING_RUNTIME,
@@ -135,6 +162,9 @@ class PilotPlan:
     delivery_rate_limit: int
     authority_digest: str
     prerequisites: PilotPrerequisites = PilotPrerequisites()
+    claim_scope: QualificationClaimScope = (
+        QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY
+    )
 
     def __post_init__(self) -> None:
         for name in ("pilot_id", "candidate_digest", "authority_digest"):
@@ -147,6 +177,8 @@ class PilotPlan:
             raise ValueError("invalid pilot mode")
         if type(self.prerequisites) is not PilotPrerequisites:
             raise ValueError("pilot prerequisites must be typed")
+        if type(self.claim_scope) is not QualificationClaimScope:
+            raise ValueError("pilot claim scope must be typed")
         if not self.subject_ids or len(set(self.subject_ids)) != len(self.subject_ids):
             raise ValueError("pilot subjects must be unique and nonempty")
         if self.ends_at <= self.starts_at:
@@ -167,6 +199,7 @@ class PilotPlan:
                 self.prerequisites.supervisor,
                 self.prerequisites.delivery_authority,
                 self.prerequisites.benchmark_candidate,
+                self.prerequisites.production_candidate,
                 *self.prerequisites.targets,
                 *self.prerequisites.runtime,
             )
@@ -177,6 +210,21 @@ class PilotPlan:
         benchmark = self.prerequisites.benchmark_candidate
         if benchmark is not None and benchmark.subject_id != self.candidate_digest:
             raise ValueError("benchmark receipt targets another candidate")
+        production = self.prerequisites.production_candidate
+        if production is not None and production.subject_id != self.candidate_digest:
+            raise ValueError("production receipt targets another candidate")
+        host = self.prerequisites.whole_os_host
+        if host is not None and host.subject_id != self.candidate_digest:
+            raise ValueError("host receipt targets another candidate")
+        for evidence, label in (
+            (self.prerequisites.supervisor, "supervisor"),
+            (self.prerequisites.delivery_authority, "delivery authority"),
+        ):
+            if evidence is not None and evidence.subject_id != self.pilot_id:
+                raise ValueError(f"{label} receipt targets another pilot")
+        authority = self.prerequisites.delivery_authority
+        if authority is not None and authority.digest != self.authority_digest:
+            raise ValueError("pilot authority digest does not match its receipt")
         if any(
             item.subject_id not in self.subject_ids
             for item in (*self.prerequisites.targets, *self.prerequisites.runtime)
@@ -303,6 +351,12 @@ class PilotStore:
 
         plan_raw = dict(raw["plan"])
         plan_raw["subject_ids"] = tuple(plan_raw["subject_ids"])
+        plan_raw["claim_scope"] = QualificationClaimScope(
+            plan_raw.get(
+                "claim_scope",
+                QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY,
+            )
+        )
         prerequisites_raw = plan_raw.pop("prerequisites", None)
         if prerequisites_raw is None:
             prerequisites = PilotPrerequisites()
@@ -318,6 +372,7 @@ class PilotStore:
                 tuple(
                     required_evidence(item) for item in prerequisites_raw["runtime"]
                 ),
+                evidence(prerequisites_raw.get("production_candidate")),
             )
         plan = PilotPlan(**plan_raw, prerequisites=prerequisites)
 
@@ -382,7 +437,12 @@ class PilotController:
                 raise ValueError("existing pilot state belongs to another plan")
         else:
             store.save(
-                PilotState(plan, obligations=plan.prerequisites.blockers(plan.mode)),
+                PilotState(
+                    plan,
+                    obligations=plan.prerequisites.blockers(
+                        plan.mode, plan.claim_scope, plan.subject_ids
+                    ),
+                ),
                 expected_revision=None,
             )
 
@@ -657,6 +717,13 @@ class PilotController:
             if state.observed_through is None
             else state.observed_through
         )
+        obligations = {
+            item.obligation_id: item for item in state.obligations
+        }
+        for item in state.plan.prerequisites.blockers(
+            state.plan.mode, state.plan.claim_scope, state.plan.subject_ids
+        ):
+            obligations.setdefault(item.obligation_id, item)
         return PilotReport(
             state.plan.pilot_id,
             state.plan.mode,
@@ -668,8 +735,12 @@ class PilotController:
             state.duplicate_effects,
             state.avoidable_owner_questions,
             state.rollback_evidence,
-            state.obligations,
+            tuple(obligations.values()),
             tuple(item.attempt_id for item in state.active_attempts),
             state.restart_evidence,
             state.observation_evidence,
+            state.plan.subject_ids,
+            state.plan.claim_scope,
+            state.plan.prerequisites.production_candidate,
+            state.plan.prerequisites.benchmark_candidate,
         )

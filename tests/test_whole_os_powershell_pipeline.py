@@ -25,10 +25,72 @@ STAGES = (
 class WholeOSPowerShellPipelineTests(unittest.TestCase):
     def test_pipeline_has_exact_sequential_stage_order(self) -> None:
         text = PIPELINE.read_text(encoding="utf-8")
-        positions = [text.index(name) for name in STAGES]
+        stage_block = text[
+            text.index("$stages = if") : text.index("foreach ($stage in $stages)")
+        ]
+        full_branch = stage_block[stage_block.index("} else {") :]
+        positions = [full_branch.index(name) for name in STAGES]
         self.assertEqual(positions, sorted(positions))
         self.assertIn('status -eq "complete"', text)
         self.assertIn("Start-Sleep -Seconds $delay", text)
+
+    def test_claim_scope_defaults_to_strict_full_and_is_forwarded(self) -> None:
+        pipeline = PIPELINE.read_text(encoding="utf-8")
+        runner = RUNNER.read_text(encoding="utf-8")
+        self.assertIn(
+            '[string]$ClaimScope = "full-autonomy-or-superiority"', pipeline
+        )
+        self.assertIn(
+            '[string]$ClaimScope = "full-autonomy-or-superiority"', runner
+        )
+        self.assertIn('-ClaimScope $ClaimScope', pipeline)
+        self.assertIn("claim_scope = $ClaimScope", runner)
+        self.assertIn("schema_version = 2", pipeline)
+        self.assertIn("schema_version = 2", runner)
+        self.assertIn("claim_scope = $ClaimScope", pipeline)
+        self.assertIn('"bounded-operational-production-pilot"', pipeline)
+        self.assertIn('"full-autonomy-or-superiority"', pipeline)
+
+    def test_bounded_pipeline_omits_benchmark_and_self_pilot_stages(self) -> None:
+        text = PIPELINE.read_text(encoding="utf-8")
+        stage_block = text[
+            text.index("$stages = if") : text.index("foreach ($stage in $stages)")
+        ]
+        bounded_branch = stage_block[: stage_block.index("} else {")]
+        self.assertIn('"Invoke-WholeOSHostBootstrap.ps1"', bounded_branch)
+        self.assertIn('"Invoke-WholeOSN32ExternalPilot.ps1"', bounded_branch)
+        self.assertIn('"Invoke-WholeOSN33Closeout.ps1"', bounded_branch)
+        self.assertNotIn('"Invoke-WholeOSN30Tournament.ps1"', bounded_branch)
+        self.assertNotIn('"Invoke-WholeOSN31SelfPilot.ps1"', bounded_branch)
+        self.assertIn('"Invoke-WholeOSN30Tournament.ps1"', text)
+        self.assertIn('"Invoke-WholeOSN31SelfPilot.ps1"', text)
+
+        for name in (
+            "Invoke-WholeOSN30Tournament.ps1",
+            "Invoke-WholeOSN31SelfPilot.ps1",
+        ):
+            stage = (PIPELINE.parent / name).read_text(encoding="utf-8")
+            self.assertIn(
+                'if ($ClaimScope -ne "full-autonomy-or-superiority")', stage
+            )
+
+    def test_retained_scope_mismatch_fails_closed_and_legacy_is_strict(self) -> None:
+        pipeline = PIPELINE.read_text(encoding="utf-8")
+        runner = RUNNER.read_text(encoding="utf-8")
+        for text in (pipeline, runner):
+            self.assertIn("Retained", text)
+            self.assertIn("not $ClaimScope", text)
+            self.assertIn("throw", text)
+        self.assertIn(
+            'if ($retainedEnvelope.PSObject.Properties.Name -contains "claim_scope")',
+            runner,
+        )
+        self.assertIn(
+            'if ($retained.PSObject.Properties.Name -contains "claim_scope")',
+            pipeline,
+        )
+        self.assertIn('"full-autonomy-or-superiority"', runner)
+        self.assertIn('"full-autonomy-or-superiority"', pipeline)
 
     def test_runner_uses_closed_results_and_no_unsafe_bypass(self) -> None:
         text = RUNNER.read_text(encoding="utf-8")
