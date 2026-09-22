@@ -922,7 +922,7 @@ def compose_factory(
 
 
 def _focused_verification(bundle: DeploymentBundle, attempt_id: str) -> tuple[dict[str, Any], Path]:
-    directory = filesystem_path(bundle.state_root / "verification" / attempt_id)
+    directory = bundle.state_root / "verification" / attempt_id
     receipt = verify_repository(
         bundle.repository,
         evidence_directory=directory,
