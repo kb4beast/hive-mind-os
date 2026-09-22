@@ -154,7 +154,7 @@ def _write_once(path: Path, document: Mapping[str, Any]) -> Path:
             raise CodexHostBootstrapError(
                 f"content-addressed host artifact conflicts: {path}"
             )
-        return path
+        return target
     temporary = filesystem_path(
         path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     )
@@ -166,7 +166,7 @@ def _write_once(path: Path, document: Mapping[str, Any]) -> Path:
         os.replace(temporary, target)
     finally:
         temporary.unlink(missing_ok=True)
-    return path
+    return target
 
 
 def _replace(path: Path, document: Mapping[str, Any]) -> Path:
@@ -708,7 +708,8 @@ def compose_factory(
         if (
             supplied.binding_descriptor.digest != bundle.descriptor.digest
             or supplied.graph.digest != bundle.config.graph.digest
-            or supplied.state_dir != bundle.config.state_dir
+            or filesystem_path(supplied.state_dir)
+            != filesystem_path(bundle.config.state_dir)
         ):
             raise CodexHostBootstrapError(
                 "launcher factory received a substituted service configuration"
@@ -774,7 +775,7 @@ def compose_factory(
                     (),
                     failures=("admitted repository candidate changed",),
                 )
-            evidence_directory = (
+            evidence_directory = filesystem_path(
                 bundle.state_root
                 / "codex-workers"
                 / "builder"
@@ -863,7 +864,7 @@ def compose_factory(
             )
 
         host = WholeOSCompositionHost(
-            state_directory=bundle.state_root / "composition",
+            state_directory=filesystem_path(bundle.state_root / "composition"),
             manifest=bundle.manifest,
             profile_id="self-python",
             repository_profile=bundle.profile,
@@ -880,9 +881,11 @@ def compose_factory(
             ),
             qualifier=CandidateQualifier(qualify),
             delivery=DeliveryBroker(
-                state_path=bundle.state_root
-                / "delivery"
-                / f"{bundle.seal_digest.removeprefix('sha256:')}.json"
+                state_path=filesystem_path(
+                    bundle.state_root
+                    / "delivery"
+                    / f"{bundle.seal_digest.removeprefix('sha256:')}.json"
+                )
             ),
             delivery_policy=DeliveryPolicy(
                 "https://github.com/kb4beast/hive-mind-os",
@@ -901,7 +904,9 @@ def compose_factory(
                 feedback_required=False,
             ),
             feedback_source=None,
-            learning=DurableLearningRecorder(bundle.state_root / "learning"),
+            learning=DurableLearningRecorder(
+                filesystem_path(bundle.state_root / "learning")
+            ),
             curator=_AdmissionCurator(
                 bundle=bundle,
                 receipt=admission_receipt,
@@ -917,7 +922,7 @@ def compose_factory(
 
 
 def _focused_verification(bundle: DeploymentBundle, attempt_id: str) -> tuple[dict[str, Any], Path]:
-    directory = bundle.state_root / "verification" / attempt_id
+    directory = filesystem_path(bundle.state_root / "verification" / attempt_id)
     receipt = verify_repository(
         bundle.repository,
         evidence_directory=directory,
@@ -944,7 +949,9 @@ def _admission_review(
     attempt_id: str,
     timeout_seconds: float,
 ) -> tuple[dict[str, Any], Path]:
-    directory = bundle.state_root / "codex-workers" / "curator" / attempt_id
+    directory = filesystem_path(
+        bundle.state_root / "codex-workers" / "curator" / attempt_id
+    )
     receipt = worker.run(
         node={
             "id": "host-bootstrap-admission",
@@ -1060,7 +1067,7 @@ def execute_trusted_launcher(
         raise CodexHostBootstrapError(
             "host state must remain outside the repository; no receipt was written"
         )
-    state_root.mkdir(parents=True, exist_ok=True)
+    filesystem_path(state_root).mkdir(parents=True, exist_ok=True)
     bundle: DeploymentBundle | None = None
     focused_path: Path | None = None
     admission_path: Path | None = None
