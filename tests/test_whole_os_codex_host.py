@@ -126,7 +126,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
                 self.assertNotIn(forbidden, serialized)
             self.assertEqual(config["graph"]["packages"][0]["acceptance_ids"], [ACCEPTANCE_ID])
 
-            focused_directory = state / "focused"
+            focused_directory = filesystem_path(state / "focused")
             focused_directory.mkdir(parents=True)
             focused = {
                 "status": "PASSED",
@@ -134,7 +134,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
             }
             focused_path = focused_directory / "receipt.json"
             focused_path.write_bytes(canonical_json_bytes(focused) + b"\n")
-            curator_directory = state / "curator"
+            curator_directory = filesystem_path(state / "curator")
             curator = _FakeWorker().run(
                 evidence_directory=curator_directory,
                 workspace=repository,
@@ -176,7 +176,7 @@ class WholeOSCodexHostTests(unittest.TestCase):
             self.assertEqual(len(worker.calls), 1)
             self.assertFalse(worker.calls[0]["writable"])
             self.assertEqual(len(builder_paths), 1)
-            self.assertTrue((state / "learning").is_dir())
+            self.assertTrue(filesystem_path(state / "learning").is_dir())
             shutil.rmtree(filesystem_path(root), ignore_errors=True)
 
     def test_launcher_creates_a_state_root_beyond_windows_max_path(self) -> None:
