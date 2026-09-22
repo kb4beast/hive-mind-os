@@ -5,7 +5,7 @@ param(
     [string]$TenantId = "local-operator",
     [string]$RepositoryId = "hive-mind-os",
     [ValidateSet("bounded-operational-production-pilot", "full-autonomy-or-superiority")]
-    [string]$ClaimScope = "bounded-operational-production-pilot",
+    [string]$ClaimScope = "full-autonomy-or-superiority",
     [ValidateRange(60, 3600)]
     [int]$TimeoutSeconds = 900
 )

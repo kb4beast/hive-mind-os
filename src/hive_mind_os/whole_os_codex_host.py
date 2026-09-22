@@ -75,7 +75,11 @@ from .whole_os_composition import (
     DurableLearningRecorder,
     WholeOSCompositionHost,
 )
-from .whole_os_qualification import CapabilityDeclaration, CompositionManifest
+from .whole_os_qualification import (
+    CapabilityDeclaration,
+    CompositionManifest,
+    QualificationClaimScope,
+)
 from .whole_os_service import WholeOSServiceConfig
 
 PROVIDER_ID = "codex-local-whole-os"
@@ -88,6 +92,9 @@ PACKAGE_ID = "host-bootstrap-startup"
 PRODUCER_ID = "codex-host-builder"
 CURATOR_ID = "codex-host-curator"
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$")
+_SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
+_STRICT_CLAIM_SCOPE = QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY.value
+_CLAIM_SCOPE_VALUES = tuple(scope.value for scope in QualificationClaimScope)
 
 
 class CodexHostBootstrapError(RuntimeError):
@@ -1008,15 +1015,11 @@ def _startup_document(
     builder_paths: Sequence[Path],
     focused_path: Path | None,
     claim_scope: str,
+    service_candidate_digest: str | None,
 ) -> dict[str, Any]:
-    candidate_digest = None
-    if isinstance(cli_output, Mapping):
-        last_result = cli_output.get("last_result")
-        if isinstance(last_result, Mapping):
-            candidate_digest = last_result.get("candidate_digest")
     return {
-        "schema_version": 1,
-        "kind": "whole-os-codex-host-startup-v1",
+        "schema_version": 2,
+        "kind": "whole-os-codex-host-startup-v2",
         "attempt_id": attempt_id,
         "claim_scope": claim_scope,
         "status": status,
@@ -1030,7 +1033,8 @@ def _startup_document(
         "branch": bundle.branch if bundle else None,
         "head": bundle.head if bundle else None,
         "tree": bundle.tree if bundle else None,
-        "candidate_digest": candidate_digest,
+        "candidate_digest": _admitted_candidate_digest(bundle) if bundle else None,
+        "service_candidate_digest": service_candidate_digest,
         "host_seal_digest": bundle.seal_digest if bundle else None,
         "service_config": str(bundle.config_path) if bundle else None,
         "service_config_digest": raw_sha256(bundle.config_path.read_bytes())
@@ -1052,6 +1056,37 @@ def _startup_document(
     }
 
 
+def _admitted_candidate_digest(bundle: DeploymentBundle) -> str:
+    """Bind host evidence to the exact admitted Git commit and tree."""
+
+    return canonical_digest({"git_tree": bundle.tree, "candidate": bundle.head})
+
+
+def _validated_service_candidate_digest(
+    bundle: DeploymentBundle, cli_output: Mapping[str, Any]
+) -> str:
+    """Require the terminal service result to identify the admitted candidate."""
+
+    last_result = cli_output.get("last_result")
+    if not isinstance(last_result, Mapping):
+        raise CodexHostBootstrapError(
+            "WholeOSService completed without a typed terminal candidate"
+        )
+    candidate_digest = last_result.get("candidate_digest")
+    if not isinstance(candidate_digest, str) or not _SHA256_REF.fullmatch(
+        candidate_digest
+    ):
+        raise CodexHostBootstrapError(
+            "WholeOSService terminal candidate digest is not a lowercase SHA-256 ref"
+        )
+    admitted_digest = _admitted_candidate_digest(bundle)
+    if candidate_digest != admitted_digest:
+        raise CodexHostBootstrapError(
+            "WholeOSService terminal candidate differs from the admitted checkout"
+        )
+    return candidate_digest
+
+
 def execute_trusted_launcher(
     *,
     repository: Path,
@@ -1060,10 +1095,16 @@ def execute_trusted_launcher(
     repository_id: str = "hive-mind-os",
     timeout_seconds: float = 900,
     executable: Path | None = None,
-    claim_scope: str = "bounded-operational-production-pilot",
+    claim_scope: str = _STRICT_CLAIM_SCOPE,
 ) -> tuple[int, dict[str, Any]]:
     """Execute the real trusted launcher and persist an append-only receipt."""
 
+    try:
+        claim_scope = QualificationClaimScope(claim_scope).value
+    except (TypeError, ValueError) as error:
+        raise CodexHostBootstrapError(
+            "claim scope must be one of: " + ", ".join(_CLAIM_SCOPE_VALUES)
+        ) from error
     started_at = _utc_now()
     attempt_id = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}-{uuid4().hex[:8]}"
     repository = repository.resolve(strict=True)
@@ -1084,6 +1125,7 @@ def execute_trusted_launcher(
     stdout = ""
     stderr = ""
     cli_output: dict[str, Any] | None = None
+    service_candidate_digest: str | None = None
     cli_exit: int | None = None
     registration: WholeOSHostFactoryRegistration | None = None
     blocker: str | None = None
@@ -1165,11 +1207,15 @@ def execute_trusted_launcher(
                     builder_sessions.append(value["session_id"])
             except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
                 continue
+        if cli_exit != 0 or not cli_output or cli_output.get("status") != "complete":
+            raise CodexHostBootstrapError(
+                "WholeOSService did not return a complete terminal observation"
+            )
+        service_candidate_digest = _validated_service_candidate_digest(
+            bundle, cli_output
+        )
         if (
-            cli_exit != 0
-            or not cli_output
-            or cli_output.get("status") != "complete"
-            or not builder_paths
+            not builder_paths
             or not builder_sessions
             or not isinstance(admission_session, str)
             or admission_session in builder_sessions
@@ -1196,6 +1242,7 @@ def execute_trusted_launcher(
         builder_paths=builder_paths,
         focused_path=focused_path,
         claim_scope=claim_scope,
+        service_candidate_digest=service_candidate_digest,
     )
     if registration is not None:
         receipt["host_registration_digest"] = registration.digest
@@ -1227,7 +1274,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tenant-id", default="local-operator")
     parser.add_argument("--repository-id", default="hive-mind-os")
     parser.add_argument("--timeout-seconds", type=float, default=900)
-    parser.add_argument("--claim-scope", default="bounded-operational-production-pilot")
+    parser.add_argument(
+        "--claim-scope", choices=_CLAIM_SCOPE_VALUES, default=_STRICT_CLAIM_SCOPE
+    )
     return parser
 
 
