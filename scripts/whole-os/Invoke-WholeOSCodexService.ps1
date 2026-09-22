@@ -4,6 +4,8 @@ param(
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA "HiveMindOS\whole-os-codex-host"),
     [string]$TenantId = "local-operator",
     [string]$RepositoryId = "hive-mind-os",
+    [ValidateSet("bounded-operational-production-pilot", "full-autonomy-or-superiority")]
+    [string]$ClaimScope = "bounded-operational-production-pilot",
     [ValidateRange(60, 3600)]
     [int]$TimeoutSeconds = 900
 )
@@ -30,6 +32,7 @@ try {
         --state-root $resolvedStateRoot `
         --tenant-id $TenantId `
         --repository-id $RepositoryId `
+        --claim-scope $ClaimScope `
         --timeout-seconds $TimeoutSeconds
     exit $LASTEXITCODE
 } finally {

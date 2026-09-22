@@ -1007,11 +1007,18 @@ def _startup_document(
     admission_path: Path | None,
     builder_paths: Sequence[Path],
     focused_path: Path | None,
+    claim_scope: str,
 ) -> dict[str, Any]:
+    candidate_digest = None
+    if isinstance(cli_output, Mapping):
+        last_result = cli_output.get("last_result")
+        if isinstance(last_result, Mapping):
+            candidate_digest = last_result.get("candidate_digest")
     return {
         "schema_version": 1,
         "kind": "whole-os-codex-host-startup-v1",
         "attempt_id": attempt_id,
+        "claim_scope": claim_scope,
         "status": status,
         "blocker": blocker,
         "non_synthetic": True,
@@ -1023,6 +1030,7 @@ def _startup_document(
         "branch": bundle.branch if bundle else None,
         "head": bundle.head if bundle else None,
         "tree": bundle.tree if bundle else None,
+        "candidate_digest": candidate_digest,
         "host_seal_digest": bundle.seal_digest if bundle else None,
         "service_config": str(bundle.config_path) if bundle else None,
         "service_config_digest": raw_sha256(bundle.config_path.read_bytes())
@@ -1052,6 +1060,7 @@ def execute_trusted_launcher(
     repository_id: str = "hive-mind-os",
     timeout_seconds: float = 900,
     executable: Path | None = None,
+    claim_scope: str = "bounded-operational-production-pilot",
 ) -> tuple[int, dict[str, Any]]:
     """Execute the real trusted launcher and persist an append-only receipt."""
 
@@ -1186,6 +1195,7 @@ def execute_trusted_launcher(
         admission_path=admission_path,
         builder_paths=builder_paths,
         focused_path=focused_path,
+        claim_scope=claim_scope,
     )
     if registration is not None:
         receipt["host_registration_digest"] = registration.digest
@@ -1217,6 +1227,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tenant-id", default="local-operator")
     parser.add_argument("--repository-id", default="hive-mind-os")
     parser.add_argument("--timeout-seconds", type=float, default=900)
+    parser.add_argument("--claim-scope", default="bounded-operational-production-pilot")
     return parser
 
 
@@ -1230,6 +1241,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         tenant_id=arguments.tenant_id,
         repository_id=arguments.repository_id,
         timeout_seconds=arguments.timeout_seconds,
+        claim_scope=arguments.claim_scope,
     )
     # The complete append-only receipt remains in external state.  Keep the
     # console contract deliberately narrow so future receipt fields cannot
