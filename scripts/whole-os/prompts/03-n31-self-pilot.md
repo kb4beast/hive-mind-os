@@ -3,6 +3,9 @@ provided by the launcher. Read `AGENTS.md`, the implementation prompt, N31 contr
 pilot runtime/orchestration code, and current receipts. Work directly with one agent
 and make useful repository changes rather than producing plans about changes.
 
+N31 is valid only for `full-autonomy-or-superiority`. Refuse any other envelope
+scope; the bounded external-pilot path skips this stage.
+
 Use the admitted N30 candidate and trusted Whole-OS host. Execute three distinct
 nontrivial change families against this repository within the configured concurrency,
 daily resource, delivery, and authority limits. Create bounded branches/PRs with the

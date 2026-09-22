@@ -36,10 +36,11 @@ def receipt(subject: str, label: str) -> EvidenceRef:
 
 def prerequisites() -> PilotPrerequisites:
     return PilotPrerequisites(
-        receipt("pilot", "host"),
+        receipt(DIGEST, "host"),
         receipt("pilot", "supervisor"),
         receipt("pilot", "authority"),
         receipt(DIGEST, "benchmark"),
+        production_candidate=receipt(DIGEST, "production"),
     )
 
 
@@ -95,7 +96,7 @@ class PilotOrchestrationTests(unittest.TestCase):
             1,
             10,
             3,
-            DIGEST,
+            receipt("pilot", "authority").digest,
             prerequisites_value,
         )
 

@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,7 +18,9 @@ from hive_mind_os.whole_os_qualification import (
     EvidenceRef,
     ExternalObligation,
     OperationalReceipt,
+    QualificationClaimScope,
     QualificationError,
+    canonical_digest,
 )
 
 CANDIDATE = "sha256:" + "a" * 64
@@ -43,12 +46,17 @@ def operation(name: str) -> OperationalReceipt:
     )
 
 
-def complete_builder() -> CloseoutBuilder:
+def complete_builder(
+    claim_scope: QualificationClaimScope = (
+        QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY
+    ),
+) -> CloseoutBuilder:
     builder = CloseoutBuilder(
         release_id="release-1",
         candidate_digest=CANDIDATE,
         previous_release_digest=PREVIOUS,
         builder_id="builder-1",
+        claim_scope=claim_scope,
     )
     for requirement_id in REQUIREMENT_IDS:
         builder.record_requirement(
@@ -115,6 +123,30 @@ class ReleaseCloseoutTests(unittest.TestCase):
                 sealed_at=101,
             )
 
+    def test_bounded_production_closeout_does_not_require_n30_or_n31(self):
+        builder = complete_builder(
+            QualificationClaimScope.BOUNDED_OPERATIONAL_PRODUCTION
+        )
+        for node_id in ("N30", "N31"):
+            builder.nodes.pop(node_id)
+            builder.disposition_node(
+                node_id,
+                Disposition.DEFER,
+                rationale="Outside the bounded operational production claim.",
+            )
+        manifest = builder.seal(
+            startup_receipt=operation("start"),
+            rollback_receipt=operation("rollback"),
+            independent_judge_id="judge-1",
+            final_disposition=Disposition.ADAPT,
+            final_rationale="Bounded production evidence passed for the declared targets.",
+            sealed_at=101,
+        )
+        self.assertEqual(
+            manifest.claim_scope,
+            QualificationClaimScope.BOUNDED_OPERATIONAL_PRODUCTION,
+        )
+
         builder.nodes.pop("N32")
         builder.disposition_node(
             "N32", Disposition.DEFER, rationale="The outcome window is incomplete."
@@ -168,6 +200,33 @@ class ReleaseCloseoutTests(unittest.TestCase):
             path.write_text(changed, encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "immutable"):
                 write_release_manifest(path, manifest)
+
+    def test_legacy_manifest_without_scope_loads_as_full_autonomy(self):
+        manifest = complete_builder().seal(
+            startup_receipt=operation("start"),
+            rollback_receipt=operation("rollback"),
+            independent_judge_id="judge-1",
+            final_disposition=Disposition.ADOPT,
+            final_rationale="All scoped evidence passed.",
+            sealed_at=101,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "legacy.json"
+            write_release_manifest(path, manifest)
+            document = json.loads(path.read_text(encoding="utf-8"))
+            document.pop("manifest_digest")
+            document.pop("claim_scope")
+            document["schema_version"] = 1
+            document["manifest_digest"] = canonical_digest(document)
+            path.write_text(
+                json.dumps(document, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+            loaded, _ = load_release_manifest(path)
+            self.assertEqual(
+                loaded.claim_scope,
+                QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY,
+            )
 
 
 if __name__ == "__main__":

@@ -67,6 +67,13 @@ class Disposition(StrEnum):
     BLOCKED_AUTHORITY = "blocked_authority"
 
 
+class QualificationClaimScope(StrEnum):
+    """The exact claim a pilot or release receipt is allowed to support."""
+
+    BOUNDED_OPERATIONAL_PRODUCTION = "bounded-operational-production-pilot"
+    FULL_AUTONOMY_OR_SUPERIORITY = "full-autonomy-or-superiority"
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceRef:
     uri: str
@@ -357,12 +364,24 @@ class PilotReport:
     active_attempt_ids: tuple[str, ...] = ()
     restart_evidence: EvidenceRef | None = None
     observation_evidence: EvidenceRef | None = None
+    subject_ids: tuple[str, ...] = ()
+    claim_scope: QualificationClaimScope = (
+        QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY
+    )
+    production_candidate: EvidenceRef | None = None
+    benchmark_candidate: EvidenceRef | None = None
 
     def __post_init__(self) -> None:
         _id(self.pilot_id, "pilot")
         if self.mode not in {"self", "external", "roblox"}:
             raise QualificationError("invalid pilot mode")
+        if type(self.claim_scope) is not QualificationClaimScope:
+            raise QualificationError("pilot claim scope must be typed")
         _digest(self.candidate_digest, "candidate digest")
+        if len(self.subject_ids) != len(set(self.subject_ids)):
+            raise QualificationError("pilot subject identities must be unique")
+        for subject_id in self.subject_ids:
+            _id(subject_id, "pilot subject")
         if (
             type(self.started_at) is not int
             or type(self.ended_at) is not int
@@ -377,6 +396,10 @@ class PilotReport:
                 raise QualificationError("pilot counters must be nonnegative integers")
         if any(row.candidate_digest != self.candidate_digest for row in self.attempts):
             raise QualificationError("pilot attempts target another candidate")
+        if self.subject_ids and any(
+            row.subject_id not in self.subject_ids for row in self.attempts
+        ):
+            raise QualificationError("pilot attempt targets an undeclared subject")
         attempt_ids = tuple(row.attempt_id for row in self.attempts)
         if len(attempt_ids) != len(set(attempt_ids)):
             raise QualificationError("pilot attempt identities must be unique")
@@ -394,6 +417,9 @@ class PilotReport:
         for evidence in (self.restart_evidence, self.observation_evidence):
             if evidence is not None and evidence.subject_id != self.pilot_id:
                 raise QualificationError("pilot control evidence targets another pilot")
+        for evidence in (self.production_candidate, self.benchmark_candidate):
+            if evidence is not None and evidence.subject_id != self.candidate_digest:
+                raise QualificationError("pilot candidate evidence targets another candidate")
 
     @property
     def elapsed_seconds(self) -> int:
@@ -409,8 +435,23 @@ class PilotReport:
             return Disposition.BLOCKED_CAPABILITY
         if self.active_attempt_ids:
             return Disposition.DEFER
+        if not self.subject_ids or self.production_candidate is None or (
+            self.production_candidate.kind
+            not in {EvidenceKind.ATTESTED_REAL, EvidenceKind.EXTERNAL_RECEIPT}
+        ):
+            return Disposition.DEFER
+        if self.claim_scope is QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY and (
+            self.benchmark_candidate is None
+            or self.benchmark_candidate.kind
+            not in {EvidenceKind.ATTESTED_REAL, EvidenceKind.EXTERNAL_RECEIPT}
+        ):
+            return Disposition.DEFER
         accepted = [row for row in self.attempts if row.status == "accepted"]
-        needed = {"self": 3, "external": 3, "roblox": 1}[self.mode]
+        needed = {
+            "self": 3,
+            "external": max(2, len(self.subject_ids)),
+            "roblox": 1,
+        }[self.mode]
         accepted_families = {row.family_id for row in accepted}
         if (
             self.elapsed_seconds < 72 * 60 * 60
@@ -427,13 +468,12 @@ class PilotReport:
             return Disposition.DEFER
         if self.mode == "external":
             subjects = {row.subject_id for row in accepted}
-            ordinary = [row for row in accepted if row.domain == "ordinary"]
             roblox = [row for row in accepted if row.domain == "roblox"]
             if (
-                len(subjects) < 2
-                or len(ordinary) < 2
-                or not roblox
-                or any(row.target_runs_without_hive is not True for row in ordinary)
+                len(self.subject_ids) < 2
+                or not set(self.subject_ids).issubset(subjects)
+                or any(row.domain is None for row in accepted)
+                or any(row.target_runs_without_hive is not True for row in accepted)
                 or any(not _roblox_runtime_complete(row) for row in roblox)
             ):
                 return Disposition.DEFER
@@ -564,6 +604,9 @@ class CloseoutManifest:
     final_disposition: Disposition
     final_rationale: str
     sealed_at: int
+    claim_scope: QualificationClaimScope = (
+        QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY
+    )
 
     def __post_init__(self) -> None:
         _id(self.release_id, "release")
@@ -617,16 +660,24 @@ class CloseoutManifest:
             raise QualificationError("closeout judge must be independent of the builder")
         if type(self.final_disposition) is not Disposition:
             raise QualificationError("final release disposition must be typed")
+        if type(self.claim_scope) is not QualificationClaimScope:
+            raise QualificationError("release claim scope must be typed")
         if type(self.final_rationale) is not str or not self.final_rationale.strip():
             raise QualificationError("final release disposition requires a rationale")
         if self.final_disposition in {Disposition.ADOPT, Disposition.ADAPT}:
-            for node_id in ("N30", "N31", "N32", "N33"):
+            required_nodes = (
+                ("N28", "N29", "N32", "N33")
+                if self.claim_scope
+                is QualificationClaimScope.BOUNDED_OPERATIONAL_PRODUCTION
+                else ("N30", "N31", "N32", "N33")
+            )
+            for node_id in required_nodes:
                 if self.node_assessments[node_id].disposition not in {
                     Disposition.ADOPT,
                     Disposition.ADAPT,
                 }:
                     raise QualificationError(
-                        "positive release requires measured tournament and pilot closeout"
+                        "positive release lacks required claim-scoped tournament or pilot closeout"
                     )
         if type(self.sealed_at) is not int or self.sealed_at < 0:
             raise QualificationError("seal timestamp is invalid")

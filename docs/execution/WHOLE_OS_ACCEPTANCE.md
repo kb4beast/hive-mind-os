@@ -1,24 +1,29 @@
 # Whole-OS acceptance status
 
+Claim scopes are explicit: bounded operational production requires exact candidate,
+host, authority, target/runtime, 72-hour observation, restart, and rollback evidence;
+full autonomy or superiority additionally requires N30/N31. Roblox is optional.
+
 Campaign disposition: `DEFER` -- the repository implementation is integrated on
 `main` and the remaining local execution gaps are repaired by the current successor
 candidate. External qualification and elapsed observation remain open. This is not a
 production, superiority, or full-autonomy verdict.
 
-This status was reconciled on `2026-09-21` for ADR-090. The N32 target scope changed;
-the missing operational evidence and the `DEFER` disposition did not.
+This status was reconciled on `2026-09-21` for ADR-091. The trusted local host now
+has an exact-baseline startup receipt, and the N32 target scope no longer carries a
+hidden Roblox or N30 dependency. The missing bounded-production evidence and the
+`DEFER` disposition remain.
 
 ## Integrated candidate
 
-- PR #186 was merged to `main` at
-  `4a0120a3a564723358f29adb60e34ab34bec5964`. Its Linux and Windows Python matrices,
-  static/type checks, CodeQL, secret scan, Autopilot check, SBOM, and build provenance
-  all passed on the exact PR candidate.
-- The current successor candidate removes four post-merge local gaps: it routes the
-  `whole-os start`/`resume` CLI through a sealed host-owned factory, executes N30 only
-  through the admitted protocol with durable intent/reconciliation, enforces N31/N32
-  concurrency and time/resource/subject/domain evidence, and prevents N33 from
-  sealing empty or self-judged evidence.
+- PR #203 was merged to `main` at
+  `ed96ffde57304d6b1ab7923e4d219640ac96b44f`, tree
+  `34f0332108193851117e159b200c30bacfdbe1e8`. All 12 hosted checks passed, including
+  Linux Python 3.11/3.12/3.14 and Windows Python 3.12/3.14.
+- A trusted-host bootstrap for that exact clean baseline completed with distinct
+  Curator and Builder sessions and 16 passing focused tests. The current successor
+  makes claim scope explicit, removes the generic pilot's hidden Roblox requirement,
+  and keeps N30/N31 only on the full-autonomy or superiority path.
 - The configured composition now joins discovery, bounded building, independent
   qualification, idempotent PR delivery/reconciliation, head-bound feedback, and
   scoped learning. Synthetic two-subject fixtures prove protocol behavior and target
@@ -30,9 +35,9 @@ the missing operational evidence and the `DEFER` disposition did not.
 
 ## Open qualification dispositions
 
-- N03: `BLOCKED_EVIDENCE` for production use. The replaceable host/profile contracts
-  exist, but no current production host attestation or sealed configured-host binding
-  was supplied.
+- N03: `ADAPT` for the exact `ed96ffde` trusted local baseline. Its non-synthetic
+  startup receipt binds the clean head/tree and distinct Curator/Builder sessions.
+  It grants no hard isolation, external delivery, or successor-candidate credit.
 - N18/N23/N29: `BLOCKED_CAPABILITY` and `BLOCKED_EVIDENCE` for strong real-backend
   claims. Deterministic negative controls exist; attested hard-isolation, egress,
   secret-probe, evaluator-custody, and exact-candidate real-service execution do not.
@@ -44,27 +49,30 @@ the missing operational evidence and the `DEFER` disposition did not.
   before each effect, persists intent first, and reconciles uncertain writes without
   duplicate execution. The protocol remains `OPEN_EXTERNAL_EVIDENCE_BLOCKED`; no
   matched real lane ran and no challenger was promoted.
-- N31: `BLOCKED_AUTHORITY` and `BLOCKED_EVIDENCE`. The durable controller now enforces
-  leases, concurrency, daily budgets, distinct accepted families, restart and rollback
-  evidence. No sealed real host, self-delivery grant, supervisor rollback pointer, or
-  measured candidate receipt exists.
-- N32: `BLOCKED_CAPABILITY`, `BLOCKED_AUTHORITY`, and `BLOCKED_EVIDENCE`. Coupon Hive
-  and Reese's Rainbow Web are selected as two real external candidates, but their
-  host-issued target profiles, scoped grants, attested runtime receipts, configured
-  Whole-OS host, and N30 candidate are not yet sealed.
-- N33: `DEFER`. The closeout schema now requires evidence-bearing R01-R18 and N00-N33
+- N31: `BLOCKED_AUTHORITY` and `BLOCKED_EVIDENCE` for the full scope. The durable
+  controller enforces leases, concurrency, daily budgets, distinct accepted families,
+  restart, and rollback evidence. No sealed real host, self-delivery grant, supervisor
+  rollback pointer, or measured candidate receipt exists.
+- N32: `BLOCKED_SOURCE`, `BLOCKED_CAPABILITY`, `BLOCKED_AUTHORITY`, and
+  `BLOCKED_EVIDENCE`. Coupon Hive and Reese's Rainbow Web are selected as two real
+  external candidates, but the exact independently qualified successor candidate,
+  successor-bound host receipt, host-issued target profiles, scoped grants, and
+  attested runtime receipts are not yet sealed. N30 is additionally required only
+  for `full-autonomy-or-superiority`.
+- N33: `DEFER`. The closeout schema requires evidence-bearing R01-R18 and N00-N33
   assessments, all roles/stages, attested successful startup/rollback receipts, and a
-  judge distinct from the builder. A positive verdict is structurally impossible
-  while N30/N31/N32 are incomplete.
+  judge distinct from the builder. Bounded closeout requires positive N28/N29/N32/N33
+  evidence; full closeout requires positive N30/N31/N32/N33 evidence.
 
-Complete source ingestion and comparator reuse rights, production host/adapters,
-signed evaluator custody, scoped pilot delivery authority, real comparator receipts,
-and the two-target observation window remain open. Optional Roblox
-Studio/game/device evidence remains deferred and outside this release scope. This is
-therefore a candidate-bound status receipt, not a production, superiority, or
-full-autonomy release verdict. A host-owned launcher must register the exact admitted
-executable factory before `hive-mind whole-os start`; configuration cannot name
-imports, commands, credentials, callbacks, or secret values.
+For the bounded path, exact successor qualification, host/adapters, scoped pilot
+delivery authority, target/runtime receipts, and the two-target observation window
+remain open. Comparator intake, rights, evaluator custody, and N30 remain open for
+the full scope. Optional Roblox Studio/game/device evidence remains deferred and
+outside this release scope. This is therefore a candidate-bound status receipt, not
+a production, superiority, or full-autonomy release verdict. A host-owned launcher
+must register the exact admitted executable factory before `hive-mind whole-os
+start`; configuration cannot name imports, commands, credentials, callbacks, or
+secret values.
 
 The color-coded dependency view and deterministic resume boundary are recorded in
 `docs/execution/WHOLE_OS_STATUS_DAG.md`.

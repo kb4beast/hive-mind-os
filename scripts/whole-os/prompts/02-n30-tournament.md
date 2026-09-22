@@ -3,6 +3,9 @@ complete implementation prompt, the N02 and N30 node contracts, current benchmar
 code, and retained benchmark evidence. Work directly with one agent; do not stop
 at planning or manufacture review ceremony.
 
+N30 is valid only for `full-autonomy-or-superiority`. Refuse any other envelope
+scope; bounded production evidence cannot waive or satisfy this stage.
+
 Materialize only exact admitted comparator recipes. Record source version, digest,
 license/reuse status, evaluator custody, lane admission, lease, task/family/block
 identity, model/configuration, costs when available, and every failure. Use the

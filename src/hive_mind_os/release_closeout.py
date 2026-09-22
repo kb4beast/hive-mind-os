@@ -19,6 +19,7 @@ from .whole_os_qualification import (
     EvidenceRef,
     ExternalObligation,
     OperationalReceipt,
+    QualificationClaimScope,
     canonical_digest,
 )
 
@@ -31,6 +32,9 @@ class CloseoutBuilder:
         candidate_digest: str,
         previous_release_digest: str,
         builder_id: str,
+        claim_scope: QualificationClaimScope = (
+            QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY
+        ),
     ) -> None:
         for value, name in ((release_id, "release"), (builder_id, "builder")):
             if (
@@ -44,6 +48,9 @@ class CloseoutBuilder:
         self.candidate_digest = candidate_digest
         self.previous_release_digest = previous_release_digest
         self.builder_id = builder_id
+        if type(claim_scope) is not QualificationClaimScope:
+            raise ValueError("release claim scope must be typed")
+        self.claim_scope = claim_scope
         self.requirements: dict[str, CloseoutAssessment] = {}
         self.nodes: dict[str, CloseoutAssessment] = {}
         self.obligations: dict[str, ExternalObligation] = {}
@@ -192,12 +199,13 @@ class CloseoutBuilder:
             final_disposition,
             final_rationale,
             sealed_at,
+            self.claim_scope,
         )
         return manifest
 
 
 def write_release_manifest(path: str | Path, manifest: CloseoutManifest) -> str:
-    document = {"schema_version": 1, **asdict(manifest)}
+    document = {"schema_version": 2, **asdict(manifest)}
     document["manifest_digest"] = canonical_digest(document)
     encoded = (
         json.dumps(document, sort_keys=True, separators=(",", ":"), allow_nan=False)
@@ -224,7 +232,8 @@ def load_release_manifest(path: str | Path) -> tuple[CloseoutManifest, str]:
         expected = canonical_digest(document)
         if supplied != expected:
             raise ValueError("release manifest digest mismatch")
-        if set(document) != {
+        schema_version = document.get("schema_version")
+        common_fields = {
             "schema_version",
             "release_id",
             "candidate_digest",
@@ -241,8 +250,19 @@ def load_release_manifest(path: str | Path) -> tuple[CloseoutManifest, str]:
             "final_disposition",
             "final_rationale",
             "sealed_at",
-        } or document["schema_version"] != 1:
+        }
+        expected_fields = (
+            common_fields
+            if schema_version == 1
+            else common_fields | {"claim_scope"}
+        )
+        if schema_version not in {1, 2} or set(document) != expected_fields:
             raise ValueError("release manifest schema is not closed")
+        claim_scope = (
+            QualificationClaimScope.FULL_AUTONOMY_OR_SUPERIORITY
+            if schema_version == 1
+            else QualificationClaimScope(document["claim_scope"])
+        )
         requirements = {
             key: _load_assessment(value)
             for key, value in document["requirement_assessments"].items()
@@ -284,6 +304,7 @@ def load_release_manifest(path: str | Path) -> tuple[CloseoutManifest, str]:
             Disposition(document["final_disposition"]),
             document["final_rationale"],
             document["sealed_at"],
+            claim_scope,
         )
         return manifest, supplied
     except (

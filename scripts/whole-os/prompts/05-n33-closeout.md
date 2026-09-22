@@ -1,4 +1,8 @@
-Execute N33 closeout from the exact retained N30/N31/N32 receipts. Read `AGENTS.md`,
+Execute N33 closeout from the exact retained receipts for the declared claim scope.
+Bounded operation requires adopted N28/N29 evidence plus production candidate, host,
+authority, target/runtime, 72-hour, restart, and rollback receipts; it must not imply
+N30/N31 or superiority.
+Full autonomy or superiority requires retained N30/N31/N32 receipts. Read `AGENTS.md`,
 the implementation prompt, N33 contract, `release_closeout.py`, acceptance/recovery
 docs, and every current stage envelope. Work directly with one agent and finish the
 operating handoff; do not create a positive release claim from missing evidence.

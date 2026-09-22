@@ -1,9 +1,9 @@
 # Whole-OS N00-N33 status DAG
 
-Reconciled on 2026-09-21. PR #186 remains the integrated implementation baseline at
-`main@4a0120a3a564723358f29adb60e34ab34bec5964`. The current successor candidate
-repairs the remaining local CLI, tournament, pilot, and closeout enforcement gaps;
-ADR-090 updates N32 to the owner-selected two-repository external scope.
+Reconciled on 2026-09-21. PR #203 is the integrated baseline at
+`main@ed96ffde57304d6b1ab7923e4d219640ac96b44f`. ADR-090 selects two generic
+repositories for N32. ADR-091 makes bounded production and full-autonomy or
+superiority alternative claim paths; arrows within each path are conjunctive.
 
 Legend: green = repository implementation and exact-candidate checks complete; blue =
 successor validation/integration in progress; amber = implementation exists but a
@@ -45,16 +45,23 @@ flowchart LR
   N02 --> N30["N30 measured tournament"]
   N28 --> N30
   N29 --> N30
-  N17 --> N31["N31 72h self pilot"]
+  N17 --> N31["N31 72h self pilot (full)"]
   N30 --> N31
-  N21 --> N32["N32 72h two-repository external pilot"]
-  N30 --> N32
-  N31 --> N33["N33 outcome closeout"]
-  N32 --> N33
-  N28 --> QMAIN["PR #186 merged + full CI"]
+  N21 --> N32B["N32 72h external pilot (bounded)"]
+  N28 --> N32B
+  N29 --> N32B
+  N03 --> N32B
+  N04 --> N32B
+  N21 --> N32F["N32 72h external pilot (full)"]
+  N30 --> N32F
+  N32B --> N33B["N33 bounded closeout"]
+  N31 --> N33F["N33 full closeout"]
+  N32F --> N33F
+  N28 --> QMAIN["PR #203 merged + full CI"]
   N30 --> QLOCAL["successor integration + full CI"]
   N31 --> QLOCAL
-  N32 --> QLOCAL
+  N32F --> QLOCAL
+  N32B --> QLOCAL
 
   classDef done fill:#1f883d,color:#fff,stroke:#116329,stroke-width:2px;
   classDef running fill:#0969da,color:#fff,stroke:#0550ae,stroke-width:2px;
@@ -65,8 +72,8 @@ flowchart LR
   class N00,N01,N02,N04,N05,N06,N07,N08,N09,N10,N11,N12,N13,N14,N15,N16,N17,N19,N20,N21,N22,N24,N25,N26,N28,QMAIN done;
   class QLOCAL running;
   class N03,N18,N23,N27,N29 partial;
-  class N30,N31,N32 blocked;
-  class N33 pending;
+  class N30,N31,N32B,N32F blocked;
+  class N33B,N33F pending;
 ```
 
 ## Exact remaining external inputs
@@ -75,15 +82,19 @@ flowchart LR
   secret probes, evaluator custody, and an independent exact-candidate execution.
 - N30: concrete comparator recipe/task/family/block manifests; source/reuse rights;
   independent evaluator custody; authenticated admission registry and bounded lease.
-- N31: sealed Whole-OS host/config, scoped self-delivery grant, external supervisor
-  champion pointer and rollback artifact, an admitted N30 candidate, and its 72-hour
-  window with three accepted nontrivial changes.
-- N32: two owner-admitted external targets with pinned snapshots, rights, acceptance
-  and runtime profiles; target grants and resource/cleanup leases; an admitted N30
-  candidate; real target runtime receipts; and the 72-hour window.
-- N33: the completed N31/N32 outcome windows and final independent closeout mapping.
+- N31 (full scope): sealed Whole-OS host/config, scoped self-delivery grant, external
+  supervisor champion pointer and rollback artifact, an admitted N30 candidate, and
+  its 72-hour window with three accepted nontrivial changes.
+- N32 bounded: an independently qualified exact production candidate; candidate-bound
+  host; two owner-admitted external targets with pinned snapshots, rights, acceptance
+  and runtime profiles; target grants and resource/cleanup leases; real target runtime
+  receipts; and the 72-hour window with restart and rollback.
+- N32 full: every bounded input plus an admitted N30 candidate.
+- N33 bounded: adopted N28/N29/N32 evidence and the independent closeout mapping.
+- N33 full: completed N30/N31/N32 evidence and the independent closeout mapping.
 
-The deterministic resume action is to inject those sealed capabilities into the
-configured composition host, close and admit the N02 protocol through the external
-registry, run the N30 runner, then start N31/N32. No checked-in document, ambient
-credential, fixture verifier, or installed binary can manufacture those inputs.
+For bounded scope, the deterministic resume action is to qualify the exact successor,
+seal its host, authority, target, and runtime receipts, then start N32 with
+`-ClaimScope bounded-operational-production-pilot`. Full scope must additionally
+close N30 and N31. No checked-in document, ambient credential, fixture verifier, or
+installed binary can manufacture those inputs.
