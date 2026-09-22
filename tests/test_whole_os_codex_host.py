@@ -23,6 +23,9 @@ from hive_mind_os.whole_os_codex_host import (
     PROVIDER_ID,
     PROVIDER_VERSION,
     CodexHostBootstrapError,
+    DeploymentBundle,
+    _admitted_candidate_digest,
+    _validated_service_candidate_digest,
     build_deployment_bundle,
     compose_factory,
     execute_trusted_launcher,
@@ -89,37 +92,44 @@ class WholeOSCodexHostTests(unittest.TestCase):
         subprocess.run(["git", "commit", "-m", "fixture"], cwd=repository, check=True, capture_output=True)
         return repository
 
+    def _deployment_bundle(
+        self, root: Path, repository: Path, state: Path
+    ) -> DeploymentBundle:
+        executable = root / (
+            "codex-test.exe" if sys.platform == "win32" else "codex-test"
+        )
+        shutil.copy2(sys.executable, executable)
+        # Match the production boundary, which canonicalizes the executable
+        # before comparing it with the independently retained probe. Windows
+        # hosted runners can otherwise expose two spellings of the same path.
+        executable = executable.resolve(strict=True)
+        probe = {
+            "schema_version": 1,
+            "kind": "whole-os-codex-tool-probe",
+            "adapter_id": "codex-cli",
+            "version": "v1.0.0",
+            "executable_path": str(executable),
+            "binary_digest": raw_sha256(executable.read_bytes()),
+            "version_output": "codex-cli 1.0.0",
+            "version_output_digest": raw_sha256(b"codex-cli 1.0.0"),
+            "exit_code": 0,
+            "platform": sys.platform,
+        }
+        return build_deployment_bundle(
+            repository=repository,
+            state_root=state,
+            codex_executable=executable,
+            tenant_id="tenant-test",
+            repository_id="repository-test",
+            observed_codex=("v1.0.0", probe),
+        )
+
     def test_sealed_config_is_inert_and_factory_runs_whole_os_service(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
             root = Path(temporary)
             repository = self._repository(root)
             state = root.joinpath(*(("external-state-segment",) * 8))
-            executable = root / ("codex-test.exe" if sys.platform == "win32" else "codex-test")
-            shutil.copy2(sys.executable, executable)
-            # Match the production boundary, which canonicalizes the executable
-            # before comparing it with the independently retained probe.  Windows
-            # hosted runners can otherwise expose two spellings of the same path.
-            executable = executable.resolve(strict=True)
-            probe = {
-                "schema_version": 1,
-                "kind": "whole-os-codex-tool-probe",
-                "adapter_id": "codex-cli",
-                "version": "v1.0.0",
-                "executable_path": str(executable),
-                "binary_digest": raw_sha256(executable.read_bytes()),
-                "version_output": "codex-cli 1.0.0",
-                "version_output_digest": raw_sha256(b"codex-cli 1.0.0"),
-                "exit_code": 0,
-                "platform": sys.platform,
-            }
-            bundle = build_deployment_bundle(
-                repository=repository,
-                state_root=state,
-                codex_executable=executable,
-                tenant_id="tenant-test",
-                repository_id="repository-test",
-                observed_codex=("v1.0.0", probe),
-            )
+            bundle = self._deployment_bundle(root, repository, state)
             config = json.loads(bundle.config_path.read_text(encoding="utf-8"))
             serialized = json.dumps(config).casefold()
             for forbidden in ("import", "callback", "command", "credential", "secret", "token"):
@@ -198,8 +208,95 @@ class WholeOSCodexHostTests(unittest.TestCase):
 
             self.assertEqual(code, 20)
             self.assertIn("stop after state-root creation", receipt["blocker"])
+            self.assertEqual(receipt["schema_version"], 2)
+            self.assertEqual(
+                receipt["claim_scope"], "full-autonomy-or-superiority"
+            )
+            self.assertIsNone(receipt["candidate_digest"])
+            self.assertIsNone(receipt["service_candidate_digest"])
             self.assertTrue(filesystem_path(state).is_dir())
             self.assertTrue(filesystem_path(Path(receipt["receipt_path"])).is_file())
+            shutil.rmtree(filesystem_path(root), ignore_errors=True)
+
+    def test_launcher_rejects_unknown_claim_scope_before_writing(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = self._repository(root)
+            state = root / "rejected-state"
+
+            with self.assertRaisesRegex(CodexHostBootstrapError, "claim scope"):
+                execute_trusted_launcher(
+                    repository=repository,
+                    state_root=state,
+                    claim_scope="invented-scope",
+                )
+
+            self.assertFalse(state.exists())
+
+    def test_blocked_receipt_retains_the_admitted_candidate(self) -> None:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            root = Path(temporary)
+            repository = self._repository(root)
+            state = root / "external-state"
+            bundle = self._deployment_bundle(root, repository, state)
+            expected = _admitted_candidate_digest(bundle)
+
+            with (
+                patch(
+                    "hive_mind_os.whole_os_codex_host.build_deployment_bundle",
+                    return_value=bundle,
+                ),
+                patch(
+                    "hive_mind_os.whole_os_codex_host._focused_verification",
+                    side_effect=CodexHostBootstrapError(
+                        "stop after candidate admission"
+                    ),
+                ),
+            ):
+                code, receipt = execute_trusted_launcher(
+                    repository=repository,
+                    state_root=state,
+                    executable=bundle.codex_executable,
+                    claim_scope="bounded-operational-production-pilot",
+                )
+
+            self.assertEqual(code, 20)
+            self.assertEqual(receipt["candidate_digest"], expected)
+            self.assertIsNone(receipt["service_candidate_digest"])
+            self.assertEqual(
+                receipt["claim_scope"], "bounded-operational-production-pilot"
+            )
+            shutil.rmtree(filesystem_path(root), ignore_errors=True)
+
+    def test_terminal_candidate_must_match_the_admitted_checkout(self) -> None:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            root = Path(temporary)
+            repository = self._repository(root)
+            bundle = self._deployment_bundle(root, repository, root / "state")
+            expected = _admitted_candidate_digest(bundle)
+
+            self.assertEqual(
+                _validated_service_candidate_digest(
+                    bundle, {"last_result": {"candidate_digest": expected}}
+                ),
+                expected,
+            )
+            invalid_outputs = (
+                {},
+                {"last_result": {}},
+                {"last_result": {"candidate_digest": "bad"}},
+                {
+                    "last_result": {
+                        "candidate_digest": "sha256:" + "0" * 64
+                    }
+                },
+            )
+            for output in invalid_outputs:
+                with self.subTest(output=output), self.assertRaises(
+                    CodexHostBootstrapError
+                ):
+                    _validated_service_candidate_digest(bundle, output)
+
             shutil.rmtree(filesystem_path(root), ignore_errors=True)
 
     def test_dirty_or_non_codex_branch_is_not_admitted(self) -> None:

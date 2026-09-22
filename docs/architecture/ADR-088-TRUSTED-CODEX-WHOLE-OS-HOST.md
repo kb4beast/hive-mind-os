@@ -28,8 +28,18 @@ receipt and cannot publish.
 A complete startup receipt requires a passing copied-worktree focused verification,
 one fresh read-only Curator Codex session, one distinct fresh read-only Builder Codex
 session executed through `WholeOSService`, unchanged Git HEAD/tree/status, and a
-terminal service observation. Synthetic unit fixtures test the protocol but are
-never accepted by the real launcher as startup evidence.
+terminal service observation. The launcher accepts only the two claim scopes in
+ADR-091 and defaults to `full-autonomy-or-superiority`. The caller must forward a
+bounded scope explicitly.
+
+Startup receipt schema V2 defines the admitted candidate digest as the canonical
+digest of the exact Git HEAD and tree. It records that digest after bundle admission
+even when a later step is blocked. A complete receipt additionally requires a typed
+lowercase SHA-256 candidate digest from the terminal service observation that equals
+the admitted digest; missing, malformed, or substituted values fail closed. The
+receipt separately retains the host seal and service-configuration digests, so a
+candidate match cannot substitute for host identity. Synthetic unit fixtures test
+the protocol but are never accepted by the real launcher as startup evidence.
 
 ## Recovery and rollback
 
@@ -37,7 +47,9 @@ The service configuration is content-addressed by checkout, Codex binary, author
 and N28 contract identities. Durable queue state is scoped to that seal. Restarting
 the launcher reconstructs the same bindings and lets `WholeOSService` reconcile its
 existing receipts. Append-only attempt receipts remain under the external state
-root; only `startup-current.json` is replaced as a convenience pointer.
+root; only `startup-current.json` is replaced as a convenience pointer. Downstream
+qualification must compare both claim scope and admitted candidate digest before
+using a receipt.
 
 Rollback selects the prior repository commit and its separate content-addressed
 state. No repository file is reverted by the startup mission, no remote effect is
@@ -47,6 +59,8 @@ issued, and retained evidence is not deleted.
 
 `tests/test_whole_os_codex_host.py` proves the closed service document, exact factory
 registration, real service scheduling seam, read-only worker scope, external state,
+closed claim scope, blocked-receipt candidate binding, terminal candidate matching,
 and fail-closed dirty-worktree behavior. The PowerShell pipeline test parses and
-inspects the trusted launcher. Real qualification additionally runs the launcher in
-a fresh process and checks the persisted non-synthetic startup receipt.
+inspects the trusted launcher and its explicit scope-forwarding instruction. Real
+qualification additionally runs the launcher in a fresh process and checks the
+persisted non-synthetic startup receipt.

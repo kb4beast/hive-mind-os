@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PIPELINE = ROOT / "scripts" / "whole-os" / "Invoke-WholeOSPipeline.ps1"
 RUNNER = ROOT / "scripts" / "whole-os" / "Invoke-WholeOSAgentStage.ps1"
 CODEX_HOST = ROOT / "scripts" / "whole-os" / "Invoke-WholeOSCodexService.ps1"
+HOST_PROMPT = ROOT / "scripts" / "whole-os" / "prompts" / "01-host-bootstrap.md"
 SCHEMA = ROOT / "scripts" / "whole-os" / "stage-result.schema.json"
 STAGES = (
     "Invoke-WholeOSHostBootstrap.ps1",
@@ -37,14 +38,22 @@ class WholeOSPowerShellPipelineTests(unittest.TestCase):
     def test_claim_scope_defaults_to_strict_full_and_is_forwarded(self) -> None:
         pipeline = PIPELINE.read_text(encoding="utf-8")
         runner = RUNNER.read_text(encoding="utf-8")
+        host = CODEX_HOST.read_text(encoding="utf-8")
+        prompt = HOST_PROMPT.read_text(encoding="utf-8")
         self.assertIn(
             '[string]$ClaimScope = "full-autonomy-or-superiority"', pipeline
         )
         self.assertIn(
             '[string]$ClaimScope = "full-autonomy-or-superiority"', runner
         )
+        self.assertIn(
+            '[string]$ClaimScope = "full-autonomy-or-superiority"', host
+        )
         self.assertIn('-ClaimScope $ClaimScope', pipeline)
         self.assertIn("claim_scope = $ClaimScope", runner)
+        self.assertIn("--claim-scope $ClaimScope", host)
+        self.assertIn("-ClaimScope", prompt)
+        self.assertIn("never rely on its conservative default", prompt)
         self.assertIn("schema_version = 2", pipeline)
         self.assertIn("schema_version = 2", runner)
         self.assertIn("claim_scope = $ClaimScope", pipeline)
