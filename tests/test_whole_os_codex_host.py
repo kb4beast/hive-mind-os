@@ -176,7 +176,6 @@ class WholeOSCodexHostTests(unittest.TestCase):
             self.assertFalse(worker.calls[0]["writable"])
             self.assertEqual(len(builder_paths), 1)
             self.assertTrue((state / "learning").is_dir())
-            shutil.rmtree(filesystem_path(root), ignore_errors=True)
 
     def test_dirty_or_non_codex_branch_is_not_admitted(self) -> None:
         with TemporaryDirectory() as temporary:
